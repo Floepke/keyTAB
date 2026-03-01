@@ -146,7 +146,7 @@ class TextDrawerMixin:
                 stroke_color=None,
                 fill_color=(1.0, 1.0, 1.0, 1.0),
                 id=int(getattr(ev, '_id', 0) or 0),
-                tags=["text"],
+                tags=["text_bg"],
             )
 
             # Text itself (center anchor, rotated)

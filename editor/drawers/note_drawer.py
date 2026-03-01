@@ -175,7 +175,7 @@ class NoteDrawerMixin:
             width_mm=thickness,
             line_cap="butt",
             id=0,
-            tags=["hand_split"],
+            tags=["stem_hand_split"],
         )
         du.add_line(
             x3,
@@ -186,7 +186,7 @@ class NoteDrawerMixin:
             width_mm=thickness,
             line_cap="butt",
             id=0,
-            tags=["hand_split"],
+            tags=["stem_hand_split"],
         )
 
     def _draw_notehead(self, du: DrawUtil, n, x: float, y1: float, draw_mode: str) -> None:

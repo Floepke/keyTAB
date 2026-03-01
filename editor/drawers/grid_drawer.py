@@ -117,7 +117,7 @@ class GridDrawerMixin:
                                 color=color,
                                 width_mm=bar_width_mm,
                                 id=0,
-                                tags=["grid_line"],
+                                tags=["barline"],
                                 dash_pattern=None
                             )
                             if full_group:

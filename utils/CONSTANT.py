@@ -18,21 +18,16 @@ QUARTER_NOTE_UNIT: float = 256.0
 # Each string corresponds to a drawer name registered in editor/drawers/__init__.py
 # Update these lists to control layer stacking in the Editor and Engraver.
 EDITOR_LAYERING = [
-    # midi_note in background of the notation.
-    'snap_grid',
+    # layers from background to foreground
+    'snap_band',
     'midi_note',
-    
-    # stave elements
-    'chord_guide',
     'grid_line',
     'stave_three_line',
     'stave_two_line',
     'stave_clef_line',
+    'text_bg',
     'barline',
-    'hand_split',
-    'stem_white_space',
-    
-    # note elements
+    'stem_hand_split',
     'stop_sign',
     'accidental',
     'stem',
@@ -40,28 +35,19 @@ EDITOR_LAYERING = [
     'notehead_black',
     'grace_note_white_outline',
     'grace_note_white_fill',
-
     'left_dot',
     'chord_connect',
-
-    # grace_note
     'grace_note',
-
-    # beam elements
     'beam',
     'beam_stem',
-
-    # other notation elements
     'measure_number',
     'tempo',
     'count_line_handle',
     'count_line',
     'line_break',
-    
-    # UI elements (top layers)
-    'selection_rect',  # Selection rectangle
-    'keyboard_overlay_bg',     # Piano keyboard overlay background
-    'keyboard_overlay_keys',   # Piano keyboard overlay keys
+    'selection_rect',
+    'keyboard_overlay_bg',
+    'keyboard_overlay_keys',
     'cursor',
     'playhead',
     'line_break_guide',
@@ -78,15 +64,18 @@ EDITOR_LAYERING = [
 ]
 
 ENGRAVER_LAYERING = [
+    # layers from background to foreground
     'midi_note',
     'grid_line',
     'count_line',
     'measure_number_guide',
     'measure_number',
     'stave',
+    'text_bg',
+    'barline',
     'beam_stem',
     'stop_sign',
-    'barline_white_space',
+    'stem_hand_split',
     'chord_connect',
     'continuation_dot',
     'stem',

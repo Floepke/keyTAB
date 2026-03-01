@@ -1302,7 +1302,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                                 color=grid_color,
                                 width_mm=bar_width_mm,
                                 id=0,
-                                tags=['grid_line'],
+                                tags=['barline'],
                                 dash_pattern=None,
                             )
                             if full_group:
@@ -1590,7 +1590,17 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                 else:
                     width_mm = max(stave_two_w, semitone_mm / 10.0)
                     dash = None
-                du.add_line(x_pos, y1, x_pos, y2, color=(0, 0, 0, 1), width_mm=width_mm, dash_pattern=dash, id=0, tags=['stave'])
+                du.add_line(
+                    x_pos, 
+                    y1, 
+                    x_pos, 
+                    y2, 
+                    color=(0, 0, 0, 1), 
+                    width_mm=width_mm, 
+                    dash_pattern=dash, 
+                    id=0, 
+                    tags=['stave']
+                )
 
             # ---- Beam drawing per line ----
             if bool(layout.get('beam_visible', True)):
@@ -1809,7 +1819,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                             width_mm=thickness,
                             line_cap="butt",
                             id=0,
-                            tags=['barline_white_space'],
+                            tags=['stem_hand_split'],
                         )
 
                 # Problem solved: avoid duplicated heads on continuations.
@@ -2053,7 +2063,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                         stroke_color=None,
                         fill_color=(1.0, 1.0, 1.0, 1.0),
                         id=int(tx.get('id', 0) or 0),
-                        tags=['text'],
+                        tags=['text_bg'],
                     )
                     du.add_text(
                         x_mm,

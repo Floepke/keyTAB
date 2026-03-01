@@ -104,7 +104,7 @@ class SnapDrawerMixin:
                             stroke_color=None,
                             fill_color=fill_rgba,
                             id=0,
-                            tags=["snap_grid"],
+                            tags=["snap_band"],
                         )
                     seg_index += 1
                     sub_cursor += h
