@@ -31,16 +31,16 @@ class CountLineDrawerMixin:
         for ev in events:
             try:
                 t0 = float(getattr(ev, 'time', 0.0) or 0.0)
-                p1 = int(getattr(ev, 'pitch1', 40) or 40)
-                p2 = int(getattr(ev, 'pitch2', 44) or 44)
+                rp1 = int(getattr(ev, 'rpitch1', 0) or 0)
+                rp2 = int(getattr(ev, 'rpitch2', 4) or 4)
             except Exception:
                 continue
             y_mm = float(self.time_to_mm(t0))
             if y_mm < (top_mm - bleed_mm) or y_mm > (bottom_mm + bleed_mm):
                 continue
 
-            x1 = float(self.pitch_to_x(p1))
-            x2 = float(self.pitch_to_x(p2))
+            x1 = float(self.relative_c4pitch_to_x(rp1))
+            x2 = float(self.relative_c4pitch_to_x(rp2))
             if x2 < x1:
                 x1, x2 = x2, x1
 

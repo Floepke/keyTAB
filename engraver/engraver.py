@@ -1345,14 +1345,15 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                 if dash_pattern:
                     dash_pattern = [float(v) * scale for v in dash_pattern]
                 countline_w = float(layout.get('countline_thickness_mm', 0.5) or 0.5) * scale
+                base_x_c4 = _key_to_x(40)
                 for ev in count_lines:
                     t0 = float(ev.get('time', 0.0) or 0.0)
-                    p1 = int(ev.get('pitch1', 40) or 40)
-                    p2 = int(ev.get('pitch2', 44) or 44)
+                    rp1 = int(ev.get('rpitch1', 0) or 0)
+                    rp2 = int(ev.get('rpitch2', 4) or 4)
                     if op_time.lt(t0, float(line['time_start'])) or op_time.gt(t0, float(line['time_end'])):
                         continue
-                    x1 = _key_to_x(p1)
-                    x2 = _key_to_x(p2)
+                    x1 = base_x_c4 + (float(rp1) * semitone_mm)
+                    x2 = base_x_c4 + (float(rp2) * semitone_mm)
                     if x2 < x1:
                         x1, x2 = x2, x1
                     y_mm = _time_to_y(t0)

@@ -165,7 +165,8 @@ class SCORE:
 		return obj
 
 	def new_count_line(self, **kwargs) -> CountLine:
-		base = {'time': 0.0, 'pitch1': 40, 'pitch2': 44}
+		# Count lines now store horizontal position as semitone offsets from C4 (key 40).
+		base = {'time': 0.0, 'rpitch1': 0, 'rpitch2': 4}
 		base.update(kwargs)
 		obj = CountLine(**base, _id=self._gen_id())
 		self.events.count_line.append(obj)
