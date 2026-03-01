@@ -67,10 +67,14 @@ EDITOR_LAYERING = [
     'line_break_guide',
     'beam_marker',
     'time_signature',
-    'text',
-    'text_handle',
     'slur',
     'slur_handle',
+    'beam_line_right',
+    'beam_connect_right',
+    'beam_line_left',
+    'beam_connect_left',
+    'text',
+    'text_handle',
 ]
 
 ENGRAVER_LAYERING = [

@@ -250,6 +250,10 @@ def get_appdata_manager() -> AppDataManager:
         adm.register("score_template", {}, "Default score template for new scores (dict of score fields except events)")
         adm.register("edwin_font_installed", False, "True when Edwin font was installed to the user font directory")
         adm.register("edwin_install_prompt_dismissed", False, "User declined the Edwin font installation prompt")
+        adm.register("lmromancaps_font_installed", False, "True when Latin Modern Roman Caps font was installed to the user font directory")
+        adm.register("lmromancaps_install_prompt_dismissed", False, "User declined the Latin Modern Roman Caps font installation prompt")
+        adm.register("lmroman_font_installed", False, "True when Latin Modern Roman font was installed to the user font directory")
+        adm.register("lmroman_install_prompt_dismissed", False, "User declined the Latin Modern Roman font installation prompt")
         adm.register("user_soundfont_path", "", "Absolute path to last selected user soundfont (.sf2/.sf3)")
         # Removed window_state persistence to avoid saving/restoring dock/toolbar layout
         adm.load()

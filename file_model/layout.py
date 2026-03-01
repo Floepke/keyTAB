@@ -96,47 +96,48 @@ class Layout:
     time_signature_indicator_guide_thickness_mm: float = 0.5
     time_signature_indicator_divide_guide_thickness_mm: float = 1.0
     time_signature_indicator_classic_font: LayoutFont = field(default_factory=lambda: LayoutFont(
-        family="Edwin",
+        family="Latin Modern Roman",
         size_pt=40.0,
         bold=True,
     ))
     time_signature_indicator_klavarskribo_font: LayoutFont = field(default_factory=lambda: LayoutFont(
-        family="Edwin",
+        family="Latin Modern Roman",
         size_pt=25.0,
     ))
     measure_numbering_font: LayoutFont = field(default_factory=lambda: LayoutFont(
-        family="Edwin",
+        family="Latin Modern Roman",
         size_pt=25.0,
         italic=True,
     ))
 
     font_text: LayoutFont = field(default_factory=lambda: LayoutFont(
-        family="Edwin",
-        size_pt=25.0,
+        family="Latin Modern Roman",
+        size_pt=14.0,
         bold=True,
+        italic=True,
     ))
 
     # Info fonts
     font_title: LayoutFont = field(default_factory=lambda: LayoutFont(
-        family="Edwin",
+        family="Latin Modern Roman Caps",
         size_pt=25.0,
         bold=True,
     ))
     font_composer: LayoutFont = field(default_factory=lambda: LayoutFont(
-        family="Edwin",
+        family="Latin Modern Roman Caps",
         size_pt=15.0,
     ))
     font_copyright: LayoutFont = field(default_factory=lambda: LayoutFont(
-        family="Edwin",
+        family="Latin Modern Roman Caps",
         size_pt=11.0,
         italic=True,
     ))
     font_arranger: LayoutFont = field(default_factory=lambda: LayoutFont(
-        family="Edwin",
+        family="Latin Modern Roman Caps",
         size_pt=12.0,
     ))
     font_lyricist: LayoutFont = field(default_factory=lambda: LayoutFont(
-        family="Edwin",
+        family="Latin Modern Roman Caps",
         size_pt=12.0,
     ))
 

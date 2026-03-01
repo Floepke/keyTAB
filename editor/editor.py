@@ -188,6 +188,8 @@ class Editor(QtCore.QObject,
         self._note_hit_rects: list[dict] = []
         # Per-frame text hit rectangles in absolute mm coordinates
         self._text_hit_rects: list[dict] = []
+        # Per-frame tempo hit rectangles in absolute mm coordinates
+        self._tempo_hit_rects: list[dict] = []
 
         # Selection window state (time-based, tool-agnostic)
         self._selection_active: bool = False
@@ -221,6 +223,7 @@ class Editor(QtCore.QObject,
         # Reset hit rectangles for this frame; drawers will register rectangles
         self._note_hit_rects = []
         self._text_hit_rects = []
+        self._tempo_hit_rects = []
         
         # Build shared render cache for this draw pass (fresh each frame)
         self._build_render_cache()
@@ -385,6 +388,24 @@ class Editor(QtCore.QObject,
         except Exception:
             pass
 
+    # ---- Hit rectangles (tempo) ----
+    def register_tempo_hit_rect(self, tempo_id: int, x_left_mm: float, y_top_mm: float, x_right_mm: float, y_bottom_mm: float) -> None:
+        """Register a clickable rectangle for a tempo marker in absolute mm coordinates."""
+        try:
+            cx = (float(x_left_mm) + float(x_right_mm)) * 0.5
+            cy = (float(y_top_mm) + float(y_bottom_mm)) * 0.5
+            self._tempo_hit_rects.append({
+                '_id': int(tempo_id),
+                'x1': float(x_left_mm),
+                'y1': float(y_top_mm),
+                'x2': float(x_right_mm),
+                'y2': float(y_bottom_mm),
+                'cx': cx,
+                'cy': cy,
+            })
+        except Exception:
+            pass
+
     def _hit_test_text_internal(self, x_mm: float, y_mm: float):
         candidates = []
         for r in (self._text_hit_rects or []):
@@ -422,6 +443,29 @@ class Editor(QtCore.QObject,
             return self._hit_test_text_internal(float(x_mm), float(y_mm))
         except Exception:
             return (None, None, None)
+
+    def hit_test_tempo(self, x_px: float, y_px: float) -> int | None:
+        """Return the tempo id whose registered rectangle contains the mouse point."""
+        try:
+            w_px_per_mm = float(getattr(self, '_widget_px_per_mm', 1.0) or 1.0)
+            if w_px_per_mm <= 0:
+                return None
+            x_mm = float(x_px) / w_px_per_mm
+            y_mm_local = float(y_px) / w_px_per_mm
+            y_mm = y_mm_local + float(getattr(self, '_view_y_mm_offset', 0.0) or 0.0)
+            matches = []
+            for r in (self._tempo_hit_rects or []):
+                if float(r['x1']) <= x_mm <= float(r['x2']) and float(r['y1']) <= y_mm <= float(r['y2']):
+                    dx = x_mm - float(r['cx'])
+                    dy = y_mm - float(r['cy'])
+                    dist2 = dx * dx + dy * dy
+                    matches.append((dist2, int(r['_id'])))
+            if not matches:
+                return None
+            matches.sort(key=lambda t: t[0])
+            return matches[0][1]
+        except Exception:
+            return None
 
     def hit_test_note_id(self, x_px: float, y_px: float) -> int | None:
         """Return the note id whose registered rectangle contains the mouse point.

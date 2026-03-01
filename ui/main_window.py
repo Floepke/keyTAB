@@ -1943,7 +1943,26 @@ class MainWindow(QtWidgets.QMainWindow):
         QtCore.QTimer.singleShot(max(0, int(delay_ms)), self._maybe_prompt_edwin_install)
 
     def _maybe_prompt_edwin_install(self) -> None:
-        font_name = "Edwin"
+        fonts = [
+            {
+                "name": "Edwin",
+                "installed_key": "edwin_font_installed",
+                "dismissed_key": "edwin_install_prompt_dismissed",
+                "desc": "Edwin font for headers and engraving (recommended)",
+            },
+            {
+                "name": "Latin Modern Roman Caps",
+                "installed_key": "lmromancaps_font_installed",
+                "dismissed_key": "lmromancaps_install_prompt_dismissed",
+                "desc": "Latin Modern Roman Caps for engraving text and titles (recommended)",
+            },
+            {
+                "name": "Latin Modern Roman",
+                "installed_key": "lmroman_font_installed",
+                "dismissed_key": "lmroman_install_prompt_dismissed",
+                "desc": "Latin Modern Roman for engraving text and titles (recommended)",
+            },
+        ]
         try:
             adm = get_appdata_manager()
         except Exception:
@@ -1953,43 +1972,65 @@ class MainWindow(QtWidgets.QMainWindow):
         except Exception:
             return
         try:
-            if bool(adm.get("edwin_font_installed", False)) and has_system_font(font_name):
-                return
-            if has_system_font(font_name):
-                adm.set("edwin_font_installed", True)
+            # Build list of fonts that are not yet installed
+            missing: list[dict] = []
+            all_dismissed = True
+            for f in fonts:
+                name = f["name"]
+                installed_key = f["installed_key"]
+                dismissed_key = f["dismissed_key"]
+                is_dismissed = bool(adm.get(dismissed_key, False))
+                all_dismissed = all_dismissed and is_dismissed
+                if has_system_font(name):
+                    adm.set(installed_key, True)
+                    continue
+                missing.append(f)
+            if not missing:
                 adm.save()
                 return
-            if bool(adm.get("edwin_install_prompt_dismissed", False)):
+            if all_dismissed:
                 return
             msg = QtWidgets.QMessageBox(self)
             msg.setIcon(QtWidgets.QMessageBox.Icon.Information)
-            msg.setWindowTitle("Install Edwin font")
-            msg.setText(
-                "keyTAB uses the Edwin font for headers and engraving."
-                "\nInstall it to your user font folder so prints and PDFs match the preview?"
-            )
+            msg.setWindowTitle("Install recommended fonts")
+            lines = ["keyTAB can install embedded fonts so the preview matches prints/PDFs (recommended):"]
+            for f in missing:
+                lines.append(f"- {f['name']}: {f['desc']}")
+            lines.append("Install these to your user font folder now?")
+            msg.setText("\n".join(lines))
             msg.setStandardButtons(QtWidgets.QMessageBox.StandardButton.Yes | QtWidgets.QMessageBox.StandardButton.No)
             msg.setDefaultButton(QtWidgets.QMessageBox.StandardButton.Yes)
             result = msg.exec()
             if result != QtWidgets.QMessageBox.StandardButton.Yes:
-                adm.set("edwin_install_prompt_dismissed", True)
+                for f in fonts:
+                    adm.set(f["dismissed_key"], True)
                 adm.save()
                 return
-            success, detail = install_embedded_font_to_system(font_name)
-            if success:
-                adm.set("edwin_font_installed", True)
-                adm.save()
+            successes = []
+            failures = []
+            for f in missing:
+                name = f["name"]
+                installed_key = f["installed_key"]
+                success, detail = install_embedded_font_to_system(name)
+                if success:
+                    adm.set(installed_key, True)
+                    successes.append(name)
+                else:
+                    failures.append((name, detail))
+            adm.save()
+            if successes:
                 QtWidgets.QMessageBox.information(
                     self,
-                    "Edwin font installed",
-                    "Edwin was installed successfully. keyTAB will now restart to apply the font.",
+                    "Fonts installed",
+                    "The following fonts were installed. keyTAB will restart to apply them:\n" + "\n".join(successes),
                 )
                 QtCore.QTimer.singleShot(100, self._request_app_restart)
-            else:
+            if failures:
+                details = "\n".join([f"{n}: {d}" for n, d in failures])
                 QtWidgets.QMessageBox.warning(
                     self,
-                    "Edwin font installation failed",
-                    f"keyTAB could not install Edwin automatically:\n{detail}",
+                    "Font installation failed",
+                    f"keyTAB could not install some fonts automatically:\n{details}",
                 )
         except Exception:
             pass

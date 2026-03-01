@@ -788,6 +788,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
         base_margin_left = float(line.get('margin_left', 0.0) or 0.0)
         ts_lane_width = 0.0
         ts_lane_right_offset = 0.0
+        ts_lane_padding_mm = 0.0
         # Problem solved: if time-signature indicators would collide with notes,
         # expand left margin to reserve a lane.
         ts_segments_in_line = [
@@ -799,6 +800,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
         ]
         if ts_segments_in_line:
             ts_lane_width = float(layout.get('time_signature_indicator_lane_width_mm', 22.0) or 22.0)
+            ts_lane_padding_mm = 2.5  # Hard-coded right padding so lane ends before the stave.
             min_pitch = None
             for seg in ts_segments_in_line:
                 win_start = float(seg.get('start', 0.0) or 0.0)
@@ -821,11 +823,12 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                 ts_lane_gap_mm = 1.0
                 ts_lane_right_offset = min(0.0, float(offset_left - ts_lane_gap_mm))
             extra_left = max(0.0, -ts_lane_right_offset)
-            lane_margin = ts_lane_width + extra_left
+            lane_margin = ts_lane_width + ts_lane_padding_mm + extra_left
             line['margin_left'] = max(base_margin_left, lane_margin)
         line['base_margin_left'] = base_margin_left
         line['ts_lane_width'] = ts_lane_width
         line['ts_lane_right_offset'] = ts_lane_right_offset
+        line['ts_lane_padding_mm'] = ts_lane_padding_mm
         line['total_width'] = float(line['margin_left'] + stave_width + line['margin_right'])
         line['bound_left'] = int(bound_left)
         line['bound_right'] = int(bound_right)
@@ -1238,9 +1241,10 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
             grid_left = line_x_start
             grid_right = line_x_start + float(line['stave_width'])
             ts_right_margin = max(0.0, 1.5 * scale)
+            ts_lane_padding_mm = float(line.get('ts_lane_padding_mm', 0.0) or 0.0)
             ts_lane_width = float(line.get('ts_lane_width', 0.0) or 0.0)
             if ts_lane_width > 0.0:
-                ts_lane_right = line_x_start + float(line.get('ts_lane_right_offset', 0.0) or 0.0)
+                ts_lane_right = line_x_start + float(line.get('ts_lane_right_offset', 0.0) or 0.0) - ts_lane_padding_mm
                 ts_lane_left = ts_lane_right - ts_lane_width
                 ts_left_edge = ts_lane_left
                 ts_right_bound = ts_lane_right
