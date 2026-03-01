@@ -23,8 +23,8 @@ class CountLineDrawerMixin:
         bleed_mm = max(2.0, float(getattr(score.editor, 'zoom_mm_per_quarter', 25.0)) * 0.25)
 
         # Handle size scales with semitone spacing
-        handle_w = max(2.0, float(self.semitone_dist or 2.5) * 0.85)
-        handle_h = max(2.0, float(self.semitone_dist or 2.5) * 0.85)
+        handle_w = max(2.0, float(self.semitone_dist or 2.5))
+        handle_h = max(2.0, float(self.semitone_dist or 2.5))
         active_tool = str(getattr(getattr(self, "_tool", None), "TOOL_NAME", ""))
         show_handles = active_tool == "count_line"
 
@@ -44,7 +44,7 @@ class CountLineDrawerMixin:
             if x2 < x1:
                 x1, x2 = x2, x1
 
-            # Dashed horizontal line
+            # the count line itself
             du.add_line(
                 x1,
                 y_mm,
@@ -60,10 +60,10 @@ class CountLineDrawerMixin:
             # Handle rectangles at both ends (only in count line tool)
             if show_handles:
                 du.add_rectangle(
-                    x1 - handle_w * 0.5,
-                    y_mm - handle_h * 0.5,
-                    x1 + handle_w * 0.5,
-                    y_mm + handle_h * 0.5,
+                    x1 - handle_w * .7,
+                    y_mm - handle_h * .7,
+                    x1 + handle_w * .7,
+                    y_mm + handle_h * .7,
                     stroke_color=None,
                     stroke_width_mm=0.0,
                     fill_color=(1.0, 0.4, 0.7, 1.0),
@@ -71,10 +71,10 @@ class CountLineDrawerMixin:
                     tags=["count_line", "count_line_handle", "count_line_handle_start"],
                 )
                 du.add_rectangle(
-                    x2 - handle_w * 0.5,
-                    y_mm - handle_h * 0.5,
-                    x2 + handle_w * 0.5,
-                    y_mm + handle_h * 0.5,
+                    x2 - handle_w * .7,
+                    y_mm - handle_h * .7,
+                    x2 + handle_w * .7,
+                    y_mm + handle_h * .7,
                     stroke_color=None,
                     stroke_width_mm=0.0,
                     fill_color=(1.0, 0.4, 0.7, 1.0),

@@ -54,8 +54,10 @@ class CountLineTool(BaseTool):
         y_mm = float(y) / max(1e-6, w_px_per_mm) + float(getattr(self._editor, '_view_y_mm_offset', 0.0) or 0.0)
 
         # Hit test handles
-        handle_w = max(1.5, float(getattr(self._editor, 'semitone_dist', 2.5) or 2.5) * 0.6)
-        handle_h = handle_w
+        # Match the visual handle size drawn in CountLineDrawer (semitone_dist scaled, 0.7 half-size).
+        vis_size = max(2.0, float(getattr(self._editor, 'semitone_dist', 2.5) or 2.5))
+        handle_w = vis_size * 1
+        handle_h = vis_size * 1
         hit = None
         hit_handle = None
         for ev in list(getattr(score.events, 'count_line', []) or []):
@@ -160,8 +162,9 @@ class CountLineTool(BaseTool):
         w_px_per_mm = float(getattr(self._editor, '_widget_px_per_mm', 1.0) or 1.0)
         x_mm = float(x) / max(1e-6, w_px_per_mm)
         y_mm = float(y) / max(1e-6, w_px_per_mm) + float(getattr(self._editor, '_view_y_mm_offset', 0.0) or 0.0)
-        handle_w = max(1.5, float(getattr(self._editor, 'semitone_dist', 2.5) or 2.5) * 0.6)
-        handle_h = handle_w
+        vis_size = max(2.0, float(getattr(self._editor, 'semitone_dist', 2.5) or 2.5))
+        handle_w = vis_size * 0.7
+        handle_h = vis_size * 0.7
 
         lst = list(getattr(score.events, 'count_line', []) or [])
         for ev in lst:

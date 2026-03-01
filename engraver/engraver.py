@@ -4,7 +4,7 @@ import bisect, math
 import multiprocessing as mp
 import queue
 from ui.widgets.draw_util import DrawUtil
-from utils.CONSTANT import BE_KEYS, QUARTER_NOTE_UNIT, PIANO_KEY_AMOUNT, SHORTEST_DURATION, hex_to_rgba, BLACK_KEYS, ENGRAVER_FRACTIONAL_SCALE_CORRECTION
+from utils.CONSTANT import BE_KEYS, QUARTER_NOTE_UNIT, PIANO_KEY_AMOUNT, SHORTEST_DURATION, hex_to_rgba, BLACK_KEYS, ENGRAVER_FRACTIONAL_TEXT_SCALING_CORRECTION
 from utils.tiny_tool import key_class_filter
 from utils.operator import Operator
 from file_model.SCORE import SCORE
@@ -800,7 +800,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
         ]
         if ts_segments_in_line:
             ts_lane_width = float(layout.get('time_signature_indicator_lane_width_mm', 22.0) or 22.0)
-            ts_lane_padding_mm = 2.5  # Hard-coded right padding so lane ends before the stave.
+            ts_lane_padding_mm = 5  # Hard-coded right padding so lane ends before the stave.
             min_pitch = None
             for seg in ts_segments_in_line:
                 win_start = float(seg.get('start', 0.0) or 0.0)
@@ -969,25 +969,11 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                 anchor='sw',
             )
             if not pageno:
-                # place a default keyTAB credit on the right side of the footer
+                # place a default keyTAB credit on the right side of the footer on the first page
                 creation_timestamp = str(meta_data.get('creation_timestamp', '') or '').strip()
                 if not creation_timestamp:
                     creation_timestamp = 'unknown'
-                credit_size = max(1.0, float(footer_size) * .75)
-                du.add_text(
-                    page_w - page_right,
-                    page_h - page_bottom - 32,
-                    f"keyTAB engraving",
-                    family=footer_family,
-                    size_pt=credit_size,
-                    bold=footer_bold,
-                    italic=footer_italic,
-                    color=(0.2, 0.2, 0.2, 1),
-                    id=0,
-                    tags=['copyright'],
-                    anchor='nw',
-                    angle_deg=90.0,
-                )
+                credit_size = max(1.0, float(footer_size))
                 du.add_text(
                     page_w - page_right,
                     page_h - page_bottom,
@@ -2050,7 +2036,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                     txt_raw = str(tx.get('text', '') or '')
                     display_txt = txt_raw if txt_raw.strip() else "(no text set)"
                     family, size_pt_raw, italic, bold = _resolve_font(tx)
-                    size_pt = float(size_pt_raw) * ENGRAVER_FRACTIONAL_SCALE_CORRECTION * (scale / 0.3333333333333333)
+                    size_pt = float(size_pt_raw) * ENGRAVER_FRACTIONAL_TEXT_SCALING_CORRECTION * (scale / 0.3333333333333333)
                     y_mm = _time_to_y(t_time) + y_off
                     x_mm = rpitch_to_x(x_rp) + x_off
                     try:

@@ -261,7 +261,7 @@ class BeamDrawerMixin:
                         y0,
                         color=stroke_color,
                         width_mm=0.5,
-                        dash_pattern=dash,
+                        dash_pattern=None,
                         id=0,
                         tags=["beam_marker", f"beam_marker_{hand_key}"],
                     )

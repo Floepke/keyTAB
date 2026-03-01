@@ -345,11 +345,24 @@ class FileManager:
 
     def save_as(self) -> bool:
         """Prompt for a path and save the current SCORE there."""
-        start_dir = str(self._path.parent if self._path else self._last_dir)
+        start_dir = Path(self._path.parent if self._path else self._last_dir)
+
+        def _default_name() -> str:
+            try:
+                title = str(getattr(getattr(self._current, 'info', None), 'title', '') or '').strip()
+            except Exception:
+                title = ''
+            if not title:
+                title = 'untitled'
+            # Basic sanitization: remove path separators
+            safe = title.replace('/', ' ').replace('\\', ' ')
+            return f"{safe}.piano"
+
+        suggested = start_dir / _default_name()
         fname, _ = QFileDialog.getSaveFileName(
             self._parent,
             "Save Score As",
-            start_dir,
+            str(suggested),
             self.SAVE_FILE_FILTER,
         )
         if not fname:

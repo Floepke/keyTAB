@@ -54,11 +54,11 @@ EDITOR_LAYERING = [
     'beam_marker',
     'time_signature',
     'slur',
-    'slur_handle',
     'beam_line_right',
     'beam_connect_right',
     'beam_line_left',
     'beam_connect_left',
+    'slur_handle',
     'text',
     'text_handle',
 ]
@@ -122,4 +122,4 @@ GRACENOTE_THRESHOLD: float = SHORTEST_DURATION
 
 ENGRAVER_VERSION: str = '1.0'
 
-ENGRAVER_FRACTIONAL_SCALE_CORRECTION: float = 0.675
+ENGRAVER_FRACTIONAL_TEXT_SCALING_CORRECTION: float = 0.675
