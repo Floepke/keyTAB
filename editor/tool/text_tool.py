@@ -80,7 +80,6 @@ class TextTool(BaseTool):
             return 0
         rp = (float(x_mm) - base_x) / dist
         # Clamp horizontal drag in rpitch space so it stays inside the stave.
-        # Adjust these bounds if you want more/less room.
         min_rp = -68.0
         max_rp = 73.0
         rp = max(min_rp, min(rp, max_rp))
@@ -341,8 +340,10 @@ class TextTool(BaseTool):
 
         x_off_edit = FloatSliderEdit(float(getattr(ev, 'x_offset_mm', 0.0) or 0.0), -25.0, 25.0, 0.1, dlg)
         y_off_edit = FloatSliderEdit(float(getattr(ev, 'y_offset_mm', 0.0) or 0.0), -25.0, 25.0, 0.1, dlg)
+        rot_edit = FloatSliderEdit(float(getattr(ev, 'rotation', 0.0) or 0.0), 0.0, 360.0, 0.1, dlg)
         layout.addRow("X offset (mm)", x_off_edit)
         layout.addRow("Y offset (mm)", y_off_edit)
+        layout.addRow("Rotation (degrees)", rot_edit)
 
         use_custom_chk = QtWidgets.QCheckBox("Use custom font", dlg)
         use_custom_chk.setChecked(bool(getattr(ev, 'use_custom_font', False)))
@@ -370,6 +371,7 @@ class TextTool(BaseTool):
             'font': deepcopy(getattr(ev, 'font', None)),
             'x_offset_mm': float(getattr(ev, 'x_offset_mm', 0.0) or 0.0),
             'y_offset_mm': float(getattr(ev, 'y_offset_mm', 0.0) or 0.0),
+            'rotation': float(getattr(ev, 'rotation', 0.0) or 0.0),
         }
 
         def _apply_live(commit_snapshot: bool = False) -> None:
@@ -382,6 +384,10 @@ class TextTool(BaseTool):
             ev.text = txt_edit.text()
             ev.x_offset_mm = float(x_off_edit.value())
             ev.y_offset_mm = float(y_off_edit.value())
+            try:
+                ev.rotation = float(rot_edit.value())
+            except Exception:
+                pass
             if commit_snapshot:
                 try:
                     self._editor._snapshot_if_changed(coalesce=False, label='text_edit')
@@ -399,6 +405,7 @@ class TextTool(BaseTool):
                 ev.font = deepcopy(original_state['font'])
                 ev.x_offset_mm = float(original_state['x_offset_mm'])
                 ev.y_offset_mm = float(original_state['y_offset_mm'])
+                ev.rotation = float(original_state['rotation'])
             except Exception:
                 pass
             self._schedule_preview()
@@ -406,6 +413,7 @@ class TextTool(BaseTool):
         txt_edit.textChanged.connect(lambda _t: _apply_live(False))
         x_off_edit.valueChanged.connect(lambda _v: _apply_live(False))
         y_off_edit.valueChanged.connect(lambda _v: _apply_live(False))
+        rot_edit.valueChanged.connect(lambda _v: _apply_live(False))
         use_custom_chk.toggled.connect(lambda _v: _apply_live(False))
         font_picker.valueChanged.connect(lambda: _apply_live(False))
 
@@ -469,7 +477,8 @@ class TextTool(BaseTool):
                 self._cached_center = self._compute_center_mm(self._active_text)
             cx, cy = self._cached_center if self._cached_center else (x_mm, y_mm)
             ang = (math.degrees(math.atan2(y_mm - cy, x_mm - cx)) + 360.0) % 360.0
-            if self._rotation_steps and self._rotation_steps > 0:
+            ctrl_down = bool(getattr(self._editor, '_ctrl_down', False)) if self._editor else False
+            if self._rotation_steps and self._rotation_steps > 0 and not ctrl_down:
                 step = 360.0 / float(self._rotation_steps)
                 ang = round(ang / step) * step
             try:

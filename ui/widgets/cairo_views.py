@@ -388,12 +388,14 @@ class CairoEditorWidget(QtWidgets.QWidget):
         self.setFocus()
         self._last_pos = ev.position()
         self._last_sent_pos = ev.position()
-        # Update modifier state on editor (Shift tracking)
+        # Update modifier state on editor (Shift/Ctrl tracking)
         try:
             mods = ev.modifiers()
             shift_down = bool(mods & QtCore.Qt.KeyboardModifier.ShiftModifier)
+            ctrl_down = bool(mods & QtCore.Qt.KeyboardModifier.ControlModifier)
             if self._editor is not None:
                 self._editor.set_shift_down(shift_down)
+                self._editor.set_ctrl_down(ctrl_down)
         except Exception:
             pass
         # On content changes, invalidate cached content
@@ -422,8 +424,10 @@ class CairoEditorWidget(QtWidgets.QWidget):
         try:
             mods = ev.modifiers()
             shift_down = bool(mods & QtCore.Qt.KeyboardModifier.ShiftModifier)
+            ctrl_down = bool(mods & QtCore.Qt.KeyboardModifier.ControlModifier)
             if self._editor is not None:
                 self._editor.set_shift_down(shift_down)
+                self._editor.set_ctrl_down(ctrl_down)
         except Exception:
             pass
         # Coalesce moves and dispatch at most 30 times/sec

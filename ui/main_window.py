@@ -244,8 +244,9 @@ class MainWindow(QtWidgets.QMainWindow):
         self.splitter.playRequested.connect(self._force_redraw)
         self.splitter.stopRequested.connect(self._stop_midi)
         self.splitter.stopRequested.connect(self._force_redraw)
-        # FX synth editor
-        self.splitter.fxRequested.connect(self._open_fx_editor)
+        self.splitter.styleRequested.connect(self._open_style_dialog)
+        self.splitter.infoRequested.connect(self._open_info_dialog)
+        self.splitter.lineBreakRequested.connect(self._open_line_break_dialog)
         # Contextual tool buttons should also force redraw
         self.splitter.contextButtonClicked.connect(lambda *_: self._force_redraw())
         # Fit state tracking

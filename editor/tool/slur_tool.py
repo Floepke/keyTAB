@@ -16,6 +16,7 @@ class SlurTool(BaseTool):
         self._hit_threshold_mm: float = 4.0
         self._created_on_press: bool = False
         self._hand: str = '<'
+        self._pressed_existing: bool = False
 
     def toolbar_spec(self) -> list[dict]:
         return [
@@ -151,10 +152,12 @@ class SlurTool(BaseTool):
         self._active_slur = sl
         self._active_handle = handle
         self._created_on_press = False
+        self._pressed_existing = sl is not None
         if sl is None:
             sl, rp, ts = self._create_slur_at(x, y)
             if sl is not None:
                 self._created_on_press = True
+            self._pressed_existing = False
 
     def on_left_drag_start(self, x: float, y: float) -> None:
         super().on_left_drag_start(x, y)
@@ -186,16 +189,18 @@ class SlurTool(BaseTool):
         self._active_handle = None
         self._active_slur = None
         self._created_on_press = False
+        self._pressed_existing = False
 
     def on_left_unpress(self, x: float, y: float) -> None:
         super().on_left_unpress(x, y)
         self._active_handle = None
         self._active_slur = None
         self._created_on_press = False
+        self._pressed_existing = False
 
     def on_left_click(self, x: float, y: float) -> None:
         super().on_left_click(x, y)
-        if self._created_on_press and self._active_slur is not None:
+        if (self._created_on_press and self._active_slur is not None) or self._pressed_existing:
             return
         self._create_slur_at(x, y)
 

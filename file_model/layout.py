@@ -5,7 +5,7 @@ from typing import Literal
 
 @dataclass
 class LayoutFont:
-    family: str = "Edwin"
+    family: str = "Latin Modern Roman"
     size_pt: float = 12.0
     bold: bool = False
     italic: bool = False
@@ -64,7 +64,7 @@ class Layout:
 
     # Text appearance
     text_visible: bool = True
-    text_background_padding_mm: float = 1.5
+    text_background_padding_mm: float = 1.0
 
     # Slur appearance
     slur_visible: bool = True
@@ -81,7 +81,7 @@ class Layout:
     # Count line
     countline_visible: bool = True
     countline_dash_pattern: list[float] = field(default_factory=lambda: [0.0, 3.0])  # Dash pattern for count lines (e.g., [dash_length, gap_length])
-    countline_thickness_mm: float = 1.0
+    countline_thickness_mm: float = 1.25
 
     # Grid lines
     grid_barline_thickness_mm: float = 1.0

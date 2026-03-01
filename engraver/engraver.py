@@ -973,19 +973,20 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                 creation_timestamp = str(meta_data.get('creation_timestamp', '') or '').strip()
                 if not creation_timestamp:
                     creation_timestamp = 'unknown'
-                credit_size = max(1.0, float(footer_size) * 0.5)
+                credit_size = max(1.0, float(footer_size) * .75)
                 du.add_text(
                     page_w - page_right,
-                    page_h - page_bottom - (credit_size * 0.45),
-                    f"keyTAB piano engraving",
+                    page_h - page_bottom - 32,
+                    f"keyTAB engraving",
                     family=footer_family,
                     size_pt=credit_size,
                     bold=footer_bold,
                     italic=footer_italic,
-                    color=(.6, .6, .6, 1),
+                    color=(0.2, 0.2, 0.2, 1),
                     id=0,
                     tags=['copyright'],
-                    anchor='se',
+                    anchor='nw',
+                    angle_deg=90.0,
                 )
                 du.add_text(
                     page_w - page_right,
@@ -995,7 +996,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                     size_pt=credit_size,
                     bold=footer_bold,
                     italic=footer_italic,
-                    color=(.5, .5, .5, 1),
+                    color=(0, 0, 0, 1),
                     id=0,
                     tags=['copyright'],
                     anchor='se',

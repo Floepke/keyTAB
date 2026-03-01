@@ -205,6 +205,7 @@ class Editor(QtCore.QObject,
         self.clipboard: dict | None = None
         # Modifier state
         self._shift_down: bool = False
+        self._ctrl_down: bool = False
         # Optional player for auditioning
         self.player = None
 
@@ -1599,6 +1600,9 @@ class Editor(QtCore.QObject,
     # ---- Modifier updates ----
     def set_shift_down(self, down: bool) -> None:
         self._shift_down = bool(down)
+
+    def set_ctrl_down(self, down: bool) -> None:
+        self._ctrl_down = bool(down)
 
     # Convenience properties for external access
     @property

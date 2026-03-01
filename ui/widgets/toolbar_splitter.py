@@ -116,36 +116,73 @@ class ToolbarHandle(QtWidgets.QSplitterHandle):
         except Exception:
             pass
 
-        # FX button (synth editor)
-        self.fx_btn = QtWidgets.QToolButton(self)
-        self.fx_btn.setFocusPolicy(QtCore.Qt.FocusPolicy.NoFocus)
-        # Use text label 'FX' instead of an icon
-        try:
-            self.fx_btn.setIcon(QtGui.QIcon())
-        except Exception:
-            pass
-        self.fx_btn.setText('FX')
-        font = self.fx_btn.font()
-        try:
-            font.setBold(True)
-            self.fx_btn.setFont(font)
-        except Exception:
-            pass
-        self.fx_btn.setFixedSize(self._button_size, self._button_size)
-        layout.addWidget(self.fx_btn)
-        try:
-            self.fx_btn.clicked.connect(parent.fxRequested.emit)
-        except Exception:
-            pass
-
-        # Visual separator between default toolbar and contextual toolbar
+        # Visual separator between playback controls and dialog shortcuts
         sep = QtWidgets.QFrame(self)
-        # Use a 1px separator that adapts to the current palette
         sep.setFrameShape(QtWidgets.QFrame.Shape.NoFrame)
         sep.setFixedHeight(1)
         pal = self.palette()
         btn = pal.color(QtGui.QPalette.Button)
-        # Slightly darken the button color to get a subtle separator line
+        line_r = max(0, min(255, int(btn.red() * 0.75)))
+        line_g = max(0, min(255, int(btn.green() * 0.75)))
+        line_b = max(0, min(255, int(btn.blue() * 0.75)))
+        sep.setStyleSheet(f"background-color: rgb({line_r}, {line_g}, {line_b});")
+        layout.addWidget(sep)
+
+        # Quick dialogs: Style, Info, Line Breaks
+        self.style_btn = QtWidgets.QToolButton(self)
+        self.style_btn.setFocusPolicy(QtCore.Qt.FocusPolicy.NoFocus)
+        ic_style = get_qicon('style', size=(64, 64))
+        if ic_style and not ic_style.isNull():
+            self.style_btn.setIcon(ic_style)
+        else:
+            self.style_btn.setText('S')
+        self.style_btn.setToolTip('Style')
+        self.style_btn.setIconSize(QtCore.QSize(self._button_size - 6, self._button_size - 6))
+        self.style_btn.setFixedSize(self._button_size, self._button_size)
+        layout.addWidget(self.style_btn)
+        try:
+            self.style_btn.clicked.connect(parent.styleRequested.emit)
+        except Exception:
+            pass
+
+        self.info_btn = QtWidgets.QToolButton(self)
+        self.info_btn.setFocusPolicy(QtCore.Qt.FocusPolicy.NoFocus)
+        ic_info = get_qicon('info', size=(64, 64))
+        if ic_info and not ic_info.isNull():
+            self.info_btn.setIcon(ic_info)
+        else:
+            self.info_btn.setText('I')
+        self.info_btn.setToolTip('Info')
+        self.info_btn.setIconSize(QtCore.QSize(self._button_size - 6, self._button_size - 6))
+        self.info_btn.setFixedSize(self._button_size, self._button_size)
+        layout.addWidget(self.info_btn)
+        try:
+            self.info_btn.clicked.connect(parent.infoRequested.emit)
+        except Exception:
+            pass
+
+        self.line_break_btn = QtWidgets.QToolButton(self)
+        self.line_break_btn.setFocusPolicy(QtCore.Qt.FocusPolicy.NoFocus)
+        ic_line_break = get_qicon('line_break', size=(64, 64))
+        if ic_line_break and not ic_line_break.isNull():
+            self.line_break_btn.setIcon(ic_line_break)
+        else:
+            self.line_break_btn.setText('LB')
+        self.line_break_btn.setToolTip('Line Breaks')
+        self.line_break_btn.setIconSize(QtCore.QSize(self._button_size - 6, self._button_size - 6))
+        self.line_break_btn.setFixedSize(self._button_size, self._button_size)
+        layout.addWidget(self.line_break_btn)
+        try:
+            self.line_break_btn.clicked.connect(parent.lineBreakRequested.emit)
+        except Exception:
+            pass
+
+        # Visual separator between dialog shortcuts and contextual toolbar
+        sep = QtWidgets.QFrame(self)
+        sep.setFrameShape(QtWidgets.QFrame.Shape.NoFrame)
+        sep.setFixedHeight(1)
+        pal = self.palette()
+        btn = pal.color(QtGui.QPalette.Button)
         line_r = max(0, min(255, int(btn.red() * 0.75)))
         line_g = max(0, min(255, int(btn.green() * 0.75)))
         line_b = max(0, min(255, int(btn.blue() * 0.75)))
@@ -216,7 +253,9 @@ class ToolbarSplitter(QtWidgets.QSplitter):
     engraveRequested = QtCore.Signal()
     playRequested = QtCore.Signal()
     stopRequested = QtCore.Signal()
-    fxRequested = QtCore.Signal()
+    styleRequested = QtCore.Signal()
+    infoRequested = QtCore.Signal()
+    lineBreakRequested = QtCore.Signal()
 
     def __init__(self, orientation: QtCore.Qt.Orientation, parent=None):
         super().__init__(orientation, parent)
