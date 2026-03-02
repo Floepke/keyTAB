@@ -489,6 +489,7 @@ class StyleDialog(QtWidgets.QDialog):
             'scale': 'Page',
             # Note
             'black_note_rule': 'Note',
+            'black_note_width_scaling': 'Note',
             'note_stem_length_semitone': 'Note',
             'note_stem_thickness_mm': 'Note',
             'note_stopsign_thickness_mm': 'Note',

@@ -154,7 +154,7 @@ class DrawUtil:
                  color: Color = (0, 0, 0, 1), width_mm: float = 0.3,
                  dash_pattern: Optional[Sequence[float]] = None,
                  dash_offset_mm: float = 0.0,
-               line_cap: str = "round",
+                 line_cap: str = "round",
                  id: int = 0, tags: Optional[List[str]] = None,
                  hit_rect_mm: Optional[Tuple[float, float, float, float]] = None) -> None:
         self._ensure_page()

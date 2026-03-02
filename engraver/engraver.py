@@ -414,37 +414,37 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
         p0 = int(item.get('pitch', 0) or 0)
         t0 = float(item.get('time', 0.0) or 0.0)
         idx0 = int(item.get('idx', -1) or -1)
-        if rule in ('above_stem_if_collision', 'only_above_stem_if_collision'):
-            for m in notes:
-                if int(m.get('idx', -2) or -2) == idx0:
+        if rule == 'above_stem_if_collision':
+            for n in notes:
+                if int(n.get('idx', -2) or -2) == idx0:
                     continue
-                if not op.eq(float(m.get('time', 0.0) or 0.0), t0):
+                if not op.eq(float(n.get('time', 0.0) or 0.0), t0):
                     continue
-                if abs(int(m.get('pitch', 0) or 0) - p0) == 1:
+                if abs(int(n.get('pitch', 0) or 0) - p0) == 1:
                     return True
             return False
         if rule == 'above_stem_if_chord_and_white_note':
-            for m in notes:
-                if int(m.get('idx', -2) or -2) == idx0:
+            for n in notes:
+                if int(n.get('idx', -2) or -2) == idx0:
                     continue
-                if not op.eq(float(m.get('time', 0.0) or 0.0), t0):
+                if not op.eq(float(n.get('time', 0.0) or 0.0), t0):
                     continue
-                mp = int(m.get('pitch', 0) or 0)
-                if mp not in BLACK_KEYS and mp != p0:
+                np = int(n.get('pitch', 0) or 0)
+                if np not in BLACK_KEYS and np != p0:
                     return True
             return False
         if rule != 'above_stem_if_chord_and_white_note_same_hand':
             return False
         hand0 = str(item.get('hand', '<') or '<')
-        for m in notes:
-            if int(m.get('idx', -2) or -2) == idx0:
+        for n in notes:
+            if int(n.get('idx', -2) or -2) == idx0:
                 continue
-            if not op.eq(float(m.get('time', 0.0) or 0.0), t0):
+            if not op.eq(float(n.get('time', 0.0) or 0.0), t0):
                 continue
-            if str(m.get('hand', '<') or '<') != hand0:
+            if str(n.get('hand', '<') or '<') != hand0:
                 continue
-            mp = int(m.get('pitch', 0) or 0)
-            if mp not in BLACK_KEYS and mp != p0:
+            np = int(n.get('pitch', 0) or 0)
+            if np not in BLACK_KEYS and np != p0:
                 return True
         return False
 
@@ -800,7 +800,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
         ]
         if ts_segments_in_line:
             ts_lane_width = float(layout.get('time_signature_indicator_lane_width_mm', 22.0) or 22.0)
-            ts_lane_padding_mm = 5  # Hard-coded right padding so lane ends before the stave.
+            ts_lane_padding_mm = 1  # Hard-coded right padding so lane ends before the stave.
             min_pitch = None
             for seg in ts_segments_in_line:
                 win_start = float(seg.get('start', 0.0) or 0.0)
@@ -1421,27 +1421,84 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                 groups, windows = _group_by_beam_markers(notes_for_hand, markers_for_hand, line_start, line_end)
                 beam_groups_by_hand[hand_norm] = (groups, windows)
 
+            stem_len_units = float(layout.get('note_stem_length_semitone', 3) or 3)
+            stem_len_mm = stem_len_units * semitone_mm
+
+            # Pre-compute beam line bounds so measure numbers can test real beam spans.
+            beam_thickness_mm = float(layout.get('beam_thickness_mm', 1.0) or 1.0) * scale
+            beam_line_bounds: list[dict[str, float]] = []
+
+            def _record_beam_line_bounds() -> None:
+                for hand_norm, payload in beam_groups_by_hand.items():
+                    groups, windows = payload
+                    for idx, grp in enumerate(groups):
+                        if not grp or idx >= len(windows):
+                            continue
+                        t0, t1 = windows[idx]
+                        starts_in = [
+                            float(n.get('time', 0.0) or 0.0)
+                            for n in grp
+                            if op_time.ge(float(n.get('time', 0.0) or 0.0), float(t0))
+                            and op_time.lt(float(n.get('time', 0.0) or 0.0), float(t1))
+                        ]
+                        if not starts_in:
+                            continue
+                        s_min, s_max = min(starts_in), max(starts_in)
+                        if op_time.eq(float(s_min), float(s_max)):
+                            continue
+                        t_first = min(starts_in)
+                        t_last = max(starts_in)
+                        if hand_norm == 'r':
+                            highest = max(grp, key=lambda n: int(n.get('pitch', 0) or 0))
+                            x1 = _key_to_x(int(highest.get('pitch', 0) or 0)) + float(stem_len_units * semitone_mm)
+                            x2 = x1 + float(semitone_mm)
+                        else:
+                            lowest = min(grp, key=lambda n: int(n.get('pitch', 0) or 0))
+                            x1 = _key_to_x(int(lowest.get('pitch', 0) or 0)) - float(stem_len_units * semitone_mm)
+                            x2 = x1 - float(semitone_mm)
+                        yb1 = _time_to_y(float(t_first))
+                        yb2 = _time_to_y(float(t_last))
+                        pad = beam_thickness_mm * 0.5
+                        beam_line_bounds.append(
+                            {
+                                'x_min': min(x1, x2) - pad,
+                                'x_max': max(x1, x2) + pad,
+                                'y_min': min(yb1, yb2) - pad,
+                                'y_max': max(yb1, yb2) + pad,
+                            }
+                        )
+
+            def _beam_right_at_y(y: float) -> float | None:
+                right = None
+                for seg in beam_line_bounds:
+                    if y < seg['y_min'] or y > seg['y_max']:
+                        continue
+                    xr = float(seg['x_max'])
+                    if right is None or xr > right:
+                        right = xr
+                return right
+
+            _record_beam_line_bounds()
+
             # Problem solved: measure numbers must avoid colliding with notes/beams.
             mn_family, mn_size, mn_bold, mn_italic = _layout_font('measure_numbering_font', 'Edwin', 10.0)
             size_pt = mn_size * scale
             mm_per_pt = 25.4 / 72.0
             text_h_mm = size_pt * mm_per_pt
             measure_pad = 1.5
-            stem_len_units = float(layout.get('note_stem_length_semitone', 3) or 3)
-            stem_len_mm = stem_len_units * semitone_mm
 
-            def _note_x_range(it: dict) -> tuple[float, float]:
+            def _note_x_range(it: dict, include_stem: bool) -> tuple[float, float]:
                 p = int(it.get('pitch', 0) or 0)
                 x = _key_to_x(p)
                 w = semitone_mm
                 hand_key = str(it.get('hand', '<') or '<')
-                beam_ext = semitone_mm
+                beam_ext = semitone_mm if include_stem else 0.0
                 if hand_key in ('l', '<'):
-                    x_min = x - max(w, stem_len_mm + beam_ext)
+                    x_min = x - (max(w, stem_len_mm + beam_ext) if include_stem else w)
                     x_max = x + w
                 else:
                     x_min = x - w
-                    x_max = x + max(w, stem_len_mm + beam_ext)
+                    x_max = x + (max(w, stem_len_mm + beam_ext) if include_stem else w)
                 return (x_min, x_max)
 
             def _right_extent(t0: float, t1: float) -> float:
@@ -1451,30 +1508,10 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                     ne = float(it.get('end', 0.0) or 0.0)
                     if op_time.ge(nt, float(t1)) or op_time.le(ne, float(t0)):
                         continue
-                    _x0, x1 = _note_x_range(it)
+                    near_start = op_time.lt(nt, float(t1)) and op_time.ge(nt, float(t0))
+                    _x0, x1 = _note_x_range(it, include_stem=near_start)
                     if x1 > max_x:
                         max_x = x1
-                return max_x
-
-            def _beam_group_right_extent(t0: float) -> float | None:
-                max_x = None
-                for hand_norm, payload in beam_groups_by_hand.items():
-                    groups, windows = payload
-                    for idx, grp in enumerate(groups):
-                        if not grp or idx >= len(windows):
-                            continue
-                        w0, w1 = windows[idx]
-                        if op_time.ge(float(t0), float(w1)) or op_time.lt(float(t0), float(w0)):
-                            continue
-                        highest = max(grp, key=lambda n: int(n.get('pitch', 0) or 0))
-                        p = int(highest.get('pitch', 0) or 0)
-                        base_x = _key_to_x(p)
-                        if hand_norm == 'r':
-                            x = base_x + stem_len_mm
-                        else:
-                            x = base_x + semitone_mm
-                        if max_x is None or x > max_x:
-                            max_x = x
                 return max_x
 
             def _collides(x0: float, x1: float, t0: float, t1: float) -> bool:
@@ -1483,7 +1520,8 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                     ne = float(it.get('end', 0.0) or 0.0)
                     if op_time.ge(nt, float(t1)) or op_time.le(ne, float(t0)):
                         continue
-                    nx0, nx1 = _note_x_range(it)
+                    near_start = op_time.lt(nt, float(t1)) and op_time.ge(nt, float(t0))
+                    nx0, nx1 = _note_x_range(it, include_stem=near_start)
                     if (nx1 >= x0) and (nx0 <= x1):
                         return True
                 return False
@@ -1503,7 +1541,11 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
 
                 # Default outside-right; only move further right on collision
                 base_right = grid_right + measure_pad
-                beam_right = _beam_group_right_extent(t0)
+                guide_y = _time_to_y(t0)
+                beam_right_candidates = [
+                    br for br in (_beam_right_at_y(guide_y), _beam_right_at_y(y_text)) if br is not None
+                ]
+                beam_right = max(beam_right_candidates) if beam_right_candidates else None
                 needed_right = _right_extent(t0, t1) + measure_pad
                 if beam_right is not None:
                     needed_right = max(needed_right, float(beam_right) + measure_pad)
@@ -1668,6 +1710,25 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
             line_start = float(line.get('time_start', 0.0) or 0.0)
             line_end = float(line.get('time_end', 0.0) or 0.0)
             black_rule = str(layout.get('black_note_rule', 'below_stem') or 'below_stem')
+            black_head_scale = float(layout.get('black_note_width_scaling', 0.75) or 0.75)
+            black_head_scale = max(0.05, min(1.0, black_head_scale))
+
+            def _has_adjacent_white_same_hand(note_dict: dict) -> bool:
+                p0 = int(note_dict.get('pitch', 0) or 0)
+                t0 = float(note_dict.get('time', 0.0) or 0.0)
+                h0 = str(note_dict.get('hand', '<') or '<')
+                idx0 = int(note_dict.get('idx', -1) or -1)
+                for m in line_notes:
+                    if int(m.get('idx', -2) or -2) == idx0:
+                        continue
+                    if str(m.get('hand', '<') or '<') != h0:
+                        continue
+                    if not op_time.eq(float(m.get('time', 0.0) or 0.0), t0):
+                        continue
+                    mp = int(m.get('pitch', 0) or 0)
+                    if mp not in BLACK_KEYS and abs(mp - p0) == 1:
+                        return True
+                return False
 
             # Grace notes: tiny heads anchored so time sits at the top.
             if bool(layout.get('grace_note_visible', True)) and line_grace:
@@ -1744,7 +1805,8 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                     y_start, y_end = y_end, y_start
                 w = semitone_mm
                 note_y = y_start
-                if p in BLACK_KEYS and _black_note_above_stem(item, black_rule, line_notes, op_time):
+                black_above = p in BLACK_KEYS and _black_note_above_stem(item, black_rule, line_notes, op_time)
+                if black_above:
                     note_y = y_start - (w * 2.0)
                 # Problem solved: draw the note body with per-hand colors or overrides.
                 raw_color = n.get('color', None)
@@ -1812,11 +1874,14 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                 # Problem solved: avoid duplicated heads on continuations.
                 if not continues_from_prev_line and bool(layout.get('note_head_visible', True)):
                     outline_w = float(layout.get('note_stem_thickness_mm', 0.5) or 0.5) * scale
+                    head_scale = 1.0
+                    if p in BLACK_KEYS and (not black_above) and _has_adjacent_white_same_hand(item):
+                        head_scale = black_head_scale
                     if p in BLACK_KEYS:
                         du.add_oval(
-                            x - (w * 0.8),
+                            x - (w * head_scale),
                             note_y,
-                            x + (w * 0.8),
+                            x + (w * head_scale),
                             note_y + (w * 2.0),
                             stroke_color=(0, 0, 0, 1),
                             stroke_width_mm=0.3,

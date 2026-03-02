@@ -41,13 +41,14 @@ class Layout:
     note_head_visible: bool = True
     note_stem_visible: bool = True
     note_stem_length_semitone: int = 5
-    note_stem_thickness_mm: float = 1.0 # Thickness of the stem as well the notehead outline
+    note_stem_thickness_mm: float = 1.0 # Thickness of the stem as well the notehead outline width
     note_stopsign_thickness_mm: float = 1.0
     note_leftdot_visible: bool = True
     note_continuation_dot_size_mm: float = 2.5
     note_midinote_visible: bool = True
     note_midinote_left_color: str = '#cccccc'
     note_midinote_right_color: str = '#cccccc'
+    black_note_width_scaling: float = 0.7 # Scaling factor for black noteheads when it sits under the stem while a white note sits next to it (0.05 to 1.0)
 
     # Beam appearance
     beam_visible: bool = True
@@ -161,6 +162,7 @@ LAYOUT_FLOAT_CONFIG: dict[str, dict[str, float]] = {
     'note_stem_thickness_mm': {'min': 0.05, 'max': 5.0, 'step': 0.05},
     'note_stopsign_thickness_mm': {'min': 0.05, 'max': 5.0, 'step': 0.05},
     'note_continuation_dot_size_mm': {'min': 0.05, 'max': 10.0, 'step': 0.05},
+    'black_note_width_scaling': {'min': 0.05, 'max': 1.0, 'step': 0.01},
     'beam_thickness_mm': {'min': 0.05, 'max': 5.0, 'step': 0.05},
     'grace_note_outline_width_mm': {'min': 0.05, 'max': 5.0, 'step': 0.05},
     'grace_note_scale': {'min': 0.05, 'max': 1.0, 'step': 0.05},

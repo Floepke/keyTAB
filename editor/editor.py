@@ -1281,13 +1281,13 @@ class Editor(QtCore.QObject,
 
             # Right side of stave
             du.add_line(
-                margin + stave_width,
+                margin * 2 + stave_width - 2.0,
                 y_mm,
-                margin * 2.0 + stave_width - 2,
+                margin + stave_width - 2.0,
                 y_mm,
                 color=(0, 0, 0, 1),
                 width_mm=.75,
-                dash_pattern=[0, 2],
+                dash_pattern=[0, 2.07],
                 id=0,
                 tags=['cursor'],
             )

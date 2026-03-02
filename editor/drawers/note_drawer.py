@@ -113,6 +113,7 @@ class NoteDrawerMixin:
         return (0.6, 0.7, 0.8, 1.0) if (getattr(n, 'hand', '<') in ('l', '<')) else (0.8, 0.7, 0.6, 1.0)
 
     def _draw_midinote(self, du: DrawUtil, n, x: float, y1: float, y2: float, draw_mode: str) -> None:
+        self = cast("Editor", self)
         fill = self._midinote_color(n, draw_mode)
         w = float(self.semitone_dist or 0.5)
         du.add_polygon(
@@ -142,6 +143,7 @@ class NoteDrawerMixin:
         self.register_note_hit_rect(rect_id, float(x_left), float(y_top), float(x_right), float(y_bottom))
 
     def _draw_hand_split_indicator(self, du: DrawUtil, n, x: float, y1: float) -> None:
+        self = cast("Editor", self)
         barlines = self._cached_barline_positions or []
         if not barlines:
             return
@@ -190,17 +192,25 @@ class NoteDrawerMixin:
         )
 
     def _draw_notehead(self, du: DrawUtil, n, x: float, y1: float, draw_mode: str) -> None:
+        self = cast("Editor", self)
         w = float(self.semitone_dist or 0.5)
         layout = cast("Editor", self).current_score().layout
         outline_w = 0.5
+        black_head_scale = float(getattr(layout, 'black_note_width_scaling', 0.75) or 0.75)
+        black_head_scale = max(0.05, min(1.0, black_head_scale))
+        black_above = n.pitch in BLACK_KEYS and self._black_note_above_stem(n, layout)
+        base_scale = 0.8
+        head_scale = base_scale
+        if n.pitch in BLACK_KEYS and (not black_above) and self._adjacent_white_same_hand(n, layout):
+            head_scale = base_scale * black_head_scale
         # Adjust vertical for black-note rule
-        if n.pitch in BLACK_KEYS and self._black_note_above_stem(n, layout):
+        if black_above:
             y1 = y1 - (w * 2.0)
         if n.pitch in BLACK_KEYS:
             du.add_oval(
-                x - (w*.8),
+                x - (w * head_scale),
                 y1,
-                x + (w*.8),
+                x + (w * head_scale),
                 y1 + w * 2.0,
                 stroke_color=self.notation_color,
                 stroke_width_mm=0.3,
@@ -224,6 +234,7 @@ class NoteDrawerMixin:
             )
 
     def _draw_notestop(self, du: DrawUtil, n, x: float, y2: float, draw_mode: str) -> None:
+        self = cast("Editor", self)
         # Show stop triangle if followed by a rest in same hand
         if not self._is_followed_by_rest(n):
             return
@@ -249,7 +260,8 @@ class NoteDrawerMixin:
         )
 
     def _draw_stem(self, du: DrawUtil, n, x: float, y1: float, draw_mode: str) -> None:
-        layout = cast("Editor", self).current_score().layout
+        self = cast("Editor", self)
+        layout = self.current_score().layout
         stem_len = float(layout.note_stem_length_semitone or 3) * float(self.semitone_dist or 0.5)
         stem_w = 0.75
         # Stem direction based on hand
@@ -269,6 +281,7 @@ class NoteDrawerMixin:
         )
 
     def _draw_note_continuation_dot(self, du: DrawUtil, n, x: float, y1: float, y2: float, draw_mode: str) -> None:
+        self = cast("Editor", self)
         # Draw dots where other notes in same hand start or end within this note duration
         hand = getattr(n, 'hand', '<')
         start = float(n.time)
@@ -315,6 +328,7 @@ class NoteDrawerMixin:
             )
 
     def _draw_connect_stem(self, du: DrawUtil, n, x: float, y1: float, draw_mode: str) -> None:
+        self = cast("Editor", self)
         # Connect notes in a chord (same start time, same hand)
         stem_w = 0.75
         hand = getattr(n, 'hand', '<')
@@ -340,10 +354,11 @@ class NoteDrawerMixin:
         )
 
     def _draw_left_dot(self, du: DrawUtil, n, x: float, y1: float, draw_mode: str) -> None:
+        self = cast("Editor", self)
         # Simple left-hand indicator dot in notehead (optional)
         if getattr(n, 'hand', '<') not in ('l', '<'):
             return
-        layout = cast("Editor", self).current_score().layout
+        layout = self.current_score().layout
         if n.pitch in BLACK_KEYS and self._black_note_above_stem(n, layout):
             y1 = y1 - (float(self.semitone_dist or 0.5) * 2.0)
         w = float(self.semitone_dist or 0.5) * 2.0
@@ -414,6 +429,27 @@ class NoteDrawerMixin:
                 continue
             mp = int(getattr(m, 'pitch', 0) or 0)
             if mp not in BLACK_KEYS and mp != p0:
+                return True
+        return False
+
+    def _adjacent_white_same_hand(self, n, layout) -> bool:
+        try:
+            cache = cast("Editor", self)._draw_cache or {}
+            notes_view = cache.get('notes_view') or (self._cached_notes_view or [])
+        except Exception:
+            notes_view = self._cached_notes_view or []
+        t0 = float(getattr(n, 'time', 0.0) or 0.0)
+        p0 = int(getattr(n, 'pitch', 0) or 0)
+        h0 = str(getattr(n, 'hand', '<') or '<')
+        for m in notes_view:
+            if getattr(m, '_id', None) == getattr(n, '_id', None):
+                continue
+            if str(getattr(m, 'hand', '<') or '<') != h0:
+                continue
+            if not self._time_op.eq(float(getattr(m, 'time', 0.0) or 0.0), t0):
+                continue
+            mp = int(getattr(m, 'pitch', 0) or 0)
+            if mp not in BLACK_KEYS and abs(mp - p0) == 1:
                 return True
         return False
 
