@@ -48,7 +48,7 @@ class TimeSignatureDrawerMixin:
 
         # Helper: draw classical numerator/denominator at segment boundary
         def draw_classical(numerator: int, denominator: int, enabled: bool, y_mm: float) -> None:
-            color = self.notation_color
+            color = (0.6, 0.6, 0.6, 1.0) if not enabled else self.notation_color
             x = stave_left_position - 7.5
             # Numerator
             du.add_text(
@@ -89,7 +89,7 @@ class TimeSignatureDrawerMixin:
 
         # Helper: draw Klavarskribo-style three-column indicator at segment boundary
         def draw_klavarskribo(numerator: int, denominator: int, enabled: bool, y_mm: float, grid_positions: list[int]) -> None:
-            color = self.notation_color
+            color = (0.6, 0.6, 0.6, 1.0) if not enabled else self.notation_color
             zpq = float(score.editor.zoom_mm_per_quarter)
             quarters_per_measure = float(numerator) * (4.0 / max(1.0, float(denominator)))
             measure_len_mm = quarters_per_measure * zpq
@@ -137,27 +137,19 @@ class TimeSignatureDrawerMixin:
                 du.add_text(x_left - 2.0, y, str(gi), size_pt=klav_size, color=color, id=0, tags=["ts_klavars_left"], anchor='w', family=klav_family)
 
         # Iterate BaseGrid segments and draw based on indicator_type
-        show_klavars = tool_name == "time_signature"
-        show_classic = True # tool_name == "time_signature"
+        # Classical is always shown; Klavarskribo only when the time-signature tool is active.
+        show_classic = True
+        show_klavars = (indicator_type in ('klavarskribo', 'both')) and (tool_name == 'time_signature')
         for bg in list(getattr(score, 'base_grid', []) or []):
             numerator = int(getattr(bg, 'numerator', 4) or 4)
             denominator = int(getattr(bg, 'denominator', 4) or 4)
             measure_amount = int(getattr(bg, 'measure_amount', 1) or 1)
             enabled = bool(getattr(bg, 'indicator_enabled', True))
             grid_positions = list(getattr(bg, 'beat_grouping', []) or [])
-
-            if enabled:
-                if indicator_type == 'classical':
-                    if show_classic:
-                        draw_classical(numerator, denominator, enabled, time_cursor)
-                elif indicator_type == 'klavarskribo':
-                    if show_klavars:
-                        draw_klavarskribo(numerator, denominator, enabled, time_cursor, grid_positions)
-                elif indicator_type == 'both':
-                    if show_classic:
-                        draw_classical(numerator, denominator, enabled, time_cursor)
-                    if show_klavars:
-                        draw_klavarskribo(numerator, denominator, enabled, time_cursor, grid_positions)
+            if show_classic:
+                draw_classical(numerator, denominator, enabled, time_cursor)
+            if show_klavars:
+                draw_klavarskribo(numerator, denominator, enabled, time_cursor, grid_positions)
             # Advance time cursor by the segment length (mm) to next segment start
             quarters_per_measure = float(numerator) * (4.0 / max(1.0, float(denominator)))
             measure_len_mm = quarters_per_measure * float(score.editor.zoom_mm_per_quarter)

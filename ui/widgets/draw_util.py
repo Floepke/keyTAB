@@ -115,6 +115,37 @@ class DrawUtil:
         self._pages: List[Page] = []
         self._current_index: int = -1
 
+    @staticmethod
+    def _safe_dash(pattern: Optional[Sequence[float]], offset: float) -> tuple[Optional[List[float]], float]:
+        """Return (dash_list_mm, offset_mm) with invalid entries stripped.
+
+        Dash lengths are interpreted in millimeters; zeros are coerced to 0.01
+        to allow dotted patterns like "0 3". Any negative or non-finite value
+        is dropped; if nothing remains we fall back to a solid stroke.
+        """
+        if not pattern:
+            return (None, 0.0)
+        cleaned: List[float] = []
+        for v in pattern:
+            try:
+                f = float(v)
+            except Exception:
+                continue
+            if not math.isfinite(f):
+                continue
+            if f < 0.0:
+                continue
+            if f == 0.0:
+                f = 0.01
+            cleaned.append(f)
+        if not cleaned:
+            return (None, 0.0)
+        try:
+            off = float(offset)
+        except Exception:
+            off = 0.0
+        return (cleaned, off)
+
     def new_page(self, width_mm: float, height_mm: float) -> None:
         self._pages.append(Page(width_mm, height_mm))
         self._current_index = len(self._pages) - 1
@@ -625,9 +656,13 @@ class DrawUtil:
             ctx.set_line_cap(cairo.LINE_CAP_SQUARE)
         else:
             ctx.set_line_cap(cairo.LINE_CAP_ROUND)
-        if stroke.dash_pattern_mm:
-            ctx.set_dash(list(stroke.dash_pattern_mm), stroke.dash_offset_mm)
-        else:
+        dash, offset = self._safe_dash(stroke.dash_pattern_mm, stroke.dash_offset_mm)
+        try:
+            if dash:
+                ctx.set_dash(dash, offset)
+            else:
+                ctx.set_dash([])
+        except Exception:
             ctx.set_dash([])
 
     def _apply_fill(self, ctx: cairo.Context, fill: Optional[Fill]):

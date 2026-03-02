@@ -523,6 +523,7 @@ class StyleDialog(QtWidgets.QDialog):
             # Stave
             'stave_two_line_thickness_mm': 'Stave',
             'stave_three_line_thickness_mm': 'Stave',
+            'stave_clef_line_thickness_mm': 'Stave',
             'stave_clef_line_dash_pattern_mm': 'Stave',
             # Fonts
             'font_text': 'Fonts',

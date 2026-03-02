@@ -214,7 +214,8 @@ class LineBreakDialog(QtWidgets.QDialog):
         auto_cb.setChecked(is_auto)
         auto_cb.setText("Automatic key range")
 
-        cf_keys = sorted(CF_KEYS)
+        # Allow starting range at key 1 (A0) for allowing to select full range
+        cf_keys = sorted(set(CF_KEYS + [1]))
         be_keys = sorted(BE_KEYS)
 
         def _build_combo(prefix: str, keys: list[int]) -> QtWidgets.QComboBox:

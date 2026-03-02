@@ -129,19 +129,26 @@ class ToolbarHandle(QtWidgets.QSplitterHandle):
         layout.addWidget(sep)
 
         # Quick dialogs: Style, Info, Line Breaks
-        self.style_btn = QtWidgets.QToolButton(self)
-        self.style_btn.setFocusPolicy(QtCore.Qt.FocusPolicy.NoFocus)
-        ic_style = get_qicon('style', size=(64, 64))
-        if ic_style and not ic_style.isNull():
-            self.style_btn.setIcon(ic_style)
-        else:
-            self.style_btn.setText('S')
-        self.style_btn.setToolTip('Style')
-        self.style_btn.setIconSize(QtCore.QSize(self._button_size - 6, self._button_size - 6))
-        self.style_btn.setFixedSize(self._button_size, self._button_size)
-        layout.addWidget(self.style_btn)
+        self.line_break_btn = QtWidgets.QToolButton(self)
+        self.line_break_btn.setFocusPolicy(QtCore.Qt.FocusPolicy.NoFocus)
+        self.line_break_btn.setText('L')
         try:
-            self.style_btn.clicked.connect(parent.styleRequested.emit)
+            f = self.line_break_btn.font()
+            sz = f.pointSizeF()
+            if sz <= 0:
+                sz = float(f.pointSize())
+            if sz <= 0:
+                sz = 10.0
+            f.setPointSizeF(sz * 2.0)
+            self.line_break_btn.setFont(f)
+        except Exception:
+            pass
+        self.line_break_btn.setToolTip('Line Breaks; organize the document into pages and systems')
+        self.line_break_btn.setIconSize(QtCore.QSize(self._button_size - 6, self._button_size - 6))
+        self.line_break_btn.setFixedSize(self._button_size, self._button_size)
+        layout.addWidget(self.line_break_btn)
+        try:
+            self.line_break_btn.clicked.connect(parent.lineBreakRequested.emit)
         except Exception:
             pass
 
@@ -152,7 +159,18 @@ class ToolbarHandle(QtWidgets.QSplitterHandle):
             self.info_btn.setIcon(ic_info)
         else:
             self.info_btn.setText('I')
-        self.info_btn.setToolTip('Info')
+            try:
+                f = self.info_btn.font()
+                sz = f.pointSizeF()
+                if sz <= 0:
+                    sz = float(f.pointSize())
+                if sz <= 0:
+                    sz = 10.0
+                f.setPointSizeF(sz * 2.0)
+                self.info_btn.setFont(f)
+            except Exception:
+                pass
+        self.info_btn.setToolTip('Info; edit title, composer and copyright and view analysis')
         self.info_btn.setIconSize(QtCore.QSize(self._button_size - 6, self._button_size - 6))
         self.info_btn.setFixedSize(self._button_size, self._button_size)
         layout.addWidget(self.info_btn)
@@ -161,19 +179,30 @@ class ToolbarHandle(QtWidgets.QSplitterHandle):
         except Exception:
             pass
 
-        self.line_break_btn = QtWidgets.QToolButton(self)
-        self.line_break_btn.setFocusPolicy(QtCore.Qt.FocusPolicy.NoFocus)
-        ic_line_break = get_qicon('line_break', size=(64, 64))
-        if ic_line_break and not ic_line_break.isNull():
-            self.line_break_btn.setIcon(ic_line_break)
+        self.style_btn = QtWidgets.QToolButton(self)
+        self.style_btn.setFocusPolicy(QtCore.Qt.FocusPolicy.NoFocus)
+        ic_style = get_qicon('style', size=(64, 64))
+        if ic_style and not ic_style.isNull():
+            self.style_btn.setIcon(ic_style)
         else:
-            self.line_break_btn.setText('LB')
-        self.line_break_btn.setToolTip('Line Breaks')
-        self.line_break_btn.setIconSize(QtCore.QSize(self._button_size - 6, self._button_size - 6))
-        self.line_break_btn.setFixedSize(self._button_size, self._button_size)
-        layout.addWidget(self.line_break_btn)
+            self.style_btn.setText('S')
+            try:
+                f = self.style_btn.font()
+                sz = f.pointSizeF()
+                if sz <= 0:
+                    sz = float(f.pointSize())
+                if sz <= 0:
+                    sz = 10.0
+                f.setPointSizeF(sz * 2.0)
+                self.style_btn.setFont(f)
+            except Exception:
+                pass
+        self.style_btn.setToolTip('Styling the notation; customize the appearance of the score')
+        self.style_btn.setIconSize(QtCore.QSize(self._button_size - 6, self._button_size - 6))
+        self.style_btn.setFixedSize(self._button_size, self._button_size)
+        layout.addWidget(self.style_btn)
         try:
-            self.line_break_btn.clicked.connect(parent.lineBreakRequested.emit)
+            self.style_btn.clicked.connect(parent.styleRequested.emit)
         except Exception:
             pass
 

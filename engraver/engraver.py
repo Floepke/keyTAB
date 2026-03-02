@@ -144,9 +144,9 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
     scale = float(layout.get('scale', 1.0) or 1.0)
     stave_two_w = float(layout.get('stave_two_line_thickness_mm', 0.5) or 0.5) * scale
     stave_three_w = float(layout.get('stave_three_line_thickness_mm', 0.5) or 0.5) * scale
-    clef_dash = list(layout.get('stave_clef_line_dash_pattern_mm', []) or [])
-    if clef_dash:
-        clef_dash = [float(v) * scale for v in clef_dash]
+    stave_clef_w = float(layout.get('stave_clef_line_thickness_mm', 0.5) or 0.5) * scale
+    clef_dash_raw = list(layout.get('stave_clef_line_dash_pattern_mm', []) or [])
+    clef_dash = [float(v) * scale for v in clef_dash_raw] if clef_dash_raw else None
     op_time = Operator(SHORTEST_DURATION)
     barline_positions: list[float] = []
     cur_bar = 0.0
@@ -753,6 +753,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                 count, lo, hi = _notes_in_window_stats(line['time_start'], line['time_end'])
         else:
             manual = _sanitize_range(line['stave_range'])
+            requested_lo = int(manual[0]) if manual else 1
             groups = _visible_line_groups_for_range(manual[0], manual[1], include_clef=False)
             if not groups:
                 grp = line_groups[clef_group_index]
@@ -767,7 +768,12 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
             line['visible_keys'] = keys
             line['pattern'] = ' '.join(patterns)
         # Problem solved: avoid clipping A#0 ledger by forcing left edge to key 2.
-        low_key_present = False
+        manual_low_request = False
+        try:
+            manual_low_request = line['stave_range'] != 'auto' and int(requested_lo) <= 2
+        except Exception:
+            manual_low_request = False
+        low_key_present = bool(bound_left <= 2 or manual_low_request)
         for item in norm_notes:
             n_t = float(item.get('time', 0.0) or 0.0)
             n_end = float(item.get('end', 0.0) or 0.0)
@@ -778,7 +784,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                 low_key_present = True
                 break
         if low_key_present:
-            bound_left = 2
+            bound_left = min(2, bound_left)
         line['low_key_left'] = bool(low_key_present)
         line['range'] = [int(bound_left), int(bound_right)]
         min_pos = key_positions.get(bound_left, 0.0)
@@ -790,7 +796,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
         ts_lane_right_offset = 0.0
         ts_lane_padding_mm = 0.0
         # Problem solved: if time-signature indicators would collide with notes,
-        # expand left margin to reserve a lane.
+        # allow shifting the indicator left, but do not reserve a lane (margins are user-defined).
         ts_segments_in_line = [
             seg
             for seg in ts_segments
@@ -820,11 +826,10 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                 origin = float(key_positions.get(bound_left, 0.0))
                 note_offset = float(key_positions.get(min_pitch, origin)) - origin
                 offset_left = note_offset - stem_len_mm
-                ts_lane_gap_mm = 1.0
+                ts_lane_gap_mm = semitone_mm * .5  # Minimum gap between indicator lane and notes
                 ts_lane_right_offset = min(0.0, float(offset_left - ts_lane_gap_mm))
-            extra_left = max(0.0, -ts_lane_right_offset)
-            lane_margin = ts_lane_width + ts_lane_padding_mm + extra_left
-            line['margin_left'] = max(base_margin_left, lane_margin)
+        # Keep user-defined margins: do not expand margin_left for the indicator lane.
+        line['margin_left'] = base_margin_left
         line['base_margin_left'] = base_margin_left
         line['ts_lane_width'] = ts_lane_width
         line['ts_lane_right_offset'] = ts_lane_right_offset
@@ -1247,9 +1252,8 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
             grid_color = (0, 0, 0, 1)
             bar_width_mm = float(layout.get('grid_barline_thickness_mm', 0.25) or 0.25) * scale
             grid_width_mm = float(layout.get('grid_gridline_thickness_mm', 0.15) or 0.15) * scale
-            dash_pattern = list(layout.get('grid_gridline_dash_pattern_mm', []) or [])
-            if dash_pattern:
-                dash_pattern = [float(v) * scale for v in dash_pattern]
+            dash_pattern_raw = list(layout.get('grid_gridline_dash_pattern_mm', []) or [])
+            dash_pattern = [float(v) * scale for v in dash_pattern_raw] if dash_pattern_raw else None
             time_cursor = 0.0
             for bg in base_grid:
                 numerator = int(bg.get('numerator', 4) or 4)
@@ -1305,7 +1309,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                                     width_mm=max(0.1, grid_width_mm),
                                     id=0,
                                     tags=['grid_line'],
-                                    dash_pattern=dash_pattern or [2.0 * scale, 2.0 * scale],
+                                    dash_pattern=dash_pattern,
                                 )
                     time_cursor += measure_len
                 if op_time.gt(time_cursor, float(line['time_end'])):
@@ -1327,9 +1331,8 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
 
             # Problem solved: render count lines as lightweight guides.
             if bool(layout.get('countline_visible', True)) and count_lines:
-                dash_pattern = list(layout.get('countline_dash_pattern', []) or [])
-                if dash_pattern:
-                    dash_pattern = [float(v) * scale for v in dash_pattern]
+                dash_pattern_raw = list(layout.get('countline_dash_pattern', []) or [])
+                dash_pattern = [float(v) * scale for v in dash_pattern_raw] if dash_pattern_raw else None
                 countline_w = float(layout.get('countline_thickness_mm', 0.5) or 0.5) * scale
                 base_x_c4 = _key_to_x(40)
                 for ev in count_lines:
@@ -1350,7 +1353,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                         y_mm,
                         color=(0, 0, 0, 1),
                         width_mm=countline_w,
-                        dash_pattern=dash_pattern or [0.0, 1.5 * scale],
+                        dash_pattern=dash_pattern,
                         id=int(ev.get('_id', 0) or 0),
                         tags=['count_line'],
                     )
@@ -1611,8 +1614,8 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                 is_clef_line = key in (41, 43)
                 is_three_line = key in key_class_filter('FGA')
                 if is_clef_line:
-                    width_mm = max(stave_two_w, semitone_mm / 6.0)
-                    dash = clef_dash if clef_dash else [2.0 * scale, 2.0 * scale]
+                    width_mm = max(stave_clef_w, semitone_mm / 6.0)
+                    dash = clef_dash
                 elif is_three_line:
                     width_mm = max(stave_three_w, semitone_mm / 3.0)
                     dash = None
@@ -1961,8 +1964,8 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                                 is_clef_line = int(key) in (41, 43)
                                 is_three_line = int(key) in key_class_filter('FGA')
                                 if is_clef_line:
-                                    width_mm = max(stave_two_w, semitone_mm / 6.0)
-                                    dash = clef_dash if clef_dash else [2.0 * scale, 2.0 * scale]
+                                    width_mm = max(stave_clef_w, semitone_mm / 6.0)
+                                    dash = clef_dash
                                 elif is_three_line:
                                     width_mm = max(stave_three_w, semitone_mm / 3.0)
                                     dash = None

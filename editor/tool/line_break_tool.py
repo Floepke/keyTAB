@@ -19,7 +19,7 @@ class LineBreakTool(BaseTool):
 
     def toolbar_spec(self) -> list[dict]:
         return [
-            {'name': 'quick_line_breaks', 'icon': 'line_break', 'tooltip': 'Open Line Break Editor'},
+            
         ]
 
     def on_toolbar_button(self, name: str) -> None:

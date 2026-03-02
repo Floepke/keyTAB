@@ -586,9 +586,14 @@ class MainWindow(QtWidgets.QMainWindow):
                 zoom_out_act.setShortcut(QtGui.QKeySequence("-"))
             except Exception:
                 pass
+        view_menu.addSeparator()
+        full_screen_act = QtGui.QAction("Full Screen", self)
+        full_screen_act.setShortcut(QtGui.QKeySequence("F11"))
+        full_screen_act.setCheckable(True)
         view_menu.addAction(zoom_in_act)
         view_menu.addAction(zoom_out_act)
         view_menu.addSeparator()
+        view_menu.addAction(full_screen_act)
 
         # Wire up triggers
         new_act.triggered.connect(self._file_new)
@@ -603,6 +608,10 @@ class MainWindow(QtWidgets.QMainWindow):
         delete_act.triggered.connect(self._edit_delete)
         zoom_in_act.triggered.connect(lambda: self._zoom_editor(1))
         zoom_out_act.triggered.connect(lambda: self._zoom_editor(-1))
+        full_screen_act.triggered.connect(self._toggle_full_screen)
+
+        # Keep reference for state sync
+        self._full_screen_act = full_screen_act
 
         # ---- Clock label manually positioned at menubar's right edge ----
         try:
@@ -698,6 +707,24 @@ class MainWindow(QtWidgets.QMainWindow):
         try:
             if hasattr(self, '_app_state_save_timer') and self._app_state_save_timer is not None:
                 self._app_state_save_timer.start(500)
+        except Exception:
+            pass
+
+    def _toggle_full_screen(self) -> None:
+        """Toggle native/fullscreen mode across platforms using F11."""
+        try:
+            if self.isFullScreen() or (self.windowState() & QtCore.Qt.WindowState.WindowFullScreen):
+                self.showNormal()
+            else:
+                self.showFullScreen()
+        except Exception:
+            try:
+                self.showFullScreen()
+            except Exception:
+                pass
+        try:
+            if hasattr(self, '_full_screen_act') and self._full_screen_act is not None:
+                self._full_screen_act.setChecked(self.isFullScreen())
         except Exception:
             pass
 

@@ -145,6 +145,7 @@ class Layout:
     # Stave appearence
     stave_two_line_thickness_mm: float = 0.5
     stave_three_line_thickness_mm: float = 1.25
+    stave_clef_line_thickness_mm: float = 0.5
     stave_clef_line_dash_pattern_mm: list[float] = field(default_factory=lambda: [4.0])  # Dash pattern for clef lines (e.g., [dash_length, gap_length])
 
 
@@ -178,4 +179,5 @@ LAYOUT_FLOAT_CONFIG: dict[str, dict[str, float]] = {
     'time_signature_indicator_divide_guide_thickness_mm': {'min': 0.05, 'max': 5.0, 'step': 0.05},
     'stave_two_line_thickness_mm': {'min': 0.05, 'max': 5.0, 'step': 0.05},
     'stave_three_line_thickness_mm': {'min': 0.05, 'max': 5.0, 'step': 0.05},
+    'stave_clef_line_thickness_mm': {'min': 0.05, 'max': 5.0, 'step': 0.05},
 }

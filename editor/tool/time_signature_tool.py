@@ -178,12 +178,79 @@ class TimeSignatureTool(BaseTool):
                                   initial_grid_positions=initial_grid_positions,
                                   initial_indicator_enabled=initial_indicator_enabled,
                                   editor_widget=editor_widget)
+
+        original_seg_state = {
+            'numer': int(getattr(seg_bg, 'numerator', initial_numer) or initial_numer),
+            'denom': int(getattr(seg_bg, 'denominator', initial_denom) or initial_denom),
+            'beat_grouping': list(getattr(seg_bg, 'beat_grouping', None) or list(initial_grid_positions)),
+            'indicator_enabled': bool(getattr(seg_bg, 'indicator_enabled', initial_indicator_enabled)),
+            'measure_amount': int(getattr(seg_bg, 'measure_amount', 1) or 1),
+        }
+        preview_state: dict = {'new_bg': None}
+
+        def _refresh_editor_view() -> None:
+            if self._editor is None:
+                return
+            self._editor.update_score_length()
+            if hasattr(self._editor, 'force_redraw_from_model'):
+                self._editor.force_redraw_from_model()
+            else:
+                self._editor.draw_frame()
+
+        def _apply_preview(numer: int, denom: int, grid_positions: list[int], indicator_enabled: bool) -> None:
+            try:
+                if score is None:
+                    return
+                if edit_i is not None:
+                    seg_bg.numerator = int(numer)
+                    seg_bg.denominator = int(denom)
+                    seg_bg.beat_grouping = list(grid_positions)
+                    seg_bg.indicator_enabled = bool(indicator_enabled)
+                else:
+                    if preview_state['new_bg'] is None:
+                        seg_bg.measure_amount = int(offset_measures)
+                        new_bg = BaseGrid(numerator=int(numer), denominator=int(denom),
+                                          beat_grouping=list(grid_positions), measure_amount=1,
+                                          indicator_enabled=bool(indicator_enabled))
+                        score.base_grid.insert(seg_i + 1, new_bg)
+                        preview_state['new_bg'] = new_bg
+                    else:
+                        new_bg = preview_state['new_bg']
+                        new_bg.numerator = int(numer)
+                        new_bg.denominator = int(denom)
+                        new_bg.beat_grouping = list(grid_positions)
+                        new_bg.indicator_enabled = bool(indicator_enabled)
+                _refresh_editor_view()
+            except Exception:
+                pass
+
+        def _revert_preview() -> None:
+            try:
+                if edit_i is not None:
+                    seg_bg.numerator = original_seg_state['numer']
+                    seg_bg.denominator = original_seg_state['denom']
+                    seg_bg.beat_grouping = list(original_seg_state['beat_grouping'])
+                    seg_bg.indicator_enabled = bool(original_seg_state['indicator_enabled'])
+                else:
+                    if preview_state['new_bg'] is not None:
+                        try:
+                            score.base_grid.remove(preview_state['new_bg'])
+                        except Exception:
+                            pass
+                        preview_state['new_bg'] = None
+                    seg_bg.measure_amount = original_seg_state['measure_amount']
+                _refresh_editor_view()
+            except Exception:
+                pass
+
+        dlg.previewChanged.connect(_apply_preview)
         dlg.raise_()
         dlg.activateWindow()
 
         def _finalize_dialog(result: int) -> None:
             try:
                 if result != QtWidgets.QDialog.Accepted:
+                    _revert_preview()
                     return
                 numer, denom, grid_positions, indicator_enabled = dlg.get_values()
 
@@ -194,26 +261,24 @@ class TimeSignatureTool(BaseTool):
                     seg_bg.beat_grouping = list(grid_positions)
                     seg_bg.indicator_enabled = bool(indicator_enabled)
                 else:
-                    # Split segment at this barline and insert new change with 1 measure
-                    seg_bg.measure_amount = int(offset_measures)
-                    new_bg = BaseGrid(numerator=int(numer), denominator=int(denom),
-                                        beat_grouping=list(grid_positions),
-                                        measure_amount=1, indicator_enabled=bool(indicator_enabled))
-
-                    # Insert right after the current segment
-                    score.base_grid.insert(seg_i + 1, new_bg)
+                    if preview_state['new_bg'] is None:
+                        seg_bg.measure_amount = int(offset_measures)
+                        preview_state['new_bg'] = BaseGrid(numerator=int(numer), denominator=int(denom),
+                                                            beat_grouping=list(grid_positions),
+                                                            measure_amount=1, indicator_enabled=bool(indicator_enabled))
+                        score.base_grid.insert(seg_i + 1, preview_state['new_bg'])
+                    else:
+                        preview_state['new_bg'].numerator = int(numer)
+                        preview_state['new_bg'].denominator = int(denom)
+                        preview_state['new_bg'].beat_grouping = list(grid_positions)
+                        preview_state['new_bg'].indicator_enabled = bool(indicator_enabled)
 
                 # Snapshot and update after dialog closes (next event loop tick)
                 self._editor._snapshot_if_changed(coalesce=False, label='time_signature_append')
-
-                # update view
-                self._editor.update_score_length()
-                if hasattr(self._editor, 'force_redraw_from_model'):
-                    self._editor.force_redraw_from_model()
-                else:
-                    self._editor.draw_frame()
+                _refresh_editor_view()
             finally:
                 self._dialog_open = False
+                preview_state['new_bg'] = None
 
         dlg.finished.connect(_finalize_dialog)
         dlg.show()
