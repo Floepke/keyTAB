@@ -174,7 +174,7 @@ class ToolbarHandle(QtWidgets.QSplitterHandle):
         except Exception:
             pass
 
-        # Quick dialogs: Title info, Appearance, Breaks
+        # Quick dialogs: Title info, Appearance, Line Breaks
         self.line_break_btn = QtWidgets.QToolButton(self)
         self.line_break_btn.setFocusPolicy(QtCore.Qt.FocusPolicy.NoFocus)
         self.line_break_btn.setText('B')
@@ -189,7 +189,7 @@ class ToolbarHandle(QtWidgets.QSplitterHandle):
             self.line_break_btn.setFont(f)
         except Exception:
             pass
-        self.line_break_btn.setToolTip('Breaks; organize the document into pages and systems')
+        self.line_break_btn.setToolTip('Line Breaks; organize the document into pages and systems')
         self.line_break_btn.setIconSize(QtCore.QSize(self._button_size - 6, self._button_size - 6))
         self.line_break_btn.setFixedSize(self._button_size, self._button_size)
         layout.addWidget(self.line_break_btn)

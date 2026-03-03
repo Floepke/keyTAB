@@ -241,7 +241,6 @@ class Style:
         self._sync_editor_named_color()
 
     @classmethod
-    @classmethod
     def get_notation_color(cls) -> tuple[int, int, int]:
         cls._ensure_theme_seeded()
         return cls._NAMED.get('notation', (0, 0, 14))

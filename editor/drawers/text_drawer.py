@@ -98,7 +98,11 @@ class TextDrawerMixin:
         bleed_mm = max(2.0, float(getattr(score.editor, 'zoom_mm_per_quarter', 25.0) or 25.0) * 0.25)
 
         active_tool = str(getattr(getattr(self, '_tool', None), 'TOOL_NAME', ''))
-        show_handles = active_tool == 'text'
+        # Hide all text elements when the text tool is not active
+        if active_tool != 'text':
+            return
+
+        show_handles = True
 
         for ev in events:
             t = float(getattr(ev, 'time', 0.0) or 0.0)

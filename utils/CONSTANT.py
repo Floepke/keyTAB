@@ -25,7 +25,6 @@ EDITOR_LAYERING = [
     'stave_three_line',
     'stave_two_line',
     'stave_clef_line',
-    'text_bg',
     'barline',
     'stem_hand_split',
     'stop_sign',
@@ -59,6 +58,7 @@ EDITOR_LAYERING = [
     'beam_line_left',
     'beam_connect_left',
     'slur_handle',
+    'text_bg',
     'text',
     'text_handle',
 ]
