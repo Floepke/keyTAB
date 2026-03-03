@@ -264,7 +264,7 @@ def main(argv: list[str] | None = None):
     if theme == 'dark':
         sty.set_dark_theme()
     else:
-        sty.set_dynamic_theme(0.75)
+        sty.set_light_theme()
 
     win = MainWindow()
 

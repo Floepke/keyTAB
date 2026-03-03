@@ -419,13 +419,13 @@ class MainWindow(QtWidgets.QMainWindow):
         if sys.platform == "darwin":
             menubar.setNativeMenuBar(True)
 
-        # Create menus in normal left-to-right order (File, Edit, Document, View, Playback, Help)
+        # Create menus in normal left-to-right order (File, Edit, Document, View, Playback, About)
         file_menu = menubar.addMenu("&File")
         edit_menu = menubar.addMenu("&Edit")
         view_menu = menubar.addMenu("&View")
         document_menu = menubar.addMenu("&Document")
         playback_menu = menubar.addMenu("&Playback")
-        help_menu = menubar.addMenu("&Help")
+        help_menu = menubar.addMenu("&About")
 
         # File actions
         new_act = QtGui.QAction("New", self)
@@ -512,7 +512,11 @@ class MainWindow(QtWidgets.QMainWindow):
 
         about_act = QtGui.QAction("About keyTAB", self)
         about_act.triggered.connect(self._open_about_dialog)
+        about_qt_act = QtGui.QAction("About Qt", self)
+        about_qt_act.triggered.connect(lambda: QtWidgets.QMessageBox.aboutQt(self))
         help_menu.addAction(about_act)
+        help_menu.addSeparator()
+        help_menu.addAction(about_qt_act)
 
         try:
             self._refresh_recent_files_menu()

@@ -7,6 +7,7 @@ from ui.widgets.draw_util import DrawUtil
 from utils.tiny_tool import key_class_filter
 from utils.operator import Operator
 from typing import Tuple
+from ui.style import Style
 
 if TYPE_CHECKING:
     from editor.editor import Editor
@@ -110,7 +111,10 @@ class NoteDrawerMixin:
     def _midinote_color(self, n, draw_mode: str) -> tuple[float, float, float, float]:
         if draw_mode in ('cursor', 'edit', 'selected'):
             return self.accent_color
-        return (0.6, 0.7, 0.8, 1.0) if (getattr(n, 'hand', '<') in ('l', '<')) else (0.8, 0.7, 0.6, 1.0)
+        hand = getattr(n, 'hand', '<')
+        key = 'midi_left' if hand in ('l', '<') else 'midi_right'
+        r, g, b = Style.get_named_rgb(key, (153, 179, 204))
+        return (float(r) / 255.0, float(g) / 255.0, float(b) / 255.0, 1.0)
 
     def _draw_midinote(self, du: DrawUtil, n, x: float, y1: float, y2: float, draw_mode: str) -> None:
         self = cast("Editor", self)
@@ -219,8 +223,8 @@ class NoteDrawerMixin:
                 tags=["notehead_black"],
             )
         else:
-            # Use explicit white for notehead fill to avoid theme bleed
-            bg_fill = (1.0, 1.0, 1.0, 1.0)
+            paper_r, paper_g, paper_b = Style.get_named_rgb('paper', (255, 255, 255))
+            bg_fill = (paper_r / 255.0, paper_g / 255.0, paper_b / 255.0, 1.0)
             du.add_oval(
                 x - w,
                 y1,
