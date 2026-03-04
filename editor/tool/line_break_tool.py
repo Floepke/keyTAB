@@ -182,7 +182,23 @@ class LineBreakTool(BaseTool):
         click_time = self._cursor_time(y)
         hit = self._hit_test_line_break(x, y)
         if hit is not None:
-            self._open_line_break_dialog(hit)
+            try:
+                hit.page_break = not bool(getattr(hit, 'page_break', False))
+                if hasattr(self._editor, '_snapshot_if_changed'):
+                    self._editor._snapshot_if_changed(coalesce=False, label='line_break_toggle')
+            except Exception:
+                pass
+            try:
+                if hasattr(self._editor, 'force_redraw_from_model'):
+                    self._editor.force_redraw_from_model()
+                else:
+                    self._editor.draw_frame()
+            except Exception:
+                pass
+            try:
+                self._editor.score_changed.emit()
+            except Exception:
+                pass
             return
         if self._is_time_zero(click_time):
             # Never insert at time 0

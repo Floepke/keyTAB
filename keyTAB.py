@@ -245,11 +245,10 @@ def main(argv: list[str] | None = None):
     # Enforce arrow cursor globally: app never changes the mouse pointer
     QtGui.QGuiApplication.setOverrideCursor(QtGui.QCursor(QtCore.Qt.CursorShape.ArrowCursor))
     
-    # Install and apply embedded UI font (FiraCode-SemiBold) globally
+    # Force the font via stylesheet as a fallback if Qt ignores the app font
     try:
-        install_default_ui_font(app, name='FiraCode-SemiBold', point_size=int(10))
+        app.setStyleSheet(app.styleSheet() + "\n* { font-family: 'Fira Code'; }\n")
     except Exception:
-        # Proceed with default font if installation fails
         pass
 
     # Set application window icon from icons package
@@ -265,6 +264,14 @@ def main(argv: list[str] | None = None):
         sty.set_dark_theme()
     else:
         sty.set_light_theme()
+
+    # Install and apply embedded UI font (FiraCode-SemiBold) globally AFTER palette/style reset
+    try:
+        install_default_ui_font(app, name='FiraCode-SemiBold', point_size=int(10))
+        # Fallback stylesheet to force family if Qt ignores app font
+        app.setStyleSheet(app.styleSheet() + "\n* { font-family: 'Fira Code'; }\n")
+    except Exception:
+        pass
 
     win = MainWindow()
 

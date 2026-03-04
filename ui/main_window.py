@@ -157,10 +157,16 @@ class MainWindow(QtWidgets.QMainWindow):
         self.splitter.setStretchFactor(0, 3)
         self.splitter.setStretchFactor(1, 2)
         self.setCentralWidget(self.splitter)
-        # Status bar for lightweight app messages
+        # Status bar for lightweight app messages and default path/dirty info
+        self._status_default_text = ""
         try:
             self._statusbar = QtWidgets.QStatusBar(self)
             self.setStatusBar(self._statusbar)
+            try:
+                self._statusbar.messageChanged.connect(self._on_status_message_changed)
+            except Exception:
+                pass
+            self._show_status_default()
         except Exception:
             self._statusbar = None
         # Ensure the editor is the main focus target
@@ -1076,6 +1082,31 @@ class MainWindow(QtWidgets.QMainWindow):
         except Exception:
             pass
 
+    def _status_default_message(self) -> str:
+        try:
+            dirty = bool(self.file_manager.is_dirty())
+        except Exception:
+            dirty = False
+        try:
+            p = self.file_manager.path()
+        except Exception:
+            p = None
+        state = "Unsaved changes" if dirty else "Saved"
+        path_text = str(p) if p else "(unsaved project)"
+        return f"{state} • {path_text}"
+
+    def _show_status_default(self) -> None:
+        try:
+            sb = self.statusBar() if hasattr(self, 'statusBar') else None
+            if sb is not None and not sb.currentMessage():
+                sb.showMessage(self._status_default_message(), 0)
+        except Exception:
+            pass
+
+    def _on_status_message_changed(self, msg: str) -> None:
+        if not msg:
+            self._show_status_default()
+
     def _open_preferences(self) -> None:
         # Ensure preferences file exists and open in system editor
         open_preferences(self)
@@ -1177,14 +1208,17 @@ class MainWindow(QtWidgets.QMainWindow):
         except Exception:
             pass
         self._update_title()
+        self._show_status_default()
 
     def _file_save(self) -> None:
         if self.file_manager.save():
             self._update_title()
+            self._show_status_default()
 
     def _file_save_as(self) -> None:
         if self.file_manager.save_as():
             self._update_title()
+            self._show_status_default()
 
     def _refresh_views_from_score(self, delay_engrave_ms: int = 0) -> None:
         try:
@@ -1214,6 +1248,7 @@ class MainWindow(QtWidgets.QMainWindow):
             self.engraver.engrave(self._current_score_dict())
         except Exception:
             pass
+        self._show_status_default()
 
     def _open_style_dialog(self) -> None:
         try:
@@ -1545,11 +1580,8 @@ class MainWindow(QtWidgets.QMainWindow):
             pass
 
     def _update_title(self) -> None:
-        p = self.file_manager.path()
-        if p:
-            self.setWindowTitle(f"keyTAB - existing project ({str(p)})")
-        else:
-            self.setWindowTitle("keyTAB - new project (unsaved)")
+        self.setWindowTitle("keyTAB")
+        self._show_status_default()
 
     def _page_dimensions_mm(self) -> tuple[float, float]:
         try:

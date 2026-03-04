@@ -26,21 +26,25 @@ class Style:
     # - paper_color: editor background (print view is forced white)
     # - notation_color: notation/stroke color
     _LIGHT = {
-        "bg_color": (250, 240, 240),
-        "alternate_background_color": (255, 245, 245),
+        "bg_color": (200, 200, 200),
+        "alternate_background_color": (205, 205, 205),
         "text_color": (0, 0, 0),
-        "accent_color": (0, 120, 215),
+        "accent_color": (170, 170, 170),
         "paper_color": (255, 255, 255),
         "notation_color": (0, 0, 16),
+        "left_midi_color": (153, 179, 204),
+        "right_midi_color": (204, 179, 153),
     }
 
     _DARK = {
-        "bg_color": (30, 30, 40),
-        "alternate_background_color": (20, 20, 30),
+        "bg_color": (40, 30, 40),
+        "alternate_background_color": (30, 20, 30),
         "text_color": (240, 240, 240),
-        "accent_color": (0, 30, 68),
+        "accent_color": (50, 40, 50),
         "paper_color": (150, 150, 150),
         "notation_color": (0, 0, 16),
+        "left_midi_color": (153, 179, 204),
+        "right_midi_color": (204, 179, 153),
     }
 
     # Palette role → dict key mapping using the four-theme colors above.
@@ -78,7 +82,9 @@ class Style:
         'alternate_background_color': (245, 245, 245),
         'accent': (0, 120, 215),
         'paper': (255, 255, 255),
-        'notation': (0, 0, 16),
+        'notation': (0, 16, 0),
+        'midi_left': (153, 179, 204),
+        'midi_right': (204, 179, 153),
     }
     _THEME_SYNCED: bool = False
 
@@ -101,6 +107,8 @@ class Style:
         _set_named('accent', 'accent_color')
         _set_named('paper', 'paper_color')
         _set_named('notation', 'notation_color')
+        _set_named('midi_left', 'left_midi_color')
+        _set_named('midi_right', 'right_midi_color')
         cls._NAMED['draw_util'] = (255, 255, 255)
         cls._NAMED['editor'] = cls._NAMED['paper']
         cls._THEME_SYNCED = True
@@ -131,12 +139,16 @@ class Style:
             accent = colors_by_key["accent_color"]
             paper = colors_by_key["paper_color"]
             notation = colors_by_key["notation_color"]
+            midi_left = colors_by_key.get("left_midi_color", paper)
+            midi_right = colors_by_key.get("right_midi_color", paper)
             Style._NAMED['bg'] = (bg.red(), bg.green(), bg.blue())
             Style._NAMED['text'] = (text.red(), text.green(), text.blue())
             Style._NAMED['alternate_background_color'] = (alternate_background_color.red(), alternate_background_color.green(), alternate_background_color.blue())
             Style._NAMED['accent'] = (accent.red(), accent.green(), accent.blue())
             Style._NAMED['paper'] = (paper.red(), paper.green(), paper.blue())
             Style._NAMED['notation'] = (notation.red(), notation.green(), notation.blue())
+            Style._NAMED['midi_left'] = (midi_left.red(), midi_left.green(), midi_left.blue())
+            Style._NAMED['midi_right'] = (midi_right.red(), midi_right.green(), midi_right.blue())
             Style._NAMED['draw_util'] = (255, 255, 255)
             Style._NAMED['editor'] = Style._NAMED['paper']
             Style._THEME_SYNCED = True

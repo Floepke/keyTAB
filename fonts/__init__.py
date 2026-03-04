@@ -216,16 +216,50 @@ def install_default_ui_font(app: Optional[QApplication] = None, name: str = 'Fir
         return False
 
     family = register_font_from_bytes(name)
+
+    # On macOS, Qt sometimes ignores in-memory fonts for UI widgets.
+    # Install the embedded font to the user font dir and register from the file as a fallback.
+    if not family:
+        ok, path = install_embedded_font_to_system(name)
+        if ok and QFontDatabase is not None:
+            try:
+                fid = QFontDatabase.addApplicationFont(path)
+                if fid >= 0:
+                    fams = [str(f) for f in QFontDatabase.applicationFontFamilies(fid)]
+                    if fams:
+                        family = fams[0]
+            except Exception:
+                pass
+
+    # Try a list of likely family names/aliases for Fira Code
+    candidates = []
+    if family:
+        candidates.append(family)
+    candidates.extend([
+        name,
+        'Fira Code',
+        'FiraCode',
+        'Fira Code SemiBold',
+        'FiraCode-SemiBold',
+    ])
+
     try:
-        if family:
-            f = QFont(family, point_size)
-            app.setFont(f)
-            return True
-        # Fallback: try system font
-        f = QFont(name, point_size)
-        if f and f.family():
-            app.setFont(f)
-            return True
+        for fam in candidates:
+            if not fam:
+                continue
+            f = QFont(str(fam), point_size)
+            # Prefer semi-bold weight when available
+            try:
+                f.setWeight(QFont.Weight.DemiBold)
+            except Exception:
+                pass
+            if f and f.family():
+                app.setFont(f)
+                return True
+        # Last resort: let Qt pick default font with size
+        f = QFont()
+        f.setPointSize(point_size)
+        app.setFont(f)
     except Exception:
         return False
     return False

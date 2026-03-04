@@ -74,9 +74,6 @@ class CairoEditorWidget(QtWidgets.QWidget):
         # Cached static layers for current viewport
         self._content_cache_image: QtGui.QImage | None = None
         self._content_cache_key: tuple | None = None  # (px_per_mm, dpr, vis_w_px, vis_h_px, clip_x_mm, clip_y_mm, clip_w_mm, clip_h_mm)
-        # Debug logging toggle (env: PIANOSCRIPT_DEBUG_SCROLL=1)
-        self._debug_scroll: bool = os.getenv('PIANOSCRIPT_DEBUG_SCROLL', '0') in ('1', 'true', 'True')
-        self._last_debug_key: tuple | None = None
         # Static viewport: no tiling/cache/renderer state
         self._last_cache_params: tuple[float, float, float] | None = None
         # Last hovered note id to avoid redundant status updates
@@ -167,14 +164,6 @@ class CairoEditorWidget(QtWidgets.QWidget):
         clip_y_mm_bleed = clip_y_mm
         clip_h_mm_bleed = float(vis_h_px_bleed) / max(1e-6, px_per_mm)
 
-        # Debug logging (only when values change)
-        if self._debug_scroll:
-            dbg_key = (scroll_val_px, round(dpr, 3), round(px_per_mm, 6), int(vp_w), int(vp_h),
-                       int(vis_w_px), int(vis_h_px), round(clip_y_mm, 3), round(clip_h_mm, 3))
-            if dbg_key != self._last_debug_key:
-                self._last_debug_key = dbg_key
-                print(f"[ScrollDbg] scroll_px={scroll_val_px} dpr={dpr:.3f} px_per_mm={px_per_mm:.6f} "
-                      f"vp=({vp_w}x{vp_h}) vis=({vis_w_px}x{vis_h_px}) clip_y_mm={clip_y_mm:.3f} clip_h_mm={clip_h_mm:.3f}")
         # Static viewport: tiling disabled and not used
 
         # Emit metrics so a container can configure an external scrollbar

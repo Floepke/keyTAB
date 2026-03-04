@@ -1887,7 +1887,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                             x + (w * head_scale),
                             note_y + (w * 2.0),
                             stroke_color=(0, 0, 0, 1),
-                            stroke_width_mm=0.3,
+                            stroke_width_mm=0.1,
                             fill_color=(0, 0, 0, 1),
                             id=int(item.get('id', 0) or 0),
                             tags=['notehead_black'],

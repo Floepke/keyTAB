@@ -71,8 +71,9 @@ class LineBreakDialog(QtWidgets.QDialog):
 
         list_label = QtWidgets.QLabel("Line/Page breaks:", self)
         self.break_table = QtWidgets.QTableWidget(self)
-        self.break_table.setColumnCount(5)
+        self.break_table.setColumnCount(6)
         self.break_table.setHorizontalHeaderLabels([
+            " ",
             " Start Measure ",
             " Type ",
             " Left margin " ,
@@ -88,7 +89,8 @@ class LineBreakDialog(QtWidgets.QDialog):
         self.break_table.horizontalHeader().setSectionResizeMode(1, QtWidgets.QHeaderView.ResizeMode.ResizeToContents)
         self.break_table.horizontalHeader().setSectionResizeMode(2, QtWidgets.QHeaderView.ResizeMode.ResizeToContents)
         self.break_table.horizontalHeader().setSectionResizeMode(3, QtWidgets.QHeaderView.ResizeMode.ResizeToContents)
-        self.break_table.horizontalHeader().setSectionResizeMode(4, QtWidgets.QHeaderView.ResizeMode.Stretch)
+        self.break_table.horizontalHeader().setSectionResizeMode(4, QtWidgets.QHeaderView.ResizeMode.ResizeToContents)
+        self.break_table.horizontalHeader().setSectionResizeMode(5, QtWidgets.QHeaderView.ResizeMode.Stretch)
         lay.addWidget(list_label)
         lay.addWidget(self.break_table)
 
@@ -159,19 +161,28 @@ class LineBreakDialog(QtWidgets.QDialog):
         btn = QtWidgets.QToolButton(self)
         btn.setText("P" if is_page else "L")
         btn.setAutoRaise(True)
-        btn.setFixedSize(22, 22)
+        btn.setSizePolicy(QtWidgets.QSizePolicy.Policy.Preferred, QtWidgets.QSizePolicy.Policy.Expanding)
+        btn.setMinimumWidth(32)
+        btn.setMinimumHeight(28)
         try:
             from fonts import register_font_from_bytes
-            marker_family = register_font_from_bytes('C059') or 'C059'
+            marker_family = register_font_from_bytes('Fira Code') or 'Fira Code'
         except Exception:
-            marker_family = 'C059'
+            marker_family = 'Fira Code'
         marker_font = btn.font()
         marker_font.setFamily(marker_family)
         marker_font.setPointSize(18)
         marker_font.setBold(True)
         btn.setFont(marker_font)
-        btn.setStyleSheet("QToolButton { background: #000000; color: #ffffff; border-radius: 0px; }")
-        btn.setToolTip("Page" if is_page else "Line")
+        btn.setStyleSheet(
+            "QToolButton {"
+            " background: #000000;"
+            " color: #ffffff;"
+            " border-radius: 4px;"
+            " padding: 0 8px;"
+            " }"
+        )
+        btn.setToolTip("Page Break" if is_page else "Line Break")
         return btn
 
     def _create_margin_spin(self, value: float) -> FlexibleDoubleSpinBox:
@@ -330,7 +341,7 @@ class LineBreakDialog(QtWidgets.QDialog):
         measure_val = self._measure_index_for_time(float(getattr(lb, 'time', 0.0) or 0.0))
         measure_item = QtWidgets.QTableWidgetItem(str(int(measure_val) + 1))
         measure_item.setData(QtCore.Qt.ItemDataRole.UserRole, lb)
-        self.break_table.setItem(row, 0, measure_item)
+        self.break_table.setItem(row, 1, measure_item)
 
         defaults = LineBreak()
         margin_mm = list(getattr(lb, 'margin_mm', defaults.margin_mm) or defaults.margin_mm)
@@ -410,27 +421,53 @@ class LineBreakDialog(QtWidgets.QDialog):
         left_spin.valueChanged.connect(_left_changed)
         right_spin.valueChanged.connect(_right_changed)
 
-        self.break_table.setCellWidget(row, 0, measure_spin)
-        self.break_table.setCellWidget(row, 1, type_btn)
-        self.break_table.setCellWidget(row, 2, left_spin)
-        self.break_table.setCellWidget(row, 3, right_spin)
-        self.break_table.setCellWidget(row, 4, range_widget)
+        # Delete control in column 0
+        delete_btn = QtWidgets.QToolButton(self)
+        delete_btn.setText("✕")
+        delete_btn.setAutoRaise(True)
+        delete_btn.setToolTip("Delete")
+        delete_btn.setFixedWidth(28)
+
+        def _delete_break() -> None:
+            try:
+                if self._score is not None:
+                    try:
+                        self._score.events.line_break.remove(lb)
+                    except Exception:
+                        pass
+                try:
+                    self._line_breaks.remove(lb)
+                except Exception:
+                    pass
+                self._populate_break_list()
+                self.valuesChanged.emit()
+            except Exception:
+                pass
+
+        delete_btn.clicked.connect(_delete_break)
+
+        self.break_table.setCellWidget(row, 0, delete_btn)
+        self.break_table.setCellWidget(row, 1, measure_spin)
+        self.break_table.setCellWidget(row, 2, type_btn)
+        self.break_table.setCellWidget(row, 3, left_spin)
+        self.break_table.setCellWidget(row, 4, right_spin)
+        self.break_table.setCellWidget(row, 5, range_widget)
 
     def _select_line_break(self, lb: Optional[LineBreak]) -> None:
         if lb is None:
             self.break_table.clearSelection()
             return
         for row in range(self.break_table.rowCount()):
-            item = self.break_table.item(row, 0)
+            item = self.break_table.item(row, 1)
             if item is not None and item.data(QtCore.Qt.ItemDataRole.UserRole) is lb:
-                self.break_table.setCurrentCell(row, 0)
+                self.break_table.setCurrentCell(row, 1)
                 return
 
     def _current_line_break(self) -> Optional[LineBreak]:
         row = self.break_table.currentRow()
         if row < 0:
             return None
-        item = self.break_table.item(row, 0)
+        item = self.break_table.item(row, 1)
         if item is None:
             return None
         return item.data(QtCore.Qt.ItemDataRole.UserRole)
