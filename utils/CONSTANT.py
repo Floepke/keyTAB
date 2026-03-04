@@ -19,6 +19,7 @@ QUARTER_NOTE_UNIT: float = 256.0
 # Update these lists to control layer stacking in the Editor and Engraver.
 EDITOR_LAYERING = [
     # layers from background to foreground
+    'page_background',
     'snap_band',
     'midi_note',
     'grid_line',
@@ -65,6 +66,7 @@ EDITOR_LAYERING = [
 
 ENGRAVER_LAYERING = [
     # layers from background to foreground
+    'page_background',
     'midi_note',
     'grid_line',
     'count_line',

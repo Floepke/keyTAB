@@ -1,4 +1,4 @@
-import sys
+import colorsys
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor, QPalette
 from PySide6.QtWidgets import QApplication
@@ -29,9 +29,9 @@ class Style:
         "bg_color": (200, 200, 200),
         "alternate_background_color": (205, 205, 205),
         "text_color": (0, 0, 0),
-        "accent_color": (170, 170, 170),
-        "paper_color": (255, 255, 255),
-        "notation_color": (0, 0, 16),
+        "accent_color": (130, 130, 130),
+        "paper_color": (240, 240, 240),
+        "notation_color": (0, 0, 25),
         "left_midi_color": (153, 179, 204),
         "right_midi_color": (204, 179, 153),
     }
@@ -41,8 +41,8 @@ class Style:
         "alternate_background_color": (30, 20, 30),
         "text_color": (240, 240, 240),
         "accent_color": (50, 40, 50),
-        "paper_color": (150, 150, 150),
-        "notation_color": (0, 0, 16),
+        "paper_color": (190, 190, 190),
+        "notation_color": (0, 0, 0),
         "left_midi_color": (153, 179, 204),
         "right_midi_color": (204, 179, 153),
     }
@@ -67,7 +67,7 @@ class Style:
     def __init__(self):
         # Match the old app's preferred light look by default
         self.set_dynamic_theme(0.75)
-        self.editor_background_color = self.get_editor_background_color()
+        self.editor_background_color = self.get_paper_color()
         self._sync_editor_named_color()
 
     # Named custom colors registry
@@ -113,21 +113,72 @@ class Style:
         cls._NAMED['editor'] = cls._NAMED['paper']
         cls._THEME_SYNCED = True
 
+    @staticmethod
+    def _luminance(rgb: tuple[int, int, int]) -> float:
+        # Convert sRGB 0-255 to linear and compute luminance
+        def _lin(c: float) -> float:
+            c = c / 255.0
+            return c / 12.92 if c <= 0.04045 else ((c + 0.055) / 1.055) ** 2.4
+        r, g, b = rgb
+        return 0.2126 * _lin(r) + 0.7152 * _lin(g) + 0.0722 * _lin(b)
+
+    @classmethod
+    def _contrast(cls, a: tuple[int, int, int], b: tuple[int, int, int]) -> float:
+        la = cls._luminance(a)
+        lb = cls._luminance(b)
+        hi, lo = (la, lb) if la >= lb else (lb, la)
+        return (hi + 0.05) / (lo + 0.05)
+
+    @classmethod
+    def _ensure_contrast(cls, src: tuple[int, int, int], paper: tuple[int, int, int], min_ratio: float = 2.0) -> tuple[int, int, int]:
+        # Keep hue, adjust lightness to meet contrast vs paper. HLS uses 0..1.
+        min_ratio = float(min_ratio)
+        ratio = cls._contrast(src, paper)
+        if ratio >= min_ratio:
+            return tuple(int(max(0, min(255, c))) for c in src)
+        pr, pg, pb = paper
+        sr, sg, sb = src
+        h, l, s = colorsys.rgb_to_hls(sr / 255.0, sg / 255.0, sb / 255.0)
+        paper_lum = cls._luminance(paper)
+        step = 0.05
+        # Decide direction: darken if paper is light, lighten if paper is dark
+        if paper_lum > 0.5:
+            # darken
+            while l > 0.05 and ratio < min_ratio:
+                l = max(0.0, l - step)
+                r, g, b = colorsys.hls_to_rgb(h, l, min(1.0, s + 0.05))
+                candidate = (int(r * 255), int(g * 255), int(b * 255))
+                ratio = cls._contrast(candidate, paper)
+                if ratio >= min_ratio or l <= 0.05:
+                    return candidate if ratio >= min_ratio else (int(r * 255), int(g * 255), int(b * 255))
+        else:
+            # lighten
+            while l < 0.95 and ratio < min_ratio:
+                l = min(1.0, l + step)
+                r, g, b = colorsys.hls_to_rgb(h, l, min(1.0, s + 0.05))
+                candidate = (int(r * 255), int(g * 255), int(b * 255))
+                ratio = cls._contrast(candidate, paper)
+                if ratio >= min_ratio or l >= 0.95:
+                    return candidate if ratio >= min_ratio else (int(r * 255), int(g * 255), int(b * 255))
+        return tuple(int(max(0, min(255, c))) for c in src)
+
     @classmethod
     def set_named_color(cls, name: str, rgb: tuple[int, int, int]) -> None:
         cls._NAMED[name] = tuple(int(max(0, min(255, c))) for c in rgb)
 
     @classmethod
     def get_named_qcolor(cls, name: str, fallback: tuple[int, int, int] = (240, 240, 240)) -> QColor:
+        cls._ensure_theme_seeded()
         rgb = cls._NAMED.get(name, fallback)
         return QColor(*rgb)
 
     @classmethod
     def get_named_rgb(cls, name: str, fallback: tuple[int, int, int] = (240, 240, 240)) -> tuple[int, int, int]:
+        cls._ensure_theme_seeded()
         return cls._NAMED.get(name, fallback)
 
     def _sync_editor_named_color(self) -> None:
-        rgb = self.get_editor_background_color()
+        rgb = self.get_paper_color()
         self.editor_background_color = rgb
         Style._NAMED['editor'] = tuple(int(c) for c in rgb)
 
@@ -258,7 +309,22 @@ class Style:
         return cls._NAMED.get('notation', (0, 0, 14))
 
     @classmethod
-    def get_editor_background_color(cls) -> tuple[int, int, int]:
-        """Get the appropriate editor background color based on current theme."""
+    def get_paper_color(cls) -> tuple[int, int, int]:
         cls._ensure_theme_seeded()
         return cls._NAMED.get('paper', (255, 255, 255))
+
+    @classmethod
+    def get_notation_qcolor(cls) -> QColor:
+        rgb = cls.get_notation_color()
+        return QColor(*rgb)
+
+    @classmethod
+    def get_paper_qcolor(cls) -> QColor:
+        rgb = cls.get_paper_color()
+        return QColor(*rgb)
+
+    @classmethod
+    def get_contrasting_midi_rgb(cls, raw_rgb: tuple[int, int, int]) -> tuple[int, int, int]:
+        cls._ensure_theme_seeded()
+        paper = cls.get_paper_color()
+        return cls._ensure_contrast(raw_rgb, paper, min_ratio=2.0)

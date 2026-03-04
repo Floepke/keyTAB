@@ -383,11 +383,11 @@ class NoteDrawerMixin:
     def _editor_background_rgba(self) -> Tuple[float, float, float, float]:
         """Return the editor background as RGBA floats (0..1), alpha=1.0.
 
-        Reads from Style.get_editor_background_color() without instantiating Style
+        Reads from Style.get_paper_color() without instantiating Style
         to avoid side effects.
         """
         from ui.style import Style
-        rgb = Style.get_editor_background_color()
+        rgb = Style.get_paper_color()
         r, g, b = tuple(int(c) for c in rgb)
         return (r / 255.0, g / 255.0, b / 255.0, 1.0)
 

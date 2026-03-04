@@ -10,6 +10,7 @@ from utils.operator import Operator
 from file_model.SCORE import SCORE
 from file_model.info import Info
 from file_model.analysis import Analysis
+from ui.style import Style
 
 _MP_CONTEXT = mp.get_context("spawn")
 
@@ -36,6 +37,23 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
     slurs = list(events.get('slur', []) or [])
     texts = list(events.get('text', []) or [])
 
+    # Theme colors
+    notation_rgb = Style.get_notation_color()
+    paper_rgb = Style.get_paper_color()
+    notation_color = (notation_rgb[0] / 255.0, notation_rgb[1] / 255.0, notation_rgb[2] / 255.0, 1.0)
+    paper_color = (paper_rgb[0] / 255.0, paper_rgb[1] / 255.0, paper_rgb[2] / 255.0, 1.0)
+
+    if pdf_export:
+        # PDF export must stay pure black ink on white paper and preserve raw MIDI colors.
+        notation_color = (0.0, 0.0, 0.0, 1.0)
+        paper_color = (1.0, 1.0, 1.0, 1.0)
+
+    def _midi_fill_from_rgb(rgb_tuple: tuple[int, int, int]) -> tuple[float, float, float, float]:
+        if pdf_export:
+            return (rgb_tuple[0] / 255.0, rgb_tuple[1] / 255.0, rgb_tuple[2] / 255.0, 1.0)
+        adjusted = Style.get_contrasting_midi_rgb(rgb_tuple)
+        return (adjusted[0] / 255.0, adjusted[1] / 255.0, adjusted[2] / 255.0, 1.0)
+
     # Problem solved: beam markers are organized per hand for fast grouping later.
     beam_by_hand: dict[str, list[dict]] = {'l': [], 'r': []}
     for b in beam_markers:
@@ -50,7 +68,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
         beam_by_hand[hk] = sorted(beam_by_hand[hk], key=lambda m: float(m.get('time', 0.0)))
 
     # Problem solved: normalize notes once to avoid repeated dict parsing in loops.
-    norm_notes: list[dict] = []
+    norm_notes: list[dict] = []  # Normalized notes for processing
     notes_by_hand: dict[str, list[dict]] = {'<': [], '>': []}
     starts_by_hand: dict[str, list[float]] = {'<': [], '>': []}
     for idx, n in enumerate(notes):
@@ -876,10 +894,20 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
 
     for page_index, page in enumerate(pages):
         du.new_page(page_w, page_h)
+        du.add_rectangle(
+            0.0,
+            0.0,
+            page_w,
+            page_h,
+            stroke_color=None,
+            fill_color=paper_color,
+            id=0,
+            tags=['page_background'],
+        )
         if not pdf_export:
             edge_thickness = .5
             edge_dash = [2]
-            edge_color = (0.0, 0.0, 0.0, 1.0)
+            edge_color = notation_color
             du.add_line(
                 0.0,
                 0.0,
@@ -929,7 +957,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                 size_pt=title_size,
                 bold=title_bold,
                 italic=title_italic,
-                color=(0, 0, 0, 1),
+                color=notation_color,
                 id=0,
                 tags=['title'],
                 anchor='nw',
@@ -942,7 +970,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                 size_pt=composer_size,
                 bold=composer_bold,
                 italic=composer_italic,
-                color=(0, 0, 0, 1),
+                color=notation_color,
                 id=0,
                 tags=['composer'],
                 anchor='ne',
@@ -968,7 +996,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                 size_pt=footer_size,
                 bold=footer_bold,
                 italic=footer_italic,
-                color=(0, 0, 0, 1),
+                color=notation_color,
                 id=0,
                 tags=['copyright'],
                 anchor='sw',
@@ -987,7 +1015,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                     size_pt=credit_size,
                     bold=footer_bold,
                     italic=footer_italic,
-                    color=(0, 0, 0, 1),
+                    color=notation_color,
                     id=0,
                     tags=['copyright'],
                     anchor='se',
@@ -1101,7 +1129,14 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
             klav_size_pt = klav_size * scale
 
             def _ts_color(enabled: bool) -> tuple[float, float, float, float]:
-                return (0.0, 0.0, 0.0, 1.0) if enabled else (0.6, 0.6, 0.6, 1.0)
+                if enabled:
+                    return notation_color
+                return (
+                    max(0.0, notation_color[0] * 0.6 + paper_color[0] * 0.4),
+                    max(0.0, notation_color[1] * 0.6 + paper_color[1] * 0.4),
+                    max(0.0, notation_color[2] * 0.6 + paper_color[2] * 0.4),
+                    1.0,
+                )
 
             def _draw_classical_ts(numerator: int, denominator: int, enabled: bool, y_mm: float) -> None:
                 color = _ts_color(enabled)
@@ -1249,7 +1284,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
             ts_x_left = ts_left_edge + (ts_col_w * 0.5)
             ts_x_mid = ts_left_edge + (ts_col_w * 1.5)
             ts_x_right = ts_left_edge + (ts_col_w * 2.5)
-            grid_color = (0, 0, 0, 1)
+            grid_color = notation_color
             bar_width_mm = float(layout.get('grid_barline_thickness_mm', 0.25) or 0.25) * scale
             grid_width_mm = float(layout.get('grid_gridline_thickness_mm', 0.15) or 0.15) * scale
             dash_pattern_raw = list(layout.get('grid_gridline_dash_pattern_mm', []) or [])
@@ -1351,7 +1386,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                         y_mm,
                         x2,
                         y_mm,
-                        color=(0, 0, 0, 1),
+                        color=notation_color,
                         width_mm=countline_w,
                         dash_pattern=dash_pattern,
                         id=int(ev.get('_id', 0) or 0),
@@ -1568,7 +1603,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                     guide_y,
                     x_pos + text_w_mm,
                     guide_y,
-                    color=(0, 0, 0, 1),
+                    color=notation_color,
                     width_mm=max(0.12, 0.15 * scale),
                     id=0,
                     tags=['measure_number_guide'],
@@ -1579,7 +1614,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                     y_text,
                     num_txt,
                     size_pt=size_pt,
-                    color=(0, 0, 0, 1),
+                    color=notation_color,
                     id=0,
                     tags=['measure_number'],
                     anchor='nw',
@@ -1601,7 +1636,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                     y1,
                     x_pos,
                     y2,
-                    color=(0, 0, 0, 1),
+                    color=notation_color,
                     width_mm=width_mm,
                     dash_pattern=None,
                     id=0,
@@ -1627,7 +1662,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                     y1, 
                     x_pos, 
                     y2, 
-                    color=(0, 0, 0, 1), 
+                    color=notation_color,
                     width_mm=width_mm, 
                     dash_pattern=dash, 
                     id=0, 
@@ -1680,7 +1715,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                             yb1,
                             x2,
                             yb2,
-                            color=(0, 0, 0, 1),
+                            color=notation_color,
                             width_mm=max(0.2, beam_w),
                             id=0,
                             tags=['beam'],
@@ -1704,7 +1739,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                                 y_note,
                                 float(x_on_beam),
                                 y_note,
-                                color=(0, 0, 0, 1),
+                                color=notation_color,
                                 width_mm=max(0.15, stem_w),
                                 id=0,
                                 tags=['beam_stem'],
@@ -1754,7 +1789,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                             y_top + (w * 2.0),
                             stroke_color=None,
                             stroke_width_mm=0.0,
-                            fill_color=(0, 0, 0, 1),
+                            fill_color=notation_color,
                             id=int(item.get('id', 0) or 0),
                             tags=['grace_note_black'],
                         )
@@ -1767,7 +1802,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                             y_top + (w * 2.0),
                             stroke_color=None,
                             stroke_width_mm=0.0,
-                            fill_color=(0, 0, 0, 1),
+                            fill_color=notation_color,
                             id=int(item.get('id', 0) or 0),
                             tags=['grace_note_black_outline'],
                         )
@@ -1789,7 +1824,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                             ib,
                             stroke_color=None,
                             stroke_width_mm=0.0,
-                            fill_color=(1, 1, 1, 1),
+                            fill_color=paper_color,
                             id=int(item.get('id', 0) or 0),
                             tags=['grace_note_white_fill'],
                         )
@@ -1827,7 +1862,11 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                     base = _normalize_hex_color(layout.get(fallback, '#cccccc'))
                 if not base:
                     base = '#cccccc'
-                fill = _hex_to_rgba01(base, 1.0)
+                try:
+                    r_i, g_i, b_i, _a = hex_to_rgba(base, 1.0)
+                except Exception:
+                    r_i, g_i, b_i = (204, 204, 204)
+                fill = _midi_fill_from_rgb((int(r_i), int(g_i), int(b_i)))
                 if bool(layout.get('note_midinote_visible', True)):
                     du.add_polygon(
                         [
@@ -1867,7 +1906,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                             y_start,
                             x2,
                             y_start,
-                            color=(1,1,1,1),
+                            color=paper_color,
                             width_mm=thickness,
                             line_cap="butt",
                             id=0,
@@ -1886,9 +1925,9 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                             note_y,
                             x + (w * head_scale),
                             note_y + (w * 2.0),
-                            stroke_color=(0, 0, 0, 1),
+                            stroke_color=notation_color,
                             stroke_width_mm=0.1,
-                            fill_color=(0, 0, 0, 1),
+                            fill_color=notation_color,
                             id=int(item.get('id', 0) or 0),
                             tags=['notehead_black'],
                         )
@@ -1898,9 +1937,9 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                             note_y,
                             x + w,
                             note_y + (w * 2.0),
-                            stroke_color=(0, 0, 0, 1),
+                            stroke_color=notation_color,
                             stroke_width_mm=outline_w,
-                            fill_color=(1, 1, 1, 1),
+                            fill_color=paper_color,
                             id=int(item.get('id', 0) or 0),
                             tags=['notehead_white'],
                         )
@@ -1916,7 +1955,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                         y_start,
                         x2,
                         y_start,
-                        color=(0, 0, 0, 1),
+                        color=notation_color,
                         width_mm=stem_w,
                         id=0,
                         tags=['stem'],
@@ -1927,7 +1966,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                     w2 = w * 2.0
                     dot_d = w2 * 0.3
                     cy = note_y + (w2 / 2.0)
-                    fill = (1, 1, 1, 1) if p in BLACK_KEYS else (0, 0, 0, 1)
+                    fill = paper_color if p in BLACK_KEYS else notation_color
                     du.add_oval(
                         x - (dot_d / 3.0),
                         cy - (dot_d / 3.0),
@@ -1981,7 +2020,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                                     y_seg1,
                                     x_pos,
                                     y_seg2,
-                                    color=(0, 0, 0, 1),
+                                    color=notation_color,
                                     width_mm=width_mm,
                                     dash_pattern=dash,
                                     id=0,
@@ -2023,7 +2062,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                             y_center - dot_d / 2.0,
                             x + dot_d / 2.0,
                             y_center + dot_d / 2.0,
-                            fill_color=(0, 0, 0, 1),
+                            fill_color=notation_color,
                             stroke_color=None,
                             id=0,
                             tags=['continuation_dot'],
@@ -2048,7 +2087,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                             y_start,
                             x2,
                             y_start,
-                            color=(0, 0, 0, 1),
+                            color=notation_color,
                             width_mm=float(layout.get('note_stem_thickness_mm', 0.5) or 0.5) * scale,
                             id=0,
                             tags=['chord_connect'],
@@ -2064,7 +2103,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                     ]
                     du.add_polyline(
                         points,
-                        stroke_color=(0, 0, 0, 1),
+                        stroke_color=notation_color,
                         stroke_width_mm=float(layout.get('note_stopsign_thickness_mm', 0.4) or 0.4) * scale,
                         id=0,
                         tags=['stop_sign'],
@@ -2116,7 +2155,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                     du.add_polygon(
                         poly,
                         stroke_color=None,
-                        fill_color=(1.0, 1.0, 1.0, 1.0),
+                        fill_color=paper_color,
                         id=int(tx.get('id', 0) or 0),
                         tags=['text_bg'],
                     )
@@ -2128,7 +2167,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                         size_pt=size_pt,
                         italic=italic,
                         bold=bold,
-                        color=(0.0, 0.0, 0.0, 1.0),
+                        color=notation_color,
                         anchor='center',
                         angle_deg=angle,
                         id=int(tx.get('id', 0) or 0),
@@ -2194,7 +2233,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                             y_a,
                             x_b,
                             y_b,
-                            color=(0, 0, 0, 1),
+                            color=notation_color,
                             width_mm=w_slur,
                             id=int(sl.get('id', 0) or 0),
                             tags=['slur'],

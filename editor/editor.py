@@ -130,6 +130,13 @@ class Editor(QtCore.QObject,
             float(notation_rgb[2]) / 255.0,
             1.0,
         )
+        paper_rgb = Style.get_named_rgb("paper", fallback=(255, 255, 255))
+        self.paper_color = (
+            float(paper_rgb[0]) / 255.0,
+            float(paper_rgb[1]) / 255.0,
+            float(paper_rgb[2]) / 255.0,
+            1.0,
+        )
         accent_rgb = Style.get_named_rgb("accent", fallback=(51, 153, 255))
         self.accent_color = (
             float(accent_rgb[0]) / 255.0,
@@ -213,8 +220,7 @@ class Editor(QtCore.QObject,
     def draw_background_gray(self, du) -> None:
         """Fill the current page with print-view grey (#7a7a7a)."""
         w_mm, h_mm = du.current_page_size_mm()
-        grey = (200, 240, 240, 1.0)
-        du.add_rectangle(0.0, 0.0, w_mm, h_mm, stroke_color=None, fill_color=grey, id=0, tags=["background"])
+        du.add_rectangle(0.0, 0.0, w_mm, h_mm, stroke_color=None, fill_color=self.paper_color, id=0, tags=["background"])
 
     def draw_all(self, du) -> None:
         """Invoke drawer mixin methods; layer order is enforced by DrawUtil tags.
@@ -1301,7 +1307,7 @@ class Editor(QtCore.QObject,
                 layout = self.current_score().layout
                 l = float(layout.note_stem_length_semitone or 3) * float(self.semitone_dist or 0.5)
                 # Draw a translucent preview notehead at cursor
-                fill_color = self.accent_color if self.pitch_cursor in BLACK_KEYS else (1,1,1,1)
+                fill_color = self.notation_color if self.pitch_cursor in BLACK_KEYS else self.paper_color
                 
                 # draw the notehead and stem
                 du.add_oval(
@@ -1330,7 +1336,7 @@ class Editor(QtCore.QObject,
                     w = float(self.semitone_dist or 0.5) * 2.0
                     dot_d = w * 0.35
                     cy = y_mm + (w / 2.0)
-                    fill = (1, 1, 1, 1) if (self.pitch_cursor in BLACK_KEYS) else (0, 0, 0, 1)
+                    fill = self.paper_color if (self.pitch_cursor in BLACK_KEYS) else self.accent_color
                     du.add_oval(
                         x_mm - dot_d / 3.0,
                         cy - dot_d / 3.0,
