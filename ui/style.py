@@ -73,6 +73,7 @@ class Style:
     # Named custom colors registry
     _NAMED: dict[str, tuple[int, int, int]] = {
         # Print view (DrawUtilView): always white
+        # Outer print-view background: follows accent color via Style.get_named_qcolor('accent')
         'draw_util': (255, 255, 255),
         # Editor background: initialized/synced at runtime
         'editor': (255, 255, 255),

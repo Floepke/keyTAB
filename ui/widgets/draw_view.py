@@ -56,7 +56,7 @@ class DrawUtilView(QtWidgets.QWidget):
         self._prev_image: QtGui.QImage | None = None
         self._fade_progress: float = 1.0
         self._fade_elapsed_ms: int = 0
-        self._fade_duration_ms: int = 125
+        self._fade_duration_ms: int = 500
         self._fade_timer = QtCore.QTimer(self)
         self._fade_timer.setInterval(16)
         self._fade_timer.timeout.connect(self._on_fade_tick)
@@ -83,9 +83,9 @@ class DrawUtilView(QtWidgets.QWidget):
         self._suppress_fade_once: bool = False
         # Apply a dedicated background color for DrawUtil views
         try:
-            color = Style.get_named_qcolor('draw_util')
+            accent = Style.get_named_qcolor('accent')
             pal = self.palette()
-            pal.setColor(QtGui.QPalette.Window, color)
+            pal.setColor(QtGui.QPalette.Window, accent)
             self.setPalette(pal)
             self.setAutoFillBackground(True)
             self.setAttribute(QtCore.Qt.WidgetAttribute.WA_OpaquePaintEvent, True)
@@ -155,6 +155,11 @@ class DrawUtilView(QtWidgets.QWidget):
         except Exception:
             painter.fillRect(self.rect(), QtCore.Qt.GlobalColor.white)
         if self._image is not None:
+            try:
+                paper_qcolor = Style.get_paper_qcolor()
+            except Exception:
+                paper_qcolor = QtCore.Qt.GlobalColor.white
+
             def _draw_image(img: QtGui.QImage, opacity: float) -> None:
                 painter.save()
                 painter.setOpacity(opacity)
@@ -174,6 +179,8 @@ class DrawUtilView(QtWidgets.QWidget):
                     max_scroll = max(0, tgt_h - self.height())
                     self._scroll_px = max(0.0, min(float(max_scroll), float(self._scroll_px)))
                     y = -int(round(self._scroll_px))
+                # Keep the page area light during fades to avoid a dark flash between frames.
+                painter.fillRect(QtCore.QRect(x, y, tgt_w, tgt_h), paper_qcolor)
                 painter.drawImage(QtCore.QRect(x, y, tgt_w, tgt_h), img)
                 painter.restore()
 
