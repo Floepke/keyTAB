@@ -97,7 +97,19 @@ class NoteDrawerMixin:
         # Do not clear caches here; when using shared cache, Editor manages lifecycle
 
     def _draw_single_note(self, du: DrawUtil, n, x: float, y1: float, y2: float, draw_mode: str = 'note') -> None:
-        
+        # In tiny mode, render only noteheads and a simple hit rect
+        if getattr(self, 'is_tiny_mode', None) and self.is_tiny_mode():
+            self._draw_notehead(du, n, x, y1, draw_mode)
+            self._draw_midinote(du, n, x, y1, y2, draw_mode)
+            self._draw_stem(du, n, x, y1, draw_mode)
+            try:
+                w = float(self.semitone_dist or 0.5)
+                rect_id = int(getattr(n, '_id', 0) or 0)
+                self.register_note_hit_rect(rect_id, float(x - w), float(y1), float(x + w), float(y1 + (w * 2.0)))
+            except Exception:
+                pass
+            return
+
         # Draw all parts of the note
         self._draw_midinote(du, n, x, y1, y2, draw_mode)
         self._draw_hand_split_indicator(du, n, x, y1)
@@ -239,6 +251,8 @@ class NoteDrawerMixin:
 
     def _draw_notestop(self, du: DrawUtil, n, x: float, y2: float, draw_mode: str) -> None:
         self = cast("Editor", self)
+        if getattr(self, 'is_tiny_mode', None) and self.is_tiny_mode():
+            return
         # Show stop triangle if followed by a rest in same hand
         if not self._is_followed_by_rest(n):
             return
@@ -286,6 +300,8 @@ class NoteDrawerMixin:
 
     def _draw_note_continuation_dot(self, du: DrawUtil, n, x: float, y1: float, y2: float, draw_mode: str) -> None:
         self = cast("Editor", self)
+        if getattr(self, 'is_tiny_mode', None) and self.is_tiny_mode():
+            return
         # Draw dots where other notes in same hand start or end within this note duration
         hand = getattr(n, 'hand', '<')
         start = float(n.time)

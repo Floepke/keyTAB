@@ -36,6 +36,8 @@ class StaveDrawerMixin:
             if key in key_class_filter('ACDFG'): # black keys
                 x_pos = self.pitch_to_x(key)
                 is_clef_line = key in (41, 43)  # C# and D# around middle C
+                if getattr(self, 'is_tiny_mode', None) and self.is_tiny_mode() and is_clef_line:
+                    continue
                 is_three_line = key in key_class_filter('FGA')
                 if is_clef_line:
                     width_mm = max(0.05, semitone_dx / 5.0)

@@ -10,6 +10,8 @@ if TYPE_CHECKING:
 class GraceNoteDrawerMixin:
     def draw_grace_note(self, du: DrawUtil) -> None:
         self = cast("Editor", self)
+        if getattr(self, 'is_tiny_mode', None) and self.is_tiny_mode():
+            return
         score = self.current_score()
         if score is None:
             return

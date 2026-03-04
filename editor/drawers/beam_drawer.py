@@ -18,6 +18,14 @@ class BeamDrawerMixin:
         if not cache:
             return
 
+        # Skip heavy beam rendering in tiny mode
+        if getattr(self, 'is_tiny_mode', None) and self.is_tiny_mode():
+            try:
+                self._beam_groups_by_hand = {}
+            except Exception:
+                pass
+            return
+
         notes_by_hand = cache.get('notes_by_hand') or {}
         grid_times = cache.get('grid_den_times') or []
         beam_markers = cache.get('beam_by_hand') or {}

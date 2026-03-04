@@ -69,6 +69,8 @@ class TextDrawerMixin:
 
     def draw_text(self, du: DrawUtil) -> None:
         self = cast("Editor", self)
+        if getattr(self, 'is_tiny_mode', None) and self.is_tiny_mode():
+            return
         score = getattr(self, 'current_score', lambda: None)()
         if score is None:
             return

@@ -121,6 +121,12 @@ class CairoEditorWidget(QtWidgets.QWidget):
         # Device pixel dimensions (rounded) for the backing image
         vis_w_px = int(max(1, round(float(vp_w) * dpr)))
         vis_h_px = int(max(1, round(float(vp_h) * dpr)))
+        # Update tiny mode based on physical (device) pixels
+        try:
+            if self._editor is not None:
+                self._editor.update_tiny_mode_from_width(float(vis_w_px))
+        except Exception:
+            pass
         # Prepare DrawUtil with page dimensions from SCORE/layout and Editor layout
         page_w_mm = 210.0
         page_h_mm = 297.0

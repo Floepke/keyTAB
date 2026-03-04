@@ -198,6 +198,9 @@ class Editor(QtCore.QObject,
         # Per-frame tempo hit rectangles in absolute mm coordinates
         self._tempo_hit_rects: list[dict] = []
 
+        # Tiny mode: toggled by viewport width (stage 1: simplified drawing, stage 2: skip drawing)
+        self.tiny_mode_stage: int = 0
+
         # Selection window state (time-based, tool-agnostic)
         self._selection_active: bool = False
         self._sel_start_units: float = 0.0
@@ -231,6 +234,10 @@ class Editor(QtCore.QObject,
         self._note_hit_rects = []
         self._text_hit_rects = []
         self._tempo_hit_rects = []
+        # In tiny stage 2, skip drawing to keep closing smooth
+        if self.is_tiny_mode_ultra():
+            self._draw_cache = None
+            return
         
         # Build shared render cache for this draw pass (fresh each frame)
         self._build_render_cache()
@@ -1102,6 +1109,26 @@ class Editor(QtCore.QObject,
             'grid_den_times': grid_den_times,
             'barline_times': barline_times,
         }
+
+    # ---- Tiny mode (viewport-based) ----
+    def update_tiny_mode_from_width(self, viewport_width_px: float) -> None:
+        try:
+            width_px = float(viewport_width_px)
+        except Exception:
+            return
+        # Stage 2: ultra tiny (skip drawing) <300px; Stage 1: simplified drawing <650px
+        stage = 0
+        if width_px < 300.0:
+            stage = 2
+        elif width_px < 650.0:
+            stage = 1
+        self.tiny_mode_stage = stage
+
+    def is_tiny_mode(self) -> bool:
+        return bool(int(getattr(self, 'tiny_mode_stage', 0)) > 0)
+
+    def is_tiny_mode_ultra(self) -> bool:
+        return bool(int(getattr(self, 'tiny_mode_stage', 0)) >= 2)
 
     # ---- External controls ----
     def set_snap_size_units(self, units: float) -> None:
