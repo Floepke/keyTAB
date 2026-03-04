@@ -102,6 +102,7 @@ class NoteDrawerMixin:
             self._draw_notehead(du, n, x, y1, draw_mode)
             self._draw_midinote(du, n, x, y1, y2, draw_mode)
             self._draw_stem(du, n, x, y1, draw_mode)
+            self._draw_left_dot(du, n, x, y1, draw_mode)
             try:
                 w = float(self.semitone_dist or 0.5)
                 rect_id = int(getattr(n, '_id', 0) or 0)
