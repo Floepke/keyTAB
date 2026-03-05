@@ -121,12 +121,20 @@ class CairoEditorWidget(QtWidgets.QWidget):
         # Device pixel dimensions (rounded) for the backing image
         vis_w_px = int(max(1, round(float(vp_w) * dpr)))
         vis_h_px = int(max(1, round(float(vp_h) * dpr)))
-        # Update tiny mode based on logical widget width (device-independent)
+        # Update tiny mode based on device-pixel width (no DPI query needed)
         try:
             if self._editor is not None:
-                self._editor.update_tiny_mode_from_width(float(vp_w))
+                self._editor.update_tiny_mode_from_width(float(vis_w_px))
         except Exception:
             pass
+        # Read continuous tiny-mode fade factor (1.0 = opaque, 0.0 = transparent)
+        content_alpha = 1.0
+        if self._editor is not None:
+            try:
+                # Preserve a true 0.0 instead of falling back via "or 1.0"
+                content_alpha = float(getattr(self._editor, 'tiny_mode_alpha', 1.0))
+            except Exception:
+                content_alpha = 1.0
         # Prepare DrawUtil with page dimensions from SCORE/layout and Editor layout
         page_w_mm = 210.0
         page_h_mm = 297.0
@@ -151,6 +159,16 @@ class CairoEditorWidget(QtWidgets.QWidget):
             self._last_cache_params = cache_params
 
         # Always use fresh DrawUtils to avoid item accumulation
+        # Lock viewport top: when px_per_mm changes (splitter resize), adjust
+        # _scroll_logical_px so clip_y_mm stays the same.
+        old_px_per_mm = self._last_px_per_mm
+        old_dpr = self._last_dpr
+        if abs(px_per_mm - old_px_per_mm) > 1e-6 and old_px_per_mm > 1e-6 and self._scroll_logical_px > 0:
+            old_clip_y_mm = float(self._scroll_logical_px) * old_dpr / old_px_per_mm
+            new_scroll = max(0, int(round(old_clip_y_mm * px_per_mm / max(1e-6, dpr))))
+            if new_scroll != self._scroll_logical_px:
+                self._scroll_logical_px = new_scroll
+                self.scrollLogicalPxChanged.emit(new_scroll)
         self._last_px_per_mm = px_per_mm
         self._last_dpr = dpr
         self._content_h_px = h_px_content
@@ -224,7 +242,17 @@ class CairoEditorWidget(QtWidgets.QWidget):
                 # Draw cached content first
                 content_img = self._content_cache_image
                 content_img.setDevicePixelRatio(dpr)
-                painter.drawImage(QtCore.QRectF(0.0, 0.0, float(vp_w), float(vp_h)), content_img)
+                if content_alpha > 0.0:
+                    if content_alpha < 0.999:
+                        painter.save()
+                        try:
+                            painter.setOpacity(content_alpha)
+                        except Exception:
+                            pass
+                        painter.drawImage(QtCore.QRectF(0.0, 0.0, float(vp_w), float(vp_h)), content_img)
+                        painter.restore()
+                    else:
+                        painter.drawImage(QtCore.QRectF(0.0, 0.0, float(vp_w), float(vp_h)), content_img)
 
                 # Rebuild only guides layer and composite on top
                 du_guides = DrawUtil()
@@ -246,23 +274,35 @@ class CairoEditorWidget(QtWidgets.QWidget):
                 painter.drawImage(QtCore.QRectF(0.0, 0.0, float(vp_w), float(vp_h)), ov_img_detached)
             else:
                 # Full path: rebuild content (without guides), cache it, then draw guides on top
-                du_content = DrawUtil()
-                du_content.set_current_page_size_mm(page_w_mm, page_h_mm)
-                if self._editor is not None:
-                    self._editor.draw_all(du_content)
-                # Rasterize content to cache image
-                c_img, c_surf, _c_buf = make_image_surface(vis_w_px, vis_h_px)
-                c_ctx = cairo.Context(c_surf)
-                try:
-                    c_ctx.set_antialias(cairo.ANTIALIAS_BEST)
-                except Exception:
-                    print('CairoEditorWidget.paintEvent: Warning: failed to set antialiasing mode')
-                du_content.render_to_cairo(c_ctx, du_content.current_page_index(), px_per_mm, clip_mm, overscan_mm=0.0)
-                c_img_detached = finalize_image_surface(c_img, device_pixel_ratio=dpr)
-                # Cache the content layer for overlay-only repaints
-                self._content_cache_image = c_img_detached
-                self._content_cache_key = cache_key
-                painter.drawImage(QtCore.QRectF(0.0, 0.0, float(vp_w), float(vp_h)), c_img_detached)
+                # Optionally skip content entirely if alpha is zero (stage 2)
+                c_img_detached = None
+                if content_alpha > 0.0:
+                    du_content = DrawUtil()
+                    du_content.set_current_page_size_mm(page_w_mm, page_h_mm)
+                    if self._editor is not None:
+                        self._editor.draw_all(du_content)
+                    # Rasterize content to cache image
+                    c_img, c_surf, _c_buf = make_image_surface(vis_w_px, vis_h_px)
+                    c_ctx = cairo.Context(c_surf)
+                    try:
+                        c_ctx.set_antialias(cairo.ANTIALIAS_BEST)
+                    except Exception:
+                        print('CairoEditorWidget.paintEvent: Warning: failed to set antialiasing mode')
+                    du_content.render_to_cairo(c_ctx, du_content.current_page_index(), px_per_mm, clip_mm, overscan_mm=0.0)
+                    c_img_detached = finalize_image_surface(c_img, device_pixel_ratio=dpr)
+                    # Cache the content layer for overlay-only repaints
+                    self._content_cache_image = c_img_detached
+                    self._content_cache_key = cache_key
+                    if content_alpha < 0.999:
+                        painter.save()
+                        try:
+                            painter.setOpacity(content_alpha)
+                        except Exception:
+                            pass
+                        painter.drawImage(QtCore.QRectF(0.0, 0.0, float(vp_w), float(vp_h)), c_img_detached)
+                        painter.restore()
+                    else:
+                        painter.drawImage(QtCore.QRectF(0.0, 0.0, float(vp_w), float(vp_h)), c_img_detached)
 
                 # Now render guides and composite
                 du_guides = DrawUtil()

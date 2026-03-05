@@ -1608,8 +1608,6 @@ class MainWindow(QtWidgets.QMainWindow):
         splitter = self.centralWidget()
         if splitter is None:
             return
-        
-        print("Fitting print view to page...")
 
         # Helper: compute desired fit sizes
         def compute_fit_sizes() -> tuple[int, int]:

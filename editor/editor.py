@@ -198,8 +198,12 @@ class Editor(QtCore.QObject,
         # Per-frame tempo hit rectangles in absolute mm coordinates
         self._tempo_hit_rects: list[dict] = []
 
-        # Tiny mode: toggled by viewport width (stage 1: simplified drawing, stage 2: skip drawing)
+        # Tiny mode: toggled by viewport width (stage 1: simplified drawing,
+        # stage 2: skip drawing). tiny_mode_alpha is a continuous fade factor
+        # (1.0 = fully opaque, 0.0 = fully transparent) used by the view to
+        # fade the drawing out as we approach stage 2.
         self.tiny_mode_stage: int = 0
+        self.tiny_mode_alpha: float = 1.0
 
         # Selection window state (time-based, tool-agnostic)
         self._selection_active: bool = False
@@ -1111,18 +1115,48 @@ class Editor(QtCore.QObject,
         }
 
     # ---- Tiny mode (viewport-based) ----
-    def update_tiny_mode_from_width(self, viewport_width_px: float) -> None:
+    def update_tiny_mode_from_width(self, device_px_width: float) -> None:
+        """Set tiny_mode_stage based on device-pixel width of the editor widget.
+
+        Uses the rendered semitone gap in device pixels as the metric.
+        page_w_mm cancels out of the formula, so only the device pixel
+        count matters — no hardware DPI query needed.
+
+        semitone_device_px = device_px_width * 2 / (3 * 101)
+
+        Thresholds (device pixels per semitone gap):
+          < 2.0  → stage 2 (skip drawing entirely)
+          < 4.5  → stage 1 (simplified drawing)
+          >= 4.5 → stage 0 (full rendering)
+        """
         try:
-            width_px = float(viewport_width_px)
+            w = float(device_px_width)
         except Exception:
             return
-        # Stage 2: ultra tiny (skip drawing) <300px; Stage 1: simplified drawing <650px
+        semitone_px = w * 2.0 / (3.0 * 101.0)
+
+        # Discrete stage selection (kept for behavior/backwards-compatibility)
         stage = 0
-        if width_px < 300.0:
+        if semitone_px < 2.0:
             stage = 2
-        elif width_px < 650.0:
+        elif semitone_px < 4.5:
             stage = 1
         self.tiny_mode_stage = stage
+
+        # Continuous fade factor between stage 1 and 2.
+        # Semitone gap >= 4.5 px  -> alpha = 1.0 (no fade)
+        # Semitone gap <= 2.0 px  -> alpha = 0.0 (fully transparent)
+        # In between: linear interpolation.
+        if semitone_px <= 2.0:
+            alpha = 0.0
+        elif semitone_px >= 4.5:
+            alpha = 1.0
+        else:
+            alpha = (semitone_px - 2.0) / (4.5 - 2.0)
+        try:
+            self.tiny_mode_alpha = float(max(0.0, min(1.0, alpha)))
+        except Exception:
+            self.tiny_mode_alpha = 1.0
 
     def is_tiny_mode(self) -> bool:
         return bool(int(getattr(self, 'tiny_mode_stage', 0)) > 0)
