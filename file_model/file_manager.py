@@ -15,6 +15,7 @@ from file_model.analysis import Analysis
 from file_model.base_grid import BaseGrid
 from file_model.appstate import AppState
 from file_model.layout import Layout
+from midi.midi_exporter import export_score_to_midi
 from utils.CONSTANT import UTILS_SAVE_DIR
 from appdata_manager import get_appdata_manager
 
@@ -36,8 +37,8 @@ class FileManager:
         "MusicXML File (*.musicxml *.mxl *.xml);;"
         "All Files (*)"
     )
-    # Save dialog: prefer only .piano
-    SAVE_FILE_FILTER = "keyTAB Score (*.piano);;All Files (*)"
+    # Save dialog: allow .piano and MIDI export
+    SAVE_FILE_FILTER = "keyTAB Score (*.piano);;MIDI File (*.mid *.midi);;All Files (*)"
 
     def __init__(self, parent: Optional[QWidget] = None) -> None:
         self._parent: Optional[QWidget] = parent
@@ -327,9 +328,12 @@ class FileManager:
     def save(self) -> bool:
         """Save to the current path, or prompt Save As if none."""
         if self._path is None:
-            return self.save_as()
+            return self.save_as(allow_export=False)
         try:
             self._refresh_analysis()
+            suffix = str(self._path.suffix or '').lower()
+            if suffix in ('.mid', '.midi'):
+                return self.save_as(allow_export=False)
             self._current.save(str(self._path))
             self._dirty = False
             try:
@@ -343,7 +347,7 @@ class FileManager:
             self._show_error("Failed to save score", f"{exc}")
             return False
 
-    def save_as(self) -> bool:
+    def save_as(self, allow_export: bool = True) -> bool:
         """Prompt for a path and save the current SCORE there."""
         start_dir = Path(self._path.parent if self._path else self._last_dir)
 
@@ -359,18 +363,30 @@ class FileManager:
             return f"{safe}.piano"
 
         suggested = start_dir / _default_name()
-        fname, _ = QFileDialog.getSaveFileName(
+        file_filter = self.SAVE_FILE_FILTER if allow_export else "keyTAB Score (*.piano);;All Files (*)"
+        fname, selected_filter = QFileDialog.getSaveFileName(
             self._parent,
             "Save Score As",
             str(suggested),
-            self.SAVE_FILE_FILTER,
+            file_filter,
         )
         if not fname:
             return False
-        target = self._ensure_piano_suffix(Path(fname))
+        target = self._ensure_save_suffix(Path(fname), str(selected_filter or ''), allow_export=allow_export)
         try:
             self._refresh_analysis()
-            self._current.save(str(target))
+            if str(target.suffix or '').lower() in ('.mid', '.midi'):
+                export_score_to_midi(self._current, target)
+                self._last_dir = target.parent
+                try:
+                    adm = get_appdata_manager()
+                    adm.set("last_file_dialog_dir", str(self._last_dir))
+                    adm.save()
+                except Exception:
+                    pass
+                return True
+            else:
+                self._current.save(str(target))
             self._path = target
             self._last_dir = target.parent
             try:
@@ -433,6 +449,17 @@ class FileManager:
         if p.suffix.lower() != ".piano":
             p = p.with_suffix(".piano")
         return p
+
+    def _ensure_save_suffix(self, p: Path, selected_filter: str, allow_export: bool = True) -> Path:
+        suffix = str(p.suffix or '').lower()
+        selected = str(selected_filter or '').lower()
+        if allow_export and 'midi' in selected:
+            if suffix not in ('.mid', '.midi'):
+                return p.with_suffix('.mid')
+            return p
+        if suffix == '.piano':
+            return p
+        return p.with_suffix('.piano')
 
     def _show_error(self, title: str, text: str) -> None:
         if self._parent is None:

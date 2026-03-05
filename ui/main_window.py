@@ -1251,173 +1251,108 @@ class MainWindow(QtWidgets.QMainWindow):
         self._show_status_default()
 
     def _open_style_dialog(self) -> None:
-        try:
-            from ui.widgets.style_dialog import StyleDialog
-            sc = self.file_manager.current()
-            layout = getattr(sc, 'layout', None)
-            try:
-                from dataclasses import asdict
-                original_layout = asdict(layout) if layout is not None else None
-            except Exception:
-                original_layout = None
-            dlg = StyleDialog(parent=self, layout=layout, score=sc)
+        from dataclasses import asdict
+        from file_model.layout import Layout
+        from ui.widgets.style_dialog import StyleDialog
 
-            try:
-                app_state = self._current_app_state()
-                dlg.set_current_tab(int(getattr(app_state, 'style_dialog_tab_index', 0) or 0))
-            except Exception:
-                pass
+        sc = self.file_manager.current()
+        layout = getattr(sc, 'layout', None)
+        original_layout = asdict(layout) if layout is not None else None
+        dlg = StyleDialog(parent=self, layout=layout, score=sc)
 
-            preview_timer = QtCore.QTimer(dlg)
-            preview_timer.setSingleShot(True)
-            preview_timer.setInterval(150)
+        app_state = self._current_app_state()
+        dlg.set_current_tab(int(getattr(app_state, 'style_dialog_tab_index', 0) or 0))
 
-            def _emit_preview() -> None:
-                try:
-                    self.editor_controller.force_redraw_from_model()
-                except Exception:
-                    pass
-                try:
-                    self.editor_controller.score_changed.emit()
-                except Exception:
-                    pass
+        preview_timer = QtCore.QTimer(dlg)
+        preview_timer.setSingleShot(True)
+        preview_timer.setInterval(150)
 
-            try:
-                preview_timer.timeout.connect(_emit_preview)
-            except Exception:
-                pass
+        def _emit_preview() -> None:
+            self.editor_controller.force_redraw_from_model()
+            self.editor_controller.score_changed.emit()
 
-            def _schedule_preview() -> None:
-                try:
-                    preview_timer.stop()
-                    preview_timer.start()
-                except Exception:
-                    pass
+        preview_timer.timeout.connect(_emit_preview)
 
-            def _apply_live(commit_snapshot: bool = False) -> None:
-                try:
-                    sc.layout = dlg.get_values()
-                except Exception:
-                    return
-                if commit_snapshot:
-                    try:
-                        self.editor_controller._snapshot_if_changed(coalesce=False, label='style_edit')
-                    except Exception:
-                        pass
-                _schedule_preview()
+        def _schedule_preview() -> None:
+            preview_timer.stop()
+            preview_timer.start()
 
-            def _revert_state() -> None:
-                if original_layout is None:
-                    return
-                try:
-                    from file_model.layout import Layout
-                    sc.layout = Layout(**original_layout)
-                except Exception:
-                    return
-                _schedule_preview()
+        def _apply_live(commit_snapshot: bool = False) -> None:
+            sc.layout = dlg.get_values()
+            if commit_snapshot:
+                self.editor_controller._snapshot_if_changed(coalesce=False, label='style_edit')
+            _schedule_preview()
 
-            try:
-                dlg.values_changed.connect(lambda: _apply_live(False))
-                dlg.accepted.connect(lambda: _apply_live(True))
-                dlg.rejected.connect(_revert_state)
-            except Exception:
-                pass
+        def _revert_state() -> None:
+            if original_layout is None:
+                return
+            sc.layout = Layout(**original_layout)
+            _schedule_preview()
 
-            def _persist_tab_index() -> None:
-                try:
-                    app_state = self._current_app_state()
-                    app_state.style_dialog_tab_index = int(dlg.current_tab_index())
-                except Exception:
-                    return
-                try:
-                    self._flush_app_state_save()
-                except Exception:
-                    pass
+        dlg.values_changed.connect(lambda: _apply_live(False))
+        dlg.accepted.connect(lambda: _apply_live(True))
+        dlg.rejected.connect(_revert_state)
 
-            dlg.finished.connect(lambda _res: _persist_tab_index())
-            dlg.accepted.connect(lambda: self.file_manager.save() if self.file_manager.path() is not None else None)
-            dlg.show()
-        except Exception:
-            pass
+        def _persist_tab_index() -> None:
+            app_state.style_dialog_tab_index = int(dlg.current_tab_index())
+            self._flush_app_state_save()
+
+        dlg.finished.connect(lambda _res: _persist_tab_index())
+        dlg.accepted.connect(lambda: self.file_manager.save() if self.file_manager.path() is not None else None)
+        dlg.show()
 
     def _open_info_dialog(self) -> None:
-        try:
-            from ui.widgets.info_dialog import InfoDialog
-            sc = self.file_manager.current()
-            dlg = InfoDialog(sc, self)
-            if dlg.exec() == QtWidgets.QDialog.Accepted:
-                dlg.apply_to_score()
-                try:
-                    self.file_manager.on_model_changed()
-                except Exception:
-                    pass
-                self._refresh_views_from_score()
-        except Exception:
-            pass
+        from ui.widgets.info_dialog import InfoDialog
+        sc = self.file_manager.current()
+        dlg = InfoDialog(sc, self)
+        if dlg.exec() == QtWidgets.QDialog.Accepted:
+            dlg.apply_to_score()
+            self.file_manager.on_model_changed()
+            self._refresh_views_from_score()
 
     def _open_line_break_dialog(self) -> None:
-        try:
-            from ui.widgets.line_break_dialog import LineBreakDialog
-            score = self.file_manager.current()
-            if score is None:
-                return
+        from ui.widgets.line_break_dialog import LineBreakDialog
 
-            preview_timer = QtCore.QTimer(self)
-            preview_timer.setSingleShot(True)
-            preview_timer.setInterval(150)
+        score = self.file_manager.current()
+        if score is None:
+            return
 
-            def _emit_preview() -> None:
-                try:
-                    self.editor_controller.force_redraw_from_model()
-                except Exception:
-                    pass
-                try:
-                    self.editor_controller.score_changed.emit()
-                except Exception:
-                    pass
+        preview_timer = QtCore.QTimer(self)
+        preview_timer.setSingleShot(True)
+        preview_timer.setInterval(150)
 
-            try:
-                preview_timer.timeout.connect(_emit_preview)
-            except Exception:
-                pass
+        def _emit_preview() -> None:
+            self.editor_controller.force_redraw_from_model()
+            self.editor_controller.score_changed.emit()
 
-            def _schedule_preview() -> None:
-                try:
-                    preview_timer.stop()
-                    preview_timer.start()
-                except Exception:
-                    pass
+        preview_timer.timeout.connect(_emit_preview)
 
-            dlg = LineBreakDialog(
-                parent=self,
-                score=score,
-                selected_line_break=None,
-                measure_resolver=(lambda t: self.editor_controller.get_measure_index_for_time(t)) if hasattr(self.editor_controller, 'get_measure_index_for_time') else None,
-                on_change=_schedule_preview,
-            )
+        def _schedule_preview() -> None:
+            preview_timer.stop()
+            preview_timer.start()
 
-            def _on_accept() -> None:
-                try:
-                    self.editor_controller._snapshot_if_changed(coalesce=False, label='line_break_edit')
-                except Exception:
-                    pass
-                _schedule_preview()
+        dlg = LineBreakDialog(
+            parent=self,
+            score=score,
+            selected_line_break=None,
+            measure_resolver=(lambda t: self.editor_controller.get_measure_index_for_time(t)) if hasattr(self.editor_controller, 'get_measure_index_for_time') else None,
+            on_change=_schedule_preview,
+        )
 
-            def _on_reject() -> None:
-                _schedule_preview()
+        def _on_accept() -> None:
+            self.editor_controller._snapshot_if_changed(coalesce=False, label='line_break_edit')
+            _schedule_preview()
 
-            def _on_finished(_result: int) -> None:
-                try:
-                    self.file_manager.on_model_changed()
-                except Exception:
-                    pass
+        def _on_reject() -> None:
+            _schedule_preview()
 
-            dlg.accepted.connect(_on_accept)
-            dlg.rejected.connect(_on_reject)
-            dlg.finished.connect(_on_finished)
-            dlg.show()
-        except Exception:
-            pass
+        def _on_finished(_result: int) -> None:
+            self.file_manager.on_model_changed()
+
+        dlg.accepted.connect(_on_accept)
+        dlg.rejected.connect(_on_reject)
+        dlg.finished.connect(_on_finished)
+        dlg.show()
 
     def _refresh_recent_files_menu(self) -> None:
         menu = getattr(self, '_recent_menu', None)
