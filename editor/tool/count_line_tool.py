@@ -29,6 +29,12 @@ class CountLineTool(BaseTool):
         except Exception:
             pass
 
+    def _handle_half_extent_mm(self) -> float:
+        if self._editor is None:
+            return 1.4
+        vis_size = max(2.0, float(getattr(self._editor, 'semitone_dist', 2.5) or 2.5))
+        return float(vis_size) * 0.7
+
     def _rpitch_to_x_mm(self, rpitch: int) -> float:
         return float(self._editor.relative_c4pitch_to_x(int(rpitch))) if self._editor else 0.0
 
@@ -68,11 +74,9 @@ class CountLineTool(BaseTool):
         x_mm = float(x) / max(1e-6, w_px_per_mm)
         y_mm = float(y) / max(1e-6, w_px_per_mm) + float(getattr(self._editor, '_view_y_mm_offset', 0.0) or 0.0)
 
-        # Hit test handles
-        # Match the visual handle size drawn in CountLineDrawer (semitone_dist scaled, 0.7 half-size).
-        vis_size = max(2.0, float(getattr(self._editor, 'semitone_dist', 2.5) or 2.5))
-        handle_w = vis_size * 1
-        handle_h = vis_size * 1
+        # Hit test handles: exact match to CountLineDrawer visual rects
+        # x/y are drawn from center ± (semitone_dist * 0.7).
+        handle_half = self._handle_half_extent_mm()
         hit = None
         hit_handle = None
         for ev in list(getattr(score.events, 'count_line', []) or []):
@@ -86,12 +90,12 @@ class CountLineTool(BaseTool):
             x1 = float(self._rpitch_to_x_mm(rp1))
             x2 = float(self._rpitch_to_x_mm(rp2))
             # Start handle rect
-            if (x1 - handle_w * 0.5) <= x_mm <= (x1 + handle_w * 0.5) and (y_ev - handle_h * 0.5) <= y_mm <= (y_ev + handle_h * 0.5):
+            if (x1 - handle_half) <= x_mm <= (x1 + handle_half) and (y_ev - handle_half) <= y_mm <= (y_ev + handle_half):
                 hit = ev
                 hit_handle = 'start'
                 break
             # End handle rect
-            if (x2 - handle_w * 0.5) <= x_mm <= (x2 + handle_w * 0.5) and (y_ev - handle_h * 0.5) <= y_mm <= (y_ev + handle_h * 0.5):
+            if (x2 - handle_half) <= x_mm <= (x2 + handle_half) and (y_ev - handle_half) <= y_mm <= (y_ev + handle_half):
                 hit = ev
                 hit_handle = 'end'
                 break
@@ -174,9 +178,7 @@ class CountLineTool(BaseTool):
         w_px_per_mm = float(getattr(self._editor, '_widget_px_per_mm', 1.0) or 1.0)
         x_mm = float(x) / max(1e-6, w_px_per_mm)
         y_mm = float(y) / max(1e-6, w_px_per_mm) + float(getattr(self._editor, '_view_y_mm_offset', 0.0) or 0.0)
-        vis_size = max(2.0, float(getattr(self._editor, 'semitone_dist', 2.5) or 2.5))
-        handle_w = vis_size * 0.7
-        handle_h = vis_size * 0.7
+        handle_half = self._handle_half_extent_mm()
 
         lst = list(getattr(score.events, 'count_line', []) or [])
         for ev in lst:
@@ -189,7 +191,7 @@ class CountLineTool(BaseTool):
             y_ev = float(self._editor.time_to_mm(t0))
             x1 = float(self._rpitch_to_x_mm(rp1))
             x2 = float(self._rpitch_to_x_mm(rp2))
-            if (x1 - handle_w * 0.5) <= x_mm <= (x1 + handle_w * 0.5) and (y_ev - handle_h * 0.5) <= y_mm <= (y_ev + handle_h * 0.5):
+            if (x1 - handle_half) <= x_mm <= (x1 + handle_half) and (y_ev - handle_half) <= y_mm <= (y_ev + handle_half):
                 lst.remove(ev)
                 score.events.count_line = lst
                 if hasattr(self._editor, 'force_redraw_from_model'):
@@ -197,7 +199,7 @@ class CountLineTool(BaseTool):
                 else:
                     self._editor.draw_frame()
                 return
-            if (x2 - handle_w * 0.5) <= x_mm <= (x2 + handle_w * 0.5) and (y_ev - handle_h * 0.5) <= y_mm <= (y_ev + handle_h * 0.5):
+            if (x2 - handle_half) <= x_mm <= (x2 + handle_half) and (y_ev - handle_half) <= y_mm <= (y_ev + handle_half):
                 lst.remove(ev)
                 score.events.count_line = lst
                 if hasattr(self._editor, 'force_redraw_from_model'):
