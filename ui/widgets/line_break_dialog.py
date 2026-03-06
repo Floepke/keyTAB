@@ -430,6 +430,9 @@ class LineBreakDialog(QtWidgets.QDialog):
 
         def _delete_break() -> None:
             try:
+                # Never allow deleting the first line break entry.
+                if row == 0:
+                    return
                 if self._score is not None:
                     try:
                         self._score.events.line_break.remove(lb)
@@ -445,6 +448,9 @@ class LineBreakDialog(QtWidgets.QDialog):
                 pass
 
         delete_btn.clicked.connect(_delete_break)
+        if row == 0:
+            delete_btn.hide()
+            delete_btn.setEnabled(False)
 
         self.break_table.setCellWidget(row, 0, delete_btn)
         self.break_table.setCellWidget(row, 1, measure_spin)
