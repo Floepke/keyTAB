@@ -26,7 +26,6 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
     layout = (score.get('layout', {}) or {})
     info = (score.get('info', {}) or {})
     default_info = Info()
-    editor = (score.get('editor', {}) or {})
     events = (score.get('events', {}) or {})
     base_grid = list(score.get('base_grid', []) or [])
     line_breaks = list(events.get('line_break', []) or [])
@@ -902,34 +901,6 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
             id=0,
             tags=['page_background'],
         )
-        if not pdf_export:
-            edge_thickness = .5
-            edge_dash = [2]
-            edge_color = notation_color
-            du.add_line(
-                0.0,
-                0.0,
-                page_w,
-                0.0,
-                color=edge_color,
-                width_mm=edge_thickness,
-                dash_pattern=edge_dash,
-                line_cap='round',
-                id=0,
-                tags=['paper_edge_guide', 'paper_edge_guide_top'],
-            )
-            du.add_line(
-                0.0,
-                page_h,
-                page_w,
-                page_h,
-                color=edge_color,
-                width_mm=edge_thickness,
-                dash_pattern=edge_dash,
-                line_cap='round',
-                id=0,
-                tags=['paper_edge_guide', 'paper_edge_guide_bottom'],
-            )
         if not pdf_export and page_index != target_page_index:
             continue
         footer_height = float(layout.get('footer_height_mm', 0.0) or 0.0)

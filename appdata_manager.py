@@ -1,5 +1,6 @@
 from __future__ import annotations
 import os
+import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, Optional
@@ -23,6 +24,35 @@ LEGACY_APPDATA_PATH: Path = Path(UTILS_SAVE_DIR) / "appdata.py"
 
 def _ensure_dir() -> None:
     os.makedirs(UTILS_SAVE_DIR, exist_ok=True)
+
+
+def _atomic_write_text(path: Path, content: str, encoding: str = "utf-8") -> None:
+    parent = path.parent
+    os.makedirs(parent, exist_ok=True)
+    temp_path: Optional[str] = None
+    try:
+        fd, temp_path = tempfile.mkstemp(prefix=f".{path.name}.", suffix=".tmp", dir=str(parent))
+        with os.fdopen(fd, "w", encoding=encoding) as f:
+            f.write(content)
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(temp_path, str(path))
+        temp_path = None
+        try:
+            flags = getattr(os, "O_DIRECTORY", 0)
+            dfd = os.open(str(parent), flags)
+            try:
+                os.fsync(dfd)
+            finally:
+                os.close(dfd)
+        except Exception:
+            pass
+    finally:
+        if temp_path is not None:
+            try:
+                os.remove(temp_path)
+            except Exception:
+                pass
 
 
 @dataclass
@@ -138,13 +168,13 @@ class AppDataManager:
                             except Exception:
                                 pass
                 content = _tomlkit.dumps(self._doc)
-                self.path.write_text(content, encoding="utf-8")
+                _atomic_write_text(self.path, content, encoding="utf-8")
                 return
             except Exception:
                 pass
         # Fallback to minimal emitter
         content = self._emit_toml_file(self._values)
-        self.path.write_text(content, encoding="utf-8")
+        _atomic_write_text(self.path, content, encoding="utf-8")
 
     # Internals
     def _parse_toml_dict(self, path: Path) -> Dict:

@@ -84,22 +84,27 @@ class MainWindow(QtWidgets.QMainWindow):
         self.engraver.engraved.connect(self._on_engraver_finished)
         
         # Startup restore: prefer opening the last saved project; else restore unsaved session; else new
+        adm2 = None
+        was_saved = False
+        saved_path = ""
         try:
             adm2 = get_appdata_manager()
             was_saved = bool(adm2.get("last_session_saved", False))
             saved_path = str(adm2.get("last_session_path", "") or "")
         except Exception:
-            was_saved = False
-            saved_path = ""
+            pass
         opened = False
         status_msg = ""
         if was_saved and saved_path:
             try:
                 from pathlib import Path as _Path
                 if _Path(saved_path).exists():
-                    self.file_manager.open_path(saved_path)
-                    opened = True
-                    status_msg = f"Opened last saved project: {saved_path}"
+                    sc = self.file_manager.open_path(saved_path)
+                    if sc is not None:
+                        opened = True
+                        status_msg = f"Opened last saved project: {saved_path}"
+                    else:
+                        opened = False
             except Exception:
                 opened = False
         if not opened:
@@ -112,6 +117,8 @@ class MainWindow(QtWidgets.QMainWindow):
             if not restored:
                 # Fallback to last explicitly opened/saved project if available
                 try:
+                    if adm2 is None:
+                        adm2 = get_appdata_manager()
                     last_path = str(adm2.get("last_opened_file", "") or "")
                 except Exception:
                     last_path = ""
@@ -119,8 +126,12 @@ class MainWindow(QtWidgets.QMainWindow):
                     try:
                         from pathlib import Path as _Path
                         if _Path(last_path).exists():
-                            self.file_manager.open_path(last_path)
-                            status_msg = f"Opened last project: {last_path}"
+                            sc = self.file_manager.open_path(last_path)
+                            if sc is not None:
+                                status_msg = f"Opened last project: {last_path}"
+                            else:
+                                self.file_manager.new()
+                                status_msg = "Started new project"
                         else:
                             self.file_manager.new()
                             status_msg = "Started new project"
@@ -410,21 +421,6 @@ class MainWindow(QtWidgets.QMainWindow):
         except Exception:
             pass
         super().keyPressEvent(ev)
-
-    def closeEvent(self, ev: QtGui.QCloseEvent) -> None:
-        # Always save session + project on exit without prompting.
-        try:
-            self.file_manager.autosave_all(force=True)
-        except Exception:
-            pass
-        # Persist splitter sizes for next run
-        try:
-            sizes = self.splitter.sizes()
-            adm = get_appdata_manager()
-            adm.set("splitter_sizes", sizes)
-        except Exception:
-            pass
-        ev.accept()
 
     def _create_menus(self) -> None:
         menubar = self.menuBar()

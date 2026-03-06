@@ -60,20 +60,6 @@ class ToolbarHandle(QtWidgets.QSplitterHandle):
         except Exception:
             pass
 
-        '''this button triggers the engrave action in the print view.'''
-        self.engrave_btn = QtWidgets.QToolButton(self)
-        self.engrave_btn.setFocusPolicy(QtCore.Qt.FocusPolicy.NoFocus)
-        ice = get_qicon('engrave', size=(64, 64))
-        if ice:
-            self.engrave_btn.setIcon(ice)
-        self.engrave_btn.setIconSize(QtCore.QSize(self._button_size - 6, self._button_size - 6))
-        self.engrave_btn.setFixedSize(self._button_size, self._button_size)
-        layout.addWidget(self.engrave_btn)
-        try:
-            self.engrave_btn.clicked.connect(parent.engraveRequested.emit)
-        except Exception:
-            pass
-
         # Visual separator between default toolbar and contextual toolbar
         sep = QtWidgets.QFrame(self)
         # Use a 1px separator that adapts to the current palette
