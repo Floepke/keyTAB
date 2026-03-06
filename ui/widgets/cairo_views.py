@@ -571,6 +571,14 @@ class CairoEditorWidget(QtWidgets.QWidget):
                         return
                 except Exception:
                     pass
+            if key == QtCore.Qt.Key_Q and mods == QtCore.Qt.KeyboardModifier.NoModifier:
+                try:
+                    if hasattr(self._editor, 'quantize_selected_notes') and self._editor.quantize_selected_notes('start/end'):
+                        self.update()
+                        ev.accept()
+                        return
+                except Exception:
+                    pass
             # Delete selection on Backspace/Delete
             if key in (QtCore.Qt.Key_Backspace, QtCore.Qt.Key_Delete):
                 try:

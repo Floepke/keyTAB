@@ -1429,6 +1429,53 @@ class Editor(QtCore.QObject,
         self._queue_transpose_snapshot(label='shift_selected_notes_time')
         return True
 
+    def quantize_selected_notes(self, qtype: str = 'start/end') -> bool:
+        """Quantize selected notes to current snap size.
+
+        Supported `qtype` values:
+        - 'start/end': quantize note start and note end
+        - 'start': quantize note start only
+        - 'end': quantize note end only
+        """
+        score: SCORE | None = self.current_score()
+        if score is None or not self._selection_active:
+            return False
+        mode = str(qtype or 'start/end').strip().lower()
+        if mode not in ('start/end', 'start', 'end'):
+            mode = 'start/end'
+        units = float(max(1e-6, getattr(self, 'snap_size_units', 0.0) or 0.0))
+        sel = self.detect_events_from_time_window(self._sel_start_units, self._sel_end_units - 0.1)
+        notes = sel.get('note', []) if isinstance(sel, dict) else []
+        if not notes:
+            return False
+
+        def _q(value: float) -> float:
+            return float(round(float(value) / units) * units)
+
+        updated = False
+        for n in notes:
+            t0 = float(getattr(n, 'time', 0.0) or 0.0)
+            dur = float(getattr(n, 'duration', 0.0) or 0.0)
+            t1 = t0 + max(0.0, dur)
+
+            qt0 = max(0.0, _q(t0)) if mode in ('start/end', 'start') else t0
+            qt1 = max(0.0, _q(t1)) if mode in ('start/end', 'end') else t1
+            if qt1 <= qt0:
+                qt1 = qt0 + units
+            qdur = max(units, qt1 - qt0)
+
+            if (not math.isclose(qt0, t0)) or (not math.isclose(qdur, dur)):
+                setattr(n, 'time', float(qt0))
+                setattr(n, 'duration', float(qdur))
+                updated = True
+
+        if not updated:
+            return False
+
+        self.update_score_length()
+        self._snapshot_if_changed(coalesce=True, label='quantize_selected_notes')
+        return True
+
     def set_selected_notes_hand(self, hand: str) -> bool:
         """Assign selected notes to a hand and snapshot the change.
 

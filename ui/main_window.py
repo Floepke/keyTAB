@@ -571,6 +571,46 @@ class MainWindow(QtWidgets.QMainWindow):
             except Exception:
                 pass
         edit_menu.addAction(delete_act)
+        edit_menu.addSeparator()
+
+        # Selection submenu (discoverability for selection shortcuts/actions)
+        selection_menu = edit_menu.addMenu("Selection")
+        select_all_act = QtGui.QAction("Select All", self)
+        select_all_act.setShortcut(QtGui.QKeySequence.StandardKey.SelectAll)
+
+        transpose_left_act = QtGui.QAction("Transpose -1 Semitone", self)
+        transpose_left_act.setShortcut(QtGui.QKeySequence(QtCore.Qt.Key_Left))
+        transpose_left_act.setShortcutContext(QtCore.Qt.ShortcutContext.WidgetShortcut)
+
+        transpose_right_act = QtGui.QAction("Transpose +1 Semitone", self)
+        transpose_right_act.setShortcut(QtGui.QKeySequence(QtCore.Qt.Key_Right))
+        transpose_right_act.setShortcutContext(QtCore.Qt.ShortcutContext.WidgetShortcut)
+
+        shift_earlier_act = QtGui.QAction("Move Earlier by Snap", self)
+        shift_earlier_act.setShortcut(QtGui.QKeySequence(QtCore.Qt.Key_Up))
+        shift_earlier_act.setShortcutContext(QtCore.Qt.ShortcutContext.WidgetShortcut)
+
+        shift_later_act = QtGui.QAction("Move Later by Snap", self)
+        shift_later_act.setShortcut(QtGui.QKeySequence(QtCore.Qt.Key_Down))
+        shift_later_act.setShortcutContext(QtCore.Qt.ShortcutContext.WidgetShortcut)
+
+        quantize_act = QtGui.QAction("Quantize starts and ends on snap", self)
+        quantize_act.setShortcut(QtGui.QKeySequence("Q"))
+        quantize_act.setShortcutContext(QtCore.Qt.ShortcutContext.WidgetShortcut)
+        quantize_start_act = QtGui.QAction("Quantize starts on snap", self)
+        quantize_end_act = QtGui.QAction("Quantize ends on snap", self)
+
+        selection_menu.addAction(select_all_act)
+        selection_menu.addSeparator()
+        selection_menu.addAction(transpose_left_act)
+        selection_menu.addAction(transpose_right_act)
+        selection_menu.addAction(shift_earlier_act)
+        selection_menu.addAction(shift_later_act)
+        selection_menu.addSeparator()
+        selection_menu.addAction(quantize_act)
+        selection_menu.addAction(quantize_start_act)
+        selection_menu.addAction(quantize_end_act)
+
         # Separator between Delete and Preferences
         edit_menu.addSeparator()
         prefs_act = QtGui.QAction("Preferences…", self)
@@ -619,6 +659,14 @@ class MainWindow(QtWidgets.QMainWindow):
         copy_act.triggered.connect(self._edit_copy)
         paste_act.triggered.connect(self._edit_paste)
         delete_act.triggered.connect(self._edit_delete)
+        select_all_act.triggered.connect(self._selection_select_all)
+        transpose_left_act.triggered.connect(lambda: self._selection_transpose(-1))
+        transpose_right_act.triggered.connect(lambda: self._selection_transpose(1))
+        shift_earlier_act.triggered.connect(lambda: self._selection_shift(-1.0))
+        shift_later_act.triggered.connect(lambda: self._selection_shift(1.0))
+        quantize_act.triggered.connect(lambda: self._selection_quantize('start/end'))
+        quantize_start_act.triggered.connect(lambda: self._selection_quantize('start'))
+        quantize_end_act.triggered.connect(lambda: self._selection_quantize('end'))
         zoom_in_act.triggered.connect(lambda: self._zoom_editor(1))
         zoom_out_act.triggered.connect(lambda: self._zoom_editor(-1))
         full_screen_act.triggered.connect(self._toggle_full_screen)
@@ -1557,6 +1605,70 @@ class MainWindow(QtWidgets.QMainWindow):
                 self._status("Deleted selection", 1200)
             else:
                 self._status("No selection to delete", 1200)
+        except Exception:
+            pass
+
+    def _selection_select_all(self) -> None:
+        try:
+            self.editor_controller.select_all()
+            try:
+                self.editor.update()
+            except Exception:
+                pass
+            self._status("Selected all", 1200)
+        except Exception:
+            pass
+
+    def _selection_transpose(self, semitones: int) -> None:
+        try:
+            changed = bool(self.editor_controller.transpose_selected_notes(int(semitones)))
+            if changed:
+                try:
+                    self.editor.update()
+                except Exception:
+                    pass
+                self._status(f"Transposed selection {int(semitones):+d} semitone", 1200)
+            else:
+                self._status("No selection to transpose", 1200)
+        except Exception:
+            pass
+
+    def _selection_shift(self, sign: float) -> None:
+        try:
+            units = float(getattr(self.editor_controller, 'snap_size_units', 0.0) or 0.0)
+            if units <= 0.0:
+                units = 1.0
+            delta = float(sign) * float(units)
+            changed = bool(self.editor_controller.shift_selected_notes_time(delta))
+            if changed:
+                try:
+                    self.editor.update()
+                except Exception:
+                    pass
+                direction = "earlier" if delta < 0 else "later"
+                self._status(f"Moved selection {direction} by snap", 1200)
+            else:
+                self._status("No selection to move", 1200)
+        except Exception:
+            pass
+
+    def _selection_quantize(self, qtype: str = 'start/end') -> None:
+        try:
+            changed = bool(getattr(self.editor_controller, 'quantize_selected_notes', lambda *_args, **_kwargs: False)(qtype))
+            if changed:
+                try:
+                    self.editor.update()
+                except Exception:
+                    pass
+                mode = str(qtype or 'start/end').strip().lower()
+                if mode == 'start':
+                    self._status("Quantized selection starts to snap", 1200)
+                elif mode == 'end':
+                    self._status("Quantized selection ends to snap", 1200)
+                else:
+                    self._status("Quantized selection starts and ends to snap", 1200)
+            else:
+                self._status("No selection to quantize", 1200)
         except Exception:
             pass
 
