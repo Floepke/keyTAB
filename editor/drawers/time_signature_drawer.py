@@ -27,8 +27,18 @@ class TimeSignatureDrawerMixin:
 
         classic_font = getattr(layout, 'time_signature_indicator_classic_font', None)
         klav_font = getattr(layout, 'time_signature_indicator_klavarskribo_font', None)
-        classic_family = _resolve_font_family(classic_font)
-        klav_family = _resolve_font_family(klav_font)
+        classic_requested = str(getattr(classic_font, 'family', 'Latin Modern Roman') or 'Latin Modern Roman')
+        klav_requested = str(getattr(klav_font, 'family', 'Latin Modern Roman') or 'Latin Modern Roman')
+
+        if getattr(self, '_ts_cached_classic_requested', None) != classic_requested:
+            self._ts_cached_classic_requested = classic_requested
+            self._ts_cached_classic_family = _resolve_font_family(classic_font)
+        if getattr(self, '_ts_cached_klav_requested', None) != klav_requested:
+            self._ts_cached_klav_requested = klav_requested
+            self._ts_cached_klav_family = _resolve_font_family(klav_font)
+
+        classic_family = str(getattr(self, '_ts_cached_classic_family', None) or _resolve_font_family(classic_font))
+        klav_family = str(getattr(self, '_ts_cached_klav_family', None) or _resolve_font_family(klav_font))
         classic_size = 25.0
         klav_size = 15.0
         guide_width_mm = float(getattr(layout, 'time_signature_indicator_guide_thickness_mm', 0.5) or 0.5)

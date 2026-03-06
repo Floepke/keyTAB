@@ -34,6 +34,8 @@ def _ensure_dir() -> None:
 class _PrefDef:
     default: object
     description: str
+    min: object | None = None
+    max: object | None = None
 
 
 class PreferencesManager:
@@ -50,8 +52,15 @@ class PreferencesManager:
         # Keep parsed TOML document for round-trip preservation when tomlkit is available
         self._doc = None
 
-    def register(self, key: str, default: object, description: str) -> None:
-        self._schema[key] = _PrefDef(default=default, description=description)
+    def register(
+        self,
+        key: str,
+        default: object,
+        description: str,
+        min: object | None = None,
+        max: object | None = None,
+    ) -> None:
+        self._schema[key] = _PrefDef(default=default, description=description, min=min, max=max)
         if key not in self._values:
             self._values[key] = default
 
@@ -286,18 +295,44 @@ def get_preferences_manager() -> PreferencesManager:
     if _prefs_manager is None:
         pm = PreferencesManager(PREFERENCES_PATH)
         # Register known preferences here
-        pm.register("ui_scale", 1.0, "Global UI scale: (0.5 .. 3.0)")
-        pm.register("theme", "light", "UI theme: ('light' | 'dark')")
-        pm.register("editor_fps_limit", 30, "Max mouse-move dispatch rate (FPS). Set 0 to disable throttling.")
-        pm.register("audition_during_note_input", True, "Play a short note on input when placing notes.")
-        pm.register("focus_on_playhead_during_playback", True, "Focus the editor view on the playhead during playback.")
         pm.register(
-            "timestamp_format",
-            "%d-%m-%Y",
-            "Timestamp format for score creation and modification metadata.\n"
-            "Uses Python datetime.strftime notation:\n"
-            "\t•%d=day, \n\t•%m=month, \n\t•%Y=year, \n\t•%H=hour(24h), \n\t•%M=minute, \n\t•%S=second.\n"
-            "Examples: \n\t'%d-%m-%Y'\n\t'%Y-%m-%d %H:%M:%S'\nUse '%%' for a literal percent sign.",
+            key="ui_scale",
+            default=1.0,
+            description="Global UI scale (0.5 .. 3.0)\n(I noticed that choosing other then 1.0 may cause some unwanted  UI artifacts)",
+            min=0.5,
+            max=3.0,
+        )
+        pm.register(
+            key="theme",
+            default="light",
+            description="UI theme 'light' or 'dark'",
+        )
+        pm.register(
+            key="editor_fps_limit",
+            default=25,
+            description="The maximum frames per second (FPS) for the editor's rendering loop. Higher values may improve visual smoothness but can increase CPU/GPU usage.",
+            min=1,
+            max=240,
+        )
+        pm.register(
+            key="audition_during_note_input",
+            default=True,
+            description="Play a short note on input when placing notes.",
+        )
+        pm.register(
+            key="focus_on_playhead_during_playback",
+            default=True,
+            description="Focus the editor view on the playhead during playback.",
+        )
+        pm.register(
+            key="timestamp_format",
+            default="%d-%m-%Y",
+            description=(
+                "Timestamp format for score creation and modification metadata.\n"
+                "Uses Python datetime.strftime notation:\n"
+                "\t•%d=day, \n\t•%m=month, \n\t•%Y=year, \n\t•%H=hour(24h), \n\t•%M=minute, \n\t•%S=second.\n"
+                "Examples: \n\t'%d-%m-%Y' becomes \n\t'%Y-%m-%d %H:%M:%S'\nUse '%%' for a literal percent sign."
+            ),
         )
         pm.load()
         _prefs_manager = pm

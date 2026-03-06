@@ -8,6 +8,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, cast
 from file_model.SCORE import SCORE
 from ui.widgets.draw_util import DrawUtil
+from utils.CONSTANT import QUARTER_NOTE_UNIT
 
 if TYPE_CHECKING:
     from editor.editor import Editor
@@ -51,49 +52,62 @@ class GridDrawerMixin:
         )
 
         # Page metrics (mm)
-        width_mm, height_mm = du.current_page_size_mm()
+        width_mm, _height_mm = du.current_page_size_mm()
         margin = float(self.margin)
         stave_left_position = margin + self.semitone_dist
         stave_right_position = max(0.0, width_mm - margin) - self.semitone_dist * 2
 
-        # Editor zoom controls vertical mm per quarter note
-        zpq = float(getattr(score.app_state, 'zoom_mm_per_quarter', 25.0) or 25.0)
-
         # --------------- drawing the grid lines, barlines, measure numbers ---------------
-        base_grid = score.base_grid
         measure_numbering_cursor = 1
-        time_cursor = margin
         meas_font = getattr(score.layout, 'measure_numbering_font', None)
         if meas_font is not None and callable(getattr(meas_font, 'resolve_family', None)):
             meas_family = str(meas_font.resolve_family())
         else:
             meas_family = getattr(meas_font, 'family', 'Courier New') if meas_font is not None else 'Courier New'
         meas_size = 20.0
-        
-        for bg in base_grid:
-            numerator = bg.numerator
-            denominator = bg.denominator
-            measure_amount = bg.measure_amount
-            beat_grouping = bg.beat_grouping
+        color = self.notation_color
+        bar_width_mm = 0.25
 
-            # General formula: quarters per measure = numerator * (4/denominator)
-            quarters_per_measure = float(numerator) * (4.0 / max(1.0, float(denominator)))
-            measure_len_mm = quarters_per_measure * zpq
+        cache = getattr(self, '_draw_cache', None) or {}
+        grid_den_times = list(cache.get('grid_den_times') or [])
+        barline_times = list(cache.get('barline_times') or [])
 
-            # Beat length inside this base_grid object
-            beat_length = measure_len_mm / numerator
+        # Safety fallback when draw cache is unavailable.
+        if not barline_times:
+            cur_t = 0.0
+            for bg in list(getattr(score, 'base_grid', []) or []):
+                numer = int(getattr(bg, 'numerator', 4) or 4)
+                denom = int(getattr(bg, 'denominator', 4) or 4)
+                mcount = int(getattr(bg, 'measure_amount', 1) or 1)
+                measure_len_ticks = float(numer) * (4.0 / float(max(1, denom))) * float(QUARTER_NOTE_UNIT)
+                beat_len_ticks = measure_len_ticks / max(1, numer)
+                positions = list(getattr(bg, 'beat_grouping', []) or [])
+                for _ in range(mcount):
+                    barline_times.append(float(cur_t))
+                    if len(positions) == numer:
+                        if positions == [v for v in range(1, numer + 1)]:
+                            for idx in range(1, numer + 1):
+                                grid_den_times.append(float(cur_t + (idx - 1) * beat_len_ticks))
+                        else:
+                            for idx, val in enumerate(positions, start=1):
+                                if int(val) == 1:
+                                    grid_den_times.append(float(cur_t + (idx - 1) * beat_len_ticks))
+                    else:
+                        grid_den_times.append(float(cur_t))
+                    cur_t += measure_len_ticks
+            barline_times.append(float(cur_t))
+            grid_den_times.append(float(cur_t))
 
-            # Draw horizontal barlines across the stave width for each measure boundary
-            color = self.notation_color
-            bar_width_mm = 0.25
+        if barline_times:
+            barline_keys = {round(float(t), 6) for t in barline_times}
 
-            for i in range(measure_amount):
-                # measure numbers:
-                measure_number_str = str(measure_numbering_cursor)
+            # Draw measure numbers at each measure start except final end barline.
+            for t in barline_times[:-1]:
+                y_mm = float(self.time_to_mm(float(t)))
                 du.add_text(
                     self.margin + self.stave_width + self.margin - 1.0,
-                    time_cursor + 1.0,
-                    measure_number_str,
+                    y_mm + 1.0,
+                    str(measure_numbering_cursor),
                     size_pt=meas_size,
                     color=color,
                     id=0,
@@ -101,69 +115,37 @@ class GridDrawerMixin:
                     anchor='ne',
                     family=meas_family,
                 )
-                
-                # following the 1 == grid system:
-                if len(beat_grouping) == int(numerator):
-                    full_group = [int(v) for v in beat_grouping] == list(range(1, int(numerator) + 1))
-                    for idx, group in enumerate(beat_grouping, start=1):
-                        line_y = time_cursor + (beat_length * (idx - 1))
-                        # draw the barline
-                        if idx == 1:
-                            du.add_line(
-                                stave_left_position,
-                                line_y,
-                                stave_right_position,
-                                line_y,
-                                color=color,
-                                width_mm=bar_width_mm,
-                                id=0,
-                                tags=["barline"],
-                                dash_pattern=None
-                            )
-                            if full_group:
-                                # continue to next beat to draw subgrid lines
-                                continue
-                            continue
-
-                        # draw subgrid lines: all beats for single full group, or only resets (value == 1)
-                        if full_group or int(group) == 1:
-                            du.add_line(
-                                stave_left_position,
-                                line_y,
-                                stave_right_position,
-                                line_y,
-                                color=color,
-                                width_mm=bar_width_mm / 2,
-                                id=0,
-                                tags=["grid_line"],
-                                dash_pattern=[2.0, 2.0]
-                            )
-                else:
-                    # Fallback: draw only the barline
-                    du.add_line(
-                        stave_left_position,
-                        time_cursor,
-                        stave_right_position,
-                        time_cursor,
-                        color=color,
-                        width_mm=bar_width_mm,
-                        id=0,
-                        tags=["grid_line"],
-                        dash_pattern=None
-                    )
-                
                 measure_numbering_cursor += 1
-                time_cursor += measure_len_mm
 
-        # draw the end barline with same style policy
-        du.add_line(
-            stave_left_position,
-            time_cursor,
-            stave_right_position,
-            time_cursor,
-            color=color,
-            width_mm=bar_width_mm * 3,
-            id=0,
-            tags=["end_barline"],
-            dash_pattern=None
-        )
+            # Draw subgrid lines from cached grid times, excluding barlines.
+            for t in grid_den_times:
+                if round(float(t), 6) in barline_keys:
+                    continue
+                y_mm = float(self.time_to_mm(float(t)))
+                du.add_line(
+                    stave_left_position,
+                    y_mm,
+                    stave_right_position,
+                    y_mm,
+                    color=color,
+                    width_mm=bar_width_mm / 2,
+                    id=0,
+                    tags=["grid_line"],
+                    dash_pattern=[2.0, 2.0],
+                )
+
+            # Draw regular barlines; draw final end barline thicker.
+            for idx, t in enumerate(barline_times):
+                y_mm = float(self.time_to_mm(float(t)))
+                is_last = idx == (len(barline_times) - 1)
+                du.add_line(
+                    stave_left_position,
+                    y_mm,
+                    stave_right_position,
+                    y_mm,
+                    color=color,
+                    width_mm=(bar_width_mm * 3.0) if is_last else bar_width_mm,
+                    id=0,
+                    tags=["end_barline" if is_last else "barline"],
+                    dash_pattern=None,
+                )

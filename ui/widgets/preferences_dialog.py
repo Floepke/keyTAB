@@ -74,7 +74,7 @@ class PreferencesDialog(QtWidgets.QDialog):
         parts = key.split("_")
         pretty_parts = []
         for p in parts:
-            if len(p) <= 3:
+            if p in ("ui", "fps"):
                 pretty_parts.append(p.upper())
             else:
                 pretty_parts.append(p.capitalize())
@@ -97,7 +97,19 @@ class PreferencesDialog(QtWidgets.QDialog):
             return checkbox, "bool"
         if isinstance(pref.default, int) and not isinstance(pref.default, bool):
             spin = QtWidgets.QSpinBox()
-            spin.setRange(-1000000000, 1000000000)
+            min_v = -1000000000
+            max_v = 1000000000
+            try:
+                if getattr(pref, 'min', None) is not None:
+                    min_v = int(pref.min)
+                if getattr(pref, 'max', None) is not None:
+                    max_v = int(pref.max)
+            except Exception:
+                min_v = -1000000000
+                max_v = 1000000000
+            if max_v < min_v:
+                min_v, max_v = max_v, min_v
+            spin.setRange(min_v, max_v)
             spin.setSingleStep(1)
             try:
                 spin.setValue(int(value))
@@ -107,7 +119,19 @@ class PreferencesDialog(QtWidgets.QDialog):
         if isinstance(pref.default, float):
             spin = QtWidgets.QDoubleSpinBox()
             spin.setDecimals(2)
-            spin.setRange(-1000000000.0, 1000000000.0)
+            min_v = -1000000000.0
+            max_v = 1000000000.0
+            try:
+                if getattr(pref, 'min', None) is not None:
+                    min_v = float(pref.min)
+                if getattr(pref, 'max', None) is not None:
+                    max_v = float(pref.max)
+            except Exception:
+                min_v = -1000000000.0
+                max_v = 1000000000.0
+            if max_v < min_v:
+                min_v, max_v = max_v, min_v
+            spin.setRange(min_v, max_v)
             spin.setSingleStep(0.05)
             try:
                 spin.setValue(float(value))
@@ -123,7 +147,7 @@ class PreferencesDialog(QtWidgets.QDialog):
         QtWidgets.QMessageBox.information(
             self,
             "Preferences",
-            "Changes take effect after restarting the app.",
+            "Some changes may take effect after restarting the app.",
         )
         self.accept()
 

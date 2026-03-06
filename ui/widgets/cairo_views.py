@@ -700,11 +700,6 @@ class CairoEditorWidget(QtWidgets.QWidget):
         if not (self._left_down or self._right_down):
             self._overlay_only_repaint = True
         self.update()
-        # Update status bar with note attributes if hovering a note rect
-        try:
-            self._update_hover_note_status(pos.x(), pos.y())
-        except Exception:
-            pass
 
     def _configure_move_timer_from_prefs(self) -> None:
         prefs = get_preferences()
@@ -729,62 +724,3 @@ class CairoEditorWidget(QtWidgets.QWidget):
                 self._move_timer.setInterval(self._fps_interval_ms)
             except Exception:
                 pass
-
-    def _update_hover_note_status(self, x_px: float, y_px: float) -> None:
-        """If hovering a note rectangle, show its attributes in the status bar."""
-        if self._editor is None:
-            return
-        try:
-            note_id = self._editor.hit_test_note_id(float(x_px), float(y_px))
-        except Exception:
-            note_id = None
-        if note_id is None:
-            # Clear memo and clear status bar message when leaving any note
-            self._last_hover_note_id = None
-            try:
-                from ui.main_window import MainWindow  # local import to avoid cycle
-            except Exception:
-                MainWindow = None  # type: ignore
-            w = self.window()
-            if MainWindow is not None and isinstance(w, MainWindow):
-                try:
-                    w._status("", 0)
-                except Exception:
-                    pass
-            return
-        if self._last_hover_note_id == int(note_id):
-            return
-        self._last_hover_note_id = int(note_id)
-        # Fetch note details and emit to MainWindow status bar
-        try:
-            n = self._editor.get_note_by_id(int(note_id))
-            if n is None:
-                return
-            time_val = float(getattr(n, 'time', 0.0) or 0.0)
-            pitch_val = int(getattr(n, 'pitch', 0) or 0)
-            dur_val = float(getattr(n, 'duration', 0.0) or 0.0)
-            vel_val = int(getattr(n, 'velocity', 64) or 64)
-            hand_val = str(getattr(n, 'hand', '<') or '<')
-            # Compute measure index and whether a rest follows this note
-            try:
-                measure_idx = int(self._editor.get_measure_index_for_time(time_val))
-            except Exception:
-                measure_idx = 0
-            msg = (
-                f"Note: time: {time_val:.0f}, pitch: {pitch_val}, duration: {dur_val:.0f}, "
-                f"velocity: {vel_val}, hand: {hand_val}, id: {int(note_id)}, "
-                f"measure: {measure_idx}"
-            )
-            w = self.window()
-            # Call MainWindow._status if available
-            try:
-                from ui.main_window import MainWindow  # local import to avoid cycle at module load
-            except Exception:
-                MainWindow = None  # type: ignore
-            if MainWindow is not None and isinstance(w, MainWindow):
-                try:
-                    w._status(msg, 0)
-                except Exception:
-                    pass
-        except Exception:
-            pass

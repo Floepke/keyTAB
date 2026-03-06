@@ -188,6 +188,9 @@ class Editor(QtCore.QObject,
         self._draw_cache: dict | None = None
         # One-shot hint to reuse the current draw cache on the next frame
         self._reuse_draw_cache_once: bool = False
+        # Cache for base-grid-derived timeline helpers used by _build_render_cache
+        self._grid_time_cache_key: tuple | None = None
+        self._grid_time_cache_values: tuple[list[float], list[float]] | None = None
         # Per-frame note hit rectangles in absolute mm coordinates
         self._note_hit_rects: list[dict] = []
         # Per-frame text hit rectangles in absolute mm coordinates
@@ -217,6 +220,9 @@ class Editor(QtCore.QObject,
         # Modifier state
         self._shift_down: bool = False
         self._ctrl_down: bool = False
+        # Gesture mode (locked on press so mid-drag modifier changes don't misclassify edits)
+        self._left_selection_mode: bool = False
+        self._right_selection_mode: bool = False
         # Optional player for auditioning
         self.player = None
 
@@ -298,8 +304,7 @@ class Editor(QtCore.QObject,
         self.draw_guides(du)
 
     def force_redraw_from_model(self) -> None:
-        """Rebuild caches from SCORE and request a full widget repaint."""
-        self.draw_frame()
+        """Request a full widget repaint from SCORE without prebuilding a duplicate frame."""
         w = getattr(self, 'widget', None)
         if w is not None and hasattr(w, 'force_full_redraw'):
             w.force_full_redraw()
@@ -591,10 +596,11 @@ class Editor(QtCore.QObject,
             self._left_pressed = True
             self._dragging_left = False
             self._press_pos = (x, y)
-            if not self._shift_down:
+            self._left_selection_mode = bool(self._shift_down)
+            if not self._left_selection_mode:
                 self._tool.on_left_press(x, y)
             # If Shift is held, initialize selection anchor on left press
-            if self._shift_down:
+            if self._left_selection_mode:
                 anchor_t = self.snap_time(self.y_to_time(y))
                 self._sel_anchor_units = float(anchor_t)
                 self._sel_start_units = float(anchor_t)
@@ -610,31 +616,35 @@ class Editor(QtCore.QObject,
             self._right_pressed = True
             self._dragging_right = False
             self._press_pos = (x, y)
-            self._tool.on_right_press(x, y)
-            # Initialize selection anchor at press to be robust against scrolling
-            anchor_t = self.snap_time(self.y_to_time(y))
-            self._sel_anchor_units = float(anchor_t)
-            self._sel_start_units = float(anchor_t)
-            ss = max(1e-6, float(self.snap_size_units))
-            self._sel_end_units = float(anchor_t + ss)
-            anchor_p = int(self.x_to_pitch(x))
-            anchor_p = max(1, min(88, anchor_p))
-            self._sel_anchor_pitch = anchor_p
-            self._sel_min_pitch = anchor_p
-            self._sel_max_pitch = anchor_p
-            self._selection_active = True
+            # Right-button gesture is selection unless the active tool explicitly edits on right drag.
+            self._right_selection_mode = not bool(getattr(self._tool, 'RIGHT_DRAG_EDITS', False))
+            if not self._right_selection_mode:
+                self._tool.on_right_press(x, y)
+            else:
+                # Initialize selection anchor at press to be robust against scrolling
+                anchor_t = self.snap_time(self.y_to_time(y))
+                self._sel_anchor_units = float(anchor_t)
+                self._sel_start_units = float(anchor_t)
+                ss = max(1e-6, float(self.snap_size_units))
+                self._sel_end_units = float(anchor_t + ss)
+                anchor_p = int(self.x_to_pitch(x))
+                anchor_p = max(1, min(88, anchor_p))
+                self._sel_anchor_pitch = anchor_p
+                self._sel_min_pitch = anchor_p
+                self._sel_max_pitch = anchor_p
+                self._selection_active = True
 
     def mouse_move(self, x: float, y: float, dx: float, dy: float) -> None:
         if self._left_pressed:
             if not self._dragging_left and (abs(dx) > self.DRAG_THRESHOLD or abs(dy) > self.DRAG_THRESHOLD):
                 self._dragging_left = True
-                if not self._shift_down:
+                if not self._left_selection_mode:
                     self._tool.on_left_drag_start(x, y)
             if self._dragging_left:
-                if not self._shift_down:
+                if not self._left_selection_mode:
                     self._tool.on_left_drag(x, y, dx, dy)
                 # Update selection window when Shift+Left-dragging
-                if self._shift_down:
+                if self._left_selection_mode:
                     cur_t = self.snap_time(self.y_to_time(y))
                     anchor_t = float(self._sel_anchor_units)
                     ss = max(1e-6, float(self.snap_size_units))
@@ -654,25 +664,28 @@ class Editor(QtCore.QObject,
         elif self._right_pressed:
             if not self._dragging_right and (abs(dx) > self.DRAG_THRESHOLD or abs(dy) > self.DRAG_THRESHOLD):
                 self._dragging_right = True
-                self._tool.on_right_drag_start(x, y)
+                if not self._right_selection_mode:
+                    self._tool.on_right_drag_start(x, y)
             if self._dragging_right:
-                self._tool.on_right_drag(x, y, dx, dy)
-                # Update selection window while right-dragging (tool-agnostic)
-                cur_t = self.snap_time(self.y_to_time(y))
-                anchor_t = float(self._sel_anchor_units)
-                ss = max(1e-6, float(self.snap_size_units))
-                if cur_t >= anchor_t:
-                    self._sel_start_units = float(anchor_t)
-                    self._sel_end_units = float(cur_t + ss)
+                if not self._right_selection_mode:
+                    self._tool.on_right_drag(x, y, dx, dy)
                 else:
-                    self._sel_start_units = float(cur_t)
-                    self._sel_end_units = float(anchor_t)
-                cur_p = int(self.x_to_pitch(x))
-                cur_p = max(1, min(88, cur_p))
-                anchor_p = int(self._sel_anchor_pitch)
-                self._sel_min_pitch = int(min(anchor_p, cur_p))
-                self._sel_max_pitch = int(max(anchor_p, cur_p))
-                self._selection_active = True
+                    # Update selection window while right-dragging (selection mode)
+                    cur_t = self.snap_time(self.y_to_time(y))
+                    anchor_t = float(self._sel_anchor_units)
+                    ss = max(1e-6, float(self.snap_size_units))
+                    if cur_t >= anchor_t:
+                        self._sel_start_units = float(anchor_t)
+                        self._sel_end_units = float(cur_t + ss)
+                    else:
+                        self._sel_start_units = float(cur_t)
+                        self._sel_end_units = float(anchor_t)
+                    cur_p = int(self.x_to_pitch(x))
+                    cur_p = max(1, min(88, cur_p))
+                    anchor_p = int(self._sel_anchor_pitch)
+                    self._sel_min_pitch = int(min(anchor_p, cur_p))
+                    self._sel_max_pitch = int(max(anchor_p, cur_p))
+                    self._selection_active = True
                 # Skip intermediate drag snapshots
         else:
             # Update shared cursor state for guide rendering (time + mm), with snapping
@@ -689,7 +702,7 @@ class Editor(QtCore.QObject,
     def mouse_release(self, button: int, x: float, y: float) -> None:
         if button == 1:
             if self._dragging_left:
-                if not self._shift_down:
+                if not self._left_selection_mode:
                     self._tool.on_left_drag_end(x, y)
                     # Capture a single coalesced snapshot for the whole drag
                     self._snapshot_if_changed(coalesce=True, label="left_drag")
@@ -697,22 +710,24 @@ class Editor(QtCore.QObject,
                 # Click if moved <= threshold
                 px, py = self._press_pos
                 if (abs(x - px) <= self.DRAG_THRESHOLD and abs(y - py) <= self.DRAG_THRESHOLD):
-                    if not self._shift_down:
+                    if not self._left_selection_mode:
                         self._tool.on_left_click(x, y)
                         # Capture click changes (non-coalesced)
                         self._snapshot_if_changed(coalesce=False, label="left_click")
             # Stop drawing selection on any click
-            if not self._dragging_left and not self._shift_down:
+            if not self._dragging_left and not self._left_selection_mode:
                 self._selection_active = False
-            if not self._shift_down:
+            if not self._left_selection_mode:
                 self._tool.on_left_unpress(x, y)
             self._left_pressed = False
             self._dragging_left = False
+            self._left_selection_mode = False
         elif button == 2:
             if self._dragging_right:
-                self._tool.on_right_drag_end(x, y)
-                if bool(getattr(self._tool, 'RIGHT_DRAG_EDITS', False)):
-                    self._snapshot_if_changed(coalesce=True, label="right_drag")
+                if not self._right_selection_mode:
+                    self._tool.on_right_drag_end(x, y)
+                    if bool(getattr(self._tool, 'RIGHT_DRAG_EDITS', False)):
+                        self._snapshot_if_changed(coalesce=True, label="right_drag")
                 # Do not modify clipboard on selection changes
             else:
                 px, py = self._press_pos
@@ -725,6 +740,7 @@ class Editor(QtCore.QObject,
             self._tool.on_right_unpress(x, y)
             self._right_pressed = False
             self._dragging_right = False
+            self._right_selection_mode = False
 
     def mouse_double_click(self, button: int, x: float, y: float) -> None:
         if button == 1:
@@ -903,48 +919,54 @@ class Editor(QtCore.QObject,
         for h in beam_by_hand:
             beam_by_hand[h] = sorted(beam_by_hand[h], key=lambda b: float(getattr(b, 'time', 0.0)))
 
-        # Grid helpers: absolute times (ticks) of drawn grid lines across the score following specific conditions
-        grid_den_times: list[float] = []
-        barline_times: list[float] = []
-        cur_t = 0.0
-        for bg in getattr(score, 'base_grid', []) or []:
-            # Total measure length in ticks
-            measure_len_ticks = float(bg.numerator) * (4.0 / float(bg.denominator)) * float(QUARTER_NOTE_UNIT)
-            
-            # Beat length inside this measure (ticks)
-            beat_len_ticks = measure_len_ticks / max(1, int(bg.numerator))
-            
-            # For each measure in this segment
-            for _ in range(int(bg.measure_amount)):
-                barline_times.append(float(cur_t))
-                # Append grid line times for configured grid positions
+        # Grid helpers: absolute times (ticks) of drawn grid lines across the score.
+        # Cache these by base_grid signature to avoid expensive full recomputation every frame.
+        base_grid_list = list(getattr(score, 'base_grid', []) or [])
+        grid_key_parts: list[tuple[int, int, int, tuple[int, ...]]] = []
+        for bg in base_grid_list:
+            positions = getattr(bg, 'beat_grouping', None)
+            positions_list = list(positions if positions is not None else (getattr(bg, 'beat_grouping', []) or []))
+            grid_key_parts.append(
+                (
+                    int(getattr(bg, 'numerator', 4) or 4),
+                    int(getattr(bg, 'denominator', 4) or 4),
+                    int(getattr(bg, 'measure_amount', 1) or 1),
+                    tuple(int(v) for v in positions_list),
+                )
+            )
+        grid_cache_key = tuple(grid_key_parts)
+        if self._grid_time_cache_key == grid_cache_key and self._grid_time_cache_values is not None:
+            grid_den_times = self._grid_time_cache_values[0]
+            barline_times = self._grid_time_cache_values[1]
+        else:
+            grid_den_times = []
+            barline_times = []
+            cur_t = 0.0
+            for bg in base_grid_list:
+                measure_len_ticks = float(bg.numerator) * (4.0 / float(bg.denominator)) * float(QUARTER_NOTE_UNIT)
+                beat_len_ticks = measure_len_ticks / max(1, int(bg.numerator))
                 positions = getattr(bg, 'beat_grouping', None)
                 positions_list = list(positions if positions is not None else (getattr(bg, 'beat_grouping', []) or []))
-                
-                # New scheme: list index represents beat; draw lines where value == 1
-                if len(positions_list) == int(bg.numerator):
-                    if (positions_list == [v for v in range(1, int(bg.numerator) + 1)]):
-                        # we have one group so we draw all beats
-                        for idx in range(1, int(bg.numerator) + 1):
-                            t_line = cur_t + (idx - 1) * beat_len_ticks
-                            grid_den_times.append(float(t_line))
+                for _ in range(int(bg.measure_amount)):
+                    barline_times.append(float(cur_t))
+                    if len(positions_list) == int(bg.numerator):
+                        if positions_list == [v for v in range(1, int(bg.numerator) + 1)]:
+                            for idx in range(1, int(bg.numerator) + 1):
+                                t_line = cur_t + (idx - 1) * beat_len_ticks
+                                grid_den_times.append(float(t_line))
+                        else:
+                            for idx, val in enumerate(positions_list, start=1):
+                                if int(val) != 1:
+                                    continue
+                                t_line = cur_t + (idx - 1) * beat_len_ticks
+                                grid_den_times.append(float(t_line))
                     else:
-                        # we have multiple groups so only draw first beat of each group e.g. 7/8 and 1231234 draws beat 1 and 4
-                        for idx, val in enumerate(positions_list, start=1):
-                            if int(val) != 1:
-                                continue
-                            t_line = cur_t + (idx - 1) * beat_len_ticks
-                            grid_den_times.append(float(t_line))
-                else:
-                    # Fallback: if malformed, at least draw the barline
-                    grid_den_times.append(float(cur_t))
-                
-                # Advance to next measure start
-                cur_t += measure_len_ticks
-        
-        # Append final end barline time for completeness
-        grid_den_times.append(float(cur_t))
-        barline_times.append(float(cur_t))
+                        grid_den_times.append(float(cur_t))
+                    cur_t += measure_len_ticks
+            grid_den_times.append(float(cur_t))
+            barline_times.append(float(cur_t))
+            self._grid_time_cache_key = grid_cache_key
+            self._grid_time_cache_values = (grid_den_times, barline_times)
 
         self._draw_cache = {
             'time_begin': time_begin,
@@ -1381,38 +1403,54 @@ class Editor(QtCore.QObject,
         return True
 
     def shift_selected_notes_time(self, delta_units: float) -> bool:
-        """Shift selected notes in time by `delta_units` ticks and move the selection window."""
+        """Move selected notes to the nearest snap band in the requested direction.
+
+        - Positive `delta_units`: move each note to the next snap band (later)
+        - Negative `delta_units`: move each note to the previous snap band (earlier)
+        """
         score: SCORE | None = self.current_score()
         if score is None or not self._selection_active:
             return False
         delta = float(delta_units)
         if abs(delta) < 1e-9:
             return False
+        units = float(max(1e-6, getattr(self, 'snap_size_units', 0.0) or 0.0))
+        direction = 1 if delta > 0.0 else -1
+
+        def _move_to_directional_band(value: float) -> float:
+            q = float(value) / units
+            nearest_i = int(round(q))
+            on_band = math.isclose(q, float(nearest_i), abs_tol=1e-9)
+            if direction > 0:
+                if on_band:
+                    return float(nearest_i + 1) * units
+                return float(math.ceil(q)) * units
+            if on_band:
+                return max(0.0, float(nearest_i - 1) * units)
+            return max(0.0, float(math.floor(q)) * units)
+
         sel = self.detect_events_from_time_window(self._sel_start_units, self._sel_end_units - 0.1)
         notes = sel.get('note', []) if isinstance(sel, dict) else []
         if not notes:
             return False
-        min_time = min(float(getattr(n, 'time', 0.0) or 0.0) for n in notes)
-        delta_clamped = delta
-        if delta < 0.0:
-            # Prevent shifting before time zero
-            limit = min_time + delta
-            if limit < 0.0:
-                delta_clamped = -min_time
-        if abs(delta_clamped) < 1e-9:
-            return False
+
         updated = False
         for n in notes:
             t = float(getattr(n, 'time', 0.0) or 0.0)
-            new_t = max(0.0, t + delta_clamped)
+            new_t = _move_to_directional_band(t)
             if not math.isclose(new_t, t):
                 setattr(n, 'time', new_t)
                 updated = True
         if not updated:
             return False
-        self._sel_start_units = max(0.0, float(self._sel_start_units) + delta_clamped)
-        self._sel_end_units = max(0.0, float(self._sel_end_units) + delta_clamped)
-        self._sel_anchor_units = max(0.0, float(self._sel_anchor_units) + delta_clamped)
+
+        self._sel_start_units = _move_to_directional_band(float(self._sel_start_units))
+        self._sel_end_units = _move_to_directional_band(float(self._sel_end_units))
+        self._sel_anchor_units = _move_to_directional_band(float(self._sel_anchor_units))
+
+        if self._sel_end_units <= self._sel_start_units:
+            self._sel_end_units = float(self._sel_start_units) + units
+
         self.update_score_length()
         self._reuse_draw_cache_once = True
         w = getattr(self, 'widget', None)

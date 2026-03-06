@@ -25,6 +25,7 @@ except Exception:
 
 
 _EMBEDDED_FONT_NAMES: set[str] = set()
+_REGISTERED_FONT_CACHE: dict[str, Optional[str]] = {}
 _FONT_EXTS = ('.ttf', '.otf', '.ttc', '.otc')
 
 
@@ -155,9 +156,13 @@ def register_font_from_bytes(name: str) -> Optional[str]:
     """
     if QFontDatabase is None:
         return None
+    cache_key = _normalize_font_name(name)
+    if cache_key in _REGISTERED_FONT_CACHE:
+        return _REGISTERED_FONT_CACHE[cache_key]
     try:
         raw = _decoded_font_bytes(name)
         if raw is None:
+            _REGISTERED_FONT_CACHE[cache_key] = None
             return None
         if QByteArray is not None:
             data = QByteArray(raw)
@@ -165,6 +170,7 @@ def register_font_from_bytes(name: str) -> Optional[str]:
             data = raw
         fid = QFontDatabase.addApplicationFontFromData(data)
         if fid < 0:
+            _REGISTERED_FONT_CACHE[cache_key] = None
             return None
         fams = QFontDatabase.applicationFontFamilies(fid)
         fams = [str(f) for f in fams]
@@ -172,8 +178,11 @@ def register_font_from_bytes(name: str) -> Optional[str]:
         _EMBEDDED_FONT_NAMES.add(normalized)
         for fam in fams:
             _EMBEDDED_FONT_NAMES.add(_normalize_font_name(fam))
-        return fams[0] if fams else name
+        resolved = fams[0] if fams else name
+        _REGISTERED_FONT_CACHE[cache_key] = resolved
+        return resolved
     except Exception:
+        _REGISTERED_FONT_CACHE[cache_key] = None
         return None
 
 
