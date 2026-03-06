@@ -764,7 +764,7 @@ class Editor(QtCore.QObject,
         """
         total_time_ticks = float(self._calc_base_grid_list_total_length())
         score: SCORE | None = self.current_score()
-        zpq: float = score.editor.zoom_mm_per_quarter
+        zpq: float = float(getattr(score.app_state, 'zoom_mm_per_quarter', 25.0) or 25.0)
         stave_length_mm = (total_time_ticks / float(QUARTER_NOTE_UNIT)) * zpq
         top_bottom_mm = float(self.margin or 0.0) * 6.0
         height_mm = max(10.0, stave_length_mm + top_bottom_mm)
@@ -850,7 +850,7 @@ class Editor(QtCore.QObject,
         vp_h_mm = float(getattr(self, '_viewport_h_mm', 0.0) or 0.0)
         bottom_mm = top_mm + vp_h_mm
         # Small bleed similar to prior behavior
-        zpq = float(score.editor.zoom_mm_per_quarter)
+        zpq = float(getattr(score.app_state, 'zoom_mm_per_quarter', 25.0) or 25.0)
         bleed_mm = max(2.0, zpq * 0.25)
         time_begin = float(self.mm_to_time(top_mm - bleed_mm))
         bottom_bleed = max(0.0, float(getattr(self, 'viewport_bottom_bleed', 0.0) or 0.0))
@@ -1030,7 +1030,7 @@ class Editor(QtCore.QObject,
             w_mm = float(getattr(lay, 'page_width_mm', 210.0) or 210.0) if lay is not None else 210.0
             self._calculate_layout(float(w_mm))
         # Layout metrics
-        zpq = float(score.editor.zoom_mm_per_quarter)
+        zpq = float(getattr(score.app_state, 'zoom_mm_per_quarter', 25.0) or 25.0)
         return float(self.margin or 0.0) + (float(time) / float(QUARTER_NOTE_UNIT)) * zpq
     
     def pitch_to_x(self, key_number: int) -> float:
@@ -1103,7 +1103,7 @@ class Editor(QtCore.QObject,
             lay = getattr(score, 'layout', None)
             w_mm = float(getattr(lay, 'page_width_mm', 210.0) or 210.0) if lay is not None else 210.0
             self._calculate_layout(float(w_mm))
-        zpq = float(score.editor.zoom_mm_per_quarter)
+        zpq = float(getattr(score.app_state, 'zoom_mm_per_quarter', 25.0) or 25.0)
         ticks = (float(y_mm) - float(self.margin or 0.0)) / max(1e-6, zpq) * float(QUARTER_NOTE_UNIT)
         return max(0.0, ticks)
 
@@ -1205,7 +1205,7 @@ class Editor(QtCore.QObject,
                 layout = self.current_score().layout
                 l = float(layout.note_stem_length_semitone or 3) * float(self.semitone_dist or 0.5)
                 # Draw a translucent preview notehead at cursor
-                fill_color = self.notation_color if self.pitch_cursor in BLACK_KEYS else self.paper_color
+                fill_color = self.accent_color if self.pitch_cursor in BLACK_KEYS else self.paper_color
                 
                 # draw the notehead and stem
                 du.add_oval(
@@ -1448,9 +1448,9 @@ class Editor(QtCore.QObject,
         for n in notes:
             note_hand = str(getattr(n, 'hand', '') or '')
             note_color = str(getattr(n, 'color', '') or '')
-            if note_hand != h or note_color != h:
+            if note_hand != h or note_color != 'auto':
                 setattr(n, 'hand', h)
-                setattr(n, 'color', h)
+                setattr(n, 'color', 'auto')
                 updated = True
         if updated:
             self._snapshot_if_changed(coalesce=True, label='set_note_hand')

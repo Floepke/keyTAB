@@ -9,7 +9,7 @@ from datetime import datetime
 
 from PySide6.QtWidgets import QFileDialog, QMessageBox, QWidget
 
-from file_model.SCORE import SCORE, EditorSettings, MetaData
+from file_model.SCORE import SCORE, MetaData
 from file_model.info import Info
 from file_model.analysis import Analysis
 from file_model.base_grid import BaseGrid
@@ -125,8 +125,11 @@ class FileManager:
             pass
         try:
             editor_data = data.get('editor')
-            if isinstance(editor_data, dict):
-                score.editor = EditorSettings(**editor_data)
+            if isinstance(editor_data, dict) and 'zoom_mm_per_quarter' in editor_data:
+                try:
+                    score.app_state.zoom_mm_per_quarter = float(editor_data.get('zoom_mm_per_quarter'))
+                except Exception:
+                    pass
         except Exception:
             pass
         try:

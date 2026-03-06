@@ -217,14 +217,12 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
             cur_m += measure_len
 
     def _normalize_hex_color(value: str | None) -> str | None:
-        """Normalize hex color strings and allow special hand markers."""
+        """Normalize hex color strings."""
         if value is None:
             return None
         txt = str(value).strip()
         if not txt:
             return None
-        if txt in ('<', '>'):
-            return txt
         if not txt.startswith('#'):
             txt = f"#{txt}"
         hex_part = txt[1:]
@@ -1846,20 +1844,16 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                 black_above = p in BLACK_KEYS and _black_note_above_stem(item, black_rule, line_notes, op_time)
                 if black_above:
                     note_y = y_start - (w * 2.0)
-                # Problem solved: draw the note body with per-hand colors or overrides.
-                raw_color = n.get('color', None)
-                if raw_color in (None, ''):
-                    raw_color = n.get('hand', '<')
-                midicol = _normalize_hex_color(raw_color)
-                if midicol == '<':
-                    base = _normalize_hex_color(layout.get('note_midinote_left_color', '#cccccc'))
-                elif midicol == '>':
-                    base = _normalize_hex_color(layout.get('note_midinote_right_color', '#cccccc'))
-                elif midicol:
-                    base = midicol
-                else:
-                    fallback = 'note_midinote_left_color' if hand_key in ('l', '<') else 'note_midinote_right_color'
+                # Problem solved: draw the note body with auto-by-hand or explicit hex color.
+                raw_color = n.get('color', 'auto')
+                color_txt = str(raw_color).strip() if isinstance(raw_color, str) else 'auto'
+                fallback = 'note_midinote_left_color' if hand_key in ('l', '<') else 'note_midinote_right_color'
+                if color_txt == 'auto':
                     base = _normalize_hex_color(layout.get(fallback, '#cccccc'))
+                else:
+                    base = _normalize_hex_color(color_txt)
+                    if not base:
+                        base = _normalize_hex_color(layout.get(fallback, '#cccccc'))
                 if not base:
                     base = '#cccccc'
                 try:

@@ -57,7 +57,7 @@ class GridDrawerMixin:
         stave_right_position = max(0.0, width_mm - margin) - self.semitone_dist * 2
 
         # Editor zoom controls vertical mm per quarter note
-        zpq = score.editor.zoom_mm_per_quarter
+        zpq = float(getattr(score.app_state, 'zoom_mm_per_quarter', 25.0) or 25.0)
 
         # --------------- drawing the grid lines, barlines, measure numbers ---------------
         base_grid = score.base_grid

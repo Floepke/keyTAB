@@ -12,7 +12,7 @@ Welcome to **keyTAB**, a passion project for creating, editing, and engraving Kl
 
 ## Core Features
 - Editing tools for notes, grace notes, beams, slurs, pedal, dynamics, cresc/decresc, text, tempo, repeats, and line breaks.
-- Selection operations: transpose by semitone, shift in time by snap units, assign hand/color (`<` left, `>` right), cut/copy/paste, delete, select-all.
+- Selection operations: transpose by semitone, shift in time by snap units, assign hand (`<` left, `>` right; note color set to `auto`), cut/copy/paste, delete, select-all.
 - Layout & style: adjustable zoom (mm per quarter), page margins, stave ranges, color presets, and per-hand coloring that flows into engraving.
 - Engraving: multi-page rendering with headers/footers, document info, creation timestamp, and page numbering suitable for print/PDF.
 - Info & analysis: title/author/copyright plus live analysis of notes, measures, lines, pages, and grace notes.
@@ -25,7 +25,7 @@ Welcome to **keyTAB**, a passion project for creating, editing, and engraving Kl
 5. Export: save `.piano` files or print/PDF from the engraved view.
 
 ## Selection Shortcuts
-- `[` / `]`: set hand/color to left/right.
+- `[` / `]`: set hand to left/right and reset note color to `auto`.
 - `←` / `→`: transpose selection ±1 semitone.
 - `↑` / `↓`: shift selection in time by one snap unit.
 - `Backspace` / `Delete`: remove selection.

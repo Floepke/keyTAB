@@ -2,7 +2,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Literal
 
-NoteColor = Literal['<', '>'] | str
+NoteColor = Literal['auto'] | str
 
 @dataclass
 class Note:
@@ -20,7 +20,7 @@ class Note:
                             or 'above_stem_if_collision')
                 in the layout section.
     '''
-    notehead: Literal['default',
+    notehead: Literal['auto',
                       # these are the available noteheads:
                       'circle_white_up',
                       'circle_white_down',
@@ -35,6 +35,6 @@ class Note:
                       'triangle_black_up',
                       'triangle_black_down',
                       'cross_up',
-                      'cross_down'] = 'default'
-    color: NoteColor = ''
+                      'cross_down'] = 'auto'
+    color: NoteColor = 'auto'
     _id: int = 0

@@ -341,8 +341,8 @@ class CairoEditorWidget(QtWidgets.QWidget):
         sc = self._editor.current_score()
         if sc is None:
             return
-        ed = getattr(sc, 'editor', None)
-        if ed is None:
+        app_state = getattr(sc, 'app_state', None)
+        if app_state is None:
             return
         anchor_units = getattr(self._editor, 'time_cursor', None)
         anchor_y_logical_px = None
@@ -353,11 +353,11 @@ class CairoEditorWidget(QtWidgets.QWidget):
                 anchor_y_logical_px = (abs_mm_before - clip_y_mm) * (float(self._last_px_per_mm) / max(1e-6, float(self._last_dpr)))
             except Exception:
                 anchor_y_logical_px = None
-        current = float(getattr(ed, 'zoom_mm_per_quarter', 5.0) or 5.0)
+        current = float(getattr(app_state, 'zoom_mm_per_quarter', 25.0) or 25.0)
         factor = (1.10 ** steps)
         new_zoom = max(10.0, min(200.0, current * factor))
         try:
-            ed.zoom_mm_per_quarter = float(new_zoom)
+            app_state.zoom_mm_per_quarter = float(new_zoom)
         except Exception:
             pass
         if anchor_y_logical_px is not None:
@@ -383,7 +383,7 @@ class CairoEditorWidget(QtWidgets.QWidget):
         self.update()
 
     def wheelEvent(self, ev: QtGui.QWheelEvent) -> None:
-        # Ctrl+Wheel: adjust vertical zoom via SCORE.editor.zoom_mm_per_quarter
+        # Ctrl+Wheel: adjust vertical zoom via SCORE.app_state.zoom_mm_per_quarter
         angle = ev.angleDelta().y()
         if angle == 0:
             ev.accept()

@@ -90,7 +90,7 @@ class TimeSignatureDrawerMixin:
         # Helper: draw Klavarskribo-style three-column indicator at segment boundary
         def draw_klavarskribo(numerator: int, denominator: int, enabled: bool, y_mm: float, grid_positions: list[int]) -> None:
             color = (0.6, 0.6, 0.6, 1.0) if not enabled else self.notation_color
-            zpq = float(score.editor.zoom_mm_per_quarter)
+            zpq = float(getattr(score.app_state, 'zoom_mm_per_quarter', 25.0) or 25.0)
             quarters_per_measure = float(numerator) * (4.0 / max(1.0, float(denominator)))
             measure_len_mm = quarters_per_measure * zpq
             beat_len_mm = measure_len_mm / max(1, int(numerator))
@@ -152,5 +152,5 @@ class TimeSignatureDrawerMixin:
                 draw_klavarskribo(numerator, denominator, enabled, time_cursor, grid_positions)
             # Advance time cursor by the segment length (mm) to next segment start
             quarters_per_measure = float(numerator) * (4.0 / max(1.0, float(denominator)))
-            measure_len_mm = quarters_per_measure * float(score.editor.zoom_mm_per_quarter)
+            measure_len_mm = quarters_per_measure * float(getattr(score.app_state, 'zoom_mm_per_quarter', 25.0) or 25.0)
             time_cursor += measure_len_mm * float(measure_amount)

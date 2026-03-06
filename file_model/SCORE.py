@@ -2,7 +2,7 @@
 
 # my json structure design for *.piano files.
 from __future__ import annotations
-from dataclasses import dataclass, field, fields, MISSING
+from dataclasses import dataclass, field, fields, MISSING, is_dataclass
 from typing import List, get_args, get_origin, get_type_hints, Literal
 import json
 from datetime import datetime
@@ -27,20 +27,10 @@ from file_model.base_grid import BaseGrid
 from file_model.appstate import AppState
 
 
-@dataclass
-class EditorSettings:
-	"""Editor-specific settings for the piano-roll style editor.
-
-	- zoom_mm_per_quarter: how many millimeters a quarter note occupies vertically.
-	"""
-	zoom_mm_per_quarter: float = 25.0
-
-
 
 @dataclass
 class MetaData:
 	description: str = 'This is a .piano score file created with keyTAB.'
-	version: int = 1
 	extension: str = '.piano'
 	format: str = 'json'
 	creation_timestamp: str = ''
@@ -62,6 +52,77 @@ class Events:
 	tempo: List[Tempo] = field(default_factory=list)
 
 
+def _defaults_for(dc_type):
+	defaults = {}
+	for f in fields(dc_type):
+		if f.name.startswith('_'):
+			continue
+		if f.default is not MISSING:
+			defaults[f.name] = f.default
+		elif f.default_factory is not MISSING:  # type: ignore[attr-defined]
+			defaults[f.name] = f.default_factory()
+		else:
+			defaults[f.name] = None
+	return defaults
+
+
+def _apply_legacy_conversion(data: dict) -> dict:
+	"""Apply legacy file conversions (fail-open)."""
+	try:
+		from scripts.old_file_conversion import convert_legacy_piano_data
+		return convert_legacy_piano_data(data)
+	except Exception:
+		return data
+
+
+def _merge_with_defaults(dc_type, incoming: dict, context: str, skip_keys: set = {'id', '_id'}) -> dict:
+	incoming = incoming or {}
+	if not isinstance(incoming, dict):
+		incoming = {}
+	if dc_type is Note:
+		incoming = dict(incoming)
+		h = str(incoming.get('hand', '<') or '<').strip()
+		if h not in ('<', '>'):
+			h = '<'
+		incoming['hand'] = h
+		raw_color = incoming.get('color', 'auto')
+		if isinstance(raw_color, str):
+			color = raw_color.strip()
+		else:
+			color = ''
+		incoming['color'] = color if color else 'auto'
+	defaults = _defaults_for(dc_type)
+	try:
+		type_hints = get_type_hints(dc_type, globals(), locals())
+	except Exception:
+		type_hints = {}
+	merged = {}
+	for f in fields(dc_type):
+		name = f.name
+		if name.startswith('_') or name in skip_keys:
+			continue
+		field_type = type_hints.get(name, f.type)
+		default_value = defaults.get(name)
+		raw_value = incoming.get(name, MISSING)
+		if raw_value is MISSING:
+			merged[name] = default_value
+			continue
+		if is_dataclass(field_type):
+			if isinstance(raw_value, str):
+				raw_value = {'text': raw_value}
+			if isinstance(raw_value, field_type):
+				merged[name] = raw_value
+				continue
+			if isinstance(raw_value, dict):
+				child = _merge_with_defaults(field_type, raw_value, f"{context}.{name}")
+				merged[name] = field_type(**child)
+			else:
+				merged[name] = default_value
+			continue
+		merged[name] = raw_value
+	return merged
+
+
 @dataclass
 class SCORE:
 	meta_data: MetaData = field(default_factory=MetaData)
@@ -70,7 +131,6 @@ class SCORE:
 	base_grid: List[BaseGrid] = field(default_factory=list)
 	events: Events = field(default_factory=Events)
 	layout: Layout = field(default_factory=Layout)
-	editor: EditorSettings = field(default_factory=EditorSettings)
 	app_state: AppState = field(default_factory=AppState)
 	_next_id: int = 1
 	_app_state_from_file: bool = False
@@ -82,17 +142,18 @@ class SCORE:
 		return i
 
 	def new_note(self, **kwargs) -> Note:
-		base = {'pitch': 40, 'time': 0.0, 'duration': 100.0, 'hand': '<'}
+		base = {'pitch': 40, 'time': 0.0, 'duration': 100.0, 'hand': '<', 'color': 'auto'}
 		base.update(kwargs)
 		h = str(base.get('hand', '<') or '<').strip()
-		if h.lower() == 'l':
-			h = '<'
-		elif h.lower() == 'r':
-			h = '>'
-		elif h not in ('<', '>'):
+		if h not in ('<', '>'):
 			h = '<'
 		base['hand'] = h
-		base['color'] = h
+		raw_color = base.get('color', 'auto')
+		if isinstance(raw_color, str):
+			color = raw_color.strip()
+		else:
+			color = ''
+		base['color'] = color if color else 'auto'
 		obj = Note(**base, _id=self._gen_id())
 		self.events.note.append(obj)
 		return obj
@@ -213,75 +274,19 @@ class SCORE:
 	def save(self, path: str) -> None:
 		# Update modification timestamp before writing
 		self.meta_data.modification_timestamp = datetime.now().strftime("%d-%m-%Y_%H:%M:%S")
+		payload = self.get_dict()
+		if isinstance(payload, dict):
+			payload.pop('editor', None)
 		with open(path, 'w', encoding='utf-8') as f:
-			json.dump(self.get_dict(), f, indent=None, ensure_ascii=False, separators=(',', ':'))
+			json.dump(payload, f, indent=None, ensure_ascii=False, separators=(',', ':'))
 
 	def load(self, path: str) -> "SCORE":
 		with open(path, 'r', encoding='utf-8') as f:
 			data = json.load(f)
 
-		# Helper: compute dataclass defaults (respecting default_factory)
-		def _defaults_for(dc_type):
-			defaults = {}
-			for f in fields(dc_type):
-				if f.name.startswith('_'):
-					continue
-				if f.default is not MISSING:
-					defaults[f.name] = f.default
-				elif f.default_factory is not MISSING:  # type: ignore[attr-defined]
-					defaults[f.name] = f.default_factory()
-				else:
-					defaults[f.name] = None
-			return defaults
+		# Migrate legacy file conventions (fail-open).
+		data = _apply_legacy_conversion(data)
 
-		# Helper: merge incoming dict with dataclass defaults and report repairs
-		def _merge_with_defaults(dc_type, incoming: dict, context: str, skip_keys: set = {'id', '_id'}) -> dict:
-			from dataclasses import is_dataclass
-
-			incoming = incoming or {}
-			if not isinstance(incoming, dict):
-				incoming = {}
-			if dc_type is Note:
-				incoming = dict(incoming)
-				h = str(incoming.get('hand', '<') or '<').strip()
-				if h.lower() == 'l':
-					h = '<'
-				elif h.lower() == 'r':
-					h = '>'
-				elif h not in ('<', '>'):
-					h = '<'
-				incoming['hand'] = h
-				incoming['color'] = h
-			defaults = _defaults_for(dc_type)
-			try:
-				type_hints = get_type_hints(dc_type, globals(), locals())
-			except Exception:
-				type_hints = {}
-			merged = {}
-			for f in fields(dc_type):
-				name = f.name
-				if name.startswith('_') or name in skip_keys:
-					continue
-				field_type = type_hints.get(name, f.type)
-				default_value = defaults.get(name)
-				raw_value = incoming.get(name, MISSING)
-				if raw_value is MISSING:
-					merged[name] = default_value
-					continue
-				if is_dataclass(field_type):
-					if isinstance(raw_value, str):
-						raw_value = {'text': raw_value}
-					if isinstance(raw_value, field_type):
-						merged[name] = raw_value
-						continue
-					if isinstance(raw_value, dict):
-						child = _merge_with_defaults(field_type, raw_value, f"{context}.{name}")
-						merged[name] = field_type(**child)
-					else:
-						merged[name] = default_value
-					continue
-				merged[name] = raw_value
-			return merged
 		# Meta/Info
 		md = data.get('meta_data', {})
 		self.meta_data = MetaData(**_merge_with_defaults(MetaData, md, 'meta_data'))
@@ -301,10 +306,6 @@ class SCORE:
 		# Layout: simple dataclass-merge with defaults, no legacy migration
 		lay = data.get('layout', {}) or {}
 		self.layout = Layout(**_merge_with_defaults(Layout, lay, 'layout'))
-
-		# Editor settings (optional)
-		ed = data.get('editor', {}) or {}
-		self.editor = EditorSettings(**_merge_with_defaults(EditorSettings, ed, 'editor'))
 
 		# App state (optional)
 		app = data.get('app_state', None)
@@ -348,41 +349,9 @@ class SCORE:
 					pass
 				lst.append(obj)
 
-		# Normalize hand values across events to '<' or '>' (repair legacy 'l'/'r')
+		# Normalize hand values and convert short notes to grace notes.
 		try:
-			# Convert very short notes to grace notes and normalize hand values
-			converted_grace: List[GraceNote] = []
-			remaining_notes: List[Note] = []
-			for n in getattr(self.events, 'note', []) or []:
-				h = str(getattr(n, 'hand', '<') or '<').strip()
-				if h.lower() == 'l':
-					setattr(n, 'hand', '<')
-				elif h.lower() == 'r':
-					setattr(n, 'hand', '>')
-				elif h not in ('<', '>'):
-					setattr(n, 'hand', '<')
-				setattr(n, 'color', str(getattr(n, 'hand', '<') or '<'))
-				# Convert to grace note if shorter than threshold
-				try:
-					du = float(getattr(n, 'duration', 0.0) or 0.0)
-					if du < float(GRACENOTE_THRESHOLD):
-						converted_grace.append(GraceNote(pitch=int(getattr(n, 'pitch', 40) or 40), time=float(getattr(n, 'time', 0.0) or 0.0)))
-					else:
-						remaining_notes.append(n)
-				except Exception:
-					remaining_notes.append(n)
-			# Replace lists: keep remaining notes, append converted grace notes via builder to assign ids
-			self.events.note = remaining_notes
-			for g in converted_grace:
-				self.new_grace_note(pitch=int(g.pitch), time=float(g.time))
-			for b in getattr(self.events, 'beam', []) or []:
-				h = str(getattr(b, 'hand', '<') or '<').strip()
-				if h.lower() == 'l':
-					setattr(b, 'hand', '<')
-				elif h.lower() == 'r':
-					setattr(b, 'hand', '>')
-				elif h not in ('<', '>'):
-					setattr(b, 'hand', '<')
+			self._normalize_events_after_load()
 		except Exception:
 			pass
 
@@ -413,71 +382,10 @@ class SCORE:
 	@classmethod
 	def from_dict(cls, data: dict) -> "SCORE":
 		"""Construct a SCORE from its dict representation (like load, but in-memory)."""
+		# Keep in-memory construction aligned with file load conversion.
+		data = _apply_legacy_conversion(data)
+
 		self = cls()
-
-		from dataclasses import fields, MISSING
-		from typing import List, get_args, get_origin, get_type_hints
-
-		def _defaults_for(dc_type):
-			defaults = {}
-			for f in fields(dc_type):
-				if f.name.startswith('_'):
-					continue
-				if f.default is not MISSING:
-					defaults[f.name] = f.default
-				elif getattr(f, 'default_factory', MISSING) is not MISSING:  # type: ignore[attr-defined]
-					defaults[f.name] = f.default_factory()
-				else:
-					defaults[f.name] = None
-			return defaults
-
-		def _merge_with_defaults(dc_type, incoming: dict, context: str, skip_keys: set = {'id', '_id'}) -> dict:
-			from dataclasses import is_dataclass
-
-			incoming = incoming or {}
-			if not isinstance(incoming, dict):
-				incoming = {}
-			if dc_type is Note:
-				incoming = dict(incoming)
-				h = str(incoming.get('hand', '<') or '<').strip()
-				if h.lower() == 'l':
-					h = '<'
-				elif h.lower() == 'r':
-					h = '>'
-				elif h not in ('<', '>'):
-					h = '<'
-				incoming['hand'] = h
-				incoming['color'] = h
-			defaults = _defaults_for(dc_type)
-			try:
-				type_hints = get_type_hints(dc_type, globals(), locals())
-			except Exception:
-				type_hints = {}
-			merged = {}
-			for f in fields(dc_type):
-				name = f.name
-				if name.startswith('_') or name in skip_keys:
-					continue
-				field_type = type_hints.get(name, f.type)
-				default_value = defaults.get(name)
-				raw_value = incoming.get(name, MISSING)
-				if raw_value is MISSING:
-					merged[name] = default_value
-					continue
-				if is_dataclass(field_type):
-					if isinstance(raw_value, str):
-						raw_value = {'text': raw_value}
-					if isinstance(raw_value, field_type):
-						merged[name] = raw_value
-						continue
-					if isinstance(raw_value, dict):
-						child = _merge_with_defaults(field_type, raw_value, f"{context}.{name}")
-						merged[name] = field_type(**child)
-					else:
-						merged[name] = default_value
-					continue
-				merged[name] = raw_value
-			return merged
 
 		# Meta/Info
 		md = (data or {}).get('meta_data', {})
@@ -500,10 +408,6 @@ class SCORE:
 		# Layout
 		lay = (data or {}).get('layout', {}) or {}
 		self.layout = Layout(**_merge_with_defaults(Layout, lay, 'layout'))
-
-		# Editor settings
-		ed = (data or {}).get('editor', {}) or {}
-		self.editor = EditorSettings(**_merge_with_defaults(EditorSettings, ed, 'editor'))
 
 		# App state
 		app = (data or {}).get('app_state', None)
@@ -544,40 +448,9 @@ class SCORE:
 					pass
 				lst.append(obj)
 
-		# Normalize hand values across events to '<' or '>' (repair legacy 'l'/'r')
+		# Normalize hand values and convert short notes to grace notes.
 		try:
-			# Convert very short notes to grace notes and normalize hand values
-			converted_grace: List[GraceNote] = []
-			remaining_notes: List[Note] = []
-			for n in getattr(self.events, 'note', []) or []:
-				h = str(getattr(n, 'hand', '<') or '<').strip()
-				if h.lower() == 'l':
-					setattr(n, 'hand', '<')
-				elif h.lower() == 'r':
-					setattr(n, 'hand', '>')
-				elif h not in ('<', '>'):
-					setattr(n, 'hand', '<')
-				setattr(n, 'color', str(getattr(n, 'hand', '<') or '<'))
-				# Convert to grace note if shorter than threshold
-				try:
-					du = float(getattr(n, 'duration', 0.0) or 0.0)
-					if du < float(GRACENOTE_THRESHOLD):
-						converted_grace.append(GraceNote(pitch=int(getattr(n, 'pitch', 40) or 40), time=float(getattr(n, 'time', 0.0) or 0.0)))
-					else:
-						remaining_notes.append(n)
-				except Exception:
-					remaining_notes.append(n)
-			self.events.note = remaining_notes
-			for g in converted_grace:
-				self.new_grace_note(pitch=int(g.pitch), time=float(g.time))
-			for b in getattr(self.events, 'beam', []) or []:
-				h = str(getattr(b, 'hand', '<') or '<').strip()
-				if h.lower() == 'l':
-					setattr(b, 'hand', '<')
-				elif h.lower() == 'r':
-					setattr(b, 'hand', '>')
-				elif h not in ('<', '>'):
-					setattr(b, 'hand', '<')
+			self._normalize_events_after_load()
 		except Exception:
 			pass
 
@@ -604,7 +477,6 @@ class SCORE:
 		self.base_grid = [BaseGrid()]
 		self.events = Events()
 		self.layout = Layout()
-		self.editor = EditorSettings()
 		self.app_state = AppState()
 		self._next_id = 1
 		self._app_state_from_file = False
@@ -639,6 +511,37 @@ class SCORE:
 			self.events.line_break.sort(key=lambda lb: float(getattr(lb, 'time', 0.0) or 0.0))
 		except Exception:
 			pass
+
+	def _normalize_events_after_load(self) -> None:
+		"""Normalize event fields after parsing and convert short notes to grace notes."""
+		converted_grace: List[GraceNote] = []
+		remaining_notes: List[Note] = []
+		for n in getattr(self.events, 'note', []) or []:
+			h = str(getattr(n, 'hand', '<') or '<').strip()
+			if h not in ('<', '>'):
+				setattr(n, 'hand', '<')
+			c = str(getattr(n, 'color', '') or '').strip()
+			if not c:
+				setattr(n, 'color', 'auto')
+			try:
+				dur = float(getattr(n, 'duration', 0.0) or 0.0)
+				if dur < float(GRACENOTE_THRESHOLD):
+					converted_grace.append(GraceNote(pitch=int(getattr(n, 'pitch', 40) or 40), time=float(getattr(n, 'time', 0.0) or 0.0)))
+				else:
+					remaining_notes.append(n)
+			except Exception:
+				remaining_notes.append(n)
+
+		# Replace original notes with remaining valid notes and add converted grace notes.
+		self.events.note = remaining_notes
+		for g in converted_grace:
+			self.new_grace_note(pitch=int(g.pitch), time=float(g.time))
+	
+		# Normalize beam hand values as well.
+		for b in getattr(self.events, 'beam', []) or []:
+			h = str(getattr(b, 'hand', '<') or '<').strip()
+			if h not in ('<', '>'):
+				setattr(b, 'hand', '<')
 
 	def apply_quick_line_breaks(self, groups: List[int]) -> bool:
 		"""Distribute line breaks in repeating measure groups across the score.

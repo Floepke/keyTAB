@@ -63,7 +63,7 @@ class SnapDrawerMixin:
         # Match horizontal span under the stave
         stave_left = self.margin + self.semitone_dist
         stave_right = page_w_mm - self.margin - self.semitone_dist * 2.0
-        zpq = float(score.editor.zoom_mm_per_quarter)
+        zpq = float(getattr(score.app_state, 'zoom_mm_per_quarter', 25.0) or 25.0)
 
         # Snap size in time units → mm
         snap_units: float

@@ -31,7 +31,7 @@ class LineBreakTool(BaseTool):
         if self._editor is None:
             return 0.0
         score = self._editor.current_score()
-        zpq = float(getattr(score.editor, 'zoom_mm_per_quarter', 25.0) or 25.0)
+        zpq = float(getattr(score.app_state, 'zoom_mm_per_quarter', 25.0) or 25.0)
         return (float(tol_mm) / max(1e-6, zpq)) * float(QUARTER_NOTE_UNIT)
 
     def _marker_positions_mm(self) -> Tuple[float, float]:

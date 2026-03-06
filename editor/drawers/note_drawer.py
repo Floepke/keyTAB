@@ -46,7 +46,7 @@ class NoteDrawerMixin:
 
         # Layout metrics
         margin = float(self.margin or 0.0)
-        zpq = float(score.editor.zoom_mm_per_quarter)
+        zpq = float(getattr(score.app_state, 'zoom_mm_per_quarter', 25.0) or 25.0)
 
         def time_to_mm(ticks: float) -> float:
             return margin + (float(ticks) / float(QUARTER_NOTE_UNIT)) * zpq

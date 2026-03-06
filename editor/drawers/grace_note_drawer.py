@@ -21,7 +21,7 @@ class GraceNoteDrawerMixin:
 
         margin = float(getattr(self, 'margin', 0.0) or 0.0)
         try:
-            zpq = float(score.editor.zoom_mm_per_quarter)
+            zpq = float(getattr(score.app_state, 'zoom_mm_per_quarter', 25.0) or 25.0)
         except Exception:
             zpq = 1.0
 

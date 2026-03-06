@@ -22,7 +22,7 @@ class CountLineDrawerMixin:
         top_mm = float(getattr(self, '_view_y_mm_offset', 0.0) or 0.0)
         vp_h_mm = float(getattr(self, '_viewport_h_mm', 0.0) or 0.0)
         bottom_mm = top_mm + vp_h_mm
-        bleed_mm = max(2.0, float(getattr(score.editor, 'zoom_mm_per_quarter', 25.0)) * 0.25)
+        bleed_mm = max(2.0, float(getattr(score.app_state, 'zoom_mm_per_quarter', 25.0)) * 0.25)
 
         # Handle size scales with semitone spacing
         handle_w = max(2.0, float(self.semitone_dist or 2.5))

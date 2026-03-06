@@ -134,6 +134,13 @@ class MainWindow(QtWidgets.QMainWindow):
             else:
                 status_msg = "Restored unsaved session"
 
+        # Initialize page navigation from persisted app state before first engrave.
+        try:
+            app_state = self._resolve_app_state_defaults()
+            self._page_counter = max(0, int(getattr(app_state, 'print_view_page_index', 0) or 0))
+        except Exception:
+            self._page_counter = 0
+
         # Provide initial score to engrave and update titlebar (delay first engrave)
         self._refresh_views_from_score(delay_engrave_ms=1000)
         # Show startup status on the status bar
@@ -282,7 +289,7 @@ class MainWindow(QtWidgets.QMainWindow):
         QtCore.QTimer.singleShot(0, self._adjust_docks_to_fit)
 
         # Page navigation state
-        self._page_counter = 0
+        self._page_counter = max(0, int(getattr(self, '_page_counter', 0) or 0))
 
         # Connect external scrollbar to the editor canvas
         try:
@@ -676,6 +683,8 @@ class MainWindow(QtWidgets.QMainWindow):
             pass
         try:
             adm = get_appdata_manager()
+            app_state.zoom_mm_per_quarter = float(adm.get("zoom_mm_per_quarter", app_state.zoom_mm_per_quarter) or app_state.zoom_mm_per_quarter)
+            app_state.print_view_page_index = int(adm.get("print_view_page_index", app_state.print_view_page_index) or app_state.print_view_page_index)
             app_state.editor_scroll_pos = int(adm.get("editor_scroll_pos", app_state.editor_scroll_pos) or app_state.editor_scroll_pos)
             app_state.snap_base = int(adm.get("snap_base", app_state.snap_base) or app_state.snap_base)
             app_state.snap_divide = int(adm.get("snap_divide", app_state.snap_divide) or app_state.snap_divide)
@@ -706,6 +715,12 @@ class MainWindow(QtWidgets.QMainWindow):
             # Scroll restore (used when metrics arrive)
             try:
                 self._pending_scroll_restore = int(app_state.editor_scroll_pos or 0)
+            except Exception:
+                pass
+            # Print page restore
+            try:
+                self._page_counter = max(0, int(getattr(app_state, 'print_view_page_index', 0) or 0))
+                self._set_page_index(self._page_counter)
             except Exception:
                 pass
         finally:
@@ -1192,6 +1207,11 @@ class MainWindow(QtWidgets.QMainWindow):
             self._refresh_recent_files_menu()
         except Exception:
             pass
+        try:
+            app_state = self._resolve_app_state_defaults()
+            self._page_counter = max(0, int(getattr(app_state, 'print_view_page_index', 0) or 0))
+        except Exception:
+            self._page_counter = 0
         self._refresh_views_from_score()
         try:
             self.editor_controller.set_score(self.file_manager.current())
@@ -1230,13 +1250,13 @@ class MainWindow(QtWidgets.QMainWindow):
         if delay_engrave_ms and delay_engrave_ms > 0:
             def _delayed_engrave() -> None:
                 try:
-                    self.engraver.engrave(self._current_score_dict())
+                    self.engraver.engrave(self._current_score_dict(), pageno=int(getattr(self, '_page_counter', 0)))
                 except Exception:
                     self.print_view.request_render()
             QtCore.QTimer.singleShot(int(delay_engrave_ms), _delayed_engrave)
         else:
             try:
-                self.engraver.engrave(sc_dict)
+                self.engraver.engrave(sc_dict, pageno=int(getattr(self, '_page_counter', 0)))
             except Exception:
                 # Fallback: render current content
                 self.print_view.request_render()
@@ -1245,7 +1265,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def _on_score_changed(self) -> None:
         try:
-            self.engraver.engrave(self._current_score_dict())
+            self.engraver.engrave(self._current_score_dict(), pageno=int(getattr(self, '_page_counter', 0)))
         except Exception:
             pass
         self._show_status_default()
@@ -1603,7 +1623,6 @@ class MainWindow(QtWidgets.QMainWindow):
         if self.is_startup:
             self.is_startup = False
             splitter.setSizes([fitted_editor_w, fitted_pv_w])
-            QtCore.QTimer.singleShot(0, self.print_view.request_render)
             return
 
         # Determine if hidden or fitted (with small tolerance)
@@ -1621,7 +1640,6 @@ class MainWindow(QtWidgets.QMainWindow):
         # If not hidden and not fitted (in-between), or hidden: run fit logic
         if (not hidden and not fitted) or hidden:
             splitter.setSizes([fitted_editor_w, fitted_pv_w])
-            QtCore.QTimer.singleShot(0, self.print_view.request_render)
             self.is_fit = True
             return
 
@@ -1677,12 +1695,23 @@ class MainWindow(QtWidgets.QMainWindow):
             pass
 
     def _set_page_index(self, index: int) -> None:
+        idx = max(0, int(index))
         try:
-            self.du.set_current_page(int(index))
+            self.du.set_current_page(idx)
         except Exception:
             pass
         try:
-            self.print_view.set_page(index, request_render=False)
+            self.print_view.set_page(idx, request_render=False)
+        except Exception:
+            pass
+        self._page_counter = idx
+        try:
+            app_state = self._current_app_state()
+            app_state.print_view_page_index = idx
+        except Exception:
+            pass
+        try:
+            self._schedule_app_state_save()
         except Exception:
             pass
 
