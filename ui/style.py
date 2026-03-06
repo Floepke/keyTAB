@@ -1,8 +1,19 @@
 import colorsys
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor, QPalette
-from PySide6.QtWidgets import QApplication
+from PySide6.QtWidgets import QApplication, QProxyStyle, QStyle
 from settings_manager import get_preferences
+
+
+class _InstantTooltipStyle(QProxyStyle):
+    """Force Qt tooltips to appear and disappear without delay."""
+
+    def styleHint(self, hint, option=None, widget=None, returnData=None):
+        if hint == QStyle.StyleHint.SH_ToolTip_WakeUpDelay:
+            return 0
+        if hint == QStyle.StyleHint.SH_ToolTip_FallAsleepDelay:
+            return 0
+        return super().styleHint(hint, option, widget, returnData)
 
 
 class Style:
@@ -88,6 +99,7 @@ class Style:
         'midi_right': (204, 179, 153),
     }
     _THEME_SYNCED: bool = False
+    _APP_STYLE_PROXY: QProxyStyle | None = None
 
     @classmethod
     def _ensure_theme_seeded(cls) -> None:
@@ -241,6 +253,12 @@ class Style:
         except Exception:
             pass
         try:
+            base_style = app.style()
+            Style._APP_STYLE_PROXY = _InstantTooltipStyle(base_style)
+            app.setStyle(Style._APP_STYLE_PROXY)
+        except Exception:
+            pass
+        try:
             QApplication.setEffectEnabled(Qt.UI_AnimateMenu, False)
             QApplication.setEffectEnabled(Qt.UI_FadeMenu, False)
         except Exception:
@@ -259,7 +277,21 @@ class Style:
         # Remove menu highlight while keeping text readable
         bg = colors_by_key["bg_color"]
         text = colors_by_key["text_color"]
+        scroll_extent = int(app.style().pixelMetric(QStyle.PixelMetric.PM_ScrollBarExtent))
+        scroll_extent = max(12, int(scroll_extent * 2))
         app.setStyleSheet(
+            "QScrollBar:vertical {"
+            f"width: {scroll_extent}px;"
+            "}"
+            "QScrollBar:horizontal {"
+            f"height: {scroll_extent}px;"
+            "}"
+            "QToolTip {"
+            f"background-color: rgb({bg.red()},{bg.green()},{bg.blue()});"
+            f"color: rgb({text.red()},{text.green()},{text.blue()});"
+            f"border: 0px;"
+            "padding: 3px 6px;"
+            "}"
             "QMenuBar {"
             "padding: 0px;"
             "}"

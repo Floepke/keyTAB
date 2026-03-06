@@ -315,9 +315,26 @@ def get_preferences_manager() -> PreferencesManager:
             max=240,
         )
         pm.register(
-            key="audition_during_note_input",
+            key="auto_save",
             default=True,
-            description="Play a short note on input when placing notes.",
+            description="Enable periodic automatic saving of session and project files.",
+        )
+        pm.register(
+            key="auto_save_interval",
+            default=1,
+            description="Autosave interval in minutes.",
+            min=1,
+            max=120,
+        )
+        pm.register(
+            key="save_on_exit",
+            default=True,
+            description="Save the current file if a file is currently open when exiting the app. You will not get the yesnocancel prompt on exit.",
+        )
+        pm.register(
+            key="play_note_on_edit",
+            default=True,
+            description="Play a short note when clicking or pitch-editing notes and grace notes.",
         )
         pm.register(
             key="focus_on_playhead_during_playback",
@@ -335,6 +352,16 @@ def get_preferences_manager() -> PreferencesManager:
             ),
         )
         pm.load()
+        try:
+            raw = pm._parse_toml_dict(pm.path) if pm.path.exists() else {}
+        except Exception:
+            raw = {}
+        try:
+            if ("play_note_on_edit" not in raw) and ("audition_during_note_input" in raw):
+                pm.set("play_note_on_edit", bool(raw.get("audition_during_note_input", True)))
+                pm.save()
+        except Exception:
+            pass
         _prefs_manager = pm
     return _prefs_manager
 

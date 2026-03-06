@@ -961,7 +961,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
             du.add_text(
                 page_left + footer_x_off,
                 footer_baseline_y,
-                f"Page {page_index + 1} of {len(pages)}•{document_title}•{footer_text}",
+                f"Page {page_index + 1} of {len(pages)} • {document_title} • {footer_text}",
                 family=footer_family,
                 size_pt=footer_size,
                 bold=footer_bold,
@@ -971,28 +971,23 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                 tags=['copyright'],
             )
             if not pageno:
-                # place a default keyTAB credit on the right side of the footer on the first page
-                creation_timestamp = str(meta_data.get('creation_timestamp', '') or '').strip()
-                if not creation_timestamp:
-                    creation_timestamp = ''
                 credit_size = max(1.0, float(footer_size))
-                ts_text = f"{creation_timestamp}"
                 ts_xb, _, ts_w_mm, _ = du._get_text_extents_mm(
-                    ts_text,
+                    'keyTAB',
                     footer_family,
                     credit_size,
-                    footer_italic,
-                    footer_bold,
+                    False,
+                    True,
                 )
                 ts_x = (page_w - page_right) - (ts_xb + ts_w_mm)
                 du.add_text(
                     ts_x,
                     footer_baseline_y,
-                    ts_text,
+                    'keyTAB',
                     family=footer_family,
                     size_pt=credit_size,
-                    bold=footer_bold,
-                    italic=footer_italic,
+                    bold=True,
+                    italic=False,
                     color=notation_color,
                     id=0,
                     tags=['copyright'],

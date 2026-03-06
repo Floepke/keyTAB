@@ -548,9 +548,12 @@ class Editor(QtCore.QObject,
     def _snapshot_if_changed(self, coalesce: bool = False, label: str = "") -> None:
         if self._file_manager is None:
             return
+        has_change = True
         # Use dict-based ctlz snapshots
         if self._ctlz is not None:
-            self._ctlz.add_ctlz()
+            has_change = bool(self._ctlz.add_ctlz())
+        if not has_change:
+            return
         # Notify FileManager so it can handle autosave/session saving/dirty state
         if hasattr(self._file_manager, 'on_model_changed'):
             self._file_manager.on_model_changed()

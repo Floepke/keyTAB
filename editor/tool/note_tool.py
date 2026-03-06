@@ -22,6 +22,25 @@ class NoteTool(BaseTool):
         self._orig_duration: float = 0.0
         self._press_start_time: float = 0.0
         self._duration_edit_armed: bool = False
+        self._last_audition_pitch: int | None = None
+
+    def _play_note_on_edit_enabled(self) -> bool:
+        try:
+            from settings_manager import get_preferences_manager
+            pm = get_preferences_manager()
+            return bool(pm.get("play_note_on_edit", True))
+        except Exception:
+            return True
+
+    def _audition_pitch(self, pitch: int) -> None:
+        if not self._play_note_on_edit_enabled():
+            return
+        try:
+            if hasattr(self._editor, 'player') and self._editor.player is not None:
+                self._editor.player.audition_note(pitch=int(pitch))
+                self._last_audition_pitch = int(pitch)
+        except Exception:
+            pass
 
     def toolbar_spec(self) -> list[dict]:
         # Two explicit hand selectors for quick switching
@@ -42,19 +61,6 @@ class NoteTool(BaseTool):
         pitch_press = int(self._editor.x_to_pitch(x))
         self._hand = str(getattr(self._editor, 'hand_cursor', '<') or '<')
 
-        # Audition on input if enabled
-        try:
-            from settings_manager import get_preferences_manager
-            pm = get_preferences_manager()
-            audition = bool(pm.get("audition_during_note_input", True))
-            if audition and hasattr(self._editor, 'player') and self._editor.player is not None:
-                try:
-                    self._editor.player.audition_note(pitch=pitch_press)
-                except Exception:
-                    pass
-        except Exception:
-            pass
-
         # Prefer rectangle-based hit detection for precise clickable area
         found = None
         hit_id = None
@@ -72,6 +78,11 @@ class NoteTool(BaseTool):
             self.edit_note = found
             self._editing_existing = True
             try:
+                self._last_audition_pitch = int(getattr(found, 'pitch', pitch_press) or pitch_press)
+            except Exception:
+                self._last_audition_pitch = int(pitch_press)
+            self._audition_pitch(int(getattr(found, 'pitch', pitch_press) or pitch_press))
+            try:
                 self._orig_duration = float(getattr(found, 'duration', 0.0) or 0.0)
                 self._press_start_time = float(getattr(found, 'time', 0.0) or 0.0)
             except Exception:
@@ -86,6 +97,7 @@ class NoteTool(BaseTool):
             self._orig_duration = float(units)
             self._press_start_time = float(t_press_snap)
             self._duration_edit_armed = False
+            self._last_audition_pitch = None
 
         # switch guides off during note editing
         self._editor.guides_active = False
@@ -104,6 +116,7 @@ class NoteTool(BaseTool):
         self.edit_note = None
         self._editing_existing = False
         self._duration_edit_armed = False
+        self._last_audition_pitch = None
         
         # switch guides back on after note editing
         self._editor.guides_active = True
@@ -166,7 +179,10 @@ class NoteTool(BaseTool):
             #   * If back inside first band: set duration to exactly one snap unit
             #   * Else: adjust duration snapped as usual
             if op.le(cur_t_raw, start_t):
+                prev_pitch = int(getattr(note, 'pitch', cur_pitch) or cur_pitch)
                 note.pitch = cur_pitch
+                if cur_pitch != prev_pitch and cur_pitch != self._last_audition_pitch:
+                    self._audition_pitch(cur_pitch)
             else:
                 if not self._duration_edit_armed:
                     if op.ge(cur_t_raw, start_t + units):
@@ -186,6 +202,7 @@ class NoteTool(BaseTool):
         self.edit_note = None
         self._editing_existing = False
         self._duration_edit_armed = False
+        self._last_audition_pitch = None
         
         # Ensure the music/base_grid covers latest note end
         self._editor.update_score_length()
@@ -232,7 +249,6 @@ class NoteTool(BaseTool):
         if deleted_any:
             # Keep base_grid in sync and trigger engrave via snapshot.
             self._editor.update_score_length()
-            self._editor._snapshot_if_changed(coalesce=True, label='note_delete')
 
     def _latest_measure_has_notes(self, score: SCORE) -> bool:
         """Return True if there is at least one note in the score's latest measure window.

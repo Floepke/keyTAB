@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import sys
+
 from PySide6 import QtCore, QtGui, QtWidgets
 
 from settings_manager import get_preferences_manager
@@ -7,20 +9,27 @@ from settings_manager import get_preferences_manager
 
 class PreferencesDialog(QtWidgets.QDialog):
     # Tweak this value to adjust the shared width of all first-column descriptions.
-    FIRST_COLUMN_WIDTH = 240
+    FIRST_COLUMN_WIDTH = 350
 
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
-        self.setWindowFlags(self.windowFlags() | QtCore.Qt.FramelessWindowHint)
+        self.setWindowFlags(self.windowFlags())
         self.setWindowTitle("Preferences")
         self.setModal(True)
-        self.resize(550, 420)
+        self.resize(768, 768)
 
         self._pm = get_preferences_manager()
         self._initial_values = dict(self._pm._values)
         self._fields: dict[str, tuple[str, QtWidgets.QWidget]] = {}
 
         layout = QtWidgets.QVBoxLayout(self)
+
+        restart_notice = QtWidgets.QLabel(
+            "Changes are applied by restarting keyTAB when you press Apply and Restart keyTAB.",
+            self,
+        )
+        restart_notice.setWordWrap(True)
+        layout.addWidget(restart_notice)
 
         prefs_group = QtWidgets.QGroupBox("Preferences", self)
         group_layout = QtWidgets.QVBoxLayout(prefs_group)
@@ -62,11 +71,10 @@ class PreferencesDialog(QtWidgets.QDialog):
 
         layout.addWidget(prefs_group, stretch=1)
 
-        buttons = QtWidgets.QDialogButtonBox(
-            QtWidgets.QDialogButtonBox.StandardButton.Ok
-            | QtWidgets.QDialogButtonBox.StandardButton.Cancel
-        )
-        buttons.accepted.connect(self._on_accept)
+        buttons = QtWidgets.QDialogButtonBox(self)
+        apply_button = buttons.addButton("Apply and Restart keyTAB", QtWidgets.QDialogButtonBox.ButtonRole.AcceptRole)
+        buttons.addButton(QtWidgets.QDialogButtonBox.StandardButton.Close)
+        apply_button.clicked.connect(self._on_accept)
         buttons.rejected.connect(self.reject)
         layout.addWidget(buttons, stretch=0)
 
@@ -144,12 +152,20 @@ class PreferencesDialog(QtWidgets.QDialog):
 
     def _on_accept(self) -> None:
         self._apply_changes()
-        QtWidgets.QMessageBox.information(
-            self,
-            "Preferences",
-            "Some changes may take effect after restarting the app.",
-        )
+        self._restart_application()
         self.accept()
+
+    def _restart_application(self) -> None:
+        app = QtWidgets.QApplication.instance()
+        if app is None:
+            return
+        try:
+            args = list(sys.argv)
+            if args:
+                QtCore.QProcess.startDetached(sys.executable, args)
+        except Exception:
+            pass
+        app.quit()
 
     def _apply_changes(self) -> None:
         for key, (kind, widget) in self._fields.items():

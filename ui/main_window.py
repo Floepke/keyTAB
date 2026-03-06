@@ -9,6 +9,7 @@ from file_model.file_manager import FileManager
 from file_model.analysis import Analysis
 from ui.widgets.toolbar_splitter import ToolbarSplitter
 from ui.widgets.cairo_views import CairoEditorWidget
+from ui.widgets.editor_scrollbar import EditorScrollBar
 from ui.widgets.tool_selector import ToolSelectorDock
 from ui.widgets.snap_size_selector import SnapSizeDock
 from ui.widgets.draw_util import DrawUtil
@@ -48,12 +49,8 @@ class MainWindow(QtWidgets.QMainWindow):
 
         # Periodic autosave (session + project) to reduce per-action latency
         self._autosave_timer = QtCore.QTimer(self)
-        self._autosave_timer.setInterval(60_000)  # 1 minute
         self._autosave_timer.timeout.connect(lambda: self.file_manager.autosave_all())
-        try:
-            self._autosave_timer.start()
-        except Exception:
-            pass
+        self._apply_autosave_preferences()
 
         self._create_menus()
 
@@ -66,7 +63,11 @@ class MainWindow(QtWidgets.QMainWindow):
         
         # Editor view with external scrollbar for static viewport scrolling
         self.editor_canvas = CairoEditorWidget()
-        self.editor_vscroll = QtWidgets.QScrollBar(QtCore.Qt.Orientation.Vertical)
+        self.editor_vscroll = EditorScrollBar(QtCore.Qt.Orientation.Vertical)
+        self._editor_metric_px_per_mm: float = 1.0
+        self._editor_metric_dpr: float = 1.0
+        self._editor_metric_viewport_logical_px: int = 0
+        self._configure_editor_scrollbar()
         
         # For external code, expose the canvas under the same name
         self.editor = self.editor_canvas
@@ -235,6 +236,12 @@ class MainWindow(QtWidgets.QMainWindow):
             self.editor_controller.score_changed.connect(self._on_score_changed)
         except Exception:
             pass
+
+        # Coalesce model-change engrave requests so input handlers return quickly.
+        self._score_change_engrave_timer = QtCore.QTimer(self)
+        self._score_change_engrave_timer.setSingleShot(True)
+        self._score_change_engrave_timer.setInterval(1)
+        self._score_change_engrave_timer.timeout.connect(self._flush_score_change_engrave)
 
         # Wire tool selector to Editor controller
         self.tool_dock.selector.toolSelected.connect(self.editor_controller.set_tool_by_name)
@@ -702,6 +709,27 @@ class MainWindow(QtWidgets.QMainWindow):
         except Exception:
             pass
 
+    def _configure_editor_scrollbar(self) -> None:
+        extent = int(self.style().pixelMetric(QtWidgets.QStyle.PixelMetric.PM_ScrollBarExtent))
+        self.editor_vscroll.setFixedWidth(max(12, int(extent * 2)))
+        self.editor_vscroll.set_tooltip_provider(self._editor_scrollbar_tooltip_text)
+
+    def _editor_scrollbar_tooltip_text(self, predicted_top_value: int) -> str:
+        if not hasattr(self, 'editor_controller') or self.editor_controller is None:
+            return ""
+        viewport_logical = int(max(0, getattr(self, '_editor_metric_viewport_logical_px', 0) or 0))
+        center_logical = float(predicted_top_value) + (float(viewport_logical) * 0.5)
+        px_per_mm = float(getattr(self, '_editor_metric_px_per_mm', 1.0) or 1.0)
+        dpr = float(getattr(self, '_editor_metric_dpr', 1.0) or 1.0)
+        if px_per_mm <= 0.0:
+            return ""
+        center_mm = float(center_logical) * max(1.0, dpr) / px_per_mm
+        ticks = float(self.editor_controller.mm_to_time(center_mm))
+        if hasattr(self.editor_controller, 'get_measure_index_for_time'):
+            meas = int(self.editor_controller.get_measure_index_for_time(ticks))
+            return f"Measure {max(1, meas)}"
+        return ""
+
     def _current_app_state(self) -> AppState:
         try:
             sc = self.file_manager.current() if hasattr(self, 'file_manager') else None
@@ -779,6 +807,34 @@ class MainWindow(QtWidgets.QMainWindow):
         except Exception:
             pass
 
+    def _read_autosave_preferences(self) -> tuple[bool, int]:
+        enabled = True
+        interval_minutes = 1
+        try:
+            pm = get_preferences_manager()
+            enabled = bool(pm.get("auto_save", True))
+            interval_minutes = int(pm.get("auto_save_interval", 1))
+        except Exception:
+            pass
+        if interval_minutes < 1:
+            interval_minutes = 1
+        return enabled, interval_minutes
+
+    def _apply_autosave_preferences(self) -> None:
+        enabled, interval_minutes = self._read_autosave_preferences()
+        interval_ms = int(interval_minutes) * 60_000
+        try:
+            self._autosave_timer.setInterval(interval_ms)
+        except Exception:
+            pass
+        try:
+            if enabled:
+                self._autosave_timer.start()
+            else:
+                self._autosave_timer.stop()
+        except Exception:
+            pass
+
     def _toggle_full_screen(self) -> None:
         """Toggle native/fullscreen mode across platforms using F11."""
         try:
@@ -799,22 +855,19 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def _flush_app_state_save(self) -> None:
         """Persist app state to session and optionally autosave project."""
+        auto_save_enabled, _ = self._read_autosave_preferences()
+        if not auto_save_enabled:
+            return
         try:
             if hasattr(self.file_manager, 'autosave_current'):
                 self.file_manager.autosave_current()
         except Exception:
             pass
         try:
-            pm = get_preferences_manager()
-            auto_save_enabled = bool(pm.get("auto_save", True))
+            if self.file_manager.path() is not None:
+                self.file_manager.save()
         except Exception:
-            auto_save_enabled = True
-        if auto_save_enabled:
-            try:
-                if self.file_manager.path() is not None:
-                    self.file_manager.save()
-            except Exception:
-                pass
+            pass
 
     def _playback_system_label(self) -> str:
         if sys.platform.startswith('linux'):
@@ -1308,11 +1361,14 @@ class MainWindow(QtWidgets.QMainWindow):
         self.editor.update()
 
     def _on_score_changed(self) -> None:
-        try:
+        if hasattr(self, '_score_change_engrave_timer') and self._score_change_engrave_timer is not None:
+            self._score_change_engrave_timer.start()
+        else:
             self.engraver.engrave(self._current_score_dict(), pageno=int(getattr(self, '_page_counter', 0)))
-        except Exception:
-            pass
         self._show_status_default()
+
+    def _flush_score_change_engrave(self) -> None:
+        self.engraver.engrave(self._current_score_dict(), pageno=int(getattr(self, '_page_counter', 0)))
 
     def _open_style_dialog(self) -> None:
         from dataclasses import asdict
@@ -1484,6 +1540,9 @@ class MainWindow(QtWidgets.QMainWindow):
     def _on_editor_metrics(self, content_px: int, viewport_px: int, px_per_mm: float, dpr: float) -> None:
         # External QScrollBar works in logical pixels
         scale = max(1.0, dpr)
+        self._editor_metric_px_per_mm = float(px_per_mm)
+        self._editor_metric_dpr = float(dpr)
+        self._editor_metric_viewport_logical_px = int(max(0, round(float(viewport_px) / scale)))
         max_scroll = max(0, int(round((content_px - viewport_px) / scale)))
         self.editor_vscroll.setRange(0, max_scroll)
         # Page step ~ 80% of viewport height (logical px)
@@ -2334,6 +2393,19 @@ class MainWindow(QtWidgets.QMainWindow):
             self.file_manager.autosave_current()
         except Exception:
             pass
+
+        save_on_exit = True
+        try:
+            pm = get_preferences_manager()
+            save_on_exit = bool(pm.get("save_on_exit", True))
+        except Exception:
+            pass
+        if save_on_exit:
+            try:
+                if self.file_manager.path() is not None:
+                    self.file_manager.save()
+            except Exception:
+                pass
         # Persist sizes via prepare_close
         try:
             self.prepare_close()

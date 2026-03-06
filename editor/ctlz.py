@@ -28,12 +28,12 @@ class CtlZ:
         self.buffer = [d]
         self.index = 0
 
-    def add_ctlz(self) -> None:
+    def add_ctlz(self) -> bool:
         cur = self._current_dict()
         if self.index >= 0 and self.index < len(self.buffer):
             if cur == self.buffer[self.index]:
                 # no change, do nothing
-                return
+                return False
         # if we are in the past (undo/redo), drop future branch
         if self.index != (len(self.buffer) - 1):
             self.buffer = self.buffer[: self.index + 1]
@@ -43,6 +43,7 @@ class CtlZ:
         if len(self.buffer) > self.max_ctlz_num:
             self.buffer.pop(0)
         self.index = len(self.buffer) - 1
+        return True
 
     def undo(self):
         if not self.buffer:
