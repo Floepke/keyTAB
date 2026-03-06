@@ -14,6 +14,21 @@ class CountLineTool(BaseTool):
         self._active_handle: str | None = None  # 'start', 'end', or 'line'
 
     # ---- Helpers ----
+    def _request_light_repaint(self) -> None:
+        if self._editor is None:
+            return
+        w = getattr(self._editor, 'widget', None)
+        if w is not None and hasattr(w, 'update'):
+            try:
+                w.update()
+                return
+            except Exception:
+                pass
+        try:
+            self._editor.draw_frame()
+        except Exception:
+            pass
+
     def _rpitch_to_x_mm(self, rpitch: int) -> float:
         return float(self._editor.relative_c4pitch_to_x(int(rpitch))) if self._editor else 0.0
 
@@ -136,10 +151,7 @@ class CountLineTool(BaseTool):
                 self._active_line.rpitch2 = int(rpitch)
             except Exception:
                 pass
-        if hasattr(self._editor, 'force_redraw_from_model'):
-            self._editor.force_redraw_from_model()
-        else:
-            self._editor.draw_frame()
+        self._request_light_repaint()
     def on_left_drag_end(self, x: float, y: float) -> None:
         super().on_left_drag_end(x, y)
         self._active_line = None

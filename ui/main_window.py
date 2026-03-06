@@ -1650,6 +1650,26 @@ class MainWindow(QtWidgets.QMainWindow):
             return {}
 
     def _on_engraver_finished(self) -> None:
+        # Keep print view page selection aligned with restored/app-state page index.
+        try:
+            page_count = int(self.du.page_count())
+        except Exception:
+            page_count = 0
+        if page_count > 0:
+            try:
+                desired = int(getattr(self, '_page_counter', 0) or 0)
+            except Exception:
+                desired = 0
+            desired = max(0, min(page_count - 1, desired))
+            try:
+                self.du.set_current_page(desired)
+            except Exception:
+                pass
+            try:
+                self.print_view.set_page(desired, request_render=False)
+            except Exception:
+                pass
+            self._page_counter = desired
         try:
             self._update_analysis_from_engraver()
         except Exception:
@@ -1696,6 +1716,12 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def _set_page_index(self, index: int) -> None:
         idx = max(0, int(index))
+        try:
+            page_count = int(self.du.page_count())
+        except Exception:
+            page_count = 0
+        if page_count > 0:
+            idx = min(idx, page_count - 1)
         try:
             self.du.set_current_page(idx)
         except Exception:

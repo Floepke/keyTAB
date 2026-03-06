@@ -20,7 +20,7 @@ class Style:
     # Base palettes (RGB tuples) used for interpolation.
     # The theme is driven by six colors:
     # - bg_color: window/dialog/dropdown backgrounds
-    # - text_color: all text color
+    # - text_color: all text color and icons that need to contrast with bg_color
     # - alternate_background_color: buttons and widget entry/list backgrounds
     # - accent_color: selection and emphasis highlights
     # - paper_color: editor background (print view is forced white)
@@ -37,10 +37,10 @@ class Style:
     }
 
     _DARK = {
-        "bg_color": (40, 30, 40),
-        "alternate_background_color": (30, 20, 30),
+        "bg_color": (50, 40, 50),
+        "alternate_background_color": (40, 30, 40),
         "text_color": (240, 240, 240),
-        "accent_color": (50, 40, 50),
+        "accent_color": (60, 60, 60),
         "paper_color": (190, 190, 190),
         "notation_color": (0, 0, 0),
         "left_midi_color": (153, 179, 204),

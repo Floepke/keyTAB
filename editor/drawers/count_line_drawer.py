@@ -68,7 +68,7 @@ class CountLineDrawerMixin:
                     y_mm + handle_h * .7,
                     stroke_color=None,
                     stroke_width_mm=0.0,
-                    fill_color=(1.0, 0.4, 0.7, 1.0),
+                    fill_color=self.accent_color,
                     id=int(getattr(ev, '_id', 0) or 0),
                     tags=["count_line", "count_line_handle", "count_line_handle_start"],
                 )
@@ -79,7 +79,7 @@ class CountLineDrawerMixin:
                     y_mm + handle_h * .7,
                     stroke_color=None,
                     stroke_width_mm=0.0,
-                    fill_color=(1.0, 0.4, 0.7, 1.0),
+                    fill_color=self.accent_color,
                     id=int(getattr(ev, '_id', 0) or 0),
                     tags=["count_line", "count_line_handle", "count_line_handle_end"],
                 )
