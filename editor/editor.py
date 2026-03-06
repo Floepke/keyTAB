@@ -454,18 +454,11 @@ class Editor(QtCore.QObject,
         - stave width: width - 2 * margin
         - semitone spacing: stave width / (PIANO_KEY_AMOUNT - 1)
         """
-        # Calculate margin
         self.margin = view_width_mm / 6
-        
-        # Calculate stave units
-        visual_semitone_spaces = 101
+        physical_semitone_spaces = 101
         self.stave_width = view_width_mm - (2 * self.margin)
-        self.semitone_dist = self.stave_width / visual_semitone_spaces
-        
-        # Ensure editor_height reflects the current SCORE content height in mm
+        self.semitone_dist = self.stave_width / physical_semitone_spaces
         self.editor_height = self._calc_editor_height()
-
-        # Rebuild cached x positions
         self._rebuild_x_positions()
 
     # ---- Note lookup ----
@@ -474,20 +467,19 @@ class Editor(QtCore.QObject,
 
         Falls back to scanning all notes if cache is unavailable.
         """
-        nid = int(note_id)
         # Prefer notes in the current viewport draw cache
         cache = getattr(self, '_draw_cache', None) or {}
         notes_view = cache.get('notes_view') or []
         if notes_view:
             for n in notes_view:
-                if int(getattr(n, '_id', -1) or -1) == nid:
+                if int(getattr(n, '_id', -1) or -1) == note_id:
                     return n
         # Fallback: global scan
         score: SCORE | None = self.current_score()
         if score is None:
             return None
         for n in getattr(score.events, 'note', []) or []:
-            if int(getattr(n, '_id', -1) or -1) == nid:
+            if int(getattr(n, '_id', -1) or -1) == note_id:
                 return n
         return None
 
@@ -504,7 +496,7 @@ class Editor(QtCore.QObject,
         return max(1, int(i + 1))
 
     def _rebuild_x_positions(self) -> None:
-        """Precompute x positions for keys 1..PIANO_KEY_AMOUNT with BE gap after B/E."""
+        """Precompute x positions for keys 1..88 with BE gap after a b or e key."""
         be_set = set(BE_KEYS)
         x_pos = self.margin - self.semitone_dist
         xs = [x_pos]
@@ -1176,7 +1168,7 @@ class Editor(QtCore.QObject,
                 y_mm,
                 margin,
                 y_mm,
-                color=self.accent_color,
+                color=(0, 0, 0, 1),
                 width_mm=.75,
                 dash_pattern=[0, 2],
                 id=0,
@@ -1189,7 +1181,7 @@ class Editor(QtCore.QObject,
                 y_mm,
                 margin + stave_width - 2.0,
                 y_mm,
-                color=self.accent_color,
+                color=(0, 0, 0, 1),
                 width_mm=.75,
                 dash_pattern=[0, 2.07],
                 id=0,

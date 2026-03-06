@@ -15,7 +15,7 @@ UTILS_SAVE_DIR: Path = Path(os.path.expanduser('~/.keyTAB'))
 QUARTER_NOTE_UNIT: float = 256.0
 
 # Drawing orders (single sources of truth)
-# Each string corresponds to a drawer name registered in editor/drawers/__init__.py
+# Each string corresponds to a tag name used in the Editor and Engraver for layering.
 # Update these lists to control layer stacking in the Editor and Engraver.
 EDITOR_LAYERING = [
     # layers from background to foreground
@@ -105,17 +105,10 @@ BE_KEYS: list[int] = key_class_filter('be')
 CF_KEYS: list[int] = key_class_filter('cf')
 
 # Editor colors
-ACCENT_COLOR_HEX: str = '#3399FF'
-NOTATION_COLOR_HEX: str = '#000000'
-CURSOR_COLOR_HEX: str = "#000000"
-# convert hex to rgbal with alpha 0.3
 def hex_to_rgba(hex_color: str, alpha: float = 1) -> tuple[int, int, int, float]:
     hex_color = hex_color.lstrip('#')
     r, g, b = tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4))
     return (r, g, b, alpha)
-ACCENT_COLOR_HEX: tuple[int, int, int, float] = hex_to_rgba(ACCENT_COLOR_HEX)
-CURSOR_COLOR: tuple[int, int, int, float] = hex_to_rgba(CURSOR_COLOR_HEX)
-NOTATION_COLOR: tuple[int, int, int, float] = hex_to_rgba(NOTATION_COLOR_HEX)
 
 SHORTEST_DURATION: float = 8.0  # shortest note duration in time units (128th) (for playback and rendering)
 # Threshold for interpreting very short notes as grace notes on load/import.

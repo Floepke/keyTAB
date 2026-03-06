@@ -1,13 +1,17 @@
 from __future__ import annotations
 
-from PySide6 import QtCore, QtWidgets
+from PySide6 import QtCore, QtGui, QtWidgets
 
 from settings_manager import get_preferences_manager
 
 
 class PreferencesDialog(QtWidgets.QDialog):
+    # Tweak this value to adjust the shared width of all first-column descriptions.
+    FIRST_COLUMN_WIDTH = 240
+
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
+        self.setWindowFlags(self.windowFlags() | QtCore.Qt.FramelessWindowHint)
         self.setWindowTitle("Preferences")
         self.setModal(True)
         self.resize(550, 420)
@@ -18,37 +22,45 @@ class PreferencesDialog(QtWidgets.QDialog):
 
         layout = QtWidgets.QVBoxLayout(self)
 
-        # Header copy
-        header = QtWidgets.QWidget(self)
-        header_layout = QtWidgets.QVBoxLayout(header)
-        header_layout.setContentsMargins(4, 4, 4, 4)
-        title = QtWidgets.QLabel("Preferences", self)
-        title.setAlignment(QtCore.Qt.AlignmentFlag.AlignLeft | QtCore.Qt.AlignmentFlag.AlignVCenter)
-        subtitle = QtWidgets.QLabel("Fine-tune how keyTAB looks, feels, and plays.", self)
-        subtitle.setWordWrap(True)
-        header_layout.addWidget(title)
-        header_layout.addWidget(subtitle)
-        layout.addWidget(header, stretch=0)
-
+        prefs_group = QtWidgets.QGroupBox("Preferences", self)
+        group_layout = QtWidgets.QVBoxLayout(prefs_group)
         scroll = QtWidgets.QScrollArea(self)
         scroll.setWidgetResizable(True)
-        layout.addWidget(scroll, stretch=1)
+        scroll.setFrameShape(QtWidgets.QFrame.Shape.NoFrame)
+        group_layout.addWidget(scroll)
 
         body = QtWidgets.QWidget()
         body.setObjectName("PrefsForm")
-        form = QtWidgets.QFormLayout(body)
-        form.setFieldGrowthPolicy(QtWidgets.QFormLayout.FieldGrowthPolicy.ExpandingFieldsGrow)
-        form.setLabelAlignment(QtCore.Qt.AlignmentFlag.AlignRight | QtCore.Qt.AlignmentFlag.AlignVCenter)
-        form.setHorizontalSpacing(14)
-        form.setVerticalSpacing(12)
-        form.setContentsMargins(12, 8, 12, 8)
+        body_layout = QtWidgets.QVBoxLayout(body)
+        body_layout.setContentsMargins(12, 8, 12, 8)
+        body_layout.setSpacing(8)
         scroll.setWidget(body)
 
+        app_palette = QtWidgets.QApplication.palette(self)
+        accent_qcolor = app_palette.color(QtGui.QPalette.ColorRole.Text)
+        accent_css = f"rgb({accent_qcolor.red()}, {accent_qcolor.green()}, {accent_qcolor.blue()})"
+        first_column_width = int(self.FIRST_COLUMN_WIDTH)
         for key, pref in self._pm.iter_schema():
             widget, kind = self._build_editor(key, pref)
-            label = self._build_label(key)
-            form.addRow(label, widget)
+            setting_group = QtWidgets.QGroupBox(self._pretty_label(key), self)
+            setting_form = QtWidgets.QFormLayout(setting_group)
+            setting_form.setFieldGrowthPolicy(QtWidgets.QFormLayout.FieldGrowthPolicy.ExpandingFieldsGrow)
+            setting_form.setLabelAlignment(QtCore.Qt.AlignmentFlag.AlignLeft | QtCore.Qt.AlignmentFlag.AlignTop)
+            setting_form.setHorizontalSpacing(12)
+            setting_form.setVerticalSpacing(0)
+            desc = QtWidgets.QLabel(str(getattr(pref, 'description', '') or ''))
+            desc.setWordWrap(True)
+            desc.setAlignment(QtCore.Qt.AlignmentFlag.AlignLeft | QtCore.Qt.AlignmentFlag.AlignTop)
+            desc.setFixedWidth(first_column_width)
+            desc.setSizePolicy(QtWidgets.QSizePolicy.Policy.Fixed, QtWidgets.QSizePolicy.Policy.Preferred)
+            desc.setStyleSheet(f"font-size: 11px; color: {accent_css};")
+            setting_form.addRow(desc, widget)
+            body_layout.addWidget(setting_group)
             self._fields[key] = (kind, widget)
+
+        body_layout.addStretch(1)
+
+        layout.addWidget(prefs_group, stretch=1)
 
         buttons = QtWidgets.QDialogButtonBox(
             QtWidgets.QDialogButtonBox.StandardButton.Ok
@@ -57,14 +69,6 @@ class PreferencesDialog(QtWidgets.QDialog):
         buttons.accepted.connect(self._on_accept)
         buttons.rejected.connect(self.reject)
         layout.addWidget(buttons, stretch=0)
-
-    def _build_label(self, key: str) -> QtWidgets.QLabel:
-        pretty = self._pretty_label(key)
-        label = QtWidgets.QLabel(pretty)
-        label.setWordWrap(False)
-        label.setTextFormat(QtCore.Qt.TextFormat.PlainText)
-        label.setAlignment(QtCore.Qt.AlignmentFlag.AlignRight | QtCore.Qt.AlignmentFlag.AlignVCenter)
-        return label
 
     def _pretty_label(self, key: str) -> str:
         parts = key.split("_")

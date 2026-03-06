@@ -1,6 +1,7 @@
 from __future__ import annotations
 from typing import TYPE_CHECKING, cast
 from ui.widgets.draw_util import DrawUtil
+from fonts import register_font_from_bytes
 
 if TYPE_CHECKING:
     from editor.editor import Editor
@@ -18,18 +19,11 @@ class TimeSignatureDrawerMixin:
         layout = score.layout
 
         def _resolve_font_family(font) -> str:
-            family = str(getattr(font, 'family', 'C059') or 'C059')
-            if family != 'C059':
+            family = str(getattr(font, 'family', 'Latin Modern Roman') or 'Latin Modern Roman')
+            if family != 'Latin Modern Roman':
                 return family
-            try:
-                from fonts import register_font_from_bytes
-            except Exception:
-                register_font_from_bytes = None  # type: ignore
-            try:
-                reg = register_font_from_bytes('C059') if register_font_from_bytes else 'C059'
-                return reg or 'C059'
-            except Exception:
-                return 'C059'
+            reg = register_font_from_bytes('Latin Modern Roman') if register_font_from_bytes else 'Latin Modern Roman'
+            return reg or 'Latin Modern Roman'
 
         classic_font = getattr(layout, 'time_signature_indicator_classic_font', None)
         klav_font = getattr(layout, 'time_signature_indicator_klavarskribo_font', None)

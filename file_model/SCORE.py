@@ -27,6 +27,25 @@ from file_model.base_grid import BaseGrid
 from file_model.appstate import AppState
 
 
+def _timestamp_now() -> str:
+	"""Return current timestamp formatted from preferences with a safe fallback."""
+	default_fmt = "%d-%m-%Y_%H:%M:%S"
+	fmt = default_fmt
+	try:
+		from settings_manager import get_preferences_manager
+		pm = get_preferences_manager()
+		raw_fmt = pm.get('timestamp_format', default_fmt)
+		fmt = str(raw_fmt).strip() if raw_fmt is not None else default_fmt
+		if not fmt:
+			fmt = default_fmt
+	except Exception:
+		fmt = default_fmt
+	try:
+		return datetime.now().strftime(fmt)
+	except Exception:
+		return datetime.now().strftime(default_fmt)
+
+
 
 @dataclass
 class MetaData:
@@ -273,7 +292,7 @@ class SCORE:
 	# ---- Persistence ----
 	def save(self, path: str) -> None:
 		# Update modification timestamp before writing
-		self.meta_data.modification_timestamp = datetime.now().strftime("%d-%m-%Y_%H:%M:%S")
+		self.meta_data.modification_timestamp = _timestamp_now()
 		payload = self.get_dict()
 		if isinstance(payload, dict):
 			payload.pop('editor', None)
@@ -465,8 +484,8 @@ class SCORE:
 	# ---- New minimal template ----
 	def new(self) -> "SCORE":
 		self.meta_data = MetaData()
-		# Set creation timestamp in format dd-mm-YYYY_HH:MM:SS
-		self.meta_data.creation_timestamp = datetime.now().strftime("%d-%m-%Y_%H:%M:%S")
+		# Set creation timestamp using user-configurable timestamp format.
+		self.meta_data.creation_timestamp = _timestamp_now()
 		self.info = Info()
 		self.analysis = Analysis()
 		try:

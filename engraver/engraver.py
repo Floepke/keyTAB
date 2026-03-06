@@ -957,10 +957,11 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                 'Courier',
                 8.0,
             )
+            footer_baseline_y = (page_h - page_bottom) + footer_y_off
             du.add_text(
                 page_left + footer_x_off,
-                (page_h - page_bottom) + footer_y_off,
-                f"Page {page_index + 1} of {len(pages)} | {document_title} | {footer_text}",
+                footer_baseline_y,
+                f"Page {page_index + 1} of {len(pages)}•{document_title}•{footer_text}",
                 family=footer_family,
                 size_pt=footer_size,
                 bold=footer_bold,
@@ -968,18 +969,26 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                 color=notation_color,
                 id=0,
                 tags=['copyright'],
-                anchor='sw',
             )
             if not pageno:
                 # place a default keyTAB credit on the right side of the footer on the first page
                 creation_timestamp = str(meta_data.get('creation_timestamp', '') or '').strip()
                 if not creation_timestamp:
-                    creation_timestamp = 'unknown'
+                    creation_timestamp = ''
                 credit_size = max(1.0, float(footer_size))
+                ts_text = f"{creation_timestamp}"
+                ts_xb, _, ts_w_mm, _ = du._get_text_extents_mm(
+                    ts_text,
+                    footer_family,
+                    credit_size,
+                    footer_italic,
+                    footer_bold,
+                )
+                ts_x = (page_w - page_right) - (ts_xb + ts_w_mm)
                 du.add_text(
-                    page_w - page_right,
-                    page_h - page_bottom,
-                    f"created: {creation_timestamp}",
+                    ts_x,
+                    footer_baseline_y,
+                    ts_text,
                     family=footer_family,
                     size_pt=credit_size,
                     bold=footer_bold,
@@ -987,7 +996,6 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                     color=notation_color,
                     id=0,
                     tags=['copyright'],
-                    anchor='se',
                 )
         if not page:
             continue

@@ -17,7 +17,7 @@ class TextDrawerMixin:
         - rotated_corners are the four axis-aligned corners after rotation (for handles).
         - rounded_polygon is a rotated list of points approximating rounded corners.
         """
-        xb, yb, w_mm, h_mm = du._get_text_extents_mm(text, family, size_pt, italic, bold)
+        _, _, w_mm, h_mm = du._get_text_extents_mm(text, family, size_pt, italic, bold)
         pad = max(0.0, float(padding_mm))
         w_mm += pad * 2.0
         h_mm += pad * 2.0
@@ -128,15 +128,9 @@ class TextDrawerMixin:
             if y_mm < (top_mm - bleed_mm) or y_mm > (bottom_mm + bleed_mm):
                 continue
 
-            try:
-                x_mm = float(self.relative_c4pitch_to_x(rp)) + x_off
-            except Exception:
-                x_mm = 0.0
+            x_mm = float(self.relative_c4pitch_to_x(rp)) + x_off
 
-            try:
-                w_mm, h_mm, offset_down, rot_corners, rot_poly = self._text_bbox(du, display_txt, family, size_pt, italic, bold, angle, pad_mm)
-            except Exception:
-                continue
+            w_mm, _, offset_down, _, rot_poly = self._text_bbox(du, display_txt, family, size_pt, italic, bold, angle, pad_mm)
 
             cy = y_mm + offset_down
             # Build rotated polygon in absolute coords
@@ -170,11 +164,7 @@ class TextDrawerMixin:
                 id=int(getattr(ev, '_id', 0) or 0),
                 tags=["text"],
             )
-
-            try:
-                self.register_text_hit_rect(int(getattr(ev, '_id', 0) or 0), min_x, min_y, max_x, max_y, kind='body')
-            except Exception:
-                pass
+            self.register_text_hit_rect(int(getattr(ev, '_id', 0) or 0), min_x, min_y, max_x, max_y, kind='body')
 
             if show_handles:
                 # Place handle just beyond the rotated right edge
@@ -199,7 +189,4 @@ class TextDrawerMixin:
                     id=int(getattr(ev, '_id', 0) or 0),
                     tags=["text", "text_handle"],
                 )
-                try:
-                    self.register_text_hit_rect(int(getattr(ev, '_id', 0) or 0), hx1, hy1, hx2, hy2, kind='handle')
-                except Exception:
-                    pass
+                self.register_text_hit_rect(int(getattr(ev, '_id', 0) or 0), hx1, hy1, hx2, hy2, kind='handle')
