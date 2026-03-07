@@ -335,7 +335,7 @@ class FontPicker(QtWidgets.QWidget):
                 spin.setSingleStep(0.25)
                 spin.setMinimumWidth(70)
                 spin.setKeyboardTracking(True)
-                spin.setToolTip(f"{axis}-offset (mm)")
+                spin.setToolTip(f"{axis}-offset (mm).")
 
         layout = QtWidgets.QHBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)

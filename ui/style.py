@@ -38,11 +38,11 @@ class Style:
     # - notation_color: notation/stroke color
     _LIGHT = {
         "bg_color": (200, 200, 200),
-        "alternate_background_color": (205, 205, 205),
+        "alternate_background_color": (215, 215, 215),
         "text_color": (0, 0, 0),
         "accent_color": (130, 130, 130),
         "paper_color": (240, 240, 240),
-        "notation_color": (0, 0, 25),
+        "notation_color": (0, 0, 30),
         "left_midi_color": (153, 179, 204),
         "right_midi_color": (204, 179, 153),
     }
@@ -53,7 +53,7 @@ class Style:
         "text_color": (240, 240, 240),
         "accent_color": (60, 60, 60),
         "paper_color": (190, 190, 190),
-        "notation_color": (0, 0, 0),
+        "notation_color": (0, 0, 30),
         "left_midi_color": (153, 179, 204),
         "right_midi_color": (204, 179, 153),
     }

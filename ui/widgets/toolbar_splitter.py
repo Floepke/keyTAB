@@ -6,6 +6,10 @@ class ToolbarHandle(QtWidgets.QSplitterHandle):
     def __init__(self, orientation, parent):
         super().__init__(orientation, parent)
         self.setObjectName("ToolbarHandle")
+        self.setToolTip(
+            "Drag this splitter to zoom the editor and print-preview. "
+            "Double-click to fit the current page entirely in the screen to get an overview of the document."
+        )
         parent.setHandleWidth(50)
         # Prevent resize cursor when hovering the splitter handle
         self.setCursor(QtCore.Qt.CursorShape.ArrowCursor)
@@ -30,6 +34,12 @@ class ToolbarHandle(QtWidgets.QSplitterHandle):
         # Keep width; reduce height to half
         self.fit_btn.setFixedWidth(self._button_size)
         self.fit_btn.setFixedHeight(max(1, self._button_size // 2))
+        self.fit_btn.setToolTip(
+            "Fit the page to screen. "
+            "If the page doesn't fit; this button fits the page. "
+            "If the page already fits; this button hides the page. "
+            "If the page is hidden; this button fits the page again. "
+        )
         layout.addWidget(self.fit_btn)
 
         '''this button goes to the next page in the print view.'''
@@ -40,6 +50,7 @@ class ToolbarHandle(QtWidgets.QSplitterHandle):
             self.next_btn.setIcon(icn)
         self.next_btn.setIconSize(QtCore.QSize(self._button_size - 6, self._button_size - 6))
         self.next_btn.setFixedSize(self._button_size, self._button_size)
+        self.next_btn.setToolTip("Go to the next print page.")
         layout.addWidget(self.next_btn)
         try:
             self.next_btn.clicked.connect(parent.nextRequested.emit)
@@ -54,6 +65,7 @@ class ToolbarHandle(QtWidgets.QSplitterHandle):
             self.prev_btn.setIcon(icp)
         self.prev_btn.setIconSize(QtCore.QSize(self._button_size - 6, self._button_size - 6))
         self.prev_btn.setFixedSize(self._button_size, self._button_size)
+        self.prev_btn.setToolTip("Go to the previous print page.")
         layout.addWidget(self.prev_btn)
         try:
             self.prev_btn.clicked.connect(parent.previousRequested.emit)
@@ -82,6 +94,10 @@ class ToolbarHandle(QtWidgets.QSplitterHandle):
             self.play_btn.setIcon(icplay)
         self.play_btn.setIconSize(QtCore.QSize(self._button_size - 6, self._button_size - 6))
         self.play_btn.setFixedSize(self._button_size, self._button_size)
+        self.play_btn.setToolTip(
+            "Start playback from the current cursor position. "
+            "<space> toggles playback from the current mouse cursor position."
+        )
         layout.addWidget(self.play_btn)
         try:
             self.play_btn.clicked.connect(parent.playRequested.emit)
@@ -96,6 +112,10 @@ class ToolbarHandle(QtWidgets.QSplitterHandle):
             self.stop_btn.setIcon(icstop)
         self.stop_btn.setIconSize(QtCore.QSize(self._button_size - 6, self._button_size - 6))
         self.stop_btn.setFixedSize(self._button_size, self._button_size)
+        self.stop_btn.setToolTip(
+            "Stop playback immediately. "
+            "<space> toggles playback from the current mouse cursor position."
+        )
         layout.addWidget(self.stop_btn)
         try:
             self.stop_btn.clicked.connect(parent.stopRequested.emit)
@@ -128,7 +148,7 @@ class ToolbarHandle(QtWidgets.QSplitterHandle):
             self.info_btn.setFont(f)
         except Exception:
             pass
-        self.info_btn.setToolTip('Title info; edit title, composer and copyright and view analysis')
+        self.info_btn.setToolTip('Title info. Edit title, composer, and copyright. View analysis information.')
         self.info_btn.setIconSize(QtCore.QSize(self._button_size - 6, self._button_size - 6))
         self.info_btn.setFixedSize(self._button_size, self._button_size)
         layout.addWidget(self.info_btn)
@@ -151,7 +171,7 @@ class ToolbarHandle(QtWidgets.QSplitterHandle):
             self.style_btn.setFont(f)
         except Exception:
             pass
-        self.style_btn.setToolTip('Appearance; customize the appearance of the score')
+        self.style_btn.setToolTip('Appearance. Customize the visual style of the score.')
         self.style_btn.setIconSize(QtCore.QSize(self._button_size - 6, self._button_size - 6))
         self.style_btn.setFixedSize(self._button_size, self._button_size)
         layout.addWidget(self.style_btn)
@@ -175,7 +195,7 @@ class ToolbarHandle(QtWidgets.QSplitterHandle):
             self.line_break_btn.setFont(f)
         except Exception:
             pass
-        self.line_break_btn.setToolTip('Line Breaks; organize the document into pages and systems')
+        self.line_break_btn.setToolTip('Line breaks. Organize the document into systems and pages.')
         self.line_break_btn.setIconSize(QtCore.QSize(self._button_size - 6, self._button_size - 6))
         self.line_break_btn.setFixedSize(self._button_size, self._button_size)
         layout.addWidget(self.line_break_btn)
@@ -231,7 +251,10 @@ class ToolbarHandle(QtWidgets.QSplitterHandle):
         for d in defs or []:
             name = d.get('name', '')
             icon_name = d.get('icon', '')
-            tooltip = d.get('tooltip', name)
+            tooltip = str(d.get('tooltip', name) or '').replace(';', '.')
+            tooltip = tooltip.strip()
+            if tooltip and not tooltip.endswith('.'):
+                tooltip = f"{tooltip}."
             btn = QtWidgets.QToolButton(self._toolbar_area)
             btn.setFocusPolicy(QtCore.Qt.FocusPolicy.NoFocus)
             ic = get_qicon(icon_name, size=(64, 64))

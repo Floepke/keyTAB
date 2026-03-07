@@ -23,6 +23,7 @@ class NoteTool(BaseTool):
         self._press_start_time: float = 0.0
         self._duration_edit_armed: bool = False
         self._last_audition_pitch: int | None = None
+        self._move_pitch_time_mode: bool = False
 
     def _play_note_on_edit_enabled(self) -> bool:
         try:
@@ -35,12 +36,9 @@ class NoteTool(BaseTool):
     def _audition_pitch(self, pitch: int) -> None:
         if not self._play_note_on_edit_enabled():
             return
-        try:
-            if hasattr(self._editor, 'player') and self._editor.player is not None:
-                self._editor.player.audition_note(pitch=int(pitch))
-                self._last_audition_pitch = int(pitch)
-        except Exception:
-            pass
+        if hasattr(self._editor, 'player') and self._editor.player is not None:
+            self._editor.player.audition_note(pitch=int(pitch))
+            self._last_audition_pitch = int(pitch)
 
     def toolbar_spec(self) -> list[dict]:
         # Two explicit hand selectors for quick switching
@@ -48,6 +46,75 @@ class NoteTool(BaseTool):
             {'name': 'hand_left', 'icon': 'note_left', 'tooltip': 'Click to write left hand notes'},
             {'name': 'hand_right', 'icon': 'note_right', 'tooltip': 'Click to write right hand notes'},
         ]
+
+    def _cursor_mm(self, x_px: float, y_px: float) -> tuple[float, float]:
+        w_px_per_mm = float(getattr(self._editor, '_widget_px_per_mm', 1.0) or 1.0)
+        x_mm = float(x_px) / max(1e-6, w_px_per_mm)
+        y_mm_local = float(y_px) / max(1e-6, w_px_per_mm)
+        y_mm = y_mm_local + float(getattr(self._editor, '_view_y_mm_offset', 0.0) or 0.0)
+        return x_mm, y_mm
+
+    def _hit_note_and_rect(self, score: SCORE, x_px: float, y_px: float):
+        x_mm, y_mm = self._cursor_mm(x_px, y_px)
+        matches = []
+        for r in (getattr(self._editor, '_note_hit_rects', []) or []):
+            if float(r['x1']) <= x_mm <= float(r['x2']) and float(r['y1']) <= y_mm <= float(r['y2']):
+                dx = x_mm - float(r['cx'])
+                dy = y_mm - float(r['cy'])
+                dist2 = dx * dx + dy * dy
+                matches.append((dist2, r))
+        if not matches:
+            return None, None, y_mm
+        matches.sort(key=lambda t: t[0])
+        hit_rect = matches[0][1]
+        hit_id = int(hit_rect.get('_id', -1) or -1)
+        for n in getattr(score.events, 'note', []) or []:
+            if int(getattr(n, '_id', -1) or -1) == hit_id:
+                return n, hit_rect, y_mm
+        return None, hit_rect, y_mm
+
+    def _can_apply_duration(self, note: Note, candidate_duration: float) -> bool:
+        score: SCORE = self._editor.current_score()
+        if score is None:
+            return True
+        start_t = float(getattr(note, 'time', 0.0) or 0.0)
+        end_t = float(start_t + max(0.0, float(candidate_duration)))
+        pitch = int(getattr(note, 'pitch', 0) or 0)
+        note_id = int(getattr(note, '_id', -1) or -1)
+
+        for other in getattr(score.events, 'note', []) or []:
+            other_id = int(getattr(other, '_id', -2) or -2)
+            if other_id == note_id:
+                continue
+            other_pitch = int(getattr(other, 'pitch', 0) or 0)
+            if other_pitch != pitch:
+                continue
+            other_start = float(getattr(other, 'time', 0.0) or 0.0)
+            if start_t < other_start < end_t:
+                return False
+        return True
+
+    def _can_apply_time_pitch_move(self, note: Note, candidate_time: float, candidate_pitch: int) -> bool:
+        score: SCORE = self._editor.current_score()
+        if score is None:
+            return True
+        note_id = int(getattr(note, '_id', -1) or -1)
+        start_t = float(max(0.0, candidate_time))
+        duration = float(max(0.0, self._orig_duration))
+        end_t = float(start_t + duration)
+
+        for other in getattr(score.events, 'note', []) or []:
+            other_id = int(getattr(other, '_id', -2) or -2)
+            if other_id == note_id:
+                continue
+            if int(getattr(other, 'pitch', 0) or 0) != int(candidate_pitch):
+                continue
+            other_start = float(getattr(other, 'time', 0.0) or 0.0)
+            other_duration = float(getattr(other, 'duration', 0.0) or 0.0)
+            other_end = float(other_start + max(0.0, other_duration))
+            if start_t < other_end and other_start < end_t:
+                return False
+        return True
 
     def on_left_press(self, x: float, y: float) -> None:
         '''Detect existing note under cursor or create a new one, then enter edit mode'''
@@ -61,22 +128,14 @@ class NoteTool(BaseTool):
         pitch_press = int(self._editor.x_to_pitch(x))
         self._hand = str(getattr(self._editor, 'hand_cursor', '<') or '<')
 
-        # Prefer rectangle-based hit detection for precise clickable area
-        found = None
-        hit_id = None
-        hit_test = getattr(self._editor, 'hit_test_note_id', None)
-        if callable(hit_test):
-            hit_id = hit_test(x, y)
-        if hit_id is not None:
-            for n in getattr(score.events, 'note', []) or []:
-                if int(getattr(n, '_id', -1) or -1) == int(hit_id):
-                    found = n
-                    break
+        # Rectangle-based hit detection for precise clickable area
+        found, hit_rect, y_mm_abs = self._hit_note_and_rect(score, x, y)
 
         if found:
             # Edit existing note
             self.edit_note = found
             self._editing_existing = True
+            self._move_pitch_time_mode = False
             try:
                 self._last_audition_pitch = int(getattr(found, 'pitch', pitch_press) or pitch_press)
             except Exception:
@@ -89,6 +148,10 @@ class NoteTool(BaseTool):
                 self._orig_duration = 0.0
                 self._press_start_time = float(t_press_snap)
             self._duration_edit_armed = False
+            if hit_rect is not None:
+                notehead_len_mm = float(getattr(self._editor, 'semitone_dist', 0.0) or 0.0) * 2.0
+                notehead_end_mm = float(hit_rect.get('y1', 0.0) or 0.0) + notehead_len_mm
+                self._move_pitch_time_mode = bool(notehead_len_mm > 0.0 and y_mm_abs <= notehead_end_mm)
         else:
             # Create a new note at the snapped press time with minimum duration = snap size
             units = float(max(1e-6, getattr(self._editor, 'snap_size_units', 8.0)))
@@ -98,6 +161,8 @@ class NoteTool(BaseTool):
             self._press_start_time = float(t_press_snap)
             self._duration_edit_armed = False
             self._last_audition_pitch = None
+            self._move_pitch_time_mode = False
+            self._audition_pitch(pitch_press)
 
         # switch guides off during note editing
         self._editor.guides_active = False
@@ -117,6 +182,7 @@ class NoteTool(BaseTool):
         self._editing_existing = False
         self._duration_edit_armed = False
         self._last_audition_pitch = None
+        self._move_pitch_time_mode = False
         
         # switch guides back on after note editing
         self._editor.guides_active = True
@@ -162,16 +228,36 @@ class NoteTool(BaseTool):
         if not self._editing_existing:
             # Creating a new note: original behavior
             if op.le(cur_t_raw, start_t):
+                prev_pitch = int(getattr(note, 'pitch', cur_pitch) or cur_pitch)
                 note.pitch = cur_pitch
+                if cur_pitch != prev_pitch and cur_pitch != self._last_audition_pitch:
+                    self._audition_pitch(cur_pitch)
             else:
                 if op.lt(cur_t_raw, start_t + units):
-                    note.duration = units
+                    if self._can_apply_duration(note, units):
+                        note.duration = units
                 else:
                     # Compute bands beyond the first using raw time to reduce snapping jitter
                     ratio = max(0.0, (float(cur_t_raw) - float(start_t)) / max(1e-6, units))
                     bands_beyond_first = int(math.floor(ratio + 1e-9))
-                    note.duration = float(bands_beyond_first + 1) * float(units)
+                    candidate = float(bands_beyond_first + 1) * float(units)
+                    if self._can_apply_duration(note, candidate):
+                        note.duration = candidate
         else:
+            # Editing existing note:
+            if self._move_pitch_time_mode:
+                candidate_time = float(max(0.0, cur_t_snap))
+                candidate_pitch = int(cur_pitch)
+                if not self._can_apply_time_pitch_move(note, candidate_time, candidate_pitch):
+                    return
+                prev_pitch = int(getattr(note, 'pitch', cur_pitch) or cur_pitch)
+                note.pitch = candidate_pitch
+                if cur_pitch != prev_pitch and cur_pitch != self._last_audition_pitch:
+                    self._audition_pitch(cur_pitch)
+                note.time = candidate_time
+                note.duration = float(max(0.0, self._orig_duration))
+                return
+
             # Editing existing note:
             # - Before start: pitch-only
             # - Until we cross one snap unit past start, do pitch-only and do not alter duration
@@ -190,11 +276,14 @@ class NoteTool(BaseTool):
                 else:
                     # Armed: allow duration edits, including 1 snap when back inside first band
                     if op.lt(cur_t_raw, start_t + units):
-                        note.duration = units
+                        if self._can_apply_duration(note, units):
+                            note.duration = units
                     else:
                         ratio = max(0.0, (float(cur_t_raw) - float(start_t)) / max(1e-6, units))
                         bands_beyond_first = int(math.floor(ratio + 1e-9))
-                        note.duration = float(bands_beyond_first + 1) * float(units)
+                        candidate = float(bands_beyond_first + 1) * float(units)
+                        if self._can_apply_duration(note, candidate):
+                            note.duration = candidate
 
     def on_left_drag_end(self, x: float, y: float) -> None:
         super().on_left_drag_end(x, y)
@@ -203,6 +292,7 @@ class NoteTool(BaseTool):
         self._editing_existing = False
         self._duration_edit_armed = False
         self._last_audition_pitch = None
+        self._move_pitch_time_mode = False
         
         # Ensure the music/base_grid covers latest note end
         self._editor.update_score_length()
@@ -222,16 +312,7 @@ class NoteTool(BaseTool):
         score: SCORE = self._editor.current_score()
 
         # Use rectangle hit detection for delete
-        target = None
-        hit_id = None
-        hit_test = getattr(self._editor, 'hit_test_note_id', None)
-        if callable(hit_test):
-            hit_id = hit_test(x, y)
-        if hit_id is not None:
-            for n in getattr(score.events, 'note', []) or []:
-                if int(getattr(n, '_id', -1) or -1) == int(hit_id):
-                    target = n
-                    break
+        target, _hit_rect, _y_mm = self._hit_note_and_rect(score, x, y)
 
         deleted_any = False
         if target is not None:

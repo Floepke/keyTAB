@@ -757,15 +757,13 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
 
 
     # Problem solved: compute per-line horizontal geometry (margins, ranges).
-    semitone_mm = 2.5 * scale
+    semitone_mm = 2 * scale
     key_positions = _build_key_positions(1, PIANO_KEY_AMOUNT, semitone_mm)
     for line in lines:
         if line['stave_range'] == 'auto':
-            groups, keys, bound_left, bound_right, empty, pattern = _auto_line_keys_and_bounds(line['time_start'], line['time_end'])
+            groups, keys, bound_left, bound_right, _, pattern = _auto_line_keys_and_bounds(line['time_start'], line['time_end'])
             line['visible_keys'] = keys
             line['pattern'] = pattern
-            if empty:
-                count, lo, hi = _notes_in_window_stats(line['time_start'], line['time_end'])
         else:
             manual = _sanitize_range(line['stave_range'])
             requested_lo = int(manual[0]) if manual else 1
@@ -782,13 +780,9 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
             bound_right = int(keys[-1])
             line['visible_keys'] = keys
             line['pattern'] = ' '.join(patterns)
+        
         # Problem solved: avoid clipping A#0 ledger by forcing left edge to key 2.
-        manual_low_request = False
-        try:
-            manual_low_request = line['stave_range'] != 'auto' and int(requested_lo) <= 2
-        except Exception:
-            manual_low_request = False
-        low_key_present = bool(bound_left <= 2 or manual_low_request)
+        low_key_present = bool(bound_left <= 2 or line['stave_range'] != 'auto' and int(requested_lo) <= 2)
         for item in norm_notes:
             n_t = float(item.get('time', 0.0) or 0.0)
             n_end = float(item.get('end', 0.0) or 0.0)

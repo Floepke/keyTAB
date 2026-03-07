@@ -149,9 +149,11 @@ class NoteDrawerMixin:
         # Register a clickable rectangle covering the main midinote body
         x_left = x - w
         x_right = x + w
-        # Use computed w to avoid relying on raw semitone_dist
-        y_top = y1 + w
-        y_bottom = y2
+        # Shift hit-rect origin up by one semitone distance so the top aligns with notehead.
+        y1_hit = y1 - w
+        y2_hit = y2 - w
+        y_top = y1_hit + w
+        y_bottom = y2_hit
         if x_left > x_right:
             x_left, x_right = x_right, x_left
         if y_top > y_bottom:

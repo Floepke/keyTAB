@@ -17,6 +17,7 @@ from ui.widgets.draw_view import DrawUtilView
 from ui.about_dialog import AboutDialog
 from settings_manager import open_preferences, get_preferences_manager
 from appdata_manager import get_appdata_manager
+from utils.CONSTANT import UTILS_SAVE_DIR, QUARTER_NOTE_UNIT
 from engraver.engraver import Engraver
 from editor.tool_manager import ToolManager
 from editor.editor import Editor
@@ -32,6 +33,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.player = None
         self._player_config: tuple[str, str] | None = None
         self._left_panel_width_frozen = False
+        self._editor_scroll_step_logical_px: int = 1
 
         # File management
         self.file_manager = FileManager(self)
@@ -71,7 +73,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self._configure_editor_scrollbar()
         
         # For external code, expose the canvas under the same name
-        self.editor = self.editor_canvas
+        self.editor_canvas = self.editor_canvas
 
         self.du = DrawUtil()
         self.du.new_page(width_mm=210, height_mm=297)
@@ -95,9 +97,23 @@ class MainWindow(QtWidgets.QMainWindow):
             saved_path = str(adm2.get("last_session_path", "") or "")
         except Exception:
             pass
+        session_path = Path(UTILS_SAVE_DIR) / "session.piano"
         opened = False
         status_msg = ""
-        if was_saved and saved_path:
+        prefer_session_restore = False
+        if session_path.exists():
+            if (not was_saved) or (not saved_path):
+                prefer_session_restore = True
+            else:
+                try:
+                    saved_mtime = Path(saved_path).stat().st_mtime if Path(saved_path).exists() else 0.0
+                    session_mtime = session_path.stat().st_mtime
+                    if session_mtime > saved_mtime:
+                        prefer_session_restore = True
+                except Exception:
+                    prefer_session_restore = False
+
+        if (not prefer_session_restore) and was_saved and saved_path:
             try:
                 from pathlib import Path as _Path
                 if _Path(saved_path).exists():
@@ -222,10 +238,10 @@ class MainWindow(QtWidgets.QMainWindow):
         # Editor + ToolManager
         self.tool_manager = ToolManager(self.splitter)
         self.editor_controller = Editor(self.tool_manager)
-        self.editor.set_editor(self.editor_controller)
+        self.editor_canvas.set_editor(self.editor_controller)
         # Provide widget reference to editor for explicit full redraws
         try:
-            self.editor_controller.widget = self.editor
+            self.editor_controller.widget = self.editor_canvas
         except Exception:
             pass
         # Provide editor to ToolManager so tools can use editor wrappers
@@ -314,12 +330,12 @@ class MainWindow(QtWidgets.QMainWindow):
 
         # Connect external scrollbar to the editor canvas
         try:
-            self.editor.viewportMetricsChanged.connect(self._on_editor_metrics)
+            self.editor_canvas.viewportMetricsChanged.connect(self._on_editor_metrics)
             self.editor_vscroll.valueChanged.connect(self._on_editor_scroll_changed)
             # Keep external scrollbar in sync with wheel-driven scroll from the editor
-            self.editor.scrollLogicalPxChanged.connect(self.editor_vscroll.setValue)
+            self.editor_canvas.scrollLogicalPxChanged.connect(self.editor_vscroll.setValue)
             # Persist app state only on wheel scrolling inside the editor view
-            self.editor.scrollWheelUsed.connect(self._schedule_app_state_save)
+            self.editor_canvas.scrollWheelUsed.connect(self._schedule_app_state_save)
         except Exception:
             pass
         # Restore last scroll position once viewport metrics are available
@@ -438,20 +454,28 @@ class MainWindow(QtWidgets.QMainWindow):
         if sys.platform == "darwin":
             menubar.setNativeMenuBar(True)
 
-        # Create menus in normal left-to-right order (File, Edit, Document, View, Playback, About)
+        # Create menus in normal left-to-right order (File, Edit, Selection, Document, View, Playback, About)
         file_menu = menubar.addMenu("&File")
         edit_menu = menubar.addMenu("&Edit")
+        selection_menu = menubar.addMenu("&Selection")
         view_menu = menubar.addMenu("&View")
         document_menu = menubar.addMenu("&Document")
         playback_menu = menubar.addMenu("&Playback")
         help_menu = menubar.addMenu("&About")
+        for menu in (file_menu, edit_menu, selection_menu, view_menu, document_menu, playback_menu, help_menu):
+            menu.setToolTipsVisible(True)
 
         # File actions
         new_act = QtGui.QAction("New", self)
+        new_act.setToolTip("Create a new project.")
         open_act = QtGui.QAction("Load...", self)
+        open_act.setToolTip("Open an existing project file.")
         save_act = QtGui.QAction("Save", self)
+        save_act.setToolTip("Save the current project.")
         save_as_act = QtGui.QAction("Save As...", self)
+        save_as_act.setToolTip("Save the current project under a new file name.")
         exit_act = QtGui.QAction("Exit", self)
+        exit_act.setToolTip("Exit the application.")
         try:
             exit_act.setShortcut(QtGui.QKeySequence("Escape"))
         except Exception:
@@ -468,15 +492,19 @@ class MainWindow(QtWidgets.QMainWindow):
         file_menu.addAction(save_act)
         file_menu.addAction(save_as_act)
         self._recent_menu = file_menu.addMenu("Recent Files")
+        self._recent_menu.setToolTipsVisible(True)
         file_menu.addSeparator()
 
         style_act = QtGui.QAction("Style...", self)
+        style_act.setToolTip("Open appearance settings for the score.")
         style_act.setShortcut(QtGui.QKeySequence("S"))
         style_act.triggered.connect(self._open_style_dialog)
         info_act = QtGui.QAction("Info...", self)
+        info_act.setToolTip("Open title and metadata settings.")
         info_act.setShortcut(QtGui.QKeySequence("I"))
         info_act.triggered.connect(self._open_info_dialog)
         line_break_act = QtGui.QAction("Line Breaks...", self)
+        line_break_act.setToolTip("Open line break and page break settings.")
         line_break_act.setShortcut(QtGui.QKeySequence("L"))
         line_break_act.triggered.connect(self._open_line_break_dialog)
 
@@ -486,6 +514,7 @@ class MainWindow(QtWidgets.QMainWindow):
         document_menu.addSeparator()
 
         export_pdf_act = QtGui.QAction("Export PDF...", self)
+        export_pdf_act.setToolTip("Export the current score as a PDF document.")
         export_pdf_act.setShortcut(QtGui.QKeySequence("Ctrl+E"))
         export_pdf_act.triggered.connect(self._export_pdf)
         file_menu.addAction(export_pdf_act)
@@ -496,12 +525,14 @@ class MainWindow(QtWidgets.QMainWindow):
         self._playback_mode_group.setExclusive(True)
 
         self._playback_mode_system_action = QtGui.QAction(self._playback_system_label(), self)
+        self._playback_mode_system_action.setToolTip("Use the system playback backend.")
         self._playback_mode_system_action.setCheckable(True)
         self._playback_mode_system_action.triggered.connect(lambda checked: self._set_playback_mode('system') if checked else None)
         playback_menu.addAction(self._playback_mode_system_action)
         self._playback_mode_group.addAction(self._playback_mode_system_action)
 
         self._playback_mode_external_action = QtGui.QAction("Playback using External MIDI port", self)
+        self._playback_mode_external_action.setToolTip("Use an external MIDI output port for playback.")
         self._playback_mode_external_action.setCheckable(True)
         self._playback_mode_external_action.triggered.connect(lambda checked: self._set_playback_mode('external') if checked else None)
         playback_menu.addAction(self._playback_mode_external_action)
@@ -509,29 +540,35 @@ class MainWindow(QtWidgets.QMainWindow):
 
         playback_menu.addSeparator()
         self._midi_port_menu = playback_menu.addMenu("MIDI port")
+        self._midi_port_menu.setToolTipsVisible(True)
         self._midi_port_menu.aboutToShow.connect(self._rebuild_midi_port_menu)
         self._rebuild_midi_port_menu()
         playback_menu.addSeparator()
 
         test_tone_act = QtGui.QAction("Play Test Tone", self)
+        test_tone_act.setToolTip("Play a short test tone.")
         test_tone_act.triggered.connect(self._play_test_tone)
         playback_menu.addAction(test_tone_act)
 
         if sys.platform.startswith("linux"):
             playback_menu.addSeparator()
             select_sf_act = QtGui.QAction("Select Custom SoundFont (.sf2/.sf3) for FluidSynth", self)
+            select_sf_act.setToolTip("Select a custom SoundFont file for FluidSynth playback.")
             select_sf_act.triggered.connect(lambda: self._prompt_for_soundfont(force_dialog=True))
             playback_menu.addAction(select_sf_act)
 
             unset_sf_act = QtGui.QAction("Use Default FluidSynth SoundFont", self)
+            unset_sf_act.setToolTip("Switch back to the default FluidSynth SoundFont.")
             unset_sf_act.triggered.connect(self._unset_soundfont)
             playback_menu.addAction(unset_sf_act)
 
         self._set_playback_mode(str(self._get_playback_mode_from_appdata() or 'system'), show_status=False)
 
         about_act = QtGui.QAction("About keyTAB", self)
+        about_act.setToolTip("Show information about keyTAB.")
         about_act.triggered.connect(self._open_about_dialog)
         about_qt_act = QtGui.QAction("About Qt", self)
+        about_qt_act.setToolTip("Show information about the Qt framework.")
         about_qt_act.triggered.connect(lambda: QtWidgets.QMessageBox.aboutQt(self))
         help_menu.addAction(about_act)
         help_menu.addSeparator()
@@ -547,8 +584,10 @@ class MainWindow(QtWidgets.QMainWindow):
 
         # Edit actions
         undo_act = QtGui.QAction("Undo", self)
+        undo_act.setToolTip("Undo the last editing action.")
         undo_act.setShortcut(QtGui.QKeySequence.StandardKey.Undo)
         redo_act = QtGui.QAction("Redo", self)
+        redo_act.setToolTip("Redo the last undone editing action.")
         # Use platform-aware Redo shortcut to avoid ambiguity; explicit combos handled in editor
         try:
             redo_act.setShortcut(QtGui.QKeySequence.StandardKey.Redo)
@@ -558,10 +597,13 @@ class MainWindow(QtWidgets.QMainWindow):
         edit_menu.addAction(redo_act)
         # Cut/Copy/Paste actions (platform-aware shortcuts)
         cut_act = QtGui.QAction("Cut", self)
+        cut_act.setToolTip("Cut the current selection.")
         cut_act.setShortcut(QtGui.QKeySequence.StandardKey.Cut)
         copy_act = QtGui.QAction("Copy", self)
+        copy_act.setToolTip("Copy the current selection.")
         copy_act.setShortcut(QtGui.QKeySequence.StandardKey.Copy)
         paste_act = QtGui.QAction("Paste", self)
+        paste_act.setToolTip("Paste clipboard content.")
         paste_act.setShortcut(QtGui.QKeySequence.StandardKey.Paste)
         edit_menu.addSeparator()
         edit_menu.addAction(cut_act)
@@ -569,6 +611,7 @@ class MainWindow(QtWidgets.QMainWindow):
         edit_menu.addAction(paste_act)
         # Delete selection action with visible shortcuts (Delete, Backspace)
         delete_act = QtGui.QAction("Delete", self)
+        delete_act.setToolTip("Delete the current selection.")
         try:
             delete_act.setShortcuts([
                 QtGui.QKeySequence(QtGui.QKeySequence.StandardKey.Delete),
@@ -583,32 +626,39 @@ class MainWindow(QtWidgets.QMainWindow):
         edit_menu.addAction(delete_act)
         edit_menu.addSeparator()
 
-        # Selection submenu (discoverability for selection shortcuts/actions)
-        selection_menu = edit_menu.addMenu("Selection")
+        # Selection menu (discoverability for selection shortcuts/actions)
         select_all_act = QtGui.QAction("Select All", self)
+        select_all_act.setToolTip("Select all editable events.")
         select_all_act.setShortcut(QtGui.QKeySequence.StandardKey.SelectAll)
 
         transpose_left_act = QtGui.QAction("Transpose -1 Semitone", self)
+        transpose_left_act.setToolTip("Transpose Selection Down by One Semitone.")
         transpose_left_act.setShortcut(QtGui.QKeySequence(QtCore.Qt.Key_Left))
         transpose_left_act.setShortcutContext(QtCore.Qt.ShortcutContext.WidgetShortcut)
 
         transpose_right_act = QtGui.QAction("Transpose +1 Semitone", self)
+        transpose_right_act.setToolTip("Transpose Selection Up by One Semitone.")
         transpose_right_act.setShortcut(QtGui.QKeySequence(QtCore.Qt.Key_Right))
         transpose_right_act.setShortcutContext(QtCore.Qt.ShortcutContext.WidgetShortcut)
 
-        shift_earlier_act = QtGui.QAction("Move Earlier by Snap", self)
+        shift_earlier_act = QtGui.QAction("Move Earlier by Snap Band", self)
+        shift_earlier_act.setToolTip("Move Selection Earlier by One Snap Band.")
         shift_earlier_act.setShortcut(QtGui.QKeySequence(QtCore.Qt.Key_Up))
         shift_earlier_act.setShortcutContext(QtCore.Qt.ShortcutContext.WidgetShortcut)
 
-        shift_later_act = QtGui.QAction("Move Later by Snap", self)
+        shift_later_act = QtGui.QAction("Move Later by Snap Band", self)
+        shift_later_act.setToolTip("Move Selection Later by One Snap Band.")
         shift_later_act.setShortcut(QtGui.QKeySequence(QtCore.Qt.Key_Down))
         shift_later_act.setShortcutContext(QtCore.Qt.ShortcutContext.WidgetShortcut)
 
-        quantize_act = QtGui.QAction("Quantize starts and ends on snap", self)
+        quantize_act = QtGui.QAction("Quantize Starts and Ends on Snap Band", self)
+        quantize_act.setToolTip("Quantize Selection Starts and Ends to the Current Snap Band.")
         quantize_act.setShortcut(QtGui.QKeySequence("Q"))
         quantize_act.setShortcutContext(QtCore.Qt.ShortcutContext.WidgetShortcut)
-        quantize_start_act = QtGui.QAction("Quantize starts on snap", self)
-        quantize_end_act = QtGui.QAction("Quantize ends on snap", self)
+        quantize_start_act = QtGui.QAction("Quantize Starts on Snap Band", self)
+        quantize_start_act.setToolTip("Quantize Selection Starts to the Current Snap Band.")
+        quantize_end_act = QtGui.QAction("Quantize Ends on Snap Band", self)
+        quantize_end_act.setToolTip("Quantize Selection Ends to the Current Snap Band.")
 
         selection_menu.addAction(select_all_act)
         selection_menu.addSeparator()
@@ -624,10 +674,12 @@ class MainWindow(QtWidgets.QMainWindow):
         # Separator between Delete and Preferences
         edit_menu.addSeparator()
         prefs_act = QtGui.QAction("Preferences…", self)
+        prefs_act.setToolTip("Open application preferences.")
         prefs_act.triggered.connect(self._open_preferences)
         edit_menu.addAction(prefs_act)
         # View actions
         zoom_in_act = QtGui.QAction("Zoom In", self)
+        zoom_in_act.setToolTip("Zoom in on the editor view.")
         try:
             zoom_in_act.setShortcuts([
                 QtGui.QKeySequence("="),
@@ -639,6 +691,7 @@ class MainWindow(QtWidgets.QMainWindow):
             except Exception:
                 pass
         zoom_out_act = QtGui.QAction("Zoom Out", self)
+        zoom_out_act.setToolTip("Zoom out from the editor view.")
         try:
             zoom_out_act.setShortcuts([
                 QtGui.QKeySequence("-"),
@@ -651,6 +704,7 @@ class MainWindow(QtWidgets.QMainWindow):
                 pass
         view_menu.addSeparator()
         full_screen_act = QtGui.QAction("Full Screen", self)
+        full_screen_act.setToolTip("Toggle full screen mode.")
         full_screen_act.setShortcut(QtGui.QKeySequence("F11"))
         full_screen_act.setCheckable(True)
         view_menu.addAction(zoom_in_act)
@@ -715,7 +769,68 @@ class MainWindow(QtWidgets.QMainWindow):
     def _configure_editor_scrollbar(self) -> None:
         extent = int(self.style().pixelMetric(QtWidgets.QStyle.PixelMetric.PM_ScrollBarExtent))
         self.editor_vscroll.setFixedWidth(max(12, int(extent * 2)))
+        self.editor_vscroll.setToolTip("Editor scrollbar. Drag to scroll. Click outside the scrollbar handle to jump. Hover outside the scrollbar handle to preview the current destination measure.")
         self.editor_vscroll.set_tooltip_provider(self._editor_scrollbar_tooltip_text)
+        self.editor_vscroll.set_measure_index_provider(self._editor_scrollbar_measure_index_for_predicted_top)
+        self.editor_vscroll.set_jump_target_provider(self._editor_scrollbar_jump_target_for_predicted_top)
+
+    def _score_measure_starts_units(self) -> list[float]:
+        ed = self.editor_controller if hasattr(self, 'editor_controller') else None
+        if ed is None or not hasattr(ed, '_get_barline_positions'):
+            return [0.0]
+        starts = list(ed._get_barline_positions() or [])
+        if not starts:
+            return [0.0]
+        return [float(v) for v in starts]
+
+    def _editor_scrollbar_measure_index_for_predicted_top(self, predicted_top_value: int) -> int:
+        starts = self._score_measure_starts_units()
+        measure_count = max(1, len(starts))
+        minimum = int(self.editor_vscroll.minimum())
+        maximum = int(self.editor_vscroll.maximum())
+        if maximum <= minimum:
+            return 0
+        ratio = (float(predicted_top_value) - float(minimum)) / float(maximum - minimum)
+        ratio = max(0.0, min(1.0, ratio))
+        idx = int(round(ratio * float(measure_count - 1)))
+        return max(0, min(measure_count - 1, idx))
+
+    def _editor_scrollbar_jump_target_for_predicted_top(self, predicted_top_value: int) -> int:
+        ed = self.editor_controller if hasattr(self, 'editor_controller') else None
+        if ed is None:
+            return int(predicted_top_value)
+
+        starts = self._score_measure_starts_units()
+        measure_count = max(1, len(starts))
+        if measure_count <= 0:
+            return int(predicted_top_value)
+
+        measure_idx = self._editor_scrollbar_measure_index_for_predicted_top(predicted_top_value)
+        if measure_idx + 1 < len(starts):
+            start_units = float(starts[measure_idx])
+            end_units = float(starts[measure_idx + 1])
+        elif len(starts) >= 2:
+            last_len = float(starts[-1] - starts[-2])
+            start_units = float(starts[-1])
+            end_units = start_units + max(1.0, last_len)
+        else:
+            start_units = float(starts[0]) if starts else 0.0
+            end_units = start_units + 256.0
+
+        center_units = (start_units + end_units) * 0.5
+        center_mm = float(ed.time_to_mm(center_units))
+        vp_h_mm = float(getattr(ed, '_viewport_h_mm', 0.0) or 0.0)
+        target_top_mm = max(0.0, center_mm - (vp_h_mm * 0.5))
+
+        px_per_mm = float(getattr(self, '_editor_metric_px_per_mm', 0.0) or 0.0)
+        dpr = float(getattr(self, '_editor_metric_dpr', 1.0) or 1.0)
+        if px_per_mm <= 0.0:
+            return int(predicted_top_value)
+
+        target_scroll = int(round(target_top_mm * px_per_mm / max(1.0, dpr)))
+        minimum = int(self.editor_vscroll.minimum())
+        maximum = int(self.editor_vscroll.maximum())
+        return max(minimum, min(maximum, target_scroll))
 
     def _tooltip_anchor_widget(self) -> QtWidgets.QWidget | None:
         if not hasattr(self, 'tool_dock'):
@@ -739,39 +854,56 @@ class MainWindow(QtWidgets.QMainWindow):
         return False
 
     def _extract_tooltip_text(self, watched: QtCore.QObject, event: QtGui.QHelpEvent) -> str:
+        if isinstance(watched, QtWidgets.QMenu):
+            action = watched.actionAt(event.pos())
+            if action is not None:
+                return str(action.toolTip() or action.text() or "").strip()
+            return str(watched.toolTip() or "").strip()
+
+        if isinstance(watched, QtWidgets.QWidget):
+            parent_widget = watched.parentWidget()
+            if isinstance(parent_widget, QtWidgets.QListWidget):
+                item = parent_widget.itemAt(event.pos())
+                if item is not None:
+                    item_text = str(item.data(QtCore.Qt.ItemDataRole.ToolTipRole) or item.toolTip() or "").strip()
+                    if item_text:
+                        return item_text
+                return str(parent_widget.toolTip() or "").strip()
+
         if watched is self.tool_dock.selector.viewport():
             item = self.tool_dock.selector.itemAt(event.pos())
             if item is None:
-                return ""
-            return str(item.data(QtCore.Qt.ItemDataRole.ToolTipRole) or item.toolTip() or "").strip()
+                return str(self.tool_dock.selector.toolTip() or "").strip()
+            return str(item.data(QtCore.Qt.ItemDataRole.ToolTipRole) or item.toolTip() or self.tool_dock.selector.toolTip() or "").strip()
 
         if isinstance(watched, QtWidgets.QListWidget):
             item = watched.itemAt(event.pos())
             if item is not None:
                 return str(item.data(QtCore.Qt.ItemDataRole.ToolTipRole) or item.toolTip() or "").strip()
+            return str(watched.toolTip() or "").strip()
 
         if isinstance(watched, QtWidgets.QWidget):
             return str(watched.toolTip() or "").strip()
 
         return ""
 
-    def _show_tooltip_in_tool_area(self, text: str) -> bool:
+    def _show_tooltip_in_tool_area(self, text: str, hide_popup: bool = True) -> bool:
         area = self._tooltip_anchor_widget()
         if area is None:
             return False
         self.tool_dock.set_tooltip_text(str(text or ""))
-        QtWidgets.QToolTip.hideText()
+        if hide_popup:
+            QtWidgets.QToolTip.hideText()
         return True
 
     def eventFilter(self, watched: QtCore.QObject, event: QtCore.QEvent) -> bool:
         et = event.type()
 
         if et == QtCore.QEvent.Type.ToolTip and isinstance(event, QtGui.QHelpEvent):
-            if self._is_editor_scrollbar_source(watched):
-                return False
+            scrollbar_source = self._is_editor_scrollbar_source(watched)
             text = self._extract_tooltip_text(watched, event)
             if text:
-                shown = self._show_tooltip_in_tool_area(text)
+                shown = self._show_tooltip_in_tool_area(text, hide_popup=not scrollbar_source)
                 if shown:
                     self._tooltip_redirect_source = watched
                     return True
@@ -791,20 +923,8 @@ class MainWindow(QtWidgets.QMainWindow):
         return super().eventFilter(watched, event)
 
     def _editor_scrollbar_tooltip_text(self, predicted_top_value: int) -> str:
-        if not hasattr(self, 'editor_controller') or self.editor_controller is None:
-            return ""
-        viewport_logical = int(max(0, getattr(self, '_editor_metric_viewport_logical_px', 0) or 0))
-        center_logical = float(predicted_top_value) + (float(viewport_logical) * 0.5)
-        px_per_mm = float(getattr(self, '_editor_metric_px_per_mm', 1.0) or 1.0)
-        dpr = float(getattr(self, '_editor_metric_dpr', 1.0) or 1.0)
-        if px_per_mm <= 0.0:
-            return ""
-        center_mm = float(center_logical) * max(1.0, dpr) / px_per_mm
-        ticks = float(self.editor_controller.mm_to_time(center_mm))
-        if hasattr(self.editor_controller, 'get_measure_index_for_time'):
-            meas = int(self.editor_controller.get_measure_index_for_time(ticks))
-            return f"Measure {max(1, meas)}"
-        return ""
+        measure_idx = self._editor_scrollbar_measure_index_for_predicted_top(int(predicted_top_value))
+        return f"{max(1, measure_idx + 1)}"
 
     def _current_app_state(self) -> AppState:
         try:
@@ -1333,7 +1453,7 @@ class MainWindow(QtWidgets.QMainWindow):
         try:
             self._pending_scroll_restore = 0
             self.editor_vscroll.setValue(0)
-            self.editor.set_scroll_logical_px(0)
+            self.editor_canvas.set_scroll_logical_px(0)
         except Exception:
             pass
         try:
@@ -1434,7 +1554,7 @@ class MainWindow(QtWidgets.QMainWindow):
                 # Fallback: render current content
                 self.print_view.request_render()
         # Also refresh the editor view
-        self.editor.update()
+        self.editor_canvas.update()
 
     def _on_score_changed(self) -> None:
         if hasattr(self, '_score_change_engrave_timer') and self._score_change_engrave_timer is not None:
@@ -1623,39 +1743,60 @@ class MainWindow(QtWidgets.QMainWindow):
         self.editor_vscroll.setRange(0, max_scroll)
         # Page step ~ 80% of viewport height (logical px)
         self.editor_vscroll.setPageStep(int(max(1, round(0.8 * viewport_px / scale))))
-        # Single step ~ 40mm in logical pixels (independent of editor zoom)
-        base_mm_per_step = 40.0
-        device_px_step = base_mm_per_step * px_per_mm
-        logical_px_step = int(max(1, round(device_px_step / scale)))
+        # Single step follows one snap band in logical pixels.
+        logical_px_step = self._editor_scroll_step_from_metrics(px_per_mm, dpr)
+        self._editor_scroll_step_logical_px = int(max(1, logical_px_step))
         self.editor_vscroll.setSingleStep(logical_px_step)
+        self.editor_canvas.set_scroll_step_logical_px(logical_px_step)
         # Clamp current value within new range to avoid unbounded wheel scroll
         cur = int(self.editor_vscroll.value())
         if cur > max_scroll:
             self.editor_vscroll.setValue(max_scroll)
         # Apply a pending restore once, after we know the range
-        try:
-            pending = int(getattr(self, '_pending_scroll_restore', 0) or 0)
-            if pending and max_scroll >= 0:
-                target = max(0, min(pending, max_scroll))
-                if int(self.editor_vscroll.value()) != target:
-                    self.editor_vscroll.setValue(target)
-                self._pending_scroll_restore = 0
-        except Exception:
-            pass
+        pending = int(getattr(self, '_pending_scroll_restore', 0) or 0)
+        if pending and max_scroll >= 0:
+            target = max(0, min(pending, max_scroll))
+            if int(self.editor_vscroll.value()) != target:
+                self.editor_vscroll.setValue(target)
+            self._pending_scroll_restore = 0
 
     @QtCore.Slot(int)
     def _on_editor_scroll_changed(self, value: int) -> None:
-        self.editor.set_scroll_logical_px(value)
-        try:
-            app_state = self._current_app_state()
-            app_state.editor_scroll_pos = int(value)
-        except Exception:
-            pass
+        value = int(value)
+        self.editor_canvas.set_scroll_logical_px(value)
+        app_state = self._current_app_state()
+        app_state.editor_scroll_pos = int(value)
+
+    def _editor_scroll_step_from_metrics(self, px_per_mm: float, dpr: float) -> int:
+        sc = self.file_manager.current()
+        app_state = getattr(sc, 'app_state', None) if sc is not None else None
+        zoom_mm_per_quarter = float(getattr(app_state, 'zoom_mm_per_quarter', 25.0) or 25.0)
+
+        snap_units = float(getattr(self.editor_controller, 'snap_size_units', 0.0) or 0.0)
+        if snap_units <= 0.0 and hasattr(self, 'snap_dock') and hasattr(self.snap_dock, 'selector'):
+            snap_units = float(self.snap_dock.selector.get_snap_size() or 0.0)
+        if snap_units <= 0.0:
+            snap_units = float(QUARTER_NOTE_UNIT) / 2.0
+
+        snap_mm = (float(snap_units) / float(QUARTER_NOTE_UNIT)) * float(zoom_mm_per_quarter)
+        scale = max(1.0, float(dpr))
+        device_px_step = float(snap_mm) * float(px_per_mm)
+        return int(max(1, round(device_px_step / scale)))
+
+    def _quantize_editor_scroll_value(self, value: int) -> int:
+        minimum = int(self.editor_vscroll.minimum())
+        maximum = int(self.editor_vscroll.maximum())
+        clamped = max(minimum, min(maximum, int(value)))
+        step = int(max(1, getattr(self, '_editor_scroll_step_logical_px', 1) or 1))
+        if step <= 1:
+            return clamped
+        snapped = int(round(float(clamped) / float(step)) * step)
+        return max(minimum, min(maximum, snapped))
 
     def _zoom_editor(self, steps: int) -> None:
         try:
-            if hasattr(self, 'editor') and hasattr(self.editor, 'apply_zoom_steps'):
-                self.editor.apply_zoom_steps(int(steps))
+            if hasattr(self, 'editor') and hasattr(self.editor_canvas, 'apply_zoom_steps'):
+                self.editor_canvas.apply_zoom_steps(int(steps))
         except Exception:
             pass
 
@@ -1747,7 +1888,7 @@ class MainWindow(QtWidgets.QMainWindow):
         try:
             self.editor_controller.select_all()
             try:
-                self.editor.update()
+                self.editor_canvas.update()
             except Exception:
                 pass
             self._status("Selected all", 1200)
@@ -1759,7 +1900,7 @@ class MainWindow(QtWidgets.QMainWindow):
             changed = bool(self.editor_controller.transpose_selected_notes(int(semitones)))
             if changed:
                 try:
-                    self.editor.update()
+                    self.editor_canvas.update()
                 except Exception:
                     pass
                 self._status(f"Transposed selection {int(semitones):+d} semitone", 1200)
@@ -1777,7 +1918,7 @@ class MainWindow(QtWidgets.QMainWindow):
             changed = bool(self.editor_controller.shift_selected_notes_time(delta))
             if changed:
                 try:
-                    self.editor.update()
+                    self.editor_canvas.update()
                 except Exception:
                     pass
                 direction = "earlier" if delta < 0 else "later"
@@ -1792,7 +1933,7 @@ class MainWindow(QtWidgets.QMainWindow):
             changed = bool(getattr(self.editor_controller, 'quantize_selected_notes', lambda *_args, **_kwargs: False)(qtype))
             if changed:
                 try:
-                    self.editor.update()
+                    self.editor_canvas.update()
                 except Exception:
                     pass
                 mode = str(qtype or 'start/end').strip().lower()
@@ -2030,8 +2171,8 @@ class MainWindow(QtWidgets.QMainWindow):
         try:
             if hasattr(self, 'editor_vscroll') and self.editor_vscroll is not None:
                 self.editor_vscroll.setValue(0)
-            elif hasattr(self, 'editor') and self.editor is not None:
-                self.editor.set_scroll_logical_px(0)
+            elif hasattr(self, 'editor') and self.editor_canvas is not None:
+                self.editor_canvas.set_scroll_logical_px(0)
         except Exception:
             pass
 
@@ -2095,10 +2236,10 @@ class MainWindow(QtWidgets.QMainWindow):
             # Center the playhead in the viewport while playing
             if getattr(self, "_center_playhead_enabled", True):
                 self._center_playhead_scroll(units)
-            if hasattr(self.editor, 'request_overlay_refresh'):
-                self.editor.request_overlay_refresh()
+            if hasattr(self.editor_canvas, 'request_overlay_refresh'):
+                self.editor_canvas.request_overlay_refresh()
             else:
-                self.editor.update()
+                self.editor_canvas.update()
                 pass
         else:
             # Not playing: clear and stop timer
@@ -2126,8 +2267,8 @@ class MainWindow(QtWidgets.QMainWindow):
                 target_scroll = max(0, min(target_scroll, max_scroll))
                 if int(self.editor_vscroll.value()) != target_scroll:
                     self.editor_vscroll.setValue(target_scroll)
-            elif hasattr(self, 'editor') and self.editor is not None:
-                self.editor.set_scroll_logical_px(target_scroll)
+            elif hasattr(self, 'editor') and self.editor_canvas is not None:
+                self.editor_canvas.set_scroll_logical_px(target_scroll)
         except Exception:
             pass
 
@@ -2140,10 +2281,10 @@ class MainWindow(QtWidgets.QMainWindow):
             pass
         try:
             self.editor_controller.playhead_time = None
-            if hasattr(self.editor, 'request_overlay_refresh'):
-                self.editor.request_overlay_refresh()
+            if hasattr(self.editor_canvas, 'request_overlay_refresh'):
+                self.editor_canvas.request_overlay_refresh()
             else:
-                self.editor.update()
+                self.editor_canvas.update()
         except Exception:
             pass
 
@@ -2207,12 +2348,12 @@ class MainWindow(QtWidgets.QMainWindow):
                 self.editor_controller.draw_frame()
         # Also refresh the canvas overlays so guide stem direction updates instantly
         try:
-            if hasattr(self, 'editor') and self.editor is not None:
-                if hasattr(self.editor, 'request_overlay_refresh'):
-                    self.editor.request_overlay_refresh()
+            if hasattr(self, 'editor') and self.editor_canvas is not None:
+                if hasattr(self.editor_canvas, 'request_overlay_refresh'):
+                    self.editor_canvas.request_overlay_refresh()
                 else:
                     # Fallback: normal repaint
-                    self.editor.update()
+                    self.editor_canvas.update()
         except Exception:
             pass
 
@@ -2255,23 +2396,23 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def _on_snap_changed(self, base: int, divide: int) -> None:
         # Update editor snap size units and request a redraw
-        try:
-            size_units = self.snap_dock.selector.get_snap_size()
-            if hasattr(self, 'editor_controller') and self.editor_controller is not None:
-                self.editor_controller.set_snap_size_units(size_units)
-                self.editor_controller.draw_frame()
-                
-            if hasattr(self, 'editor_canvas') and self.editor_canvas is not None:
-                self.editor_canvas.update()
-            # Persist to app state
-            try:
-                app_state = self._current_app_state()
-                app_state.snap_base = int(base)
-                app_state.snap_divide = int(divide)
-            except Exception:
-                pass
-        except Exception:
-            pass
+        size_units = self.snap_dock.selector.get_snap_size()
+        if hasattr(self, 'editor_controller') and self.editor_controller is not None:
+            self.editor_controller.set_snap_size_units(size_units)
+            self.editor_controller.draw_frame()
+
+        if hasattr(self, 'editor_canvas') and self.editor_canvas is not None:
+            self.editor_canvas.update()
+
+        logical_px_step = self._editor_scroll_step_from_metrics(self._editor_metric_px_per_mm, self._editor_metric_dpr)
+        self._editor_scroll_step_logical_px = int(max(1, logical_px_step))
+        self.editor_vscroll.setSingleStep(int(self._editor_scroll_step_logical_px))
+        self.editor_canvas.set_scroll_step_logical_px(int(self._editor_scroll_step_logical_px))
+
+        # Persist to app state
+        app_state = self._current_app_state()
+        app_state.snap_base = int(base)
+        app_state.snap_divide = int(divide)
 
     def _on_tool_selected(self, name: str) -> None:
         # Persist selected tool to app state
@@ -2503,6 +2644,14 @@ class MainWindow(QtWidgets.QMainWindow):
                     self.file_manager.save()
             except Exception:
                 pass
+        try:
+            adm = get_appdata_manager()
+            was_saved = bool(self.file_manager.path() is not None and not self.file_manager.is_dirty())
+            adm.set("last_session_saved", was_saved)
+            adm.set("last_session_path", str(self.file_manager.path() or ""))
+            adm.save()
+        except Exception:
+            pass
         # Persist sizes via prepare_close
         try:
             self.prepare_close()

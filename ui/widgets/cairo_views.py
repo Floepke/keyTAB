@@ -66,6 +66,7 @@ class CairoEditorWidget(QtWidgets.QWidget):
         self._content_h_px: int = 0
         # External scroll (logical px), controlled by an external QScrollBar
         self._scroll_logical_px: int = 0
+        self._scroll_step_logical_px: int = 1
         # Track mouse button state to decide when overlay-only redraw is safe
         self._left_down: bool = False
         self._right_down: bool = False
@@ -111,6 +112,9 @@ class CairoEditorWidget(QtWidgets.QWidget):
         """Set external logical pixel scroll offset and repaint."""
         self._scroll_logical_px = max(0, int(value))
         self.update()
+
+    def set_scroll_step_logical_px(self, value: int) -> None:
+        self._scroll_step_logical_px = max(1, int(value))
 
     def paintEvent(self, ev: QtGui.QPaintEvent) -> None:
         # Use widget size as static viewport; do not rely on QScrollArea.
@@ -403,7 +407,7 @@ class CairoEditorWidget(QtWidgets.QWidget):
 
         # Default: bounded wheel scrolling using external scrollbar semantics
         scale = max(1.0, float(self._last_dpr))
-        step_logical_px = int(max(1, round(40.0 * (float(self._last_px_per_mm) / scale))))
+        step_logical_px = int(max(1, getattr(self, '_scroll_step_logical_px', 1) or 1))
         steps = int(round(angle / 120.0))
         delta = -steps * step_logical_px  # negative angle scrolls down visually
         new_val = max(0, int(self._scroll_logical_px + delta))

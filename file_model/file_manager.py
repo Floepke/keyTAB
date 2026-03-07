@@ -182,6 +182,8 @@ class FileManager:
                 try:
                     from midi.midi_loader import midi_load
                     self._current = midi_load(fname)
+                    if hasattr(self._current, '_normalize_events_after_load'):
+                        self._current._normalize_events_after_load()
                 except Exception as exc:
                     raise RuntimeError(f"Failed to load MIDI: {exc}")
                 self._path = None
@@ -205,12 +207,15 @@ class FileManager:
                     self._push_recent_file(str(fname))
                 except Exception:
                     pass
+                self._show_load_checks_info(self._current)
                 return self._current
             elif suffix in (".musicxml", ".mxl", ".xml"):
                 # Load MusicXML via utils.musicxml2piano parser; keep project path unset
                 try:
                     from utils.musicxml2piano import parse_musicxml
                     self._current, _stats = parse_musicxml(Path(fname))
+                    if hasattr(self._current, '_normalize_events_after_load'):
+                        self._current._normalize_events_after_load()
                 except Exception as exc:
                     raise RuntimeError(f"Failed to load MusicXML: {exc}")
                 self._path = None
@@ -234,6 +239,7 @@ class FileManager:
                     self._push_recent_file(str(fname))
                 except Exception:
                     pass
+                self._show_load_checks_info(self._current)
                 return self._current
             else:
                 # Native keyTAB file
@@ -259,6 +265,7 @@ class FileManager:
                     self._push_recent_file(str(self._path))
                 except Exception:
                     pass
+                self._show_load_checks_info(self._current)
                 return self._current
         except Exception as exc:
             self._show_error("Failed to open score", f"{exc}")
@@ -274,6 +281,8 @@ class FileManager:
             if suffix in (".mid", ".midi"):
                 from midi.midi_loader import midi_load
                 self._current = midi_load(path)
+                if hasattr(self._current, '_normalize_events_after_load'):
+                    self._current._normalize_events_after_load()
                 self._path = None
                 self._last_dir = Path(path).parent
                 self._dirty = True
@@ -288,10 +297,13 @@ class FileManager:
                     self._push_recent_file(str(path))
                 except Exception:
                     pass
+                self._show_load_checks_info(self._current)
                 return self._current
             elif suffix in (".musicxml", ".mxl", ".xml"):
                 from utils.musicxml2piano import parse_musicxml
                 self._current, _stats = parse_musicxml(Path(path))
+                if hasattr(self._current, '_normalize_events_after_load'):
+                    self._current._normalize_events_after_load()
                 self._path = None
                 self._last_dir = Path(path).parent
                 self._dirty = True
@@ -306,6 +318,7 @@ class FileManager:
                     self._push_recent_file(str(path))
                 except Exception:
                     pass
+                self._show_load_checks_info(self._current)
                 return self._current
             else:
                 self._current = SCORE().load(path)
@@ -323,6 +336,7 @@ class FileManager:
                     self._push_recent_file(str(self._path))
                 except Exception:
                     pass
+                self._show_load_checks_info(self._current)
                 return self._current
         except Exception as exc:
             self._show_error("Failed to open score", f"{exc}")
@@ -473,6 +487,36 @@ class FileManager:
         msg.setWindowTitle(title)
         msg.setText(text)
         msg.exec()
+
+    def _show_info(self, title: str, text: str) -> None:
+        if self._parent is None:
+            return
+        msg = QMessageBox(self._parent)
+        msg.setIcon(QMessageBox.Information)
+        msg.setWindowTitle(title)
+        msg.setText(text)
+        msg.exec()
+
+    def _show_load_checks_info(self, score: Optional[SCORE]) -> None:
+        if score is None:
+            return
+        getter = getattr(score, 'get_load_checks_report', None)
+        if not callable(getter):
+            return
+        report = getter() or {}
+        deduped_removed = int(report.get('deduped_removed', 0) or 0)
+        shortened_overlaps = int(report.get('shortened_overlaps', 0) or 0)
+        converted_to_grace = int(report.get('converted_to_grace', 0) or 0)
+        if deduped_removed <= 0 and shortened_overlaps <= 0 and converted_to_grace <= 0:
+            return
+        lines = []
+        if deduped_removed > 0:
+            lines.append(f"Removed duplicate-start notes: {deduped_removed}")
+        if shortened_overlaps > 0:
+            lines.append(f"Shortened overlapping notes: {shortened_overlaps}")
+        if converted_to_grace > 0:
+            lines.append(f"Converted short notes to grace notes: {converted_to_grace}")
+        self._show_info("Score checks applied", "\n".join(lines))
 
     # Autosave and error-backup utilities
     def autosave_current(self) -> None:

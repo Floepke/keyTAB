@@ -182,7 +182,7 @@ class LineBreakDialog(QtWidgets.QDialog):
             " padding: 0 8px;"
             " }"
         )
-        btn.setToolTip("Page Break" if is_page else "Line Break")
+        btn.setToolTip("Page break." if is_page else "Line break.")
         return btn
 
     def _create_margin_spin(self, value: float) -> FlexibleDoubleSpinBox:
@@ -380,7 +380,7 @@ class LineBreakDialog(QtWidgets.QDialog):
         def _toggle_type() -> None:
             lb.page_break = not bool(getattr(lb, 'page_break', False))
             type_btn.setText("P" if lb.page_break else "L")
-            type_btn.setToolTip("Page" if lb.page_break else "Line")
+            type_btn.setToolTip("Page break." if lb.page_break else "Line break.")
             self.valuesChanged.emit()
 
         def _left_changed(val: float) -> None:
@@ -425,7 +425,7 @@ class LineBreakDialog(QtWidgets.QDialog):
         delete_btn = QtWidgets.QToolButton(self)
         delete_btn.setText("✕")
         delete_btn.setAutoRaise(True)
-        delete_btn.setToolTip("Delete")
+        delete_btn.setToolTip("Delete this line break entry.")
         delete_btn.setFixedWidth(28)
 
         def _delete_break() -> None:

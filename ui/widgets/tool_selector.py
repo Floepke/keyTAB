@@ -13,22 +13,22 @@ LEFT_PANEL_PADDING_PX: int = 6
 # - 'tooltip': hover text description (optional)
 TOOL_ITEMS: list[dict] = [
     # basic notation elements
-    { 'name': 'note',           'displayed_name': 'Note',           'icon': 'note',           'tooltip': 'Note: enter and edit notes; the basic element of the notation' },
-    { 'name': 'grace_note',     'displayed_name': 'Grace Note',     'icon': 'grace_note',     'tooltip': 'Grace Note: a smaller note without stem; use it to engrave trills, mordents, and other ornamentations' },
-    { 'name': 'count_line',     'displayed_name': 'Count Line',     'icon': 'count_line',     'tooltip': 'Count Line: draw guide lines; for highlighting rhythmic grid subdivisions' },
-    { 'name': 'beam',           'displayed_name': 'Beam Grouping',  'icon': 'beam',           'tooltip': 'Beam: group notes with beams' },
+    { 'name': 'note',           'displayed_name': 'Note',           'icon': 'note',           'tooltip': 'Note tool. Enter and edit notes. To edit duration, click and drag on a colored midi-rectangle and move down/up. To edit pitch+time, click and drag on the notehead. To delete, right click on a note.' },
+    { 'name': 'grace_note',     'displayed_name': 'Grace Note',     'icon': 'grace_note',     'tooltip': 'Grace Note tool. Enter small ornamental notes without normal rhythmic duration. Use this for trills, mordents, and similar decorations. Click in empty space to add. Drag on existing grace note to edit time+pitch. Right click to delete.' },
+    { 'name': 'count_line',     'displayed_name': 'Count Line',     'icon': 'count_line',     'tooltip': 'Count Line tool. Draw guide lines to highlight rhythmic grid subdivisions. Left click on empty space to add. Drag on a handle to edit. Right click on a handle to delete.' },
+    { 'name': 'beam',           'displayed_name': 'Beam Grouping',  'icon': 'beam',           'tooltip': 'Beam Grouping tool. Overwrite the default time signature beam grouping by placing beam markers. Click/drag to the left/right of the clef to add/edit for left/right hand. Right click left/right of the clef in a marker time range to delete. ' },
     # layout elements
-    { 'name': 'line_break',     'displayed_name': 'Line Break/Page Break',     'icon': 'line_break',     'tooltip': 'Line Break: insert line breaks; click on a line break to edit its properties' },
-    { 'name': 'time_signature', 'displayed_name': 'Time Signature/Grid Pattern', 'icon': 'time_signature', 'tooltip': 'Base-Grid/Time-Signature: Configure time signature & grid pattern' },
-    { 'name': 'tempo',          'displayed_name': 'Tempo',          'icon': 'metronome',           'tooltip': 'Tempo: add tempo regions (units per minute over a duration)'} ,
-    { 'name': 'slur',           'displayed_name': 'Slur',           'icon': 'slur',           'tooltip': 'Slur: place phrasing slurs' },
-    { 'name': 'text',           'displayed_name': 'Text',           'icon': 'text',           'tooltip': 'Text: place text annotations' },
-    { 'name': 'start_repeat',   'displayed_name': 'Start Repeat',   'icon': 'start_repeat',   'tooltip': 'Start Repeat: repeat begin mark' },
-    { 'name': 'end_repeat',     'displayed_name': 'End Repeat',     'icon': 'end_repeat',     'tooltip': 'End Repeat: repeat end mark' },
-    { 'name': 'dynamic',        'displayed_name': 'Dynamics',       'icon': 'dynamic',        'tooltip': 'Dynamic: place dynamic markings' },
-    { 'name': 'crescendo',      'displayed_name': 'Crescendo',      'icon': 'crescendo',      'tooltip': 'Crescendo: place hairpin volume up' },
-    { 'name': 'decrescendo',    'displayed_name': 'Decrescendo',    'icon': 'decrescendo',    'tooltip': 'Decrescendo: place hairpin volume down' },
-    { 'name': 'pedal',          'displayed_name': 'Pedal',          'icon': 'pedal',          'tooltip': 'Pedal: add pedal markings' },
+    { 'name': 'line_break',     'displayed_name': 'Line/Page Break','icon': 'line_break',     'tooltip': 'Line/Page Break tool. Insert system or page breaks. Click an existing break to edit its properties.' },
+    { 'name': 'time_signature', 'displayed_name': 'Time Signature', 'icon': 'time_signature', 'tooltip': 'Time Signature tool. Configure meter and base grid subdivision.' },
+    { 'name': 'tempo',          'displayed_name': 'Tempo',          'icon': 'metronome',      'tooltip': 'Tempo tool. Add tempo regions in units per minute over a duration.'} ,
+    { 'name': 'slur',           'displayed_name': 'Slur',           'icon': 'slur',           'tooltip': 'Slur tool. Place phrasing slurs.' },
+    { 'name': 'text',           'displayed_name': 'Text',           'icon': 'text',           'tooltip': 'Text tool. Place text annotations.' },
+    { 'name': 'start_repeat',   'displayed_name': 'Start Repeat',   'icon': 'start_repeat',   'tooltip': 'Start Repeat tool. Insert a repeat start mark.' },
+    { 'name': 'end_repeat',     'displayed_name': 'End Repeat',     'icon': 'end_repeat',     'tooltip': 'End Repeat tool. Insert a repeat end mark.' },
+    { 'name': 'dynamic',        'displayed_name': 'Dynamics',       'icon': 'dynamic',        'tooltip': 'Dynamics tool. Place dynamic markings.' },
+    { 'name': 'crescendo',      'displayed_name': 'Crescendo',      'icon': 'crescendo',      'tooltip': 'Crescendo tool. Place a hairpin for increasing volume.' },
+    { 'name': 'decrescendo',    'displayed_name': 'Decrescendo',    'icon': 'decrescendo',    'tooltip': 'Decrescendo tool. Place a hairpin for decreasing volume.' },
+    { 'name': 'pedal',          'displayed_name': 'Pedal',          'icon': 'pedal',          'tooltip': 'Pedal tool. Add pedal markings.' },
 ]
 
 

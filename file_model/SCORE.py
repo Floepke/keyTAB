@@ -25,6 +25,7 @@ from file_model.analysis import Analysis
 from utils.CONSTANT import GRACENOTE_THRESHOLD, QUARTER_NOTE_UNIT
 from file_model.base_grid import BaseGrid
 from file_model.appstate import AppState
+from utils.operator import Operator
 
 
 def _timestamp_now() -> str:
@@ -153,6 +154,7 @@ class SCORE:
 	app_state: AppState = field(default_factory=AppState)
 	_next_id: int = 1
 	_app_state_from_file: bool = False
+	_last_load_checks_report: dict = field(default_factory=dict)
 
 	# ---- Builders (ensure unique _id) ----
 	def _gen_id(self) -> int:
@@ -499,6 +501,7 @@ class SCORE:
 		self.app_state = AppState()
 		self._next_id = 1
 		self._app_state_from_file = False
+		self._last_load_checks_report = {}
 		try:
 			self._ensure_line_break_zero()
 		except Exception:
@@ -552,15 +555,80 @@ class SCORE:
 				remaining_notes.append(n)
 
 		# Replace original notes with remaining valid notes and add converted grace notes.
-		self.events.note = remaining_notes
+		# De-duplicate notes that start at effectively the same time (with a small load-time threshold)
+		# and share the same pitch. Keep the shortest duration note among duplicates.
+		op_load = Operator(0.1)
+		remaining_notes.sort(key=lambda n: (int(getattr(n, 'pitch', 0) or 0), float(getattr(n, 'time', 0.0) or 0.0), float(getattr(n, 'duration', 0.0) or 0.0)))
+		deduped_notes: List[Note] = []
+		for n in remaining_notes:
+			if not deduped_notes:
+				deduped_notes.append(n)
+				continue
+			prev = deduped_notes[-1]
+			prev_pitch = int(getattr(prev, 'pitch', 0) or 0)
+			prev_time = float(getattr(prev, 'time', 0.0) or 0.0)
+			cur_pitch = int(getattr(n, 'pitch', 0) or 0)
+			cur_time = float(getattr(n, 'time', 0.0) or 0.0)
+			if cur_pitch == prev_pitch and op_load.eq(cur_time, prev_time):
+				prev_dur = float(getattr(prev, 'duration', 0.0) or 0.0)
+				cur_dur = float(getattr(n, 'duration', 0.0) or 0.0)
+				if cur_dur < prev_dur:
+					deduped_notes[-1] = n
+				continue
+			deduped_notes.append(n)
+		deduped_removed = max(0, len(remaining_notes) - len(deduped_notes))
+
+		# Prevent overlapping same-pitch notes by shortening each note to the
+		# first later same-pitch note start that falls inside its duration window.
+		by_pitch: dict[int, List[Note]] = {}
+		for n in deduped_notes:
+			pitch = int(getattr(n, 'pitch', 0) or 0)
+			by_pitch.setdefault(pitch, []).append(n)
+		shortened_overlaps = 0
+		for pitch_notes in by_pitch.values():
+			pitch_notes.sort(key=lambda n: float(getattr(n, 'time', 0.0) or 0.0))
+			for i, n in enumerate(pitch_notes):
+				start_t = float(getattr(n, 'time', 0.0) or 0.0)
+				duration = float(getattr(n, 'duration', 0.0) or 0.0)
+				if duration <= 0.0:
+					continue
+				end_t = float(start_t + duration)
+				overlap_start = None
+				for other in pitch_notes[i + 1:]:
+					other_start = float(getattr(other, 'time', 0.0) or 0.0)
+					if other_start <= start_t:
+						continue
+					if other_start >= end_t:
+						break
+					overlap_start = other_start
+					break
+				if overlap_start is not None:
+					new_duration = float(max(0.0, overlap_start - start_t))
+					if new_duration < duration:
+						shortened_overlaps += 1
+					setattr(n, 'duration', new_duration)
+
+		self.events.note = deduped_notes
 		for g in converted_grace:
 			self.new_grace_note(pitch=int(g.pitch), time=float(g.time))
+
+		self._last_load_checks_report = {
+			'deduped_removed': int(deduped_removed),
+			'shortened_overlaps': int(shortened_overlaps),
+			'converted_to_grace': int(len(converted_grace)),
+		}
 	
 		# Normalize beam hand values as well.
 		for b in getattr(self.events, 'beam', []) or []:
 			h = str(getattr(b, 'hand', '<') or '<').strip()
 			if h not in ('<', '>'):
 				setattr(b, 'hand', '<')
+
+	def get_load_checks_report(self) -> dict:
+		report = getattr(self, '_last_load_checks_report', None)
+		if isinstance(report, dict):
+			return dict(report)
+		return {}
 
 	def apply_quick_line_breaks(self, groups: List[int]) -> bool:
 		"""Distribute line breaks in repeating measure groups across the score.
