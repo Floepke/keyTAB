@@ -8,6 +8,7 @@ from utils.CONSTANT import BE_KEYS, QUARTER_NOTE_UNIT, PIANO_KEY_AMOUNT, SHORTES
 from utils.tiny_tool import key_class_filter
 from utils.operator import Operator
 from file_model.SCORE import SCORE
+from file_model.base_grid import resolve_grid_layer_offsets
 from file_model.info import Info
 from file_model.analysis import Analysis
 from ui.style import Style
@@ -171,9 +172,12 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
         numer = int(bg.get('numerator', 4) or 4)
         denom = int(bg.get('denominator', 4) or 4)
         measures = int(bg.get('measure_amount', 1) or 1)
+        beat_grouping = list(bg.get('beat_grouping', []) or [])
+        bar_offsets, _grid_offsets = resolve_grid_layer_offsets(beat_grouping, numer, denom)
         measure_len = float(numer) * (4.0 / float(max(1, denom))) * float(QUARTER_NOTE_UNIT)
         for _ in range(int(max(0, measures))):
-            barline_positions.append(float(cur_bar))
+            for off in bar_offsets:
+                barline_positions.append(float(cur_bar + float(off)))
             cur_bar += measure_len
 
     # Problem solved: precompute time signature segments for lane rendering.
@@ -343,8 +347,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
             measures = int(bg.get('measure_amount', 1) or 1)
             seq = list(bg.get('beat_grouping', []) or [])
             measure_len = float(numer) * (4.0 / float(max(1, denom))) * float(QUARTER_NOTE_UNIT)
-            beat_len = measure_len / max(1, int(numer))
-            full_group = len(seq) == numer and [int(v) for v in seq] == list(range(1, numer + 1))
+            _bar_offsets, grid_offsets = resolve_grid_layer_offsets(seq, numer, denom)
             for _ in range(int(measures)):
                 m_start = float(cur)
                 m_end = float(cur + measure_len)
@@ -354,18 +357,13 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                 if op_time.gt(m_start, float(b)):
                     cur = m_end
                     continue
-                if len(seq) != numer:
-                    seq = [1]
-                if full_group:
-                    group_starts = list(range(1, numer + 1))
-                else:
-                    group_starts = [i for i, v in enumerate(seq, start=1) if int(v) == 1]
-                    if not group_starts or group_starts[0] != 1:
-                        group_starts = [1] + group_starts
-                for gi, s in enumerate(group_starts):
-                    e = (group_starts[gi + 1] - 1) if (gi + 1) < len(group_starts) else numer
-                    w0 = m_start + (s - 1) * beat_len
-                    w1 = m_start + float(e) * beat_len
+                boundaries = [0.0] + [float(v) for v in grid_offsets if 0.0 < float(v) < measure_len] + [float(measure_len)]
+                boundaries = sorted(dict.fromkeys(round(v, 6) for v in boundaries))
+                if len(boundaries) < 2:
+                    boundaries = [0.0, float(measure_len)]
+                for idx in range(len(boundaries) - 1):
+                    w0 = m_start + float(boundaries[idx])
+                    w1 = m_start + float(boundaries[idx + 1])
                     w0 = max(float(a), w0)
                     w1 = min(float(b), w1)
                     if op_time.lt(w0, w1):
@@ -1256,16 +1254,19 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
             dash_pattern_raw = list(layout.get('grid_gridline_dash_pattern_mm', []) or [])
             dash_pattern = [float(v) * scale for v in dash_pattern_raw] if dash_pattern_raw else None
             time_cursor = 0.0
+            has_any_barlines = False
             for bg in base_grid:
                 numerator = int(bg.get('numerator', 4) or 4)
                 denominator = int(bg.get('denominator', 4) or 4)
                 measure_amount = int(bg.get('measure_amount', 1) or 1)
                 beat_grouping = list(bg.get('beat_grouping', []) or [])
                 indicator_enabled = bool(bg.get('indicator_enabled', True))
+                bar_offsets, grid_offsets = resolve_grid_layer_offsets(beat_grouping, numerator, denominator)
+                if bar_offsets:
+                    has_any_barlines = True
                 if measure_amount <= 0:
                     continue
                 measure_len = float(numerator) * (4.0 / float(max(1, denominator))) * float(QUARTER_NOTE_UNIT)
-                beat_len = measure_len / max(1, int(numerator))
                 if op_time.ge(float(time_cursor), float(line['time_start'])) and op_time.lt(float(time_cursor), float(line['time_end'])) and indicator_enabled:
                     y_ts = _time_to_y(float(time_cursor))
                     if indicator_type == 'classical':
@@ -1278,45 +1279,43 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                 for _ in range(measure_amount):
                     if op_time.gt(time_cursor, float(line['time_end'])):
                         break
-                    full_group = len(beat_grouping) == int(numerator) and [int(v) for v in beat_grouping] == list(range(1, int(numerator) + 1))
-                    for idx in range(int(numerator)):
-                        t = float(time_cursor + (beat_len * idx))
+                    for off in bar_offsets:
+                        t = float(time_cursor + float(off))
                         if op_time.lt(t, float(line['time_start'])) or op_time.gt(t, float(line['time_end'])):
                             continue
                         y = _time_to_y(t)
-                        if idx == 0:
-                            du.add_line(
-                                grid_left,
-                                y,
-                                grid_right,
-                                y,
-                                color=grid_color,
-                                width_mm=bar_width_mm,
-                                id=0,
-                                tags=['barline'],
-                                dash_pattern=None,
-                            )
-                            if full_group:
-                                continue
-                        else:
-                            group_val = beat_grouping[idx] if idx < len(beat_grouping) else (idx + 1)
-                            if full_group or int(group_val) == 1:
-                                du.add_line(
-                                    grid_left,
-                                    y,
-                                    grid_right,
-                                    y,
-                                    color=grid_color,
-                                    width_mm=max(0.1, grid_width_mm),
-                                    id=0,
-                                    tags=['grid_line'],
-                                    dash_pattern=dash_pattern,
-                                )
+                        du.add_line(
+                            grid_left,
+                            y,
+                            grid_right,
+                            y,
+                            color=grid_color,
+                            width_mm=bar_width_mm,
+                            id=0,
+                            tags=['barline'],
+                            dash_pattern=None,
+                        )
+                    for off in grid_offsets:
+                        t = float(time_cursor + float(off))
+                        if op_time.lt(t, float(line['time_start'])) or op_time.gt(t, float(line['time_end'])):
+                            continue
+                        y = _time_to_y(t)
+                        du.add_line(
+                            grid_left,
+                            y,
+                            grid_right,
+                            y,
+                            color=grid_color,
+                            width_mm=max(0.1, grid_width_mm),
+                            id=0,
+                            tags=['grid_line'],
+                            dash_pattern=dash_pattern,
+                        )
                     time_cursor += measure_len
                 if op_time.gt(time_cursor, float(line['time_end'])):
                     break
 
-            if op_time.ge(total_ticks, float(line['time_start'])) and op_time.le(total_ticks, float(line['time_end'])):
+            if has_any_barlines and op_time.ge(total_ticks, float(line['time_start'])) and op_time.le(total_ticks, float(line['time_end'])):
                 y_end_bar = _time_to_y(float(total_ticks))
                 du.add_line(
                     grid_left,

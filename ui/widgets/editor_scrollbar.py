@@ -1,5 +1,4 @@
 from __future__ import annotations
-import html
 
 from typing import Callable, Optional
 
@@ -12,6 +11,10 @@ class _JumpToClickScrollBarStyle(QtWidgets.QProxyStyle):
     def styleHint(self, hint, option=None, widget=None, returnData=None):
         if hint == QtWidgets.QStyle.StyleHint.SH_ScrollBar_LeftClickAbsolutePosition:
             return 1
+        if hint == QtWidgets.QStyle.StyleHint.SH_ToolTip_WakeUpDelay:
+            return 0
+        if hint == QtWidgets.QStyle.StyleHint.SH_ToolTip_FallAsleepDelay:
+            return 0
         return super().styleHint(hint, option, widget, returnData)
 
 
@@ -26,8 +29,51 @@ class EditorScrollBar(QtWidgets.QScrollBar):
         self._jump_target_provider: Optional[Callable[[int], int]] = None
         self._measure_tooltip_font_point_size: Optional[float] = 32.0
         self._measure_tooltip_font_family: str = "Edwin"
+        self._measure_popup = QtWidgets.QLabel(None)
+        self._measure_popup.setWindowFlags(
+            QtCore.Qt.WindowType.ToolTip
+            | QtCore.Qt.WindowType.FramelessWindowHint
+            | QtCore.Qt.WindowType.BypassWindowManagerHint
+        )
+        self._measure_popup.setAttribute(QtCore.Qt.WidgetAttribute.WA_ShowWithoutActivating, True)
+        self._measure_popup.setAttribute(QtCore.Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
+        self._measure_popup.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
+        self._measure_popup.hide()
         self._jump_style = _JumpToClickScrollBarStyle(self.style())
         self.setStyle(self._jump_style)
+
+    def _hide_measure_popup(self) -> None:
+        try:
+            self._measure_popup.hide()
+        except Exception:
+            pass
+
+    def _show_measure_popup(self, text: str, global_pos: QtCore.QPoint) -> None:
+        tooltip_font = QtGui.QFont(QtWidgets.QToolTip.font())
+        tooltip_font.setFamily(self._measure_tooltip_font_family)
+        custom_pt = self._measure_tooltip_font_point_size
+        if custom_pt is not None:
+            tooltip_font.setPointSizeF(custom_pt)
+        self._measure_popup.setFont(tooltip_font)
+
+        palette = QtWidgets.QToolTip.palette()
+        bg = palette.color(QtGui.QPalette.ColorRole.ToolTipBase)
+        fg = palette.color(QtGui.QPalette.ColorRole.ToolTipText)
+        border = fg
+        self._measure_popup.setStyleSheet(
+            f"QLabel {{ background: {bg.name()}; color: {fg.name()}; "
+            f"border: 1px solid {border.name()}; border-radius: 3px; padding: 2px 4px; }}"
+        )
+        self._measure_popup.setText(str(text))
+        self._measure_popup.adjustSize()
+
+        tip_w = int(self._measure_popup.width())
+        tip_h = int(self._measure_popup.height())
+        scrollbar_left_global_x = self.mapToGlobal(QtCore.QPoint(0, 0)).x()
+        tip_x = int(scrollbar_left_global_x - tip_w - 2)
+        tip_y = int(global_pos.y() - (tip_h // 2))
+        self._measure_popup.move(tip_x, tip_y)
+        self._measure_popup.show()
 
     def set_tooltip_provider(self, provider: Optional[Callable[[int], str]]) -> None:
         self._tooltip_provider = provider
@@ -89,11 +135,11 @@ class EditorScrollBar(QtWidgets.QScrollBar):
         provider = self._tooltip_provider
         measure_index_provider = self._measure_index_provider
         if provider is None and measure_index_provider is None:
-            QtWidgets.QToolTip.hideText()
+            self._hide_measure_popup()
             return
 
         if self._slider_rect().contains(pos.toPoint()):
-            QtWidgets.QToolTip.hideText()
+            self._hide_measure_popup()
             return
 
         predicted_value = self._predicted_value_for_pos(pos)
@@ -105,31 +151,9 @@ class EditorScrollBar(QtWidgets.QScrollBar):
             text = str(provider(predicted_value) or "").strip()
 
         if not text:
-            QtWidgets.QToolTip.hideText()
+            self._hide_measure_popup()
             return
-
-        tooltip_font = QtGui.QFont(QtWidgets.QToolTip.font())
-        tooltip_font.setFamily(self._measure_tooltip_font_family)
-        custom_pt = self._measure_tooltip_font_point_size
-        if custom_pt is not None:
-            tooltip_font.setPointSizeF(custom_pt)
-
-        fm = QtGui.QFontMetrics(tooltip_font)
-        text_w = int(fm.horizontalAdvance(text))
-        text_h = int(fm.height())
-        tip_w = text_w + 6
-        tip_h = text_h - (custom_pt)
-
-        scrollbar_left_global_x = self.mapToGlobal(QtCore.QPoint(0, 0)).x()
-        tip_x = int(scrollbar_left_global_x - tip_w)
-        tip_y = int(global_pos.y() - (tip_h * 1.7))
-
-        safe_text = html.escape(text)
-        style_parts = [f"font-family:{self._measure_tooltip_font_family}"]
-        if custom_pt is not None:
-            style_parts.append(f"font-size:{custom_pt}pt")
-        rich_text = f"<span style='{' ; '.join(style_parts)}'>{safe_text}</span>"
-        QtWidgets.QToolTip.showText(QtCore.QPoint(tip_x, tip_y), rich_text, self)
+        self._show_measure_popup(text, global_pos)
 
     def mousePressEvent(self, ev: QtGui.QMouseEvent) -> None:
         if ev.button() == QtCore.Qt.MouseButton.LeftButton and not self._slider_rect().contains(ev.position().toPoint()):
@@ -154,5 +178,9 @@ class EditorScrollBar(QtWidgets.QScrollBar):
         super().enterEvent(ev)
 
     def leaveEvent(self, ev: QtCore.QEvent) -> None:
-        QtWidgets.QToolTip.hideText()
+        self._hide_measure_popup()
         super().leaveEvent(ev)
+
+    def hideEvent(self, ev: QtGui.QHideEvent) -> None:
+        self._hide_measure_popup()
+        super().hideEvent(ev)

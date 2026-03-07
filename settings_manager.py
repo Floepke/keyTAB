@@ -372,7 +372,7 @@ def get_preferences() -> Dict:
 
 def open_preferences(parent=None) -> None:
     try:
-        from ui.widgets.preferences_dialog import PreferencesDialog
+        from ui.dialogs.preferences_dialog import PreferencesDialog
         dlg = PreferencesDialog(parent=parent)
         dlg.exec()
     except Exception:

@@ -226,7 +226,7 @@ class LineBreakTool(BaseTool):
         if self._dialog_open:
             return
         self._dialog_open = True
-        from ui.widgets.line_break_dialog import LineBreakDialog
+        from ui.dialogs.line_break_dialog import LineBreakDialog
         parent_w = QtWidgets.QApplication.activeWindow() if hasattr(QtWidgets, 'QApplication') else None
         score = self._editor.current_score()
 

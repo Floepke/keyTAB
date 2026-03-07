@@ -285,6 +285,11 @@ def get_appdata_manager() -> AppDataManager:
         adm.register("lmroman_font_installed", False, "True when Latin Modern Roman font was installed to the user font directory")
         adm.register("lmroman_install_prompt_dismissed", False, "User declined the Latin Modern Roman font installation prompt")
         adm.register("user_soundfont_path", "", "Absolute path to last selected user soundfont (.sf2/.sf3)")
+        adm.register(
+            "slur_bow_optimizer_settings",
+            {},
+            "Last-used slur bow optimizer dialog values",
+        )
         # Removed window_state persistence to avoid saving/restoring dock/toolbar layout
         adm.load()
         # Strip any legacy keys from stored values

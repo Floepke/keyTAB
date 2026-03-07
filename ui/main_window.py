@@ -1,6 +1,6 @@
 from PySide6 import QtCore, QtGui, QtWidgets
 from typing import Optional
-import sys, os
+import sys, os, time
 from pathlib import Path
 from utils.file_associations import is_supported_document
 from datetime import datetime
@@ -23,6 +23,54 @@ from editor.tool_manager import ToolManager
 from editor.editor import Editor
 
 
+class _SlurOptimizerWorker(QtCore.QObject):
+    finished = QtCore.Signal(dict)
+    failed = QtCore.Signal(str)
+
+    def __init__(self, score, settings: dict, optimize_fn):
+        super().__init__()
+        self._score = score
+        self._settings = dict(settings or {})
+        self._optimize_fn = optimize_fn
+
+    @QtCore.Slot()
+    def run(self) -> None:
+        try:
+            def _int_setting(key: str, default: int) -> int:
+                value = self._settings.get(key, default)
+                if value is None:
+                    value = default
+                return int(value)
+
+            def _float_setting(key: str, default: float) -> float:
+                value = self._settings.get(key, default)
+                if value is None:
+                    value = default
+                return float(value)
+
+            stats = self._optimize_fn(
+                self._score,
+                hit_test_finetune=_int_setting("hit_test_finetune", 64),
+                anchor_range=_int_setting("anchor_range", 10),
+                control_range=_int_setting("control_range", 16),
+                max_iterations=_int_setting("max_iterations", 3),
+                max_slurs_from_start=_int_setting("max_slurs_from_start", 12),
+                include_stave_lines=bool(self._settings.get("include_stave_lines", True)),
+                include_beams=bool(self._settings.get("include_beams", True)),
+                pointiness_weight=_float_setting("pointiness_weight", 0.5),
+                symmetry_weight=_float_setting("symmetry_weight", 0.5),
+                pointiness_bonus_points=_float_setting("pointiness_bonus_points", 100.0),
+                symmetry_bonus_points=_float_setting("symmetry_bonus_points", 100.0),
+                antisymmetry_penalty_points=_float_setting("antisymmetry_penalty_points", 100.0),
+                straight_line_penalty_points=_float_setting("straight_line_penalty_points", 100.0),
+                neighbor_connection_bonus_points=_float_setting("neighbor_connection_bonus_points", 100.0),
+                control_y_pass_penalty_points=_float_setting("control_y_pass_penalty_points", 1000.0),
+            )
+            self.finished.emit(dict(stats or {}))
+        except Exception as exc:
+            self.failed.emit(str(exc))
+
+
 class MainWindow(QtWidgets.QMainWindow):
     def __init__(self) -> None:
         super().__init__()
@@ -34,6 +82,12 @@ class MainWindow(QtWidgets.QMainWindow):
         self._player_config: tuple[str, str] | None = None
         self._left_panel_width_frozen = False
         self._editor_scroll_step_logical_px: int = 1
+        self._slur_opt_thread: QtCore.QThread | None = None
+        self._slur_opt_worker: _SlurOptimizerWorker | None = None
+        self._slur_opt_progress: QtWidgets.QProgressDialog | None = None
+        self._slur_opt_settings: dict | None = None
+        self._slur_opt_started_at: float | None = None
+        self._slur_opt_dialog = None
 
         # File management
         self.file_manager = FileManager(self)
@@ -88,6 +142,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.engraver.engraved.connect(self._on_engraver_finished)
         
         # Startup restore: prefer opening the last saved project; else restore unsaved session; else new
+        self._session_restore_mode: bool = False
         adm2 = None
         was_saved = False
         saved_path = ""
@@ -100,31 +155,50 @@ class MainWindow(QtWidgets.QMainWindow):
         session_path = Path(UTILS_SAVE_DIR) / "session.piano"
         opened = False
         status_msg = ""
-        prefer_session_restore = False
-        if session_path.exists():
-            if (not was_saved) or (not saved_path):
-                prefer_session_restore = True
-            else:
-                try:
-                    saved_mtime = Path(saved_path).stat().st_mtime if Path(saved_path).exists() else 0.0
-                    session_mtime = session_path.stat().st_mtime
-                    if session_mtime > saved_mtime:
-                        prefer_session_restore = True
-                except Exception:
-                    prefer_session_restore = False
 
-        if (not prefer_session_restore) and was_saved and saved_path:
+        def _try_open_path_with_retries(path_text: str, retries: int = 12, delay_sec: float = 0.25):
+            p = str(path_text or "").strip()
+            if not p:
+                return None
+            candidate = Path(p).expanduser()
+            for attempt in range(max(1, int(retries))):
+                try:
+                    if candidate.exists():
+                        sc_try = self.file_manager.open_path(str(candidate))
+                        if sc_try is not None:
+                            return sc_try
+                except Exception:
+                    pass
+                if attempt < (max(1, int(retries)) - 1):
+                    try:
+                        QtWidgets.QApplication.processEvents(QtCore.QEventLoop.ProcessEventsFlag.AllEvents, 50)
+                    except Exception:
+                        pass
+                    time.sleep(max(0.0, float(delay_sec)))
+            return None
+
+        # Always try real project paths first (handles delayed cloud mounts).
+        if saved_path:
+            sc = _try_open_path_with_retries(saved_path, retries=16, delay_sec=0.25)
+            if sc is not None:
+                opened = True
+                self._session_restore_mode = False
+                status_msg = f"Opened last saved project: {saved_path}"
+
+        if not opened:
             try:
-                from pathlib import Path as _Path
-                if _Path(saved_path).exists():
-                    sc = self.file_manager.open_path(saved_path)
-                    if sc is not None:
-                        opened = True
-                        status_msg = f"Opened last saved project: {saved_path}"
-                    else:
-                        opened = False
+                if adm2 is None:
+                    adm2 = get_appdata_manager()
+                last_path = str(adm2.get("last_opened_file", "") or "")
             except Exception:
-                opened = False
+                last_path = ""
+            if last_path and str(last_path) != str(saved_path):
+                sc = _try_open_path_with_retries(last_path, retries=16, delay_sec=0.25)
+                if sc is not None:
+                    opened = True
+                    self._session_restore_mode = False
+                    status_msg = f"Opened last project: {last_path}"
+
         if not opened:
             # If the last session wasn't saved, try restoring the session snapshot
             restored = False
@@ -133,35 +207,13 @@ class MainWindow(QtWidgets.QMainWindow):
             except Exception:
                 restored = False
             if not restored:
-                # Fallback to last explicitly opened/saved project if available
-                try:
-                    if adm2 is None:
-                        adm2 = get_appdata_manager()
-                    last_path = str(adm2.get("last_opened_file", "") or "")
-                except Exception:
-                    last_path = ""
-                if last_path:
-                    try:
-                        from pathlib import Path as _Path
-                        if _Path(last_path).exists():
-                            sc = self.file_manager.open_path(last_path)
-                            if sc is not None:
-                                status_msg = f"Opened last project: {last_path}"
-                            else:
-                                self.file_manager.new()
-                                status_msg = "Started new project"
-                        else:
-                            self.file_manager.new()
-                            status_msg = "Started new project"
-                    except Exception:
-                        self.file_manager.new()
-                        status_msg = "Started new project"
-                else:
-                    # Nothing to restore; start fresh
-                    self.file_manager.new()
-                    status_msg = "Started new project"
+                # Nothing to restore/open; start fresh
+                self.file_manager.new()
+                self._session_restore_mode = False
+                status_msg = "Started new project"
             else:
-                status_msg = "Restored unsaved session"
+                self._session_restore_mode = True
+                status_msg = "Restored unsaved session (session.piano mode)"
 
         # Initialize page navigation from persisted app state before first engrave.
         try:
@@ -172,12 +224,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
         # Provide initial score to engrave and update titlebar (delay first engrave)
         self._refresh_views_from_score(delay_engrave_ms=1000)
-        # Show startup status on the status bar
-        try:
-            if status_msg:
-                self._status(status_msg, 5000)
-        except Exception:
-            pass
+        self._startup_status_message = str(status_msg or "")
 
         self._update_title()
 
@@ -203,6 +250,11 @@ class MainWindow(QtWidgets.QMainWindow):
             except Exception:
                 pass
             self._show_status_default()
+            try:
+                if self._startup_status_message:
+                    self._status(self._startup_status_message, 7000)
+            except Exception:
+                pass
         except Exception:
             self._statusbar = None
         # Ensure the editor is the main focus target
@@ -454,15 +506,16 @@ class MainWindow(QtWidgets.QMainWindow):
         if sys.platform == "darwin":
             menubar.setNativeMenuBar(True)
 
-        # Create menus in normal left-to-right order (File, Edit, Selection, Document, View, Playback, About)
+        # Create menus in normal left-to-right order (File, Edit, Selection, Document, Tools, View, Playback, About)
         file_menu = menubar.addMenu("&File")
         edit_menu = menubar.addMenu("&Edit")
         view_menu = menubar.addMenu("&View")
         selection_menu = menubar.addMenu("&Selection")
         document_menu = menubar.addMenu("&Document")
+        tools_menu = menubar.addMenu("&Tools")
         playback_menu = menubar.addMenu("&Playback")
         help_menu = menubar.addMenu("&About")
-        for menu in (file_menu, edit_menu, selection_menu, view_menu, document_menu, playback_menu, help_menu):
+        for menu in (file_menu, edit_menu, selection_menu, view_menu, document_menu, tools_menu, playback_menu, help_menu):
             menu.setToolTipsVisible(True)
 
         # File actions
@@ -507,11 +560,14 @@ class MainWindow(QtWidgets.QMainWindow):
         line_break_act.setToolTip("Open line break and page break settings.")
         line_break_act.setShortcut(QtGui.QKeySequence("L"))
         line_break_act.triggered.connect(self._open_line_break_dialog)
+        slur_bow_opt_act = QtGui.QAction("Slur bow optimizer", self)
+        slur_bow_opt_act.setToolTip("Optimize slur bow X handles to reduce collisions.")
 
         document_menu.addAction(style_act)
         document_menu.addAction(info_act)
         document_menu.addAction(line_break_act)
         document_menu.addSeparator()
+        tools_menu.addAction(slur_bow_opt_act)
 
         export_pdf_act = QtGui.QAction("Export PDF...", self)
         export_pdf_act.setToolTip("Export the current score as a PDF document.")
@@ -734,6 +790,7 @@ class MainWindow(QtWidgets.QMainWindow):
         zoom_in_act.triggered.connect(lambda: self._zoom_editor(1))
         zoom_out_act.triggered.connect(lambda: self._zoom_editor(-1))
         full_screen_act.triggered.connect(self._toggle_full_screen)
+        slur_bow_opt_act.triggered.connect(self._run_slur_bow_optimizer)
 
         # Keep reference for state sync
         self._full_screen_act = full_screen_act
@@ -896,6 +953,19 @@ class MainWindow(QtWidgets.QMainWindow):
     def eventFilter(self, watched: QtCore.QObject, event: QtCore.QEvent) -> bool:
         et = event.type()
 
+        # Ensure scrollbar hover tooltip text is cleared immediately once the
+        # cursor is no longer over the custom editor scrollbar.
+        try:
+            if self._tooltip_redirect_source is not None:
+                src_is_scrollbar = self._is_editor_scrollbar_source(self._tooltip_redirect_source)
+                if src_is_scrollbar and hasattr(self, 'editor_vscroll') and self.editor_vscroll is not None:
+                    if not bool(self.editor_vscroll.underMouse()):
+                        self._tooltip_redirect_source = None
+                        self.tool_dock.set_tooltip_text("")
+                        QtWidgets.QToolTip.hideText()
+        except Exception:
+            pass
+
         if et == QtCore.QEvent.Type.ToolTip and isinstance(event, QtGui.QHelpEvent):
             scrollbar_source = self._is_editor_scrollbar_source(watched)
             text = self._extract_tooltip_text(watched, event)
@@ -912,7 +982,7 @@ class MainWindow(QtWidgets.QMainWindow):
                 return True
 
         if et in (QtCore.QEvent.Type.Leave, QtCore.QEvent.Type.FocusOut, QtCore.QEvent.Type.Hide):
-            if watched is self._tooltip_redirect_source:
+            if watched is self._tooltip_redirect_source or self._is_editor_scrollbar_source(watched):
                 self._tooltip_redirect_source = None
                 self.tool_dock.set_tooltip_text("")
                 QtWidgets.QToolTip.hideText()
@@ -1396,9 +1466,11 @@ class MainWindow(QtWidgets.QMainWindow):
             p = self.file_manager.path()
         except Exception:
             p = None
+        session_mode = bool(getattr(self, '_session_restore_mode', False)) and p is None
         state = "Unsaved changes" if dirty else "Saved"
-        path_text = str(p) if p else "(unsaved project)"
-        return f"{state} • {path_text}"
+        path_text = str(p) if p else ("(session.piano restored)" if session_mode else "(unsaved project)")
+        prefix = "Session mode • " if session_mode else ""
+        return f"{prefix}{state} • {path_text}"
 
     def _show_status_default(self) -> None:
         try:
@@ -1429,6 +1501,7 @@ class MainWindow(QtWidgets.QMainWindow):
         if not self.file_manager.confirm_save_for_action("creating a new project", force_prompt=True):
             return
         self.file_manager.new()
+        self._session_restore_mode = False
         self._refresh_views_from_score()
         try:
             QtCore.QTimer.singleShot(1000, lambda: self.engraver.engrave(self._current_score_dict()))
@@ -1493,6 +1566,7 @@ class MainWindow(QtWidgets.QMainWindow):
                 pass
 
     def _after_project_loaded(self) -> None:
+        self._session_restore_mode = False
         try:
             self._refresh_recent_files_menu()
         except Exception:
@@ -1522,11 +1596,15 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def _file_save(self) -> None:
         if self.file_manager.save():
+            if self.file_manager.path() is not None:
+                self._session_restore_mode = False
             self._update_title()
             self._show_status_default()
 
     def _file_save_as(self) -> None:
         if self.file_manager.save_as():
+            if self.file_manager.path() is not None:
+                self._session_restore_mode = False
             self._update_title()
             self._show_status_default()
 
@@ -1566,7 +1644,7 @@ class MainWindow(QtWidgets.QMainWindow):
     def _open_style_dialog(self) -> None:
         from dataclasses import asdict
         from file_model.layout import Layout
-        from ui.widgets.style_dialog import StyleDialog
+        from ui.dialogs.style_dialog import StyleDialog
 
         sc = self.file_manager.current()
         layout = getattr(sc, 'layout', None)
@@ -1615,7 +1693,7 @@ class MainWindow(QtWidgets.QMainWindow):
         dlg.show()
 
     def _open_info_dialog(self) -> None:
-        from ui.widgets.info_dialog import InfoDialog
+        from ui.dialogs.info_dialog import InfoDialog
         sc = self.file_manager.current()
         dlg = InfoDialog(sc, self)
         if dlg.exec() == QtWidgets.QDialog.Accepted:
@@ -1624,7 +1702,7 @@ class MainWindow(QtWidgets.QMainWindow):
             self._refresh_views_from_score()
 
     def _open_line_break_dialog(self) -> None:
-        from ui.widgets.line_break_dialog import LineBreakDialog
+        from ui.dialogs.line_break_dialog import LineBreakDialog
 
         score = self.file_manager.current()
         if score is None:
@@ -1666,6 +1744,204 @@ class MainWindow(QtWidgets.QMainWindow):
         dlg.rejected.connect(_on_reject)
         dlg.finished.connect(_on_finished)
         dlg.show()
+
+    def _run_slur_bow_optimizer(self) -> None:
+        score = self.file_manager.current()
+        if score is None:
+            self._status("Slur bow optimizer: no score loaded", 2500)
+            return
+
+        try:
+            from ui.dialogs.slur_bow_optimizer import SlurBowOptimizerDialog, optimize_slur_bows_in_score
+        except Exception as exc:
+            QtWidgets.QMessageBox.critical(self, "Slur bow optimizer", f"Failed to load optimizer:\n{exc}")
+            return
+
+        dlg = self._slur_opt_dialog
+        if dlg is None:
+            dlg = SlurBowOptimizerDialog(self)
+            self._slur_opt_dialog = dlg
+
+            def _on_apply(settings: dict, fn=optimize_slur_bows_in_score) -> None:
+                self._start_slur_bow_optimizer_run(dict(settings or {}), fn)
+
+            dlg.applyRequested.connect(_on_apply)
+            dlg.finished.connect(self._on_slur_optimizer_dialog_closed)
+
+        dlg.show()
+        dlg.raise_()
+        dlg.activateWindow()
+        try:
+            dlg.set_info_text("Adjust parameters and click Apply to run optimizer.")
+        except Exception:
+            pass
+        self._status("Adjust parameters and click Apply to run optimizer", 3000)
+
+    @QtCore.Slot()
+    def _on_slur_optimizer_dialog_closed(self) -> None:
+        self._slur_opt_dialog = None
+
+    def _start_slur_bow_optimizer_run(self, settings: dict, optimize_slur_bows_in_score) -> None:
+        if self._slur_opt_thread is not None and self._slur_opt_thread.isRunning():
+            self._status("Slur bow optimizer is already running", 2500)
+            return
+
+        score = self.file_manager.current()
+        if score is None:
+            self._status("Slur bow optimizer: no score loaded", 2500)
+            return
+
+        self._slur_opt_settings = dict(settings)
+        self._slur_opt_started_at = time.perf_counter()
+
+        try:
+            if self._slur_opt_dialog is not None:
+                self._slur_opt_dialog.set_apply_enabled(False)
+        except Exception:
+            pass
+
+        progress = QtWidgets.QProgressDialog("Optimizing slur bows...", "", 0, 0, self)
+        progress.setWindowTitle("Slur bow optimizer")
+        progress.setCancelButton(None)
+        progress.setWindowModality(QtCore.Qt.WindowModality.WindowModal)
+        progress.setMinimumDuration(0)
+        progress.setValue(0)
+        progress.show()
+        self._slur_opt_progress = progress
+
+        try:
+            QtWidgets.QApplication.setOverrideCursor(QtCore.Qt.CursorShape.WaitCursor)
+        except Exception:
+            pass
+
+        thread = QtCore.QThread(self)
+        worker = _SlurOptimizerWorker(score, settings, optimize_slur_bows_in_score)
+        worker.moveToThread(thread)
+
+        thread.started.connect(worker.run)
+        worker.finished.connect(self._on_slur_optimizer_finished, QtCore.Qt.ConnectionType.QueuedConnection)
+        worker.failed.connect(self._on_slur_optimizer_failed, QtCore.Qt.ConnectionType.QueuedConnection)
+        self._slur_opt_worker = worker
+        self._slur_opt_thread = thread
+        thread.start()
+
+    def _cleanup_slur_optimizer_thread(self) -> None:
+        try:
+            if self._slur_opt_progress is not None:
+                self._slur_opt_progress.close()
+                self._slur_opt_progress.deleteLater()
+        except Exception:
+            pass
+        self._slur_opt_progress = None
+        try:
+            QtWidgets.QApplication.restoreOverrideCursor()
+        except Exception:
+            pass
+
+        thread = self._slur_opt_thread
+        worker = self._slur_opt_worker
+        self._slur_opt_thread = None
+        self._slur_opt_worker = None
+
+        try:
+            if thread is not None and thread.isRunning():
+                thread.quit()
+                thread.wait(1000)
+        except Exception:
+            pass
+        try:
+            if worker is not None:
+                worker.deleteLater()
+        except Exception:
+            pass
+        try:
+            if thread is not None:
+                thread.deleteLater()
+        except Exception:
+            pass
+        try:
+            if self._slur_opt_dialog is not None:
+                self._slur_opt_dialog.set_apply_enabled(True)
+        except Exception:
+            pass
+
+    @QtCore.Slot(dict)
+    def _on_slur_optimizer_finished(self, stats: dict) -> None:
+        settings = self._slur_opt_settings or {}
+        total = int(stats.get("slurs_total", 0) or 0)
+        available = int(stats.get("slurs_available", total) or total)
+        changed = int(stats.get("slurs_changed", 0) or 0)
+        effective_iters = int(stats.get("effective_max_iterations", int(settings.get("max_iterations", 3) or 3)) or 0)
+        effective_samples = int(stats.get("effective_hit_test_finetune", int(settings.get("hit_test_finetune", 64) or 64)) or 0)
+        requested_limit = int(settings.get("max_slurs_from_start", total) or total)
+        openness_before = float(stats.get("openness_before", 0.0) or 0.0)
+        openness_after = float(stats.get("openness_after", 0.0) or 0.0)
+        openness_delta = float(stats.get("openness_delta", 0.0) or 0.0)
+        objective_before = float(stats.get("objective_before_avg", 0.0) or 0.0)
+        objective_after = float(stats.get("objective_after_avg", 0.0) or 0.0)
+        objective_delta = float(objective_after - objective_before)
+        beams_used = bool(settings.get("include_beams", True))
+        started_at = self._slur_opt_started_at
+        elapsed_s = max(0.0, float(time.perf_counter() - started_at)) if started_at is not None else 0.0
+
+        if changed > 0:
+            try:
+                self.file_manager.on_model_changed()
+            except Exception:
+                pass
+            try:
+                self.editor_controller._snapshot_if_changed(coalesce=False, label='slur_bow_optimizer')
+            except Exception:
+                pass
+            self._refresh_views_from_score()
+            try:
+                self.editor_controller.set_score(self.file_manager.current())
+            except Exception:
+                pass
+            try:
+                self.editor_controller.force_redraw_from_model()
+            except Exception:
+                pass
+            self._status(
+                f"Slur bow optimizer: updated {changed}/{total} slurs (iter={effective_iters}, samples={effective_samples})",
+                4500,
+            )
+        else:
+            self._status(
+                f"Slur bow optimizer: no changes ({total} slurs checked, iter={effective_iters}, samples={effective_samples})",
+                4500,
+            )
+
+        # Professional completion notification with key run metrics.
+        details = [
+            f"Processed slurs: {total} (requested first {requested_limit}, available {available})",
+            f"Changed slurs: {changed}",
+            f"Duration: {elapsed_s:.2f} s",
+            f"Effective settings: iterations={effective_iters}, samples={effective_samples}, beams={'on' if beams_used else 'off'}",
+            f"Objective avg: {objective_before:.3f} -> {objective_after:.3f} (Δ {objective_delta:+.3f})",
+            f"Openness score: {openness_before:.3f} -> {openness_after:.3f} (Δ {openness_delta:+.3f})",
+        ]
+        prefix = "Optimization completed successfully." if changed > 0 else "Optimization completed with no required changes."
+        summary_text = prefix + "\n\n" + "\n".join(details)
+        try:
+            if self._slur_opt_dialog is not None:
+                self._slur_opt_dialog.set_info_text(summary_text)
+        except Exception:
+            pass
+
+        self._slur_opt_started_at = None
+        self._cleanup_slur_optimizer_thread()
+
+    @QtCore.Slot(str)
+    def _on_slur_optimizer_failed(self, message: str) -> None:
+        self._status("Slur bow optimizer: failed", 4500)
+        try:
+            if self._slur_opt_dialog is not None:
+                self._slur_opt_dialog.set_info_text(f"Optimization failed:\n{message}")
+        except Exception:
+            pass
+        self._slur_opt_started_at = None
+        self._cleanup_slur_optimizer_thread()
 
     def _refresh_recent_files_menu(self) -> None:
         menu = getattr(self, '_recent_menu', None)

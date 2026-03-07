@@ -5,7 +5,7 @@ from typing import Optional, Tuple
 
 from PySide6 import QtWidgets, QtCore
 
-from ui.widgets.style_dialog import FontPicker, FloatSliderEdit
+from ui.dialogs.style_dialog import FontPicker, FloatSliderEdit
 
 from editor.tool.base_tool import BaseTool
 from file_model.SCORE import SCORE

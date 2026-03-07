@@ -3,6 +3,7 @@ from typing import TYPE_CHECKING, cast
 from ui.widgets.draw_util import DrawUtil
 from utils.operator import Operator
 from utils.CONSTANT import QUARTER_NOTE_UNIT
+from file_model.base_grid import resolve_grid_layer_offsets
 import bisect
 
 if TYPE_CHECKING:
@@ -99,9 +100,8 @@ class BeamDrawerMixin:
                 denom = int(getattr(bg, 'denominator', 4) or 4)
                 # Use ticks: QUARTER_NOTE_UNIT per quarter note
                 measure_len_ticks = float(numer) * (4.0 / float(denom)) * float(QUARTER_NOTE_UNIT)
-                beat_len_ticks = measure_len_ticks / max(1, int(numer))
                 seq = list(getattr(bg, 'beat_grouping', []) or [])
-                full_group = len(seq) == numer and [int(v) for v in seq] == list(range(1, numer + 1))
+                _bar_offsets, grid_offsets = resolve_grid_layer_offsets(seq, numer, denom)
                 for _ in range(int(getattr(bg, 'measure_amount', 1) or 1)):
                     m_start = float(cur)
                     m_end = float(cur + measure_len_ticks)
@@ -111,20 +111,13 @@ class BeamDrawerMixin:
                     if op.gt(m_start, float(b)):
                         cur = m_end
                         continue
-                    if len(seq) != numer:
-                        seq = [1]
-                    if full_group:
-                        # Single full group: split into per-beat windows
-                        group_starts = list(range(1, numer + 1))
-                    else:
-                        # Multiple groups: split by reset-to-1 positions
-                        group_starts = [i for i, v in enumerate(seq, start=1) if int(v) == 1]
-                        if not group_starts or group_starts[0] != 1:
-                            group_starts = [1] + group_starts
-                    for gi, s in enumerate(group_starts):
-                        e = (group_starts[gi + 1] - 1) if (gi + 1) < len(group_starts) else numer
-                        w0 = m_start + (s - 1) * beat_len_ticks
-                        w1 = m_start + float(e) * beat_len_ticks
+                    boundaries = [0.0] + [float(v) for v in grid_offsets if 0.0 < float(v) < measure_len_ticks] + [float(measure_len_ticks)]
+                    boundaries = sorted(dict.fromkeys(round(v, 6) for v in boundaries))
+                    if len(boundaries) < 2:
+                        boundaries = [0.0, float(measure_len_ticks)]
+                    for idx in range(len(boundaries) - 1):
+                        w0 = m_start + float(boundaries[idx])
+                        w1 = m_start + float(boundaries[idx + 1])
                         w0 = max(float(a), w0)
                         w1 = min(float(b), w1)
                         if op.lt(w0, w1):

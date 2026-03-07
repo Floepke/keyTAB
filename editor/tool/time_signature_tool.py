@@ -150,7 +150,7 @@ class TimeSignatureTool(BaseTool):
         offset_measures = max(0, min(offset_measures, m_total))
         
         # Open dialog and build a new BaseGrid from its values
-        from ui.widgets.time_signature_dialog import TimeSignatureDialog
+        from ui.dialogs.time_signature_dialog import TimeSignatureDialog
         
         # Prefill dialog from the current segment for sensible defaults
         initial_numer = 4

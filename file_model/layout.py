@@ -158,7 +158,7 @@ LAYOUT_FLOAT_CONFIG: dict[str, dict[str, float]] = {
     'page_right_margin_mm': {'min': 0.0, 'max': 100.0, 'step': 0.05},
     'header_height_mm': {'min': 0.0, 'max': 100.0, 'step': 0.05},
     'footer_height_mm': {'min': 0.0, 'max': 100.0, 'step': 0.05},
-    'scale': {'min': 0.01, 'max': 1.0, 'step': 0.01},
+    'scale': {'min': 0.01, 'max': 1.0, 'step': 0.001},
     'note_stem_length_semitone': {'min': 1.0, 'max': 20.0, 'step': 1.0},
     'note_stem_thickness_mm': {'min': 0.05, 'max': 5.0, 'step': 0.05},
     'note_stopsign_thickness_mm': {'min': 0.05, 'max': 5.0, 'step': 0.05},

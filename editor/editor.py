@@ -23,7 +23,7 @@ from editor.tool.crescendo_tool import CrescendoTool
 from editor.tool.decrescendo_tool import DecrescendoTool
 from editor.tool.tempo_tool import TempoTool
 from editor.ctlz import CtlZ
-from file_model.base_grid import BaseGrid
+from file_model.base_grid import BaseGrid, resolve_grid_layer_offsets
 from settings_manager import get_preferences_manager
 from ui.style import Style
 from file_model.SCORE import SCORE
@@ -946,28 +946,22 @@ class Editor(QtCore.QObject,
             barline_times = []
             cur_t = 0.0
             for bg in base_grid_list:
-                measure_len_ticks = float(bg.numerator) * (4.0 / float(bg.denominator)) * float(QUARTER_NOTE_UNIT)
-                beat_len_ticks = measure_len_ticks / max(1, int(bg.numerator))
+                numer = int(getattr(bg, 'numerator', 4) or 4)
+                denom = int(getattr(bg, 'denominator', 4) or 4)
+                measure_len_ticks = float(numer) * (4.0 / float(max(1, denom))) * float(QUARTER_NOTE_UNIT)
                 positions = getattr(bg, 'beat_grouping', None)
                 positions_list = list(positions if positions is not None else (getattr(bg, 'beat_grouping', []) or []))
+                bar_offsets, grid_offsets = resolve_grid_layer_offsets(positions_list, numer, denom)
                 for _ in range(int(bg.measure_amount)):
-                    barline_times.append(float(cur_t))
-                    if len(positions_list) == int(bg.numerator):
-                        if positions_list == [v for v in range(1, int(bg.numerator) + 1)]:
-                            for idx in range(1, int(bg.numerator) + 1):
-                                t_line = cur_t + (idx - 1) * beat_len_ticks
-                                grid_den_times.append(float(t_line))
-                        else:
-                            for idx, val in enumerate(positions_list, start=1):
-                                if int(val) != 1:
-                                    continue
-                                t_line = cur_t + (idx - 1) * beat_len_ticks
-                                grid_den_times.append(float(t_line))
-                    else:
-                        grid_den_times.append(float(cur_t))
+                    for off in bar_offsets:
+                        barline_times.append(float(cur_t + float(off)))
+                    for off in grid_offsets:
+                        grid_den_times.append(float(cur_t + float(off)))
                     cur_t += measure_len_ticks
-            grid_den_times.append(float(cur_t))
-            barline_times.append(float(cur_t))
+            if barline_times:
+                barline_times.append(float(cur_t))
+            if grid_den_times:
+                grid_den_times.append(float(cur_t))
             self._grid_time_cache_key = grid_cache_key
             self._grid_time_cache_values = (grid_den_times, barline_times)
 
