@@ -457,8 +457,8 @@ class MainWindow(QtWidgets.QMainWindow):
         # Create menus in normal left-to-right order (File, Edit, Selection, Document, View, Playback, About)
         file_menu = menubar.addMenu("&File")
         edit_menu = menubar.addMenu("&Edit")
-        selection_menu = menubar.addMenu("&Selection")
         view_menu = menubar.addMenu("&View")
+        selection_menu = menubar.addMenu("&Selection")
         document_menu = menubar.addMenu("&Document")
         playback_menu = menubar.addMenu("&Playback")
         help_menu = menubar.addMenu("&About")
@@ -670,13 +670,13 @@ class MainWindow(QtWidgets.QMainWindow):
         selection_menu.addAction(quantize_act)
         selection_menu.addAction(quantize_start_act)
         selection_menu.addAction(quantize_end_act)
-
         # Separator between Delete and Preferences
         edit_menu.addSeparator()
         prefs_act = QtGui.QAction("Preferences…", self)
         prefs_act.setToolTip("Open application preferences.")
         prefs_act.triggered.connect(self._open_preferences)
         edit_menu.addAction(prefs_act)
+        
         # View actions
         zoom_in_act = QtGui.QAction("Zoom In", self)
         zoom_in_act.setToolTip("Zoom in on the editor view.")
@@ -739,32 +739,29 @@ class MainWindow(QtWidgets.QMainWindow):
         self._full_screen_act = full_screen_act
 
         # ---- Clock label manually positioned at menubar's right edge ----
+        self._clock_label = QtWidgets.QLabel(menubar)
+        self._clock_label.setObjectName("menuClock")
+        # Match menubar font/palette for native look
         try:
-            self._clock_label = QtWidgets.QLabel(menubar)
-            self._clock_label.setObjectName("menuClock")
-            # Match menubar font/palette for native look
-            try:
-                self._clock_label.setFont(menubar.font())
-                self._clock_label.setPalette(menubar.palette())
-            except Exception:
-                pass
-            # Vertically center text within the menubar height
-            self._clock_label.setAlignment(QtCore.Qt.AlignmentFlag.AlignVCenter)
-            # Non-interactive
-            self._clock_label.setAttribute(QtCore.Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
-            self._clock_label.setContentsMargins(0, 0, 0, 0)
-            self._clock_label.setStyleSheet("")
-            self._update_clock()
-            # Update every second
-            self._clock_timer = QtCore.QTimer(self)
-            self._clock_timer.setInterval(1000)
-            self._clock_timer.timeout.connect(self._update_clock)
-            self._clock_timer.start()
-            # Keep position updated on menubar resize
-            menubar.installEventFilter(self)
-            QtCore.QTimer.singleShot(0, self._position_clock)
+            self._clock_label.setFont(menubar.font())
+            self._clock_label.setPalette(menubar.palette())
         except Exception:
             pass
+        # Vertically center text within the menubar height
+        self._clock_label.setAlignment(QtCore.Qt.AlignmentFlag.AlignVCenter)
+        # Non-interactive
+        self._clock_label.setAttribute(QtCore.Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
+        self._clock_label.setContentsMargins(0, 0, 0, 0)
+        self._clock_label.setStyleSheet("")
+        self._update_clock()
+        # Update every second
+        self._clock_timer = QtCore.QTimer(self)
+        self._clock_timer.setInterval(1000)
+        self._clock_timer.timeout.connect(self._update_clock)
+        self._clock_timer.start()
+        # Keep position updated on menubar resize
+        menubar.installEventFilter(self)
+        QtCore.QTimer.singleShot(0, self._position_clock)
 
     def _configure_editor_scrollbar(self) -> None:
         extent = int(self.style().pixelMetric(QtWidgets.QStyle.PixelMetric.PM_ScrollBarExtent))
