@@ -4,6 +4,8 @@ from icons.icons import get_qicon
 
 # Fixed row height to fit 36px icons comfortably
 ITEM_ROW_HEIGHT_PX: int = 42
+TOOLTIP_PANEL_HEIGHT_PX: int = 200
+LEFT_PANEL_PADDING_PX: int = 6
 # Configurable tool items.
 # - 'name': internal tool identifier used in code/events
 # - 'displayed_name': human-readable label shown in the listbox
@@ -12,12 +14,12 @@ ITEM_ROW_HEIGHT_PX: int = 42
 TOOL_ITEMS: list[dict] = [
     # basic notation elements
     { 'name': 'note',           'displayed_name': 'Note',           'icon': 'note',           'tooltip': 'Note: enter and edit notes; the basic element of the notation' },
-    { 'name': 'grace_note',     'displayed_name': 'Grace Note',     'icon': 'grace_note',     'tooltip': 'Grace Note: a smaller note without stem;\nuse it for decoration notes.\nfor example: to engrave trills.' },
-    { 'name': 'count_line',     'displayed_name': 'Count Line',     'icon': 'count_line',     'tooltip': 'Count Line: draw guide lines;\nfor highlighting rhythmic grid subdivisions' },
+    { 'name': 'grace_note',     'displayed_name': 'Grace Note',     'icon': 'grace_note',     'tooltip': 'Grace Note: a smaller note without stem; use it to engrave trills, mordents, and other ornamentations' },
+    { 'name': 'count_line',     'displayed_name': 'Count Line',     'icon': 'count_line',     'tooltip': 'Count Line: draw guide lines; for highlighting rhythmic grid subdivisions' },
     { 'name': 'beam',           'displayed_name': 'Beam Grouping',  'icon': 'beam',           'tooltip': 'Beam: group notes with beams' },
     # layout elements
-    { 'name': 'line_break',     'displayed_name': 'Line Break/Page Break',     'icon': 'line_break',     'tooltip': 'Line Break: insert line breaks;\nclick on a line break to edit its properties' },
-    { 'name': 'time_signature', 'displayed_name': 'Time Signature/Grid Pattern', 'icon': 'time_signature', 'tooltip': 'Base-Grid/Time-Signature: Configure\ntime signature & grid pattern' },
+    { 'name': 'line_break',     'displayed_name': 'Line Break/Page Break',     'icon': 'line_break',     'tooltip': 'Line Break: insert line breaks; click on a line break to edit its properties' },
+    { 'name': 'time_signature', 'displayed_name': 'Time Signature/Grid Pattern', 'icon': 'time_signature', 'tooltip': 'Base-Grid/Time-Signature: Configure time signature & grid pattern' },
     { 'name': 'tempo',          'displayed_name': 'Tempo',          'icon': 'metronome',           'tooltip': 'Tempo: add tempo regions (units per minute over a duration)'} ,
     { 'name': 'slur',           'displayed_name': 'Slur',           'icon': 'slur',           'tooltip': 'Slur: place phrasing slurs' },
     { 'name': 'text',           'displayed_name': 'Text',           'icon': 'text',           'tooltip': 'Text: place text annotations' },
@@ -73,6 +75,7 @@ class ToolSelectorWidget(QtWidgets.QListWidget):
             it = QtWidgets.QListWidgetItem(icon, label)
             # 'name' remains the internal identifier used by code; store in UserRole
             it.setData(QtCore.Qt.ItemDataRole.UserRole, name)
+            it.setData(QtCore.Qt.ItemDataRole.ToolTipRole, tooltip)
             it.setToolTip(tooltip)
             # Make row height comfortably fit the 36px icon + padding
             it.setSizeHint(QtCore.QSize(it.sizeHint().width(), ITEM_ROW_HEIGHT_PX))
@@ -111,11 +114,30 @@ class ToolSelectorDock(QtWidgets.QDockWidget):
         # Wrap the list in a container with small margins to match Snap Size indent
         container = QtWidgets.QWidget(self)
         lay = QtWidgets.QVBoxLayout(container)
-        lay.setContentsMargins(6, 6, 6, 6)
+        lay.setContentsMargins(LEFT_PANEL_PADDING_PX, LEFT_PANEL_PADDING_PX, LEFT_PANEL_PADDING_PX, LEFT_PANEL_PADDING_PX)
         lay.setSpacing(6)
         self.selector = ToolSelectorWidget(container)
-        lay.addWidget(self.selector)
+        lay.addWidget(self.selector, stretch=1)
+
+        self.tooltip_area = QtWidgets.QFrame(container)
+        self.tooltip_area.setObjectName("toolSelectorTooltipArea")
+        self.tooltip_area.setFrameShape(QtWidgets.QFrame.Shape.NoFrame)
+        self.tooltip_area.setAutoFillBackground(True)
+        self.tooltip_area.setBackgroundRole(QtGui.QPalette.ColorRole.Window)
+        self.tooltip_area.setFixedHeight(int(TOOLTIP_PANEL_HEIGHT_PX))
+        tooltip_layout = QtWidgets.QVBoxLayout(self.tooltip_area)
+        tooltip_layout.setContentsMargins(LEFT_PANEL_PADDING_PX, LEFT_PANEL_PADDING_PX, LEFT_PANEL_PADDING_PX, LEFT_PANEL_PADDING_PX)
+        tooltip_layout.setSpacing(0)
+        self.tooltip_label = QtWidgets.QLabel(self.tooltip_area)
+        self.tooltip_label.setWordWrap(True)
+        self.tooltip_label.setAlignment(QtCore.Qt.AlignmentFlag.AlignLeft | QtCore.Qt.AlignmentFlag.AlignTop)
+        self.tooltip_label.setSizePolicy(QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Expanding)
+        self.tooltip_label.setText("")
+        tooltip_layout.addWidget(self.tooltip_label, stretch=1)
+        lay.addWidget(self.tooltip_area, stretch=0)
+
         self.setWidget(container)
+
         try:
             self.selector.toolSelected.connect(self._on_tool_selected_update_title)
         except Exception:
@@ -137,9 +159,6 @@ class ToolSelectorDock(QtWidgets.QDockWidget):
             lst = self.selector
             lst.setSizePolicy(QtWidgets.QSizePolicy.Policy.Expanding,
                               QtWidgets.QSizePolicy.Policy.Preferred)
-            # Do not enforce a fixed width; allow the dock to be resized.
-            self.setMinimumWidth(0)
-            self.setMaximumWidth(16777215)  # Qt default for "no max"
         except Exception:
             pass
 
@@ -158,3 +177,6 @@ class ToolSelectorDock(QtWidgets.QDockWidget):
                 self.setWindowTitle("Tool: (none)")
         except Exception:
             pass
+
+    def set_tooltip_text(self, text: str) -> None:
+        self.tooltip_label.setText(str(text or ""))

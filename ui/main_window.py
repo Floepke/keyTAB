@@ -10,7 +10,7 @@ from file_model.analysis import Analysis
 from ui.widgets.toolbar_splitter import ToolbarSplitter
 from ui.widgets.cairo_views import CairoEditorWidget
 from ui.widgets.editor_scrollbar import EditorScrollBar
-from ui.widgets.tool_selector import ToolSelectorDock
+from ui.widgets.tool_selector import ToolSelectorDock, LEFT_PANEL_PADDING_PX
 from ui.widgets.snap_size_selector import SnapSizeDock
 from ui.widgets.draw_util import DrawUtil
 from ui.widgets.draw_view import DrawUtilView
@@ -31,6 +31,7 @@ class MainWindow(QtWidgets.QMainWindow):
         # Ensure player attribute always exists
         self.player = None
         self._player_config: tuple[str, str] | None = None
+        self._left_panel_width_frozen = False
 
         # File management
         self.file_manager = FileManager(self)
@@ -205,6 +206,8 @@ class MainWindow(QtWidgets.QMainWindow):
         self.addDockWidget(QtCore.Qt.DockWidgetArea.LeftDockWidgetArea, self.snap_dock)
         self.tool_dock = ToolSelectorDock(self)
         self.addDockWidget(QtCore.Qt.DockWidgetArea.LeftDockWidgetArea, self.tool_dock)
+        self._tooltip_redirect_source: QtCore.QObject | None = None
+        QtWidgets.QApplication.instance().installEventFilter(self)
         # Stack vertically: snap (top) above tool selector (bottom)
         self.splitDockWidget(self.snap_dock, self.tool_dock, QtCore.Qt.Orientation.Vertical)
         # Avoid docks stealing focus from the editor
@@ -713,6 +716,79 @@ class MainWindow(QtWidgets.QMainWindow):
         extent = int(self.style().pixelMetric(QtWidgets.QStyle.PixelMetric.PM_ScrollBarExtent))
         self.editor_vscroll.setFixedWidth(max(12, int(extent * 2)))
         self.editor_vscroll.set_tooltip_provider(self._editor_scrollbar_tooltip_text)
+
+    def _tooltip_anchor_widget(self) -> QtWidgets.QWidget | None:
+        if not hasattr(self, 'tool_dock'):
+            return None
+        if not hasattr(self.tool_dock, 'tooltip_area'):
+            return None
+        area = self.tool_dock.tooltip_area
+        if area is None or not area.isVisible():
+            return None
+        return area
+
+    def _is_editor_scrollbar_source(self, watched: QtCore.QObject) -> bool:
+        if watched is self.editor_vscroll:
+            return True
+        if isinstance(watched, QtWidgets.QWidget):
+            parent = watched.parentWidget()
+            while parent is not None:
+                if parent is self.editor_vscroll:
+                    return True
+                parent = parent.parentWidget()
+        return False
+
+    def _extract_tooltip_text(self, watched: QtCore.QObject, event: QtGui.QHelpEvent) -> str:
+        if watched is self.tool_dock.selector.viewport():
+            item = self.tool_dock.selector.itemAt(event.pos())
+            if item is None:
+                return ""
+            return str(item.data(QtCore.Qt.ItemDataRole.ToolTipRole) or item.toolTip() or "").strip()
+
+        if isinstance(watched, QtWidgets.QListWidget):
+            item = watched.itemAt(event.pos())
+            if item is not None:
+                return str(item.data(QtCore.Qt.ItemDataRole.ToolTipRole) or item.toolTip() or "").strip()
+
+        if isinstance(watched, QtWidgets.QWidget):
+            return str(watched.toolTip() or "").strip()
+
+        return ""
+
+    def _show_tooltip_in_tool_area(self, text: str) -> bool:
+        area = self._tooltip_anchor_widget()
+        if area is None:
+            return False
+        self.tool_dock.set_tooltip_text(str(text or ""))
+        QtWidgets.QToolTip.hideText()
+        return True
+
+    def eventFilter(self, watched: QtCore.QObject, event: QtCore.QEvent) -> bool:
+        et = event.type()
+
+        if et == QtCore.QEvent.Type.ToolTip and isinstance(event, QtGui.QHelpEvent):
+            if self._is_editor_scrollbar_source(watched):
+                return False
+            text = self._extract_tooltip_text(watched, event)
+            if text:
+                shown = self._show_tooltip_in_tool_area(text)
+                if shown:
+                    self._tooltip_redirect_source = watched
+                    return True
+                return False
+            if watched is self._tooltip_redirect_source:
+                self._tooltip_redirect_source = None
+                self.tool_dock.set_tooltip_text("")
+                QtWidgets.QToolTip.hideText()
+                return True
+
+        if et in (QtCore.QEvent.Type.Leave, QtCore.QEvent.Type.FocusOut, QtCore.QEvent.Type.Hide):
+            if watched is self._tooltip_redirect_source:
+                self._tooltip_redirect_source = None
+                self.tool_dock.set_tooltip_text("")
+                QtWidgets.QToolTip.hideText()
+
+        return super().eventFilter(watched, event)
 
     def _editor_scrollbar_tooltip_text(self, predicted_top_value: int) -> str:
         if not hasattr(self, 'editor_controller') or self.editor_controller is None:
@@ -2151,6 +2227,27 @@ class MainWindow(QtWidgets.QMainWindow):
             self.tool_dock.adjust_to_fit()
         except Exception:
             pass
+        self._freeze_left_panel_width_once()
+
+    def _freeze_left_panel_width_once(self) -> None:
+        if self._left_panel_width_frozen:
+            return
+        if not hasattr(self, 'snap_dock') or not hasattr(self, 'tool_dock'):
+            return
+
+        snap_width = int(self.snap_dock.width())
+        tool_width = int(self.tool_dock.width())
+        if snap_width <= 0:
+            snap_width = int(self.snap_dock.sizeHint().width())
+        if tool_width <= 0:
+            tool_width = int(self.tool_dock.sizeHint().width())
+
+        target_width = max(1, snap_width, tool_width)
+        self.snap_dock.setMinimumWidth(target_width)
+        self.snap_dock.setMaximumWidth(target_width)
+        self.tool_dock.setMinimumWidth(target_width)
+        self.tool_dock.setMaximumWidth(target_width)
+        self._left_panel_width_frozen = True
 
     def resizeEvent(self, ev: QtGui.QResizeEvent) -> None:
         super().resizeEvent(ev)

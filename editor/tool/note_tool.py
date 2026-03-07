@@ -45,8 +45,8 @@ class NoteTool(BaseTool):
     def toolbar_spec(self) -> list[dict]:
         # Two explicit hand selectors for quick switching
         return [
-            {'name': 'hand_left', 'icon': 'note_left', 'tooltip': 'Switch To Left Hand'},
-            {'name': 'hand_right', 'icon': 'note_right', 'tooltip': 'Switch To Right Hand'},
+            {'name': 'hand_left', 'icon': 'note_left', 'tooltip': 'Click to write left hand notes'},
+            {'name': 'hand_right', 'icon': 'note_right', 'tooltip': 'Click to write right hand notes'},
         ]
 
     def on_left_press(self, x: float, y: float) -> None:

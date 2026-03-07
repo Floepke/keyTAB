@@ -2,6 +2,7 @@ from __future__ import annotations
 from PySide6 import QtCore, QtGui, QtWidgets
 from fractions import Fraction
 from utils.CONSTANT import QUARTER_NOTE_UNIT, SHORTEST_DURATION
+from ui.widgets.tool_selector import LEFT_PANEL_PADDING_PX
 
 BASE_ITEMS: list[tuple[int, str]] = [
     (1, "Whole"),
@@ -21,7 +22,7 @@ class SnapSizeSelector(QtWidgets.QWidget):
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
         layout = QtWidgets.QVBoxLayout(self)
-        layout.setContentsMargins(6, 6, 6, 6)
+        layout.setContentsMargins(LEFT_PANEL_PADDING_PX, 6, LEFT_PANEL_PADDING_PX, 6)
         layout.setSpacing(6)
 
         # Base step list (no icons; compact rows)
