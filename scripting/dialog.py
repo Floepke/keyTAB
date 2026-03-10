@@ -11,6 +11,7 @@ from scripting.spec import (
     Field,
     FloatField,
     IntField,
+    LabelField,
     StringField,
 )
 
@@ -41,6 +42,9 @@ class ScriptDialog(QtWidgets.QDialog):
         form = QtWidgets.QFormLayout()
         for field in self._spec.fields:
             widget = self._build_widget_for_field(field)
+            if isinstance(field, LabelField):
+                form.addRow(widget)
+                continue
             self._widgets[field.name] = widget
             form.addRow(field.label, widget)
         layout.addLayout(form)
@@ -58,6 +62,10 @@ class ScriptDialog(QtWidgets.QDialog):
         self.resize(420, self.sizeHint().height())
 
     def _build_widget_for_field(self, field: Field) -> QtWidgets.QWidget:
+        if isinstance(field, LabelField):
+            w = QtWidgets.QLabel(str(field.text or field.label or ""))
+            w.setWordWrap(True)
+            return w
         if isinstance(field, BoolField):
             w = QtWidgets.QCheckBox()
             w.setChecked(bool(field.default))
@@ -91,6 +99,8 @@ class ScriptDialog(QtWidgets.QDialog):
     def _collect_values(self) -> Dict[str, object]:
         values: Dict[str, object] = {}
         for field in self._spec.fields:
+            if isinstance(field, LabelField):
+                continue
             widget = self._widgets[field.name]
             values[field.name] = self._value_for_field(field, widget)
         return values

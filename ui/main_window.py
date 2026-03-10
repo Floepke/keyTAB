@@ -126,15 +126,28 @@ class MainWindow(QtWidgets.QMainWindow):
                     time.sleep(max(0.0, float(delay_sec)))
             return None
 
-        # Always try real project paths first (handles delayed cloud mounts).
-        if saved_path:
-            sc = _try_open_path_with_retries(saved_path, retries=16, delay_sec=0.25)
-            if sc is not None:
+        if not was_saved:
+            # In unsaved/new mode, restore the session snapshot first and do not reopen old project paths.
+            restored = False
+            try:
+                restored = self.file_manager.load_session_if_available()
+            except Exception:
+                restored = False
+            if restored:
                 opened = True
-                self._session_restore_mode = False
-                status_msg = f"Opened last saved project: {saved_path}"
+                self._session_restore_mode = True
+                status_msg = "Restored unsaved session (session.piano mode)"
 
         if not opened:
+            # For saved sessions, try real project paths first (handles delayed cloud mounts).
+            if saved_path:
+                sc = _try_open_path_with_retries(saved_path, retries=16, delay_sec=0.25)
+                if sc is not None:
+                    opened = True
+                    self._session_restore_mode = False
+                    status_msg = f"Opened last saved project: {saved_path}"
+
+        if not opened and was_saved:
             try:
                 if adm2 is None:
                     adm2 = get_appdata_manager()
@@ -149,14 +162,13 @@ class MainWindow(QtWidgets.QMainWindow):
                     status_msg = f"Opened last project: {last_path}"
 
         if not opened:
-            # If the last session wasn't saved, try restoring the session snapshot
+            # Fallback to session restore, then new score.
             restored = False
             try:
                 restored = self.file_manager.load_session_if_available()
             except Exception:
                 restored = False
             if not restored:
-                # Nothing to restore/open; start fresh
                 self.file_manager.new()
                 self._session_restore_mode = False
                 status_msg = "Started new project"
@@ -511,14 +523,15 @@ class MainWindow(QtWidgets.QMainWindow):
         line_break_act.setToolTip("Open line break and page break settings.")
         line_break_act.setShortcut(QtGui.QKeySequence("L"))
         line_break_act.triggered.connect(self._open_line_break_dialog)
-        run_script_act = QtGui.QAction("Run Script...", self)
-        run_script_act.setToolTip("Load and run a Python script with preview and cancel support.")
 
         document_menu.addAction(style_act)
         document_menu.addAction(info_act)
         document_menu.addAction(line_break_act)
         document_menu.addSeparator()
-        tools_menu.addAction(run_script_act)
+
+        self._tools_menu = tools_menu
+        tools_menu.aboutToShow.connect(self._rebuild_tools_menu)
+        self._rebuild_tools_menu()
 
         export_pdf_act = QtGui.QAction("Export PDF...", self)
         export_pdf_act.setToolTip("Export the current score as a PDF document.")
@@ -741,7 +754,6 @@ class MainWindow(QtWidgets.QMainWindow):
         zoom_in_act.triggered.connect(lambda: self._zoom_editor(1))
         zoom_out_act.triggered.connect(lambda: self._zoom_editor(-1))
         full_screen_act.triggered.connect(self._toggle_full_screen)
-        run_script_act.triggered.connect(self._run_script_dialog)
 
         # Keep reference for state sync
         self._full_screen_act = full_screen_act
@@ -1418,16 +1430,39 @@ class MainWindow(QtWidgets.QMainWindow):
         except Exception:
             p = None
         session_mode = bool(getattr(self, '_session_restore_mode', False)) and p is None
-        state = "Unsaved changes" if dirty else "Saved"
+        if p is None:
+            state = "Unsaved changes" if dirty else "New project"
+        else:
+            state = "Unsaved changes" if dirty else "Saved"
         path_text = str(p) if p else ("(session.piano restored)" if session_mode else "(unsaved project)")
         prefix = "Session mode • " if session_mode else ""
         return f"{prefix}{state} • {path_text}"
 
-    def _show_status_default(self) -> None:
+    def _current_file_label_for_status(self) -> str:
+        try:
+            p = self.file_manager.path()
+            if p is not None:
+                return str(p)
+        except Exception:
+            pass
+        if bool(getattr(self, '_session_restore_mode', False)):
+            return "session.piano"
+        return "(unsaved project)"
+
+    def _show_file_action_status(self, action: str, timeout_ms: int = 2500) -> None:
+        label = self._current_file_label_for_status()
+        self._status(f"{action} • {label}", timeout_ms)
+
+    def _show_status_default(self, force: bool = False) -> None:
         try:
             sb = self.statusBar() if hasattr(self, 'statusBar') else None
-            if sb is not None and not sb.currentMessage():
-                sb.showMessage(self._status_default_message(), 0)
+            if sb is not None:
+                new_default = self._status_default_message()
+                current = str(sb.currentMessage() or "")
+                previous_default = str(getattr(self, '_status_default_text', "") or "")
+                if bool(force) or not current or current == previous_default:
+                    sb.showMessage(new_default, 0)
+                    self._status_default_text = new_default
         except Exception:
             pass
 
@@ -1449,7 +1484,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def _file_new(self) -> None:
         # If there are unsaved changes, confirm save before starting a new project
-        if not self.file_manager.confirm_save_for_action("creating a new project", force_prompt=True):
+        if not self.file_manager.confirm_save_for_action("creating a new project"):
             return
         self.file_manager.new()
         self._session_restore_mode = False
@@ -1482,6 +1517,8 @@ class MainWindow(QtWidgets.QMainWindow):
         except Exception:
             pass
         self._update_title()
+        self._show_status_default(force=True)
+        self._show_file_action_status("New project")
 
     def _file_open(self) -> None:
         # If there are unsaved changes, confirm save before opening another project
@@ -1543,21 +1580,24 @@ class MainWindow(QtWidgets.QMainWindow):
         except Exception:
             pass
         self._update_title()
-        self._show_status_default()
+        self._show_status_default(force=True)
+        self._show_file_action_status("Opened")
 
     def _file_save(self) -> None:
         if self.file_manager.save():
             if self.file_manager.path() is not None:
                 self._session_restore_mode = False
             self._update_title()
-            self._show_status_default()
+            self._show_status_default(force=True)
+            self._show_file_action_status("Saved")
 
     def _file_save_as(self) -> None:
         if self.file_manager.save_as():
             if self.file_manager.path() is not None:
                 self._session_restore_mode = False
             self._update_title()
-            self._show_status_default()
+            self._show_status_default(force=True)
+            self._show_file_action_status("Saved As")
 
     def _refresh_views_from_score(self, delay_engrave_ms: int = 0) -> None:
         try:
@@ -1710,6 +1750,58 @@ class MainWindow(QtWidgets.QMainWindow):
         except Exception as exc:
             QtWidgets.QMessageBox.critical(self, "Run Script", f"Script failed: {exc}")
 
+    def _scripts_dir(self) -> Path:
+        return Path(__file__).resolve().parent.parent / "scripts"
+
+    def _run_script_path(self, script_path: str) -> None:
+        engine = getattr(self, "script_engine", None)
+        if engine is None:
+            try:
+                self.script_engine = ScriptEngine(self.file_manager, self.editor_controller, parent=self)
+                engine = self.script_engine
+            except Exception as exc:
+                QtWidgets.QMessageBox.critical(self, "Run Script", f"Failed to initialize scripting: {exc}")
+                return
+        try:
+            engine.run_script(Path(script_path))
+        except Exception as exc:
+            QtWidgets.QMessageBox.critical(self, "Run Script", f"Script failed: {exc}")
+
+    def _rebuild_tools_menu(self) -> None:
+        menu = getattr(self, "_tools_menu", None)
+        if menu is None:
+            return
+        menu.clear()
+
+        run_script_act = QtGui.QAction("Run Script...", self)
+        run_script_act.setToolTip("Load and run a Python script with preview and cancel support.")
+        run_script_act.triggered.connect(self._run_script_dialog)
+        menu.addAction(run_script_act)
+        menu.addSeparator()
+
+        scripts_dir = self._scripts_dir()
+        if not scripts_dir.exists() or not scripts_dir.is_dir():
+            empty_act = QtGui.QAction("No scripts folder found", self)
+            empty_act.setEnabled(False)
+            menu.addAction(empty_act)
+            return
+
+        script_files = sorted(
+            [p for p in scripts_dir.glob("*.py") if p.is_file()],
+            key=lambda p: p.name.lower(),
+        )
+        if not script_files:
+            empty_act = QtGui.QAction("No scripts found", self)
+            empty_act.setEnabled(False)
+            menu.addAction(empty_act)
+            return
+
+        for script_file in script_files:
+            act = QtGui.QAction(script_file.stem, self)
+            act.setToolTip(str(script_file))
+            act.triggered.connect(lambda _checked=False, p=str(script_file): self._run_script_path(p))
+            menu.addAction(act)
+
     def _refresh_recent_files_menu(self) -> None:
         menu = getattr(self, '_recent_menu', None)
         if menu is None:
@@ -1746,22 +1838,7 @@ class MainWindow(QtWidgets.QMainWindow):
                 self._refresh_recent_files_menu()
             except Exception:
                 pass
-            self._refresh_views_from_score()
-            try:
-                self.editor_controller.set_score(self.file_manager.current())
-                self.editor_controller.reset_undo_stack()
-            except Exception:
-                pass
-            try:
-                if hasattr(self.editor_controller, 'force_redraw_from_model'):
-                    self.editor_controller.force_redraw_from_model()
-            except Exception:
-                pass
-            try:
-                self._restore_app_state_from_score()
-            except Exception:
-                pass
-            self._update_title()
+            self._after_project_loaded()
 
     def _clear_recent_files(self) -> None:
         try:
@@ -1822,16 +1899,6 @@ class MainWindow(QtWidgets.QMainWindow):
         scale = max(1.0, float(dpr))
         device_px_step = float(snap_mm) * float(px_per_mm)
         return int(max(1, round(device_px_step / scale)))
-
-    def _quantize_editor_scroll_value(self, value: int) -> int:
-        minimum = int(self.editor_vscroll.minimum())
-        maximum = int(self.editor_vscroll.maximum())
-        clamped = max(minimum, min(maximum, int(value)))
-        step = int(max(1, getattr(self, '_editor_scroll_step_logical_px', 1) or 1))
-        if step <= 1:
-            return clamped
-        snapped = int(round(float(clamped) / float(step)) * step)
-        return max(minimum, min(maximum, snapped))
 
     def _zoom_editor(self, steps: int) -> None:
         try:

@@ -89,11 +89,6 @@ class BeamTool(BaseTool):
     def _min_duration(self) -> float:
         return float(self._min_duration_val)
 
-    def _quantize_duration(self, delta: float) -> float:
-        units = max(1e-6, float(getattr(self._editor, 'snap_size_units', 0.0) or 0.0))
-        steps = round(float(delta) / units)
-        return max(0.0, steps * units)
-
     # ---- Events ----
     def on_left_press(self, x: float, y: float) -> None:
         super().on_left_press(x, y)

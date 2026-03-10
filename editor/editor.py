@@ -1480,6 +1480,7 @@ class Editor(QtCore.QObject,
             return float(round(float(value) / units) * units)
 
         updated = False
+        op = Operator(1.0)
         for n in notes:
             t0 = float(getattr(n, 'time', 0.0) or 0.0)
             dur = float(getattr(n, 'duration', 0.0) or 0.0)
@@ -1491,7 +1492,7 @@ class Editor(QtCore.QObject,
                 qt1 = qt0 + units
             qdur = max(units, qt1 - qt0)
 
-            if (not math.isclose(qt0, t0)) or (not math.isclose(qdur, dur)):
+            if (not op.eq(qt0, t0)) or (not op.eq(qdur, dur)):
                 setattr(n, 'time', float(qt0))
                 setattr(n, 'duration', float(qdur))
                 updated = True

@@ -8,7 +8,7 @@ import traceback
 from pathlib import Path
 from typing import Any, Callable
 
-from PySide6 import QtWidgets
+from PySide6 import QtCore, QtWidgets
 
 from appdata_manager import get_appdata_manager
 from file_model.SCORE import SCORE
@@ -50,6 +50,7 @@ class ScriptEngine:
         self._file_manager = file_manager
         self._editor = editor
         self._parent = parent
+        self._open_dialogs: list[ScriptDialog] = []
         self._last_dir = Path.home()
         try:
             adm = get_appdata_manager()
@@ -152,7 +153,22 @@ class ScriptEngine:
             ctx.refresh()
 
         dlg = ScriptDialog(spec=spec, on_preview=_preview, on_apply=_apply, on_cancel=_cancel, parent=self._parent)
-        dlg.exec()
+        dlg.setModal(False)
+        dlg.setWindowModality(QtCore.Qt.WindowModality.NonModal)
+        dlg.setAttribute(QtCore.Qt.WidgetAttribute.WA_DeleteOnClose, True)
+        self._open_dialogs.append(dlg)
+
+        def _cleanup_open_dialog(_result: int, d=dlg) -> None:
+            try:
+                if d in self._open_dialogs:
+                    self._open_dialogs.remove(d)
+            except Exception:
+                pass
+
+        dlg.finished.connect(_cleanup_open_dialog)
+        dlg.show()
+        dlg.raise_()
+        dlg.activateWindow()
 
     def _restore_snapshot(self, snapshot: dict, dirty_state: bool | None = None) -> None:
         try:

@@ -7,6 +7,7 @@ from scripting.spec import (
     FloatField,
     StringField,
     ArrayField,
+    LabelField,
 )
 
 __all__ = [
@@ -19,4 +20,5 @@ __all__ = [
     "FloatField",
     "StringField",
     "ArrayField",
+    "LabelField",
 ]

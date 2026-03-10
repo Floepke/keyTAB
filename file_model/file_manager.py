@@ -35,10 +35,9 @@ class FileManager:
         "keyTAB Score (*.piano);;"
         "MIDI File (*.mid *.midi);;"
         "MusicXML File (*.musicxml *.mxl *.xml);;"
-        "All Files (*)"
     )
     # Save dialog: allow .piano and MIDI export
-    SAVE_FILE_FILTER = "keyTAB Score (*.piano);;MIDI File (*.mid *.midi);;All Files (*)"
+    SAVE_FILE_FILTER = "keyTAB Score (*.piano);;MIDI File (*.mid *.midi)"
 
     def __init__(self, parent: Optional[QWidget] = None) -> None:
         self._parent: Optional[QWidget] = parent

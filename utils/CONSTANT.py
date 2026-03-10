@@ -109,10 +109,10 @@ def hex_to_rgba(hex_color: str, alpha: float = 1) -> tuple[int, int, int, float]
     r, g, b = tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4))
     return (r, g, b, alpha)
 
-SHORTEST_DURATION: float = 8.0  # shortest note duration in time units (128th) (for playback and rendering)
+SHORTEST_DURATION: float = 1.0  # shortest note duration in time units (128th) (for playback and rendering)
 # Threshold for interpreting very short notes as grace notes on load/import.
 # Defaults to SHORTEST_DURATION so one edit can adjust both behaviors.
-GRACENOTE_THRESHOLD: float = SHORTEST_DURATION
+GRACENOTE_THRESHOLD: float = 16.0  # (32th) Default threshold for interpreting very short notes as grace notes on load/import.
 
 ENGRAVER_VERSION: str = '1.0'
 

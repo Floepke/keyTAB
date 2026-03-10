@@ -47,6 +47,13 @@ class ArrayField(Field):
 
 
 @dataclass
+class LabelField(Field):
+    name: str = ""
+    label: str = ""
+    text: str = ""
+
+
+@dataclass
 class DialogSpec:
     title: str
     fields: Sequence[Field]
@@ -59,5 +66,6 @@ __all__ = [
     "FloatField",
     "StringField",
     "ArrayField",
+    "LabelField",
     "DialogSpec",
 ]

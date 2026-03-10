@@ -183,8 +183,28 @@ class BeamDrawerMixin:
             # Compute windows independent of whether there are notes; groups may be empty.
             notes_sorted = sorted(notes, key=lambda n: float(n.time)) if notes else []
             starts = [float(n.time) for n in notes_sorted] if notes_sorted else []
-            score_start = float(times[0]) if times else (starts[0] if starts else 0.0)
-            score_end = float(times[-1]) if times else (starts[-1] if starts else 0.0)
+            start_candidates = [0.0]
+            if starts:
+                start_candidates.append(float(min(starts)))
+            if markers:
+                start_candidates.append(float(min(float(getattr(m, 'time', 0.0) or 0.0) for m in markers)))
+            score_start = float(min(start_candidates))
+
+            end_candidates = [0.0]
+            if times:
+                end_candidates.append(float(times[-1]))
+            if starts:
+                end_candidates.append(float(max(starts)))
+            if markers:
+                end_candidates.append(
+                    float(
+                        max(
+                            float(getattr(m, 'time', 0.0) or 0.0) + max(0.0, float(getattr(m, 'duration', 0.0) or 0.0))
+                            for m in markers
+                        )
+                    )
+                )
+            score_end = float(max(end_candidates))
             default_windows = build_grid_windows(times, score_start, score_end)
             windows = process_beam_marker_override(default_windows, markers)
             groups = assign_groups(notes_sorted, starts, windows) if notes_sorted else []
