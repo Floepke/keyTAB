@@ -359,6 +359,11 @@ class SnapSizeDock(QtWidgets.QDockWidget):
     def __init__(self, parent=None):
         super().__init__("Snap Band Size", parent)
         self.setObjectName("SnapSizeDock")
+        self.setToolTip(
+            "Configure the snap size for the editor mouse input. The snap size determines the spacing of the visual snap bands. "
+            "The edit cursor will snap to these divisions when moving or placing elements. "
+            "It is also used as the editor scroll step/size."   
+        )
         # Lock dock: no moving, no floating, no closing
         self.setAllowedAreas(QtCore.Qt.DockWidgetArea.LeftDockWidgetArea | QtCore.Qt.DockWidgetArea.RightDockWidgetArea)
         self.setFeatures(QtWidgets.QDockWidget.DockWidgetFeature.NoDockWidgetFeatures)

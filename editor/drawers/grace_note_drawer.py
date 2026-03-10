@@ -16,7 +16,7 @@ class GraceNoteDrawerMixin:
         if score is None:
             return
         layout = getattr(score, 'layout', None)
-        if layout is None or not getattr(layout, 'grace_note_visible', True):
+        if layout is None:
             return
 
         margin = float(getattr(self, 'margin', 0.0) or 0.0)

@@ -2,6 +2,7 @@ from __future__ import annotations
 from __future__ import annotations
 from typing import TYPE_CHECKING, cast
 from ui.widgets.draw_util import DrawUtil
+from utils.CONSTANT import SLUR_SEGMENT_COUNT
 
 if TYPE_CHECKING:
     from editor.editor import Editor
@@ -24,7 +25,7 @@ class SlurDrawerMixin:
         lay = getattr(score, 'layout', None)
         side_w = float(getattr(lay, 'slur_width_sides_mm', 0.1) or 0.1)
         mid_w = float(getattr(lay, 'slur_width_middle_mm', 1.5) or 1.5)
-        n_seg = 25
+        n_seg = max(2, int(SLUR_SEGMENT_COUNT))
 
         is_slur_tool = False
         try:
@@ -39,6 +40,24 @@ class SlurDrawerMixin:
 
         def width_at(t: float) -> float:
             return side_w + (mid_w - side_w) * tri_interp(t) / 2
+
+        def lerp(a: float, b: float, t: float) -> float:
+            return a + (b - a) * t
+
+        def bezier_point(t: float, p0: tuple[float, float], p1: tuple[float, float], p2: tuple[float, float], p3: tuple[float, float]) -> tuple[float, float]:
+            q0x = lerp(p0[0], p1[0], t)
+            q0y = lerp(p0[1], p1[1], t)
+            q1x = lerp(p1[0], p2[0], t)
+            q1y = lerp(p1[1], p2[1], t)
+            q2x = lerp(p2[0], p3[0], t)
+            q2y = lerp(p2[1], p3[1], t)
+
+            r0x = lerp(q0x, q1x, t)
+            r0y = lerp(q0y, q1y, t)
+            r1x = lerp(q1x, q2x, t)
+            r1y = lerp(q1y, q2y, t)
+
+            return lerp(r0x, r1x, t), lerp(r0y, r1y, t)
 
         page_w, _ = du.current_page_size_mm()
 
@@ -65,21 +84,13 @@ class SlurDrawerMixin:
                 continue
 
             pts: list[tuple[float, float]] = []
+            p0 = (x1, y1)
+            p1 = (x2, y2)
+            p2 = (x3, y3)
+            p3 = (x4, y4)
             for i in range(n_seg):
                 t = i / float(n_seg - 1)
-                omt = 1.0 - t
-                bx = (
-                    omt * omt * omt * x1
-                    + 3 * omt * omt * t * x2
-                    + 3 * omt * t * t * x3
-                    + t * t * t * x4
-                )
-                by = (
-                    omt * omt * omt * y1
-                    + 3 * omt * omt * t * y2
-                    + 3 * omt * t * t * y3
-                    + t * t * t * y4
-                )
+                bx, by = bezier_point(t, p0, p1, p2, p3)
                 pts.append((bx, by))
 
             for i in range(len(pts) - 1):

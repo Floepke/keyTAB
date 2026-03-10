@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Callable, Optional
 
 from PySide6 import QtCore, QtGui, QtWidgets
+from ui.style import Style
 
 
 class _JumpToClickScrollBarStyle(QtWidgets.QProxyStyle):
@@ -56,9 +57,15 @@ class EditorScrollBar(QtWidgets.QScrollBar):
             tooltip_font.setPointSizeF(custom_pt)
         self._measure_popup.setFont(tooltip_font)
 
-        palette = QtWidgets.QToolTip.palette()
-        bg = palette.color(QtGui.QPalette.ColorRole.ToolTipBase)
-        fg = palette.color(QtGui.QPalette.ColorRole.ToolTipText)
+        try:
+            bg_rgb = Style.get_named_rgb('bg', (240, 240, 240))
+            fg_rgb = Style.get_named_rgb('text', (0, 0, 0))
+            bg = QtGui.QColor(int(bg_rgb[0]), int(bg_rgb[1]), int(bg_rgb[2]))
+            fg = QtGui.QColor(int(fg_rgb[0]), int(fg_rgb[1]), int(fg_rgb[2]))
+        except Exception:
+            palette = QtWidgets.QToolTip.palette()
+            bg = palette.color(QtGui.QPalette.ColorRole.ToolTipBase)
+            fg = palette.color(QtGui.QPalette.ColorRole.ToolTipText)
         border = fg
         self._measure_popup.setStyleSheet(
             f"QLabel {{ background: {bg.name()}; color: {fg.name()}; "

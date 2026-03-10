@@ -28,6 +28,9 @@ class GridDrawerMixin:
     def draw_grid(self, du: DrawUtil) -> None:
         self = cast("Editor", self)
         score: SCORE = self.current_score()
+        layout = getattr(score, 'layout', None)
+        barline_visible = bool(getattr(layout, 'barline_visible', True)) if layout is not None else True
+        grid_line_visible = bool(getattr(layout, 'grid_line_visible', True)) if layout is not None else True
 
         # draw title and composer at top-left
         title_text = score.info.title
@@ -113,34 +116,36 @@ class GridDrawerMixin:
             measure_numbering_cursor += 1
 
         # Draw subgrid lines from cached grid times, excluding barline layer times.
-        for t in grid_den_times:
-            if round(float(t), 6) in barline_keys:
-                continue
-            y_mm = float(self.time_to_mm(float(t)))
-            du.add_line(
-                stave_left_position,
-                y_mm,
-                stave_right_position,
-                y_mm,
-                color=color,
-                width_mm=bar_width_mm / 2,
-                id=0,
-                tags=["grid_line"],
-                dash_pattern=[2.0, 2.0],
-            )
+        if grid_line_visible:
+            for t in grid_den_times:
+                if round(float(t), 6) in barline_keys:
+                    continue
+                y_mm = float(self.time_to_mm(float(t)))
+                du.add_line(
+                    stave_left_position,
+                    y_mm,
+                    stave_right_position,
+                    y_mm,
+                    color=color,
+                    width_mm=bar_width_mm / 2,
+                    id=0,
+                    tags=["grid_line"],
+                    dash_pattern=[2.0, 2.0],
+                )
 
         # Draw regular barlines; draw final end barline thicker.
-        for idx, t in enumerate(barline_times):
-            y_mm = float(self.time_to_mm(float(t)))
-            is_last = idx == (len(barline_times) - 1)
-            du.add_line(
-                stave_left_position,
-                y_mm,
-                stave_right_position,
-                y_mm,
-                color=color,
-                width_mm=(bar_width_mm * 3.0) if is_last else bar_width_mm,
-                id=0,
-                tags=["end_barline" if is_last else "barline"],
-                dash_pattern=None,
-            )
+        if barline_visible:
+            for idx, t in enumerate(barline_times):
+                y_mm = float(self.time_to_mm(float(t)))
+                is_last = idx == (len(barline_times) - 1)
+                du.add_line(
+                    stave_left_position,
+                    y_mm,
+                    stave_right_position,
+                    y_mm,
+                    color=color,
+                    width_mm=(bar_width_mm * 3.0) if is_last else bar_width_mm,
+                    id=0,
+                    tags=["end_barline" if is_last else "barline"],
+                    dash_pattern=None,
+                )

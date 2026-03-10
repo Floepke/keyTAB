@@ -543,9 +543,12 @@ def main() -> int:
     linuxdeploy = ensure_appimage_tools(tools_dir)
     env = os.environ.copy()
     env["PATH"] = f"{tools_dir}:{env.get('PATH', '')}"
-    env.setdefault("VERSION", "dev")
+    env.setdefault("LINUXDEPLOY_OUTPUT_VERSION", "dev")
     # Avoid FUSE mount requirement when running AppImage tools.
     env.setdefault("APPIMAGE_EXTRACT_AND_RUN", "1")
+    # We bundle project/Qt licenses explicitly; disable linuxdeploy's dpkg-query
+    # copyright probing to avoid warnings for private/bundled .so files.
+    env.setdefault("DISABLE_COPYRIGHT_FILES_DEPLOYMENT", "1")
 
     appimage_cmd = [
         str(linuxdeploy),

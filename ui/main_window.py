@@ -21,54 +21,7 @@ from utils.CONSTANT import UTILS_SAVE_DIR, QUARTER_NOTE_UNIT
 from engraver.engraver import Engraver
 from editor.tool_manager import ToolManager
 from editor.editor import Editor
-
-
-class _SlurOptimizerWorker(QtCore.QObject):
-    finished = QtCore.Signal(dict)
-    failed = QtCore.Signal(str)
-
-    def __init__(self, score, settings: dict, optimize_fn):
-        super().__init__()
-        self._score = score
-        self._settings = dict(settings or {})
-        self._optimize_fn = optimize_fn
-
-    @QtCore.Slot()
-    def run(self) -> None:
-        try:
-            def _int_setting(key: str, default: int) -> int:
-                value = self._settings.get(key, default)
-                if value is None:
-                    value = default
-                return int(value)
-
-            def _float_setting(key: str, default: float) -> float:
-                value = self._settings.get(key, default)
-                if value is None:
-                    value = default
-                return float(value)
-
-            stats = self._optimize_fn(
-                self._score,
-                hit_test_finetune=_int_setting("hit_test_finetune", 64),
-                anchor_range=_int_setting("anchor_range", 10),
-                control_range=_int_setting("control_range", 16),
-                max_iterations=_int_setting("max_iterations", 3),
-                max_slurs_from_start=_int_setting("max_slurs_from_start", 12),
-                include_stave_lines=bool(self._settings.get("include_stave_lines", True)),
-                include_beams=bool(self._settings.get("include_beams", True)),
-                pointiness_weight=_float_setting("pointiness_weight", 0.5),
-                symmetry_weight=_float_setting("symmetry_weight", 0.5),
-                pointiness_bonus_points=_float_setting("pointiness_bonus_points", 100.0),
-                symmetry_bonus_points=_float_setting("symmetry_bonus_points", 100.0),
-                antisymmetry_penalty_points=_float_setting("antisymmetry_penalty_points", 100.0),
-                straight_line_penalty_points=_float_setting("straight_line_penalty_points", 100.0),
-                neighbor_connection_bonus_points=_float_setting("neighbor_connection_bonus_points", 100.0),
-                control_y_pass_penalty_points=_float_setting("control_y_pass_penalty_points", 1000.0),
-            )
-            self.finished.emit(dict(stats or {}))
-        except Exception as exc:
-            self.failed.emit(str(exc))
+from scripting.engine import ScriptEngine
 
 
 class MainWindow(QtWidgets.QMainWindow):
@@ -82,12 +35,6 @@ class MainWindow(QtWidgets.QMainWindow):
         self._player_config: tuple[str, str] | None = None
         self._left_panel_width_frozen = False
         self._editor_scroll_step_logical_px: int = 1
-        self._slur_opt_thread: QtCore.QThread | None = None
-        self._slur_opt_worker: _SlurOptimizerWorker | None = None
-        self._slur_opt_progress: QtWidgets.QProgressDialog | None = None
-        self._slur_opt_settings: dict | None = None
-        self._slur_opt_started_at: float | None = None
-        self._slur_opt_dialog = None
 
         # File management
         self.file_manager = FileManager(self)
@@ -100,6 +47,8 @@ class MainWindow(QtWidgets.QMainWindow):
             )
         except Exception:
             self._center_playhead_enabled = True
+        self._playhead_anchor_measure: int | None = None
+        self._playhead_last_visible_measure: int | None = None
         
         # Install error-backup hook early so any unhandled exception triggers a backup
         self.file_manager.install_error_backup_hook()
@@ -307,6 +256,8 @@ class MainWindow(QtWidgets.QMainWindow):
             self.editor_controller.score_changed.connect(self._on_score_changed)
         except Exception:
             pass
+
+        self.script_engine = ScriptEngine(self.file_manager, self.editor_controller, parent=self)
 
         # Coalesce model-change engrave requests so input handlers return quickly.
         self._score_change_engrave_timer = QtCore.QTimer(self)
@@ -560,14 +511,14 @@ class MainWindow(QtWidgets.QMainWindow):
         line_break_act.setToolTip("Open line break and page break settings.")
         line_break_act.setShortcut(QtGui.QKeySequence("L"))
         line_break_act.triggered.connect(self._open_line_break_dialog)
-        slur_bow_opt_act = QtGui.QAction("Slur bow optimizer", self)
-        slur_bow_opt_act.setToolTip("Optimize slur bow X handles to reduce collisions.")
+        run_script_act = QtGui.QAction("Run Script...", self)
+        run_script_act.setToolTip("Load and run a Python script with preview and cancel support.")
 
         document_menu.addAction(style_act)
         document_menu.addAction(info_act)
         document_menu.addAction(line_break_act)
         document_menu.addSeparator()
-        tools_menu.addAction(slur_bow_opt_act)
+        tools_menu.addAction(run_script_act)
 
         export_pdf_act = QtGui.QAction("Export PDF...", self)
         export_pdf_act.setToolTip("Export the current score as a PDF document.")
@@ -790,7 +741,7 @@ class MainWindow(QtWidgets.QMainWindow):
         zoom_in_act.triggered.connect(lambda: self._zoom_editor(1))
         zoom_out_act.triggered.connect(lambda: self._zoom_editor(-1))
         full_screen_act.triggered.connect(self._toggle_full_screen)
-        slur_bow_opt_act.triggered.connect(self._run_slur_bow_optimizer)
+        run_script_act.triggered.connect(self._run_script_dialog)
 
         # Keep reference for state sync
         self._full_screen_act = full_screen_act
@@ -1745,203 +1696,19 @@ class MainWindow(QtWidgets.QMainWindow):
         dlg.finished.connect(_on_finished)
         dlg.show()
 
-    def _run_slur_bow_optimizer(self) -> None:
-        score = self.file_manager.current()
-        if score is None:
-            self._status("Slur bow optimizer: no score loaded", 2500)
-            return
-
+    def _run_script_dialog(self) -> None:
+        engine = getattr(self, "script_engine", None)
+        if engine is None:
+            try:
+                self.script_engine = ScriptEngine(self.file_manager, self.editor_controller, parent=self)
+                engine = self.script_engine
+            except Exception as exc:
+                QtWidgets.QMessageBox.critical(self, "Run Script", f"Failed to initialize scripting: {exc}")
+                return
         try:
-            from ui.dialogs.slur_bow_optimizer import SlurBowOptimizerDialog, optimize_slur_bows_in_score
+            engine.choose_and_run()
         except Exception as exc:
-            QtWidgets.QMessageBox.critical(self, "Slur bow optimizer", f"Failed to load optimizer:\n{exc}")
-            return
-
-        dlg = self._slur_opt_dialog
-        if dlg is None:
-            dlg = SlurBowOptimizerDialog(self)
-            self._slur_opt_dialog = dlg
-
-            def _on_apply(settings: dict, fn=optimize_slur_bows_in_score) -> None:
-                self._start_slur_bow_optimizer_run(dict(settings or {}), fn)
-
-            dlg.applyRequested.connect(_on_apply)
-            dlg.finished.connect(self._on_slur_optimizer_dialog_closed)
-
-        dlg.show()
-        dlg.raise_()
-        dlg.activateWindow()
-        try:
-            dlg.set_info_text("Adjust parameters and click Apply to run optimizer.")
-        except Exception:
-            pass
-        self._status("Adjust parameters and click Apply to run optimizer", 3000)
-
-    @QtCore.Slot()
-    def _on_slur_optimizer_dialog_closed(self) -> None:
-        self._slur_opt_dialog = None
-
-    def _start_slur_bow_optimizer_run(self, settings: dict, optimize_slur_bows_in_score) -> None:
-        if self._slur_opt_thread is not None and self._slur_opt_thread.isRunning():
-            self._status("Slur bow optimizer is already running", 2500)
-            return
-
-        score = self.file_manager.current()
-        if score is None:
-            self._status("Slur bow optimizer: no score loaded", 2500)
-            return
-
-        self._slur_opt_settings = dict(settings)
-        self._slur_opt_started_at = time.perf_counter()
-
-        try:
-            if self._slur_opt_dialog is not None:
-                self._slur_opt_dialog.set_apply_enabled(False)
-        except Exception:
-            pass
-
-        progress = QtWidgets.QProgressDialog("Optimizing slur bows...", "", 0, 0, self)
-        progress.setWindowTitle("Slur bow optimizer")
-        progress.setCancelButton(None)
-        progress.setWindowModality(QtCore.Qt.WindowModality.WindowModal)
-        progress.setMinimumDuration(0)
-        progress.setValue(0)
-        progress.show()
-        self._slur_opt_progress = progress
-
-        try:
-            QtWidgets.QApplication.setOverrideCursor(QtCore.Qt.CursorShape.WaitCursor)
-        except Exception:
-            pass
-
-        thread = QtCore.QThread(self)
-        worker = _SlurOptimizerWorker(score, settings, optimize_slur_bows_in_score)
-        worker.moveToThread(thread)
-
-        thread.started.connect(worker.run)
-        worker.finished.connect(self._on_slur_optimizer_finished, QtCore.Qt.ConnectionType.QueuedConnection)
-        worker.failed.connect(self._on_slur_optimizer_failed, QtCore.Qt.ConnectionType.QueuedConnection)
-        self._slur_opt_worker = worker
-        self._slur_opt_thread = thread
-        thread.start()
-
-    def _cleanup_slur_optimizer_thread(self) -> None:
-        try:
-            if self._slur_opt_progress is not None:
-                self._slur_opt_progress.close()
-                self._slur_opt_progress.deleteLater()
-        except Exception:
-            pass
-        self._slur_opt_progress = None
-        try:
-            QtWidgets.QApplication.restoreOverrideCursor()
-        except Exception:
-            pass
-
-        thread = self._slur_opt_thread
-        worker = self._slur_opt_worker
-        self._slur_opt_thread = None
-        self._slur_opt_worker = None
-
-        try:
-            if thread is not None and thread.isRunning():
-                thread.quit()
-                thread.wait(1000)
-        except Exception:
-            pass
-        try:
-            if worker is not None:
-                worker.deleteLater()
-        except Exception:
-            pass
-        try:
-            if thread is not None:
-                thread.deleteLater()
-        except Exception:
-            pass
-        try:
-            if self._slur_opt_dialog is not None:
-                self._slur_opt_dialog.set_apply_enabled(True)
-        except Exception:
-            pass
-
-    @QtCore.Slot(dict)
-    def _on_slur_optimizer_finished(self, stats: dict) -> None:
-        settings = self._slur_opt_settings or {}
-        total = int(stats.get("slurs_total", 0) or 0)
-        available = int(stats.get("slurs_available", total) or total)
-        changed = int(stats.get("slurs_changed", 0) or 0)
-        effective_iters = int(stats.get("effective_max_iterations", int(settings.get("max_iterations", 3) or 3)) or 0)
-        effective_samples = int(stats.get("effective_hit_test_finetune", int(settings.get("hit_test_finetune", 64) or 64)) or 0)
-        requested_limit = int(settings.get("max_slurs_from_start", total) or total)
-        openness_before = float(stats.get("openness_before", 0.0) or 0.0)
-        openness_after = float(stats.get("openness_after", 0.0) or 0.0)
-        openness_delta = float(stats.get("openness_delta", 0.0) or 0.0)
-        objective_before = float(stats.get("objective_before_avg", 0.0) or 0.0)
-        objective_after = float(stats.get("objective_after_avg", 0.0) or 0.0)
-        objective_delta = float(objective_after - objective_before)
-        beams_used = bool(settings.get("include_beams", True))
-        started_at = self._slur_opt_started_at
-        elapsed_s = max(0.0, float(time.perf_counter() - started_at)) if started_at is not None else 0.0
-
-        if changed > 0:
-            try:
-                self.file_manager.on_model_changed()
-            except Exception:
-                pass
-            try:
-                self.editor_controller._snapshot_if_changed(coalesce=False, label='slur_bow_optimizer')
-            except Exception:
-                pass
-            self._refresh_views_from_score()
-            try:
-                self.editor_controller.set_score(self.file_manager.current())
-            except Exception:
-                pass
-            try:
-                self.editor_controller.force_redraw_from_model()
-            except Exception:
-                pass
-            self._status(
-                f"Slur bow optimizer: updated {changed}/{total} slurs (iter={effective_iters}, samples={effective_samples})",
-                4500,
-            )
-        else:
-            self._status(
-                f"Slur bow optimizer: no changes ({total} slurs checked, iter={effective_iters}, samples={effective_samples})",
-                4500,
-            )
-
-        # Professional completion notification with key run metrics.
-        details = [
-            f"Processed slurs: {total} (requested first {requested_limit}, available {available})",
-            f"Changed slurs: {changed}",
-            f"Duration: {elapsed_s:.2f} s",
-            f"Effective settings: iterations={effective_iters}, samples={effective_samples}, beams={'on' if beams_used else 'off'}",
-            f"Objective avg: {objective_before:.3f} -> {objective_after:.3f} (Δ {objective_delta:+.3f})",
-            f"Openness score: {openness_before:.3f} -> {openness_after:.3f} (Δ {openness_delta:+.3f})",
-        ]
-        prefix = "Optimization completed successfully." if changed > 0 else "Optimization completed with no required changes."
-        summary_text = prefix + "\n\n" + "\n".join(details)
-        try:
-            if self._slur_opt_dialog is not None:
-                self._slur_opt_dialog.set_info_text(summary_text)
-        except Exception:
-            pass
-
-        self._slur_opt_started_at = None
-        self._cleanup_slur_optimizer_thread()
-
-    @QtCore.Slot(str)
-    def _on_slur_optimizer_failed(self, message: str) -> None:
-        self._status("Slur bow optimizer: failed", 4500)
-        try:
-            if self._slur_opt_dialog is not None:
-                self._slur_opt_dialog.set_info_text(f"Optimization failed:\n{message}")
-        except Exception:
-            pass
-        self._slur_opt_started_at = None
-        self._cleanup_slur_optimizer_thread()
+            QtWidgets.QMessageBox.critical(self, "Run Script", f"Script failed: {exc}")
 
     def _refresh_recent_files_menu(self) -> None:
         menu = getattr(self, '_recent_menu', None)
@@ -2519,31 +2286,102 @@ class MainWindow(QtWidgets.QMainWindow):
             self._clear_playhead_overlay()
 
     def _center_playhead_scroll(self, units: Optional[float]) -> None:
+        """Scroll so the current playhead measure sits at top+margin and advance only after full measures pass.
+
+        - We anchor the viewport to a barline (measure start) and place it at `top + margin`.
+        - While the playhead stays within the fully visible measures, we do not scroll.
+        - Once the playhead enters a measure beyond the last fully visible one, we jump so that
+          the playhead's measure becomes the new anchor at the top.
+        """
         if units is None:
             return
         try:
             ed = getattr(self, 'editor_controller', None)
             if ed is None:
                 return
-            abs_mm = float(ed.time_to_mm(float(units)))
+
+            # Gather basics
             vp_h_mm = float(getattr(ed, '_viewport_h_mm', 0.0) or 0.0)
-            if vp_h_mm <= 0.0:
-                return
-            target_top_mm = max(0.0, abs_mm - (vp_h_mm * 0.5))
             px_per_mm = float(getattr(ed, '_px_per_mm', 0.0) or 0.0)
             dpr = float(getattr(ed, '_dpr', 1.0) or 1.0)
-            if px_per_mm <= 0.0:
+            margin_mm = float(getattr(ed, 'margin', 0.0) or 0.0)
+            if vp_h_mm <= 0.0 or px_per_mm <= 0.0:
                 return
-            target_scroll = int(round(target_top_mm * px_per_mm / max(1e-6, dpr)))
-            if hasattr(self, 'editor_vscroll') and self.editor_vscroll is not None:
-                max_scroll = int(self.editor_vscroll.maximum())
-                target_scroll = max(0, min(target_scroll, max_scroll))
-                if int(self.editor_vscroll.value()) != target_scroll:
-                    self.editor_vscroll.setValue(target_scroll)
-            elif hasattr(self, 'editor') and self.editor_canvas is not None:
-                self.editor_canvas.set_scroll_logical_px(target_scroll)
+
+            # Barline positions (include terminal end) to compute measure spans
+            bars = self._barlines_with_terminal(ed)
+            if not bars:
+                return
+
+            # Current playhead measure (1-based)
+            measure_idx = max(1, min(len(bars) - 1, int(ed.get_measure_index_for_time(float(units)))))
+
+            # Establish anchor if missing or if we've scrolled beyond visible block
+            anchor = self._playhead_anchor_measure or measure_idx
+            last_visible = self._playhead_last_visible_measure or anchor
+
+            if measure_idx > last_visible:
+                anchor = measure_idx
+
+            # Compute target scroll from anchor
+            target_scroll_px, visible_last = self._scroll_plan_for_anchor(ed, bars, anchor, vp_h_mm, px_per_mm, dpr, margin_mm)
+            if target_scroll_px is None:
+                return
+
+            # Apply scroll only when anchor updates or value differs
+            if anchor != self._playhead_anchor_measure or int(self.editor_vscroll.value()) != target_scroll_px:
+                max_scroll = int(self.editor_vscroll.maximum()) if hasattr(self, 'editor_vscroll') else target_scroll_px
+                target_scroll_px = max(0, min(int(target_scroll_px), int(max_scroll)))
+                if hasattr(self, 'editor_vscroll') and self.editor_vscroll is not None:
+                    self.editor_vscroll.setValue(int(target_scroll_px))
+                elif hasattr(self, 'editor_canvas') and self.editor_canvas is not None:
+                    self.editor_canvas.set_scroll_logical_px(int(target_scroll_px))
+
+            # Persist anchor state
+            self._playhead_anchor_measure = anchor
+            self._playhead_last_visible_measure = visible_last
         except Exception:
             pass
+
+    def _barlines_with_terminal(self, ed) -> list[float]:
+        """Return barline starts plus final end position (ticks)."""
+        try:
+            score = ed.current_score()
+            bars: list[float] = []
+            cur = 0.0
+            for bg in getattr(score, 'base_grid', []) or []:
+                numer = float(getattr(bg, 'numerator', 4) or 4)
+                denom = float(getattr(bg, 'denominator', 4) or 4)
+                measure_len = numer * (4.0 / max(1.0, denom)) * float(QUARTER_NOTE_UNIT)
+                for _ in range(int(getattr(bg, 'measure_amount', 1) or 1)):
+                    bars.append(cur)
+                    cur += measure_len
+            bars.append(cur)
+            return bars
+        except Exception:
+            return []
+
+    def _scroll_plan_for_anchor(self, ed, bars: list[float], anchor_measure: int, vp_h_mm: float, px_per_mm: float, dpr: float, margin_mm: float) -> tuple[int | None, int | None]:
+        if not bars or anchor_measure < 1 or anchor_measure >= len(bars):
+            return None, None
+
+        start_tick = bars[anchor_measure - 1]
+        start_mm = float(ed.time_to_mm(start_tick))
+        top_mm = max(0.0, start_mm - margin_mm)
+        bottom_mm = top_mm + vp_h_mm
+
+        # Determine last fully visible measure
+        last_visible = anchor_measure
+        for idx in range(anchor_measure - 1, len(bars) - 1):
+            m_start_mm = float(ed.time_to_mm(bars[idx]))
+            m_end_mm = float(ed.time_to_mm(bars[idx + 1]))
+            if m_end_mm <= bottom_mm:
+                last_visible = idx + 1
+            else:
+                break
+
+        target_scroll_px = int(round(top_mm * px_per_mm / max(1e-6, dpr)))
+        return target_scroll_px, last_visible
 
 
     def _clear_playhead_overlay(self) -> None:
@@ -2560,6 +2398,8 @@ class MainWindow(QtWidgets.QMainWindow):
                 self.editor_canvas.update()
         except Exception:
             pass
+        self._playhead_anchor_measure = None
+        self._playhead_last_visible_measure = None
 
     # FX/editor hooks removed; FluidSynth is the single backend
     def _open_fx_editor(self) -> None:

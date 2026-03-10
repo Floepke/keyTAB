@@ -73,7 +73,6 @@ ENGRAVER_LAYERING = [
     'measure_number_guide',
     'measure_number',
     'stave',
-    'text_bg',
     'barline',
     'beam_stem',
     'stop_sign',
@@ -91,7 +90,7 @@ ENGRAVER_LAYERING = [
     'title',
     'composer',
     'copyright',
-    'engrave_test',
+    'text_bg',
     'text',
     'slur',
 ]
@@ -118,3 +117,6 @@ GRACENOTE_THRESHOLD: float = SHORTEST_DURATION
 ENGRAVER_VERSION: str = '1.0'
 
 ENGRAVER_FRACTIONAL_TEXT_SCALING_CORRECTION: float = 0.675
+
+# Amount of line segments used to sample/draw cubic slurs.
+SLUR_SEGMENT_COUNT: int = 100

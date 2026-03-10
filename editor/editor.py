@@ -1241,7 +1241,7 @@ class Editor(QtCore.QObject,
                     tags=['cursor'],
                 )
                 # draw the left hand dot indicator
-                if self.hand_cursor == '<' and self.current_score().layout.note_leftdot_visible:
+                if self.hand_cursor == '<':
                     w = float(self.semitone_dist or 0.5) * 2.0
                     dot_d = w * 0.35
                     cy = y_mm + (w / 2.0)

@@ -500,7 +500,7 @@ class StyleDialog(QtWidgets.QDialog):
             'scale': 'Page',
             # Note
             'black_note_rule': 'Note',
-            'black_note_width_scaling': 'Note',
+            'note_width_scaling': 'Note',
             'note_stem_length_semitone': 'Note',
             'note_stem_thickness_mm': 'Note',
             'note_stopsign_thickness_mm': 'Note',
@@ -549,8 +549,12 @@ class StyleDialog(QtWidgets.QDialog):
             # Visibility
             'note_head_visible': 'Visibility',
             'note_stem_visible': 'Visibility',
+            'note_stop_visible': 'Visibility',
             'note_leftdot_visible': 'Visibility',
             'note_midinote_visible': 'Visibility',
+            'stave_visible': 'Visibility',
+            'barline_visible': 'Visibility',
+            'grid_line_visible': 'Visibility',
             'beam_visible': 'Visibility',
             'grace_note_visible': 'Visibility',
             'pedal_lane_enabled': 'Visibility',

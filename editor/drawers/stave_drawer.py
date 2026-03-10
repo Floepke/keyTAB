@@ -15,6 +15,9 @@ class StaveDrawerMixin:
     def draw_stave(self, du: DrawUtil) -> None:
         self = cast("Editor", self)
         score: SCORE = self.current_score()
+        layout = getattr(score, 'layout', None)
+        if layout is None or not bool(getattr(layout, 'stave_visible', True)):
+            return
 
         # Piano-roll vertical stave: draw vertical lines per semitone across full height
         semitone_dx = float(self.semitone_dist)

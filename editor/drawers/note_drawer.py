@@ -175,6 +175,8 @@ class NoteDrawerMixin:
         if not on_barline:
             return
         layout = cast("Editor", self).current_score().layout
+        if not bool(getattr(layout, 'barline_visible', True)):
+            return
         w = float(self.semitone_dist or 0.5)
         stem_len = float(layout.note_stem_length_semitone or 3) * w
         thickness = float(layout.grid_barline_thickness_mm or 0.25)
@@ -215,7 +217,7 @@ class NoteDrawerMixin:
         w = float(self.semitone_dist or 0.5)
         layout = cast("Editor", self).current_score().layout
         outline_w = 0.5
-        black_head_scale = float(getattr(layout, 'black_note_width_scaling', 0.75) or 0.75)
+        black_head_scale = float(getattr(layout, 'note_width_scaling', 0.75) or 0.75)
         black_head_scale = max(0.05, min(1.0, black_head_scale))
         black_above = n.pitch in BLACK_KEYS and self._black_note_above_stem(n, layout)
         base_scale = 0.8
@@ -255,6 +257,9 @@ class NoteDrawerMixin:
     def _draw_notestop(self, du: DrawUtil, n, x: float, y2: float, draw_mode: str) -> None:
         self = cast("Editor", self)
         if getattr(self, 'is_tiny_mode', None) and self.is_tiny_mode():
+            return
+        layout = cast("Editor", self).current_score().layout
+        if not bool(getattr(layout, 'note_stop_visible', True)):
             return
         # Show stop triangle if followed by a rest in same hand
         if not self._is_followed_by_rest(n):
