@@ -259,8 +259,8 @@ class Style:
         except Exception:
             pass
         try:
-            QApplication.setEffectEnabled(Qt.UI_AnimateMenu, False)
-            QApplication.setEffectEnabled(Qt.UI_FadeMenu, False)
+            QApplication.setEffectEnabled(Qt.UI_AnimateMenu, True)
+            QApplication.setEffectEnabled(Qt.UI_FadeMenu, True)
         except Exception:
             pass
         # Clear any previous global stylesheet; we may set a minimal one below
@@ -277,6 +277,8 @@ class Style:
         # Remove menu highlight while keeping text readable
         bg = colors_by_key["bg_color"]
         text = colors_by_key["text_color"]
+        accent = colors_by_key["accent_color"]
+        alt = colors_by_key["alternate_background_color"]
         scroll_extent = int(app.style().pixelMetric(QStyle.PixelMetric.PM_ScrollBarExtent))
         scroll_extent = max(12, int(scroll_extent * 2))
         app.setStyleSheet(
@@ -318,6 +320,13 @@ class Style:
             "}"
             "QMenu::item:disabled {"
             "background-color: transparent;"
+            "}"
+            "QLineEdit, QAbstractSpinBox, QTextEdit, QPlainTextEdit, QComboBox {"
+            f"background-color: rgb({bg.red()},{bg.green()},{bg.blue()});"
+            f"color: rgb({text.red()},{text.green()},{text.blue()});"
+            f"selection-background-color: rgb({accent.red()},{accent.green()},{accent.blue()});"
+            f"selection-color: rgb({text.red()},{text.green()},{text.blue()});"
+            f"border: 1px solid rgb({alt.red()},{alt.green()},{alt.blue()});"
             "}"
         )
 

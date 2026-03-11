@@ -1075,7 +1075,12 @@ class StyleDialog(QtWidgets.QDialog):
         self.accept()
 
     def get_values(self) -> Layout:
+        # Start from current layout so fields without an editor (e.g. grid band tracks)
+        # are preserved when the dialog applies changes.
         data: dict[str, Any] = {}
+        for f in fields(Layout):
+            data[f.name] = getattr(self._layout, f.name)
+
         for f in fields(Layout):
             name = f.name
             editor = self._editors.get(name)

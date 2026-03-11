@@ -154,8 +154,6 @@ class GridBandDrawerMixin:
         qcustom = QtGui.QColor(custom)
         if qcustom.isValid():
             return (qcustom.red() / 255.0, qcustom.green() / 255.0, qcustom.blue() / 255.0, 1.0)
-        if not Style:
-            return (0.8, 0.8, 0.8, 0.3)
         r, g, b = Style.get_named_rgb('accent', (200, 200, 200))
         return (
             max(0, min(255, int(r))) / 255.0,
@@ -165,8 +163,6 @@ class GridBandDrawerMixin:
         )
 
     def _grid_band_off_rgba(self) -> tuple[float, float, float, float]:
-        if not Style:
-            return (0.8, 0.2, 0.2, 1.0)
         r, g, b = Style.get_named_rgb('accent', (200, 80, 80))
         return (
             max(0, min(255, int(r))) / 255.0,

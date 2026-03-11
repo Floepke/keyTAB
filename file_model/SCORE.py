@@ -33,19 +33,13 @@ def _timestamp_now() -> str:
 	"""Return current timestamp formatted from preferences with a safe fallback."""
 	default_fmt = "%d-%m-%Y_%H:%M:%S"
 	fmt = default_fmt
-	try:
-		from settings_manager import get_preferences_manager
-		pm = get_preferences_manager()
-		raw_fmt = pm.get('timestamp_format', default_fmt)
-		fmt = str(raw_fmt).strip() if raw_fmt is not None else default_fmt
-		if not fmt:
-			fmt = default_fmt
-	except Exception:
+	from settings_manager import get_preferences_manager
+	pm = get_preferences_manager()
+	raw_fmt = pm.get('timestamp_format', default_fmt)
+	fmt = str(raw_fmt).strip() if raw_fmt is not None else default_fmt
+	if not fmt:
 		fmt = default_fmt
-	try:
-		return datetime.now().strftime(fmt)
-	except Exception:
-		return datetime.now().strftime(default_fmt)
+	return datetime.now().strftime(fmt)
 
 
 
@@ -151,9 +145,9 @@ class SCORE:
 	info: Info = field(default_factory=Info)
 	analysis: Analysis = field(default_factory=Analysis)
 	base_grid: List[BaseGrid] = field(default_factory=list)
-	events: Events = field(default_factory=Events)
 	layout: Layout = field(default_factory=Layout)
 	app_state: AppState = field(default_factory=AppState)
+	events: Events = field(default_factory=Events)
 	_next_id: int = 1
 	_app_state_from_file: bool = False
 	_last_load_checks_report: dict = field(default_factory=dict)

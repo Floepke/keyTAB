@@ -412,6 +412,15 @@ class MainWindow(QtWidgets.QMainWindow):
         return paths
 
     def keyPressEvent(self, ev: QtGui.QKeyEvent) -> None:
+        # Number keys 1..8 control snap selector/listbox + divider.
+        # Applies to both top-row digits and numpad digits.
+        try:
+            if self._handle_snap_number_shortcut(ev):
+                ev.accept()
+                return
+        except Exception:
+            pass
+
         # Space toggles play/stop from the editor's time cursor (with note chasing)
         try:
             if ev.key() == QtCore.Qt.Key_Space:
@@ -462,6 +471,79 @@ class MainWindow(QtWidgets.QMainWindow):
         except Exception:
             pass
         super().keyPressEvent(ev)
+
+    def _is_text_input_focus(self) -> bool:
+        fw = QtWidgets.QApplication.focusWidget()
+        return isinstance(
+            fw,
+            (
+                QtWidgets.QLineEdit,
+                QtWidgets.QTextEdit,
+                QtWidgets.QPlainTextEdit,
+                QtWidgets.QAbstractSpinBox,
+                QtWidgets.QComboBox,
+            ),
+        )
+
+    def _handle_snap_number_shortcut(self, ev: QtGui.QKeyEvent) -> bool:
+        # Do not consume numeric keys while editing text values.
+        if self._is_text_input_focus():
+            return False
+
+        if not hasattr(self, 'snap_dock') or not hasattr(self.snap_dock, 'selector'):
+            return False
+
+        # Accept no modifiers or keypad-only modifier (numpad).
+        mods = ev.modifiers()
+        if bool(mods & ~QtCore.Qt.KeyboardModifier.KeypadModifier):
+            return False
+
+        key = int(ev.key())
+        digit_map = {
+            int(QtCore.Qt.Key.Key_1): 1,
+            int(QtCore.Qt.Key.Key_2): 2,
+            int(QtCore.Qt.Key.Key_3): 3,
+            int(QtCore.Qt.Key.Key_4): 4,
+            int(QtCore.Qt.Key.Key_5): 5,
+            int(QtCore.Qt.Key.Key_6): 6,
+            int(QtCore.Qt.Key.Key_7): 7,
+            int(QtCore.Qt.Key.Key_8): 8,
+        }
+        digit = digit_map.get(key)
+        if digit is None:
+            return False
+
+        selector = self.snap_dock.selector
+        base = int(selector.get_snap_base() or 8)
+        divide = int(selector.get_snap_divide() or 1)
+
+        # Requested mapping:
+        # 1 whole, 2 half, 3 divide=3, 4 quarter,
+        # 5 divide=5, 6 sixteenth, 7 divide=7, 8 eighth.
+        if digit == 1:
+            base = 1
+            divide = 1
+        elif digit == 2:
+            base = 2
+            divide = 1
+        elif digit == 3:
+            divide = 3
+        elif digit == 4:
+            base = 4
+            divide = 1
+        elif digit == 5:
+            divide = 5
+        elif digit == 6:
+            base = 16
+            divide = 1
+        elif digit == 7:
+            divide = 7
+        elif digit == 8:
+            base = 8
+            divide = 1
+
+        selector.set_snap(base, divide, emit=True)
+        return True
 
     def _create_menus(self) -> None:
         menubar = self.menuBar()

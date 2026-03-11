@@ -1320,12 +1320,12 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
 
             def _hand_band_x_span(hand_key: str, t0: float, t1: float) -> tuple[float, float] | None:
                 if hand_key == '<':
-                    # Left hand: fixed span from visible left stave edge to C4 (key 40).
+                    # Left hand: fixed span from visible left stave edge to key 42.
                     x0 = float(grid_left)
-                    x1 = float(_key_to_x(40))
+                    x1 = float(_key_to_x(42))
                 else:
-                    # Right hand: fixed span from key 44 to visible right stave edge.
-                    x0 = float(_key_to_x(44))
+                    # Right hand: fixed span from key 42 to visible right stave edge.
+                    x0 = float(_key_to_x(42))
                     x1 = float(grid_right)
 
                 x0 = max(float(grid_left), min(float(grid_right), float(x0)))

@@ -178,9 +178,12 @@ class SnapSizeSelector(QtWidgets.QWidget):
                 break
 
     def _update_ui(self) -> None:
-        self.label.setText(f"\u00F7 {self._divide}")  # ÷ symbol
+        # During early init, list selection can emit before controls are created.
+        if hasattr(self, 'label') and self.label is not None:
+            self.label.setText(f"\u00F7 {self._divide}")  # ÷ symbol
         # Enable/disable minus based on min divide = 1
-        self.minus_btn.setEnabled(self._divide > 1)
+        if hasattr(self, 'minus_btn') and self.minus_btn is not None:
+            self.minus_btn.setEnabled(self._divide > 1)
 
     def adjust_to_fit(self) -> None:
         """Adjust the widget to fit all list items and controls exactly, without scrollbars."""
@@ -240,6 +243,9 @@ class SnapSizeSelector(QtWidgets.QWidget):
         if sel:
             base = int(sel[0].data(QtCore.Qt.ItemDataRole.UserRole))
             self._base = base
+            # Selecting a base note from the list always resets tuplet divider.
+            self._divide = 1
+            self._update_ui()
         self.snapChanged.emit(self._base, self._divide)
 
     def _dec_divide(self) -> None:
@@ -339,6 +345,7 @@ class SnapSizeSelector(QtWidgets.QWidget):
         self._divide = divide
         # Select the matching base row
         try:
+            self.list.blockSignals(True)
             for i in range(self.list.count()):
                 it = self.list.item(i)
                 if int(it.data(QtCore.Qt.ItemDataRole.UserRole)) == base:
@@ -347,6 +354,9 @@ class SnapSizeSelector(QtWidgets.QWidget):
                     break
         except Exception:
             pass
+        finally:
+            self.list.blockSignals(False)
+
         self._update_ui()
         if emit:
             try:
