@@ -6,12 +6,6 @@ from utils.operator import Operator as OP
 from ui.widgets.draw_util import DrawUtil
 from utils.CONSTANT import QUARTER_NOTE_UNIT, EDITOR_SIDE_BAND_INSET_SEMITONES
 
-try:
-    # Theme-aware editor background color
-    from ui.style import Style  # type: ignore
-except Exception:  # Fallback if style import fails at runtime
-    Style = None  # type: ignore
-
 if TYPE_CHECKING:
     from editor.editor import Editor
 
@@ -22,19 +16,10 @@ class SnapDrawerMixin:
             - Alternating light/darker snap bands along the vertical timeline the size of the snap.
     '''
 
-    def _side_band_tint_rgba(self, side: str) -> tuple[float, float, float, float]:
-        """Return the themed left/right snap-band color as RGBA floats."""
-        key = "midi_left" if str(side).lower().startswith("l") else "midi_right"
-        rgb = Style.get_named_rgb(key, (200, 200, 200))
-        r = max(0, min(255, int(rgb[0])))
-        g = max(0, min(255, int(rgb[1])))
-        b = max(0, min(255, int(rgb[2])))
-        return (
-            r / 255.0,
-            g / 255.0,
-            b / 255.0,
-            .15,
-        )
+    def _side_band_tint_rgba(self, layout, side: str) -> tuple[float, float, float, float]:
+        """Return the exact left/right grid band color for snap bands."""
+        field_name = 'grid_band_left_color' if str(side).lower().startswith('l') else 'grid_band_right_color'
+        return self._grid_band_fill_rgba(layout, field_name, side)
 
     def draw_snap(self, du: DrawUtil) -> None:
         """Draw alternating light/darker snap bands along the vertical timeline.
@@ -80,9 +65,10 @@ class SnapDrawerMixin:
             snap_units = float(QUARTER_NOTE_UNIT) / 2.0
         snap_mm = (snap_units / float(QUARTER_NOTE_UNIT)) * zpq
 
-        left_fill_rgba = self._side_band_tint_rgba('left')
-        right_fill_rgba = self._side_band_tint_rgba('right')
-        sub_band_visible = bool(getattr(getattr(score, 'layout', None), 'sub_band_visible', True))
+        layout = getattr(score, 'layout', None)
+        left_fill_rgba = self._side_band_tint_rgba(layout, 'left')
+        right_fill_rgba = self._side_band_tint_rgba(layout, 'right')
+        sub_band_visible = bool(getattr(layout, 'sub_band_visible', True))
 
         # Walk the base grid (measures) and draw darker rectangles on every other snap step
         time_cursor_mm = margin

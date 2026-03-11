@@ -2,7 +2,6 @@ from PySide6 import QtCore
 from datetime import datetime
 import bisect, math
 import multiprocessing as mp
-import queue
 from ui.widgets.draw_util import DrawUtil
 from utils.CONSTANT import BE_KEYS, QUARTER_NOTE_UNIT, PIANO_KEY_AMOUNT, SHORTEST_DURATION, hex_to_rgba, BLACK_KEYS, ENGRAVER_FRACTIONAL_TEXT_SCALING_CORRECTION, SLUR_SEGMENT_COUNT
 from utils.tiny_tool import key_class_filter
@@ -2891,14 +2890,20 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
             du.set_current_page(target_page_index)
 
 
-def _engrave_worker(score: dict, request_id: int, pageno: int, out_queue) -> None:
+def _engrave_worker(score: dict, request_id: int, pageno: int, out_conn) -> None:
     """Worker entry point to build DrawUtil in a separate process.
 
     Problem solved: isolate heavy engraving work from the UI thread.
     """
-    local_du = DrawUtil()
-    do_engrave(score, local_du, pageno=pageno)
-    out_queue.put((int(request_id), local_du))
+    try:
+        local_du = DrawUtil()
+        do_engrave(score, local_du, pageno=pageno)
+        out_conn.send((int(request_id), local_du))
+    finally:
+        try:
+            out_conn.close()
+        except Exception:
+            pass
 
 
 class Engraver(QtCore.QObject):
@@ -2915,7 +2920,8 @@ class Engraver(QtCore.QObject):
         super().__init__(parent)
         self._du = draw_util
         self._mp_ctx = _MP_CONTEXT
-        self._result_queue = self._mp_ctx.Queue()
+        self._result_recv = None
+        self._result_send = None
         self._proc: mp.Process | None = None
         self._poll_timer = QtCore.QTimer(self)
         self._poll_timer.setInterval(50)
@@ -2933,6 +2939,20 @@ class Engraver(QtCore.QObject):
         self._delay_timer.setSingleShot(True)
         self._delay_timer.timeout.connect(self._maybe_start_pending)
         self.analysis: Analysis | None = None
+
+    def _close_result_pipe(self) -> None:
+        if self._result_send is not None:
+            try:
+                self._result_send.close()
+            except Exception:
+                pass
+            self._result_send = None
+        if self._result_recv is not None:
+            try:
+                self._result_recv.close()
+            except Exception:
+                pass
+            self._result_recv = None
 
     def engrave(self, score: dict, pageno: int | None = None) -> None:
         """Request an engraving; coalesce to the most recent request.
@@ -2997,33 +3017,51 @@ class Engraver(QtCore.QObject):
         if self._proc is not None:
             if self._proc.is_alive():
                 self._proc.terminate()
+            self._proc.join(timeout=0.1)
+            self._proc = None
+        self._close_result_pipe()
+        self._result_recv, self._result_send = self._mp_ctx.Pipe(duplex=False)
         self._proc = self._mp_ctx.Process(
             target=_engrave_worker,
-            args=(score, request_id, pageno, self._result_queue),
+            args=(score, request_id, pageno, self._result_send),
             daemon=True,
         )
         self._proc.start()
+        if self._result_send is not None:
+            try:
+                self._result_send.close()
+            except Exception:
+                pass
+            self._result_send = None
         if not self._poll_timer.isActive():
             self._poll_timer.start()
 
     def _poll_results(self) -> None:
-        """Drain worker results and advance the queue.
+        """Drain worker results and advance the state machine.
 
         Problem solved: process can exit without a result; this keeps the
         state machine moving and restarts pending work.
         """
         got_result = False
-        while True:
+        if self._result_recv is not None:
             try:
-                req_id, result_du = self._result_queue.get_nowait()
-            except queue.Empty:
-                break
-            got_result = True
-            self._on_finished(req_id, result_du)
+                has_result = bool(self._result_recv.poll())
+            except (EOFError, OSError):
+                has_result = False
+            if has_result:
+                try:
+                    req_id, result_du = self._result_recv.recv()
+                except (EOFError, OSError):
+                    pass
+                else:
+                    got_result = True
+                    self._close_result_pipe()
+                    self._on_finished(req_id, result_du)
 
         if self._proc is not None and not self._proc.is_alive():
-            self._proc.join(timeout=0)
+            self._proc.join(timeout=0.1)
             self._proc = None
+            self._close_result_pipe()
             if self._running and not got_result:
                 self._running = False
                 if self._pending_score is not None:
@@ -3038,11 +3076,18 @@ class Engraver(QtCore.QObject):
         """
         if self._poll_timer.isActive():
             self._poll_timer.stop()
+        if self._delay_timer.isActive():
+            self._delay_timer.stop()
         if self._proc is not None:
             if self._proc.is_alive():
                 self._proc.terminate()
             self._proc.join(timeout=0.1)
             self._proc = None
+        self._close_result_pipe()
+        self._running = False
+        self._pending_score = None
+        self._pending_pageno = None
+        self._pending_request_id = None
 
     @QtCore.Slot(int, object)
     def _on_finished(self, request_id: int, result_du: DrawUtil) -> None:

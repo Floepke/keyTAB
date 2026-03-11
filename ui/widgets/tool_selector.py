@@ -1,6 +1,8 @@
 from __future__ import annotations
+import sys
 from PySide6 import QtCore, QtGui, QtWidgets
 from icons.icons import get_qicon
+from ui.style import Style
 
 # Fixed row height to fit 36px icons comfortably
 ITEM_ROW_HEIGHT_PX: int = 42
@@ -55,7 +57,26 @@ class ToolSelectorWidget(QtWidgets.QListWidget):
         self.setViewportMargins(0, 0, 0, 0)
         self.setSelectionMode(QtWidgets.QAbstractItemView.SelectionMode.SingleSelection)
         self.itemSelectionChanged.connect(self._emit_selected)
+        self._apply_platform_scrollbar_width()
         self._populate()
+
+    def _apply_platform_scrollbar_width(self) -> None:
+        try:
+            if sys.platform != "darwin":
+                return
+            vscroll = self.verticalScrollBar()
+            if vscroll is None:
+                return
+            extent = int(self.style().pixelMetric(QtWidgets.QStyle.PixelMetric.PM_ScrollBarExtent))
+            width = int(Style.get_macos_scrollbar_width(max(12, int(extent * 2))))
+            vscroll.setFixedWidth(width)
+            vscroll.setStyleSheet(
+                "QScrollBar:vertical {"
+                f"width: {width}px;"
+                "}"
+            )
+        except Exception:
+            pass
 
     def _emit_selected(self) -> None:
         items = self.selectedItems()

@@ -1,4 +1,5 @@
 import colorsys
+import sys
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor, QPalette
 from PySide6.QtWidgets import QApplication, QProxyStyle, QStyle
@@ -100,6 +101,23 @@ class Style:
     }
     _THEME_SYNCED: bool = False
     _APP_STYLE_PROXY: QProxyStyle | None = None
+    MACOS_SCROLLBAR_WIDTH: int | None = 12
+
+    @classmethod
+    def get_macos_scrollbar_width(cls, fallback: int) -> int:
+        """Return the code-set narrow scrollbar width for macOS-only widgets."""
+        width = int(fallback)
+        if sys.platform != "darwin":
+            return max(1, width)
+        configured = getattr(cls, "MACOS_SCROLLBAR_WIDTH", None)
+        if configured is not None:
+            try:
+                configured = int(configured)
+                if configured > 0:
+                    width = configured
+            except Exception:
+                pass
+        return max(6, int(width))
 
     @classmethod
     def _ensure_theme_seeded(cls) -> None:

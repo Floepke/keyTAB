@@ -15,6 +15,7 @@ from ui.widgets.snap_size_selector import SnapSizeDock
 from ui.widgets.draw_util import DrawUtil
 from ui.widgets.draw_view import DrawUtilView
 from ui.about_dialog import AboutDialog
+from ui.style import Style
 from settings_manager import open_preferences, get_preferences_manager
 from appdata_manager import get_appdata_manager
 from utils.CONSTANT import UTILS_SAVE_DIR, QUARTER_NOTE_UNIT
@@ -879,7 +880,15 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def _configure_editor_scrollbar(self) -> None:
         extent = int(self.style().pixelMetric(QtWidgets.QStyle.PixelMetric.PM_ScrollBarExtent))
-        self.editor_vscroll.setFixedWidth(max(12, int(extent * 2)))
+        width = max(12, int(extent * 2))
+        if sys.platform == "darwin":
+            width = int(Style.get_macos_scrollbar_width(width))
+            self.editor_vscroll.setStyleSheet(
+                "QScrollBar:vertical {"
+                f"width: {width}px;"
+                "}"
+            )
+        self.editor_vscroll.setFixedWidth(int(width))
         self.editor_vscroll.setToolTip("Editor scrollbar. Drag to scroll. Click outside the scrollbar handle to jump. Hover outside the scrollbar handle to preview the current destination measure.")
         self.editor_vscroll.set_tooltip_provider(self._editor_scrollbar_tooltip_text)
         self.editor_vscroll.set_measure_index_provider(self._editor_scrollbar_measure_index_for_predicted_top)
@@ -2740,9 +2749,7 @@ class MainWindow(QtWidgets.QMainWindow):
         pref_width = int(getattr(self, '_left_panel_width_pref_px', 220) or 220)
         target_width = max(120, pref_width, snap_width, tool_width)
         self.snap_dock.setMinimumWidth(target_width)
-        self.snap_dock.setMaximumWidth(QtWidgets.QWIDGETSIZE_MAX)
         self.tool_dock.setMinimumWidth(target_width)
-        self.tool_dock.setMaximumWidth(QtWidgets.QWIDGETSIZE_MAX)
         try:
             # Apply an initial width while still allowing user resizing afterward
             self.resizeDocks([self.snap_dock, self.tool_dock], [target_width, target_width], QtCore.Qt.Orientation.Horizontal)
@@ -3028,4 +3035,5 @@ class MainWindow(QtWidgets.QMainWindow):
         # Persist sizes via prepare_close
         try:
             self.prepare_close()
-        except Excepti
+        except Exception:
+            pass
