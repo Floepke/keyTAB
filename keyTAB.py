@@ -296,10 +296,10 @@ def main(argv: list[str] | None = None):
             QtCore.QTimer.singleShot(250, win._maybe_prompt_edwin_install)
         except Exception:
             pass
-    
+
     # Ensure clean shutdown of background threads on app exit
     app.aboutToQuit.connect(win.prepare_close)
-    
+
     # Restore window geometry or start maximized based on appdata
     try:
         adm = get_appdata_manager()
@@ -317,7 +317,17 @@ def main(argv: list[str] | None = None):
     except Exception:
         # Fallback: show maximized
         win.showMaximized()
-    app.exec()
+
+    # PySide on macOS can crash in QApplication teardown when Python finalizes.
+    # Force a fast, clean termination after the event loop exits to skip Qt/PySide
+    # atexit cleanup (state is already persisted in prepare_close above).
+    exit_code = app.exec()
+    try:
+        while QtGui.QGuiApplication.overrideCursor() is not None:
+            QtGui.QGuiApplication.restoreOverrideCursor()
+    except Exception:
+        pass
+    os._exit(int(exit_code))
 
 
 if __name__ == "__main__":

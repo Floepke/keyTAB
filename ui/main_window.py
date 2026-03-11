@@ -34,6 +34,12 @@ class MainWindow(QtWidgets.QMainWindow):
         self.player = None
         self._player_config: tuple[str, str] | None = None
         self._left_panel_width_frozen = False
+        self._prepare_close_done = False
+        try:
+            adm_width = get_appdata_manager()
+            self._left_panel_width_pref_px = int(max(1, adm_width.get("left_panel_width_px", 220)))
+        except Exception:
+            self._left_panel_width_pref_px = 220
         self._editor_scroll_step_logical_px: int = 1
 
         # File management
@@ -225,10 +231,10 @@ class MainWindow(QtWidgets.QMainWindow):
             self.editor_canvas.setFocus()
         except Exception:
             pass
-        # Hide dock sizer handles and prevent resize cursor changes (docks are fixed-size)
+        # Keep separators slim but clickable so left dock width can be adjusted
         self.setStyleSheet(
-            "QMainWindow::separator { width: 0px; height: 0px; background: transparent; }\n"
-            "QMainWindow::separator:hover { background: transparent; }"
+            "QMainWindow::separator { width: 6px; height: 6px; background: transparent; margin: 0px; }\n"
+            "QMainWindow::separator:hover { background: rgba(0,0,0,0.12); }"
         )
         # Place Snap Size dock above the Tool Selector dock on the left
         self.snap_dock = SnapSizeDock(self)
@@ -2731,11 +2737,17 @@ class MainWindow(QtWidgets.QMainWindow):
         if tool_width <= 0:
             tool_width = int(self.tool_dock.sizeHint().width())
 
-        target_width = max(1, snap_width, tool_width)
+        pref_width = int(getattr(self, '_left_panel_width_pref_px', 220) or 220)
+        target_width = max(120, pref_width, snap_width, tool_width)
         self.snap_dock.setMinimumWidth(target_width)
-        self.snap_dock.setMaximumWidth(target_width)
+        self.snap_dock.setMaximumWidth(QtWidgets.QWIDGETSIZE_MAX)
         self.tool_dock.setMinimumWidth(target_width)
-        self.tool_dock.setMaximumWidth(target_width)
+        self.tool_dock.setMaximumWidth(QtWidgets.QWIDGETSIZE_MAX)
+        try:
+            # Apply an initial width while still allowing user resizing afterward
+            self.resizeDocks([self.snap_dock, self.tool_dock], [target_width, target_width], QtCore.Qt.Orientation.Horizontal)
+        except Exception:
+            pass
         self._left_panel_width_frozen = True
 
     def resizeEvent(self, ev: QtGui.QResizeEvent) -> None:
@@ -2907,6 +2919,9 @@ class MainWindow(QtWidgets.QMainWindow):
     # Duplicate keyPressEvent removed; using the earlier implementation for Escape handling
 
     def prepare_close(self) -> None:
+        if getattr(self, '_prepare_close_done', False):
+            return
+        self._prepare_close_done = True
         # Ensure worker threads are stopped before application exits
         # Persist window state to appdata
         try:
@@ -2923,6 +2938,17 @@ class MainWindow(QtWidgets.QMainWindow):
                 if sp is not None and hasattr(sp, 'sizes'):
                     sizes = list(sp.sizes())
                     adm.set("splitter_sizes", [int(sizes[0]) if sizes else 0, int(sizes[1]) if len(sizes) > 1 else 0])
+            except Exception:
+                pass
+            # Remember left panel width for next launch
+            try:
+                lw = 0
+                if hasattr(self, 'snap_dock'):
+                    lw = max(lw, int(self.snap_dock.width()))
+                if hasattr(self, 'tool_dock'):
+                    lw = max(lw, int(self.tool_dock.width()))
+                if lw > 0:
+                    adm.set("left_panel_width_px", int(lw))
             except Exception:
                 pass
             # Persist whether the session is currently saved to a project file
@@ -2944,10 +2970,9 @@ class MainWindow(QtWidgets.QMainWindow):
                 self._clock_timer.stop()
         except Exception:
             pass
-        # Stop audio playback gracefully
+        # Fully dispose audio/MIDI backend so CoreMIDI/AudioToolbox threads are released
         try:
-            if hasattr(self, 'player') and self.player is not None:
-                self.player.stop()
+            self._dispose_player()
         except Exception:
             pass
         # Stop playhead timer and clear overlay
@@ -3003,6 +3028,4 @@ class MainWindow(QtWidgets.QMainWindow):
         # Persist sizes via prepare_close
         try:
             self.prepare_close()
-        except Exception:
-            pass
-        ev.accept()
+        except Excepti

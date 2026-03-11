@@ -146,7 +146,7 @@ class GridBandDrawerMixin:
 
         return [(a, b) for a, b in merged if op.gt(float(b), float(a))]
 
-    def _grid_band_fill_rgba(self, layout, field_name: str) -> tuple[float, float, float, float]:
+    def _grid_band_fill_rgba(self, layout, field_name: str, side: str) -> tuple[float, float, float, float]:
         """Get the fill color for grid bands."""
         custom = str(getattr(layout, field_name, '') or '').strip()
         if custom and not custom.startswith('#'):
@@ -154,7 +154,8 @@ class GridBandDrawerMixin:
         qcustom = QtGui.QColor(custom)
         if qcustom.isValid():
             return (qcustom.red() / 255.0, qcustom.green() / 255.0, qcustom.blue() / 255.0, 1.0)
-        r, g, b = Style.get_named_rgb('accent', (200, 200, 200))
+        key = 'midi_left' if str(side).lower().startswith('l') else 'midi_right'
+        r, g, b = Style.get_named_rgb(key, (200, 200, 200))
         return (
             max(0, min(255, int(r))) / 255.0,
             max(0, min(255, int(g))) / 255.0,
@@ -329,7 +330,7 @@ class GridBandDrawerMixin:
         right_intervals = self._build_repeating_dark_intervals(right_markers, bars, score_end)
 
         # Draw left band
-        left_fill = self._grid_band_fill_rgba(layout, 'grid_band_left_color')
+        left_fill = self._grid_band_fill_rgba(layout, 'grid_band_left_color', 'left')
         self._draw_grid_band_side(
             du,
             left_intervals,
@@ -339,7 +340,7 @@ class GridBandDrawerMixin:
         )
 
         # Draw right band
-        right_fill = self._grid_band_fill_rgba(layout, 'grid_band_right_color')
+        right_fill = self._grid_band_fill_rgba(layout, 'grid_band_right_color', 'right')
         self._draw_grid_band_side(
             du,
             right_intervals,

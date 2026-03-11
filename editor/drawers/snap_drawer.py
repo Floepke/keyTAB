@@ -22,9 +22,10 @@ class SnapDrawerMixin:
             - Alternating light/darker snap bands along the vertical timeline the size of the snap.
     '''
 
-    def _editor_bg_tint_rgba(self) -> tuple[float, float, float, float]:
-        """Return the exact accent color as RGBA floats."""
-        rgb = Style.get_named_rgb("accent", (200, 200, 200))
+    def _side_band_tint_rgba(self, side: str) -> tuple[float, float, float, float]:
+        """Return the themed left/right snap-band color as RGBA floats."""
+        key = "midi_left" if str(side).lower().startswith("l") else "midi_right"
+        rgb = Style.get_named_rgb(key, (200, 200, 200))
         r = max(0, min(255, int(rgb[0])))
         g = max(0, min(255, int(rgb[1])))
         b = max(0, min(255, int(rgb[2])))
@@ -79,7 +80,8 @@ class SnapDrawerMixin:
             snap_units = float(QUARTER_NOTE_UNIT) / 2.0
         snap_mm = (snap_units / float(QUARTER_NOTE_UNIT)) * zpq
 
-        fill_rgba = self._editor_bg_tint_rgba()
+        left_fill_rgba = self._side_band_tint_rgba('left')
+        right_fill_rgba = self._side_band_tint_rgba('right')
         sub_band_visible = bool(getattr(getattr(score, 'layout', None), 'sub_band_visible', True))
 
         # Walk the base grid (measures) and draw darker rectangles on every other snap step
@@ -107,7 +109,7 @@ class SnapDrawerMixin:
                                 right_x2,
                                 sub_cursor + h,
                                 stroke_color=None,
-                                fill_color=fill_rgba,
+                                fill_color=left_fill_rgba,
                                 id=0,
                                 tags=["snap_band"],
                             )
@@ -118,7 +120,7 @@ class SnapDrawerMixin:
                                 left_x2,
                                 sub_cursor + h,
                                 stroke_color=None,
-                                fill_color=fill_rgba,
+                                fill_color=left_fill_rgba,
                                 id=0,
                                 tags=["snap_band"],
                             )
@@ -128,7 +130,7 @@ class SnapDrawerMixin:
                                 right_x2,
                                 sub_cursor + h,
                                 stroke_color=None,
-                                fill_color=fill_rgba,
+                                fill_color=right_fill_rgba,
                                 id=0,
                                 tags=["snap_band"],
                             )

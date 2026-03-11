@@ -328,6 +328,17 @@ class Style:
             f"selection-color: rgb({text.red()},{text.green()},{text.blue()});"
             f"border: 1px solid rgb({alt.red()},{alt.green()},{alt.blue()});"
             "}"
+            "QDockWidget {"
+            f"background-color: rgb({bg.red()},{bg.green()},{bg.blue()});"
+            f"color: rgb({text.red()},{text.green()},{text.blue()});"
+            f"border: 1px solid rgb({alt.red()},{alt.green()},{alt.blue()});"
+            "}"
+            "QDockWidget::title {"
+            f"background-color: rgb({alt.red()},{alt.green()},{alt.blue()});"
+            f"color: rgb({text.red()},{text.green()},{text.blue()});"
+            "padding: 4px;"
+            "margin: 0px;"
+            "}"
         )
 
     def set_dynamic_theme(self, tint: float = 0.75):
