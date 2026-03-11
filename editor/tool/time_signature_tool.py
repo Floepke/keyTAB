@@ -20,36 +20,18 @@ class TimeSignatureTool(BaseTool):
 
     def __init__(self) -> None:
         super().__init__()
-        self._edit_mode: str = 'Gr'  # Gr: beat_grouping, B: sub_band_left/sub_band_right
         self._dialog_open: bool = False
         self._dialog_cooldown_until: float = 0.0
         self._op = Operator(float(SHORTEST_DURATION))
 
     def toolbar_spec(self) -> list[dict]:
-        return [
-            {
-                'name': 'toggle_gr_b',
-                'text': self._edit_mode,
-                'tooltip': f"Toggle grid edit mode (current: {self._edit_mode})",
-            }
-        ]
+        return []
 
     def on_toolbar_button(self, name: str) -> None:
-        if str(name) != 'toggle_gr_b':
-            return
-        self._edit_mode = 'B' if self._edit_mode == 'Gr' else 'Gr'
-        self._show_mode_status()
+        pass
 
     def _show_mode_status(self) -> None:
-        try:
-            w = getattr(self._editor, 'widget', None)
-            if w is None:
-                return
-            win = w.window()
-            if win is not None and hasattr(win, '_status'):
-                win._status(f"Time Signature mode: {self._edit_mode}", 1500)
-        except Exception:
-            pass
+        pass
 
     def _measure_len_ticks(self, bg: BaseGrid) -> float:
         numer = float(getattr(bg, 'numerator', 4) or 4)
@@ -91,11 +73,7 @@ class TimeSignatureTool(BaseTool):
         return sorted(list(dict.fromkeys(float(v) for v in bars)))
 
     def _barline_hit_tolerance(self) -> float:
-        snap = 0.0
-        try:
-            snap = float(getattr(self._editor, 'snap_size_units', 0.0) or 0.0)
-        except Exception:
-            snap = 0.0
+        snap = float(getattr(self._editor, 'snap_size_units', 0.0) or 0.0)
         return max(4.0, snap * 0.20)
 
     def _nearest_barline(self, score: SCORE, ticks: float) -> tuple[float, bool]:
@@ -133,37 +111,24 @@ class TimeSignatureTool(BaseTool):
         )
         return self._to_unique_sorted([float(v) for v in (bar + grid)])
 
-    def _sub_band_field_for_x(self, x: float) -> str:
-        try:
-            pitch = int(self._editor.x_to_pitch(x))
-        except Exception:
-            pitch = 40
-        return 'sub_band_left' if int(pitch) < 40 else 'sub_band_right'
-
     def _edit_grid_value(self, score: SCORE, click_t: float, x: float, delete: bool) -> None:
+        # Edit beat_grouping grid lines only
+        click_t_f = float(click_t)
+        
         seg = self._find_segment_for_time(score, click_t)
         if seg is None:
             return
         _seg_i, bg, seg_start, seg_end, measure_len = seg
+        measure_start = self._measure_start_for_time(score, seg_start, seg_end, click_t_f)
 
-        # Normalize click to integer ticks to avoid persistent sub-tick offset from pixel↔time conversion.
-        click_t_i = float(round(float(click_t)))
-        measure_start = self._measure_start_for_time(score, seg_start, seg_end, click_t_i)
-
-        # Gr/B lists are editable only in the time-signature change measure (first measure of segment).
+        # Grid lines are editable only in the time-signature change measure.
         if not self._op.eq(float(measure_start), float(seg_start)):
             return
 
-        local = max(0.0, min(float(measure_len) - 1e-6, float(click_t_i) - float(measure_start)))
-
-        if self._edit_mode == 'B':
-            field_name = self._sub_band_field_for_x(x)
-            current = list(getattr(bg, field_name, None) or [])
-        else:
-            field_name = ''
-            current = self._grid_positions_as_times(bg)
-
+        local = max(0.0, min(float(measure_len) - 1e-6, float(click_t_f) - float(measure_start)))
+        current = self._grid_positions_as_times(bg)
         current = self._to_unique_sorted([float(v) for v in current if 0.0 <= float(v) < float(measure_len)])
+
         changed = False
 
         if delete:
@@ -182,10 +147,7 @@ class TimeSignatureTool(BaseTool):
         if not changed:
             return
 
-        if self._edit_mode == 'B':
-            setattr(bg, field_name, list(current) if current else None)
-        else:
-            bg.beat_grouping = list(current)
+        bg.beat_grouping = list(current)
 
         self._editor._snapshot_if_changed(coalesce=False, label='time_signature_grid_edit')
         self._editor.update_score_length()
@@ -282,9 +244,6 @@ class TimeSignatureTool(BaseTool):
             seg_bg.numerator = int(numer)
             seg_bg.denominator = int(denom)
             seg_bg.beat_grouping = [float(v) for v in (grid_positions or [])]
-            if inserted_seg_index is not None:
-                seg_bg.sub_band_left = None
-                seg_bg.sub_band_right = None
             seg_bg.indicator_enabled = bool(indicator_enabled)
 
             self._editor._snapshot_if_changed(coalesce=False, label='time_signature_change')

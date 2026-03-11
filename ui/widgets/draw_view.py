@@ -83,7 +83,7 @@ class DrawUtilView(QtWidgets.QWidget):
         self._suppress_fade_once: bool = False
         # Apply a dedicated background color for DrawUtil views
         try:
-            accent = Style.get_named_qcolor('accent')
+            accent = Style.get_named_qcolor('alternate_background_color')
             pal = self.palette()
             pal.setColor(QtGui.QPalette.Window, accent)
             self.setPalette(pal)

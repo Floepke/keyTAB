@@ -646,6 +646,60 @@ class DrawUtil:
         if surface is not None:
             surface.finish()
 
+    def save_pdf_rasterized(
+        self,
+        path: str,
+        dpi: int = 600,
+        layering: Optional[Sequence[str]] = None,
+        progress_cb: Optional[Callable[[int, int], None]] = None,
+    ) -> None:
+        """Save pages as a rasterized PDF (image per page) at the given DPI."""
+        if not self._pages:
+            return
+        dpi_i = max(72, int(dpi or 600))
+        px_per_mm = float(dpi_i) / MM_PER_INCH
+        pt_per_px = PT_PER_INCH / float(dpi_i)
+
+        surface: Optional[cairo.PDFSurface] = None
+        total_pages = len(self._pages)
+        layering_list = list(layering) if layering is not None else list(EDITOR_LAYERING)
+        for i, page in enumerate(self._pages):
+            width_pt = page.width_mm * PT_PER_MM
+            height_pt = page.height_mm * PT_PER_MM
+            width_px = max(1, int(round(page.width_mm * px_per_mm)))
+            height_px = max(1, int(round(page.height_mm * px_per_mm)))
+
+            # Render page content to an ARGB image surface at target DPI.
+            img_surface = cairo.ImageSurface(cairo.FORMAT_ARGB32, width_px, height_px)
+            img_ctx = cairo.Context(img_surface)
+            img_ctx.set_source_rgb(1, 1, 1)
+            img_ctx.rectangle(0, 0, width_px, height_px)
+            img_ctx.fill()
+            self.render_to_cairo(img_ctx, i, px_per_mm, layering=layering_list)
+
+            if i == 0:
+                surface = cairo.PDFSurface(path, width_pt, height_pt)
+            else:
+                surface.set_size(width_pt, height_pt)
+
+            pdf_ctx = cairo.Context(surface)
+            pdf_ctx.save()
+            pdf_ctx.scale(pt_per_px, pt_per_px)
+            pdf_ctx.set_source_surface(img_surface, 0.0, 0.0)
+            pdf_ctx.paint()
+            pdf_ctx.restore()
+
+            if progress_cb is not None:
+                try:
+                    progress_cb(i + 1, total_pages)
+                except Exception:
+                    pass
+            if i < (len(self._pages) - 1):
+                surface.show_page()
+
+        if surface is not None:
+            surface.finish()
+
     def _apply_stroke(self, ctx: cairo.Context, stroke: Stroke):
         ctx.set_source_rgba(*stroke.color)
         ctx.set_line_width(stroke.width_mm)

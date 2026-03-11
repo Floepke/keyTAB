@@ -19,6 +19,7 @@ from file_model.events.end_repeat import EndRepeat
 from file_model.events.count_line import CountLine
 from file_model.events.line_break import LineBreak
 from file_model.events.tempo import Tempo
+from file_model.events.grid_band import GridBand
 from file_model.layout import Layout, LayoutFont
 from file_model.info import Info
 from file_model.analysis import Analysis
@@ -65,6 +66,7 @@ class Events:
 	text: List[Text] = field(default_factory=list)
 	slur: List[Slur] = field(default_factory=list)
 	beam: List[Beam] = field(default_factory=list)
+	grid_band: List[GridBand] = field(default_factory=list)
 	start_repeat: List[StartRepeat] = field(default_factory=list)
 	end_repeat: List[EndRepeat] = field(default_factory=list)
 	count_line: List[CountLine] = field(default_factory=list)

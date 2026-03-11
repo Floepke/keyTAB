@@ -1,6 +1,7 @@
 from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Literal
+from file_model.events.grid_band import GridBand
 
 
 @dataclass
@@ -90,11 +91,14 @@ class Layout:
     barline_visible: bool = True
     grid_line_visible: bool = True
     sub_band_visible: bool = True
+    # Grid Band tracks (Grid 2). Left and right hand grid band markers.
+    grid_band_left_track: list[GridBand] = field(default_factory=list)
+    grid_band_right_track: list[GridBand] = field(default_factory=list)
     grid_barline_thickness_mm: float = 1.0
     grid_gridline_thickness_mm: float = 0.5
     grid_gridline_dash_pattern_mm: list[float] = field(default_factory=lambda: [2.5, 4.0])
-    sub_band_left_color: str = '#ccc'
-    sub_band_right_color: str = '#ccc'
+    grid_band_left_color: str = '#ccc'
+    grid_band_right_color: str = '#ccc'
     
 
     # Time signature indicator type (global)

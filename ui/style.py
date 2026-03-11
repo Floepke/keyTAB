@@ -40,7 +40,7 @@ class Style:
         "bg_color": (200, 200, 200),
         "alternate_background_color": (215, 215, 215),
         "text_color": (0, 0, 0),
-        "accent_color": (130, 130, 130),
+        "accent_color": (30, 104, 255),
         "paper_color": (240, 240, 240),
         "notation_color": (0, 0, 30),
         "left_midi_color": (153, 179, 204),
@@ -51,7 +51,7 @@ class Style:
         "bg_color": (50, 40, 50),
         "alternate_background_color": (40, 30, 40),
         "text_color": (240, 240, 240),
-        "accent_color": (60, 60, 60),
+        "accent_color": (30, 154, 200),
         "paper_color": (190, 190, 190),
         "notation_color": (0, 0, 30),
         "left_midi_color": (153, 179, 204),
@@ -84,7 +84,7 @@ class Style:
     # Named custom colors registry
     _NAMED: dict[str, tuple[int, int, int]] = {
         # Print view (DrawUtilView): always white
-        # Outer print-view background: follows accent color via Style.get_named_qcolor('accent')
+        # Outer print-view background: follows alternate background color via Style.get_named_qcolor('alternate_background_color')
         'draw_util': (255, 255, 255),
         # Editor background: initialized/synced at runtime
         'editor': (255, 255, 255),

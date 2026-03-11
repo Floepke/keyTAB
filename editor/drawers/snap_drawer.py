@@ -22,29 +22,17 @@ class SnapDrawerMixin:
             - Alternating light/darker snap bands along the vertical timeline the size of the snap.
     '''
 
-    SNAP_BAND_PAPER_DARKEN: float = 0.92
-    
     def _editor_bg_tint_rgba(self) -> tuple[float, float, float, float]:
-        """Return a configurable darker-than-paper tint as RGBA floats.
-
-        Darkening factor can be set by either:
-        - `self.snap_band_paper_darken` (runtime override), or
-        - `SNAP_BAND_PAPER_DARKEN` (class default).
-        """
-
+        """Return the exact accent color as RGBA floats."""
         rgb = Style.get_named_rgb("accent", (200, 200, 200))
         r = max(0, min(255, int(rgb[0])))
         g = max(0, min(255, int(rgb[1])))
         b = max(0, min(255, int(rgb[2])))
-
-        darken = float(getattr(self, 'snap_band_paper_darken', self.SNAP_BAND_PAPER_DARKEN))
-        darken = max(0.0, min(1.0, darken))
-
         return (
-            (r / 255.0) * darken,
-            (g / 255.0) * darken,
-            (b / 255.0) * darken,
-            1.0,
+            r / 255.0,
+            g / 255.0,
+            b / 255.0,
+            .15,
         )
 
     def draw_snap(self, du: DrawUtil) -> None:
@@ -92,6 +80,7 @@ class SnapDrawerMixin:
         snap_mm = (snap_units / float(QUARTER_NOTE_UNIT)) * zpq
 
         fill_rgba = self._editor_bg_tint_rgba()
+        sub_band_visible = bool(getattr(getattr(score, 'layout', None), 'sub_band_visible', True))
 
         # Walk the base grid (measures) and draw darker rectangles on every other snap step
         time_cursor_mm = margin
@@ -111,26 +100,38 @@ class SnapDrawerMixin:
                 while op.less(sub_cursor, measure_end_mm):
                     h = min(snap_mm, measure_end_mm - sub_cursor)
                     if (seg_index % 2) == 0:
-                        du.add_rectangle(
-                            left_x1,
-                            sub_cursor,
-                            left_x2,
-                            sub_cursor + h,
-                            stroke_color=None,
-                            fill_color=fill_rgba,
-                            id=0,
-                            tags=["snap_band"],
-                        )
-                        du.add_rectangle(
-                            right_x1,
-                            sub_cursor,
-                            right_x2,
-                            sub_cursor + h,
-                            stroke_color=None,
-                            fill_color=fill_rgba,
-                            id=0,
-                            tags=["snap_band"],
-                        )
+                        if not sub_band_visible:
+                            du.add_rectangle(
+                                left_x1,
+                                sub_cursor,
+                                right_x2,
+                                sub_cursor + h,
+                                stroke_color=None,
+                                fill_color=fill_rgba,
+                                id=0,
+                                tags=["snap_band"],
+                            )
+                        else:
+                            du.add_rectangle(
+                                left_x1,
+                                sub_cursor,
+                                left_x2,
+                                sub_cursor + h,
+                                stroke_color=None,
+                                fill_color=fill_rgba,
+                                id=0,
+                                tags=["snap_band"],
+                            )
+                            du.add_rectangle(
+                                right_x1,
+                                sub_cursor,
+                                right_x2,
+                                sub_cursor + h,
+                                stroke_color=None,
+                                fill_color=fill_rgba,
+                                id=0,
+                                tags=["snap_band"],
+                            )
                     seg_index += 1
                     sub_cursor += h
 

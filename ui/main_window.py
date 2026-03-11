@@ -539,6 +539,12 @@ class MainWindow(QtWidgets.QMainWindow):
         export_pdf_act.triggered.connect(self._export_pdf)
         file_menu.addAction(export_pdf_act)
 
+        export_image_pdf_act = QtGui.QAction("Export Image PDF...", self)
+        export_image_pdf_act.setToolTip("Export the current score as a rasterized PDF document (600 DPI).")
+        export_image_pdf_act.setShortcut(QtGui.QKeySequence("Ctrl+Shift+E"))
+        export_image_pdf_act.triggered.connect(self._export_image_pdf)
+        file_menu.addAction(export_image_pdf_act)
+
         # Playback menu
         self._playback_menu = playback_menu
         self._playback_mode_group = QtGui.QActionGroup(self)
@@ -1410,6 +1416,86 @@ class MainWindow(QtWidgets.QMainWindow):
                 progress.close()
             except Exception as e:
                 QtWidgets.QMessageBox.critical(self, "Export PDF failed", str(e))
+
+    def _export_image_pdf(self) -> None:
+        dpi_options = [300, 600, 1200]
+        dpi_labels = [str(v) for v in dpi_options]
+        dpi_dlg = QtWidgets.QInputDialog(self)
+        dpi_dlg.setWindowTitle("Export Image PDF")
+        dpi_dlg.setLabelText("Raster DPI:")
+        dpi_dlg.setComboBoxItems(dpi_labels)
+        dpi_dlg.setComboBoxEditable(False)
+        dpi_dlg.setTextValue(dpi_labels[1])
+        dpi_dlg.setMinimumWidth(420)
+        dpi_dlg.resize(420, dpi_dlg.sizeHint().height())
+        ok = dpi_dlg.exec() == QtWidgets.QDialog.DialogCode.Accepted
+        dpi_label = dpi_dlg.textValue()
+        if not ok:
+            return
+        selected_dpi = int(str(dpi_label))
+        if selected_dpi not in dpi_options:
+            selected_dpi = 600
+
+        dlg = QtWidgets.QFileDialog(self)
+        dlg.setAcceptMode(QtWidgets.QFileDialog.AcceptMode.AcceptSave)
+        dlg.setNameFilter("PDF Files (*.pdf)")
+        dlg.setDefaultSuffix("pdf")
+        # Prefill filename with score title when available
+        try:
+            score_title = ""
+            try:
+                info = getattr(self.file_manager.current(), 'info', None)
+                score_title = str(getattr(info, 'title', "") or "") if info is not None else ""
+            except Exception:
+                score_title = ""
+            safe_title = "".join(ch for ch in score_title if ch not in r'\\/:*?"<>|').strip()
+            suggested_name = f"{safe_title or 'Untitled'}.pdf"
+        except Exception:
+            suggested_name = "Untitled.pdf"
+        try:
+            adm = get_appdata_manager()
+            last_dir = str(adm.get("last_export_pdf_dir", "") or "")
+            if last_dir:
+                dlg.setDirectory(last_dir)
+                dlg.selectFile(os.path.join(last_dir, suggested_name))
+            else:
+                dlg.selectFile(suggested_name)
+        except Exception:
+            pass
+        if dlg.exec() == QtWidgets.QDialog.DialogCode.Accepted:
+            out_path = dlg.selectedFiles()[0]
+            try:
+                out_dir = os.path.dirname(str(out_path))
+                if out_dir:
+                    adm = get_appdata_manager()
+                    adm.set("last_export_pdf_dir", out_dir)
+                    adm.save()
+            except Exception:
+                pass
+            try:
+                from utils.CONSTANT import ENGRAVER_LAYERING
+                from engraver.engraver import do_engrave
+                export_du = DrawUtil()
+                do_engrave(self._current_score_dict(), export_du, pdf_export=True)
+                total_pages = max(1, export_du.page_count())
+                progress = QtWidgets.QProgressDialog(f"Exporting rasterized PDF ({selected_dpi} DPI)...", None, 0, total_pages, self)
+                progress.setWindowTitle("Export Image PDF")
+                progress.setWindowModality(QtCore.Qt.WindowModality.WindowModal)
+                progress.setMinimumDuration(0)
+                progress.setValue(0)
+                progress.show()
+
+                def _on_progress(done: int, total: int) -> None:
+                    if progress.maximum() != int(total):
+                        progress.setMaximum(int(total))
+                    progress.setValue(int(done))
+                    QtWidgets.QApplication.processEvents()
+
+                export_du.save_pdf_rasterized(out_path, dpi=selected_dpi, layering=ENGRAVER_LAYERING, progress_cb=_on_progress)
+                progress.setValue(total_pages)
+                progress.close()
+            except Exception as e:
+                QtWidgets.QMessageBox.critical(self, "Export Image PDF failed", str(e))
 
     def _status(self, message: str, timeout_ms: int = 3000) -> None:
         """Show a transient message on the status bar."""

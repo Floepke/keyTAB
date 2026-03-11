@@ -1,15 +1,10 @@
 from __future__ import annotations
 from typing import TYPE_CHECKING, cast
-from PySide6 import QtGui
 from ui.widgets.draw_util import DrawUtil
 from fonts import register_font_from_bytes
-from utils.CONSTANT import QUARTER_NOTE_UNIT, SHORTEST_DURATION, EDITOR_SIDE_BAND_INSET_SEMITONES
+from utils.CONSTANT import QUARTER_NOTE_UNIT, SHORTEST_DURATION
 from file_model.base_grid import resolve_grid_layer_offsets
 from utils.operator import Operator
-try:
-    from ui.style import Style  # type: ignore
-except Exception:
-    Style = None  # type: ignore
 
 if TYPE_CHECKING:
     from editor.editor import Editor
@@ -23,10 +18,9 @@ class TimeSignatureDrawerMixin:
             return
         tool = getattr(self, "_tool", None)
         tool_name = getattr(tool, "TOOL_NAME", "")
-        ts_mode = str(getattr(tool, "_edit_mode", "Gr") or "Gr")
         # Read global indicator type from Layout
-        indicator_type = getattr(score.layout, 'time_signature_indicator_type', 'classical')
         layout = score.layout
+        indicator_type = getattr(layout, 'time_signature_indicator_type', 'classical')
 
         def _resolve_font_family(font) -> str:
             family = str(getattr(font, 'family', 'Latin Modern Roman') or 'Latin Modern Roman')
@@ -53,84 +47,6 @@ class TimeSignatureDrawerMixin:
         klav_size = 15.0
         guide_width_mm = float(getattr(layout, 'time_signature_indicator_guide_thickness_mm', 0.5) or 0.5)
         divider_width_mm = float(getattr(layout, 'time_signature_indicator_divide_guide_thickness_mm', 1.0) or 1.0)
-
-        def _subband_fill_rgba(field_name: str) -> tuple[float, float, float, float]:
-            custom = str(getattr(layout, field_name, '') or '').strip()
-            if custom and not custom.startswith('#'):
-                custom = f"#{custom}"
-            qcustom = QtGui.QColor(custom)
-            if qcustom.isValid():
-                return (qcustom.red() / 255.0, qcustom.green() / 255.0, qcustom.blue() / 255.0, 1.0)
-            if not Style:
-                return (0.5, 0.5, 0.5, 1.0)
-            r, g, b = Style.get_named_rgb('accent', (130, 130, 130))
-            return (
-                max(0, min(255, int(r))) / 255.0,
-                max(0, min(255, int(g))) / 255.0,
-                max(0, min(255, int(b))) / 255.0,
-                1.0,
-            )
-
-        def draw_sub_band(bg, y_mm: float) -> None:
-            if not bool(getattr(layout, 'sub_band_visible', True)):
-                return
-            sub_band_left = getattr(bg, 'sub_band_left', None)
-            sub_band_right = getattr(bg, 'sub_band_right', None)
-            if (sub_band_left is None) and (sub_band_right is None):
-                return
-            numer = int(getattr(bg, 'numerator', 4) or 4)
-            denom = int(getattr(bg, 'denominator', 4) or 4)
-            zpq = float(getattr(score.app_state, 'zoom_mm_per_quarter', 25.0) or 25.0)
-            measure_len_mm = float(numer) * (4.0 / max(1.0, float(denom))) * zpq
-            measure_len_ticks = float(numer) * (4.0 / max(1.0, float(denom))) * float(QUARTER_NOTE_UNIT)
-            left_raw = [float(v) for v in (sub_band_left or []) if isinstance(v, (int, float))]
-            right_raw = [float(v) for v in (sub_band_right or []) if isinstance(v, (int, float))]
-
-            margin = float(self.margin or 0.0)
-            width_mm, _ = du.current_page_size_mm()
-            semitone = float(self.semitone_dist or 0.0)
-            stave_left = margin + semitone
-            stave_right = max(stave_left, width_mm - margin - semitone * 2.0)
-            inset_w = max(0.0, float(EDITOR_SIDE_BAND_INSET_SEMITONES) * semitone)
-            x1 = min(stave_right, stave_left + inset_w)
-            x2 = max(x1, stave_right - inset_w)
-            x_center = float(self.pitch_to_x(45))
-            x_center = max(x1, min(x2, x_center))
-            left_fill = _subband_fill_rgba('sub_band_left_color')
-            right_fill = _subband_fill_rgba('sub_band_right_color')
-
-            def _draw_side(raw_positions: list[float], xa: float, xb: float, fill: tuple[float, float, float, float]) -> None:
-                valid = [p for p in raw_positions if 0.0 <= p < measure_len_ticks]
-                positions = sorted(set(valid))
-                if not positions:
-                    return
-                if abs(float(positions[0])) > 1e-6:
-                    positions = [0.0] + positions
-                boundaries = list(positions) + [measure_len_ticks]
-                for i in range(len(boundaries) - 1):
-                    if (i % 2) != 0:
-                        continue
-                    t0 = float(boundaries[i])
-                    t1 = float(boundaries[i + 1])
-                    if t1 <= t0:
-                        continue
-                    y0 = y_mm + (t0 / max(1e-9, measure_len_ticks)) * measure_len_mm
-                    y1 = y_mm + (t1 / max(1e-9, measure_len_ticks)) * measure_len_mm
-                    if y1 <= y0:
-                        continue
-                    du.add_rectangle(
-                        xa,
-                        y0,
-                        xb,
-                        y1,
-                        stroke_color=None,
-                        fill_color=fill,
-                        id=0,
-                        tags=["sub_band"],
-                    )
-
-            _draw_side(left_raw, x1, x_center, left_fill)
-            _draw_side(right_raw, x_center, x2, right_fill)
 
         # Shared layout metrics
         margin = float(self.margin or 0.0)
@@ -269,7 +185,7 @@ class TimeSignatureDrawerMixin:
         # Iterate BaseGrid segments and draw based on indicator_type
         # Classical is always shown; Klavarskribo only when the time-signature tool is active.
         show_classic = True
-        show_klavars = (indicator_type in ('klavarskribo', 'both')) and (tool_name == 'time_signature')
+        show_klavars = (indicator_type in ('klavarskribo', 'both'))
         for bg in list(getattr(score, 'base_grid', []) or []):
             numerator = int(getattr(bg, 'numerator', 4) or 4)
             denominator = int(getattr(bg, 'denominator', 4) or 4)
@@ -282,7 +198,5 @@ class TimeSignatureDrawerMixin:
                 draw_classical(numerator, denominator, enabled, time_cursor)
             if show_klavars:
                 draw_klavarskribo(numerator, denominator, enabled, time_cursor, grid_positions)
-            for m in range(max(1, int(measure_amount))):
-                draw_sub_band(bg, time_cursor + (float(m) * float(measure_len_mm)))
             # Advance time cursor by the segment length (mm) to next segment start
             time_cursor += measure_len_mm * float(measure_amount)

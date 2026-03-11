@@ -13,12 +13,7 @@ class LineBreakDrawerMixin:
         if tool_name != "line_break":
             return
         score = self.current_score()
-        if score is None:
-            return
-
-        events = list(getattr(score.events, 'line_break', []) or [])
-        if not events:
-            return
+        line_breaks = list(getattr(score.events, 'line_break', []) or [])
 
         # Viewport culling
         top_mm = float(getattr(self, '_view_y_mm_offset', 0.0) or 0.0)
@@ -27,7 +22,7 @@ class LineBreakDrawerMixin:
         bleed_mm = max(2.0, float(getattr(score.app_state, 'zoom_mm_per_quarter', 25.0)) * 0.25)
 
         # Layout anchors
-        editor_left = 0.0
+        editor_right = self.stave_width + self.margin + self.margin
 
         # Font setup
         try:
@@ -36,25 +31,19 @@ class LineBreakDrawerMixin:
         except Exception:
             font_family = 'C059'
 
-        for ev in events:
-            try:
-                t0 = float(getattr(ev, 'time', 0.0) or 0.0)
-                is_page = bool(getattr(ev, 'page_break', False))
-            except Exception:
-                continue
+        for ev in line_breaks:
+            t0 = float(getattr(ev, 'time', 0.0) or 0.0)
+            is_page = bool(getattr(ev, 'page_break', False))
             y_mm = float(self.time_to_mm(t0))
             if y_mm < (top_mm - bleed_mm) or y_mm > (bottom_mm + bleed_mm):
                 continue
 
             label = 'P' if is_page else 'L'
             # Rectangle sized to text, top aligned at time position
-            try:
-                _xb, _yb, w_mm, h_mm = du._get_text_extents_mm(label, font_family, 18.0, False, True)
-            except Exception:
-                w_mm, h_mm = (6.0, 6.0)
+            _, _, w_mm, h_mm = du._get_text_extents_mm(label, font_family, 18.0, False, True)
             rect_w = max(6.0, float(w_mm) + 4.0)
             rect_h = max(6.0, float(h_mm) + 4.0)
-            rect_x1 = editor_left
+            rect_x1 = editor_right - rect_w
             rect_x2 = rect_x1 + rect_w
             marker_x = rect_x1 + (rect_w * 0.5)
             rect_y1 = y_mm
@@ -64,8 +53,8 @@ class LineBreakDrawerMixin:
                 rect_y1,
                 rect_x2,
                 rect_y2,
-                stroke_color=None,
-                stroke_width_mm=0.25,
+                stroke_color=(0,0,0,1),
+                stroke_width_mm=.5,
                 fill_color=(0, 0, 0, 1),
                 id=int(getattr(ev, '_id', 0) or 0),
                 tags=["line_break"],
@@ -81,4 +70,16 @@ class LineBreakDrawerMixin:
                 anchor='center',
                 family=font_family,
                 bold=True,
+            )
+            du.add_line(
+                editor_right,
+                y_mm,
+                self.margin + self.stave_width - self.semitone_dist * 2,
+                y_mm,
+                color=(0, 0, 0, 1),
+                width_mm=0.25,
+                dash_pattern=[2],
+                dash_offset_mm=2,
+                id=int(getattr(ev, '_id', 0) or 0),
+                tags=["line_break"]
             )

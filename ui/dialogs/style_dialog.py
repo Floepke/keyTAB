@@ -536,8 +536,8 @@ class StyleDialog(QtWidgets.QDialog):
             'stave_three_line_thickness_mm': 'Stave',
             'stave_clef_line_thickness_mm': 'Stave',
             'stave_clef_line_dash_pattern_mm': 'Stave',
-            'sub_band_left_color': 'Stave',
-            'sub_band_right_color': 'Stave',
+            'grid_band_left_color': 'Stave',
+            'grid_band_right_color': 'Stave',
             # Fonts
             'font_text': 'Fonts',
             'font_title': 'Fonts',

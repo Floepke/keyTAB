@@ -1,6 +1,6 @@
 from __future__ import annotations
 from dataclasses import dataclass, field
-from typing import List, Optional
+from typing import List
 from utils.CONSTANT import QUARTER_NOTE_UNIT
 
 LEGACY_MODE_MAX_VALUE: int = 8
@@ -30,8 +30,6 @@ class BaseGrid:
     numerator: int = 4
     denominator: int = 4
     beat_grouping: List[float] = field(default_factory=lambda: [1, 2, 3, 4])
-    sub_band_left: Optional[List[float]] = None
-    sub_band_right: Optional[List[float]] = None
     measure_amount: int = 1
     indicator_enabled: bool = True
 

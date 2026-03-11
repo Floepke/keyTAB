@@ -24,8 +24,8 @@ EDITOR_SIDE_BAND_INSET_SEMITONES: int = 10
 EDITOR_LAYERING = [
     # layers from background to foreground
     'page_background',
+    'grid_band',
     'snap_band',
-    'sub_band',
     'midi_note',
     'grid_line',
     'stave_three_line',
@@ -72,7 +72,8 @@ EDITOR_LAYERING = [
 ENGRAVER_LAYERING = [
     # layers from background to foreground
     'page_background',
-    'sub_band',
+    'grid_band',
+    'grid_band_marker',
     'midi_note',
     'grid_line',
     'count_line',

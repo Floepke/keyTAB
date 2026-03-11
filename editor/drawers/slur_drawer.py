@@ -1,5 +1,6 @@
 from __future__ import annotations
 from __future__ import annotations
+import math
 from typing import TYPE_CHECKING, cast
 from ui.widgets.draw_util import DrawUtil
 from utils.CONSTANT import SLUR_SEGMENT_COUNT
@@ -93,12 +94,48 @@ class SlurDrawerMixin:
                 bx, by = bezier_point(t, p0, p1, p2, p3)
                 pts.append((bx, by))
 
-            for i in range(len(pts) - 1):
-                t_mid = (i + 0.5) / float(n_seg - 1)
-                w = width_at(t_mid)
-                x_a, y_a = pts[i]
-                x_b, y_b = pts[i + 1]
-                du.add_line(x_a, y_a, x_b, y_b, color=self.notation_color, width_mm=w, tags=["slur"])
+            if len(pts) >= 2:
+                left_edge: list[tuple[float, float]] = []
+                right_edge: list[tuple[float, float]] = []
+                last_nx, last_ny = 0.0, 1.0
+
+                for i, (cx, cy) in enumerate(pts):
+                    t_cur = i / float(n_seg - 1)
+                    w = max(0.0, float(width_at(t_cur)))
+                    half_w = 0.5 * w
+
+                    if i == 0:
+                        px, py = pts[i]
+                        nxp, nyp = pts[i + 1]
+                    elif i == len(pts) - 1:
+                        px, py = pts[i - 1]
+                        nxp, nyp = pts[i]
+                    else:
+                        px, py = pts[i - 1]
+                        nxp, nyp = pts[i + 1]
+
+                    dx = float(nxp) - float(px)
+                    dy = float(nyp) - float(py)
+                    dlen = math.hypot(dx, dy)
+                    if dlen <= 1e-9:
+                        nx, ny = last_nx, last_ny
+                    else:
+                        nx = -dy / dlen
+                        ny = dx / dlen
+                        last_nx, last_ny = nx, ny
+
+                    left_edge.append((float(cx) + nx * half_w, float(cy) + ny * half_w))
+                    right_edge.append((float(cx) - nx * half_w, float(cy) - ny * half_w))
+
+                slur_poly = left_edge + list(reversed(right_edge))
+                if len(slur_poly) >= 3:
+                    du.add_polygon(
+                        slur_poly,
+                        stroke_color=None,
+                        fill_color=self.notation_color,
+                        id=int(getattr(sl, '_id', 0) or 0),
+                        tags=["slur"],
+                    )
 
             if is_slur_tool:
                 handle_w = 2.0

@@ -239,18 +239,242 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
     clef_dash = [float(v) * scale for v in clef_dash_raw] if clef_dash_raw else None
     op_time = Operator(SHORTEST_DURATION)
     barline_positions: list[float] = []
+    group_boundary_times: list[float] = []
     cur_bar = 0.0
     for bg in base_grid:
         numer = int(bg.get('numerator', 4) or 4)
         denom = int(bg.get('denominator', 4) or 4)
         measures = int(bg.get('measure_amount', 1) or 1)
         beat_grouping = list(bg.get('beat_grouping', []) or [])
-        bar_offsets, _grid_offsets = resolve_grid_layer_offsets(beat_grouping, numer, denom)
+        bar_offsets, grid_offsets = resolve_grid_layer_offsets(beat_grouping, numer, denom)
         measure_len = float(numer) * (4.0 / float(max(1, denom))) * float(QUARTER_NOTE_UNIT)
+        inner_group_offsets = sorted(
+            list(
+                dict.fromkeys(
+                    round(float(off), 6)
+                    for off in grid_offsets
+                    if 0.0 < float(off) < float(measure_len)
+                )
+            )
+        )
         for _ in range(int(max(0, measures))):
+            m_start = float(cur_bar)
+            m_end = float(cur_bar + measure_len)
+            group_boundary_times.append(float(m_start))
+            for off in inner_group_offsets:
+                group_boundary_times.append(float(m_start + float(off)))
+            group_boundary_times.append(float(m_end))
             for off in bar_offsets:
                 barline_positions.append(float(cur_bar + float(off)))
             cur_bar += measure_len
+
+    group_boundary_times = sorted(
+        list(dict.fromkeys(round(float(t), 6) for t in group_boundary_times))
+    )
+    all_barlines = sorted(list(dict.fromkeys([0.0] + [float(v) for v in barline_positions] + [float(cur_bar)])))
+
+    def _build_global_subband_intervals(
+        raw_positions: list[float],
+        bars: list[float],
+        total_len: float,
+    ) -> list[tuple[float, float]]:
+        if total_len <= 1e-6:
+            return []
+
+        track = sorted(
+            list(
+                dict.fromkeys(
+                    round(float(v), 6)
+                    for v in (raw_positions or [])
+                    if 0.0 < float(v) < float(total_len)
+                )
+            )
+        )
+        if not track:
+            return []
+
+        bar_times = sorted(list(dict.fromkeys(round(float(b), 6) for b in bars if 0.0 <= float(b) <= float(total_len))))
+        if not bar_times or abs(float(bar_times[0])) > 1e-6:
+            bar_times = [0.0] + bar_times
+        if abs(float(bar_times[-1]) - float(total_len)) > 1e-6:
+            bar_times.append(float(total_len))
+
+        out: list[tuple[float, float]] = []
+        for i, cur in enumerate(track):
+            prev_sub = float(track[i - 1]) if i > 0 else 0.0
+            prev_bar_idx = bisect.bisect_right(bar_times, float(cur)) - 1
+            prev_bar = float(bar_times[max(0, prev_bar_idx)])
+            ref = max(float(prev_sub), float(prev_bar))
+            step = float(cur) - float(ref)
+            if step <= 1e-6:
+                continue
+
+            active_start = 0.0 if i == 0 else float(cur)
+            active_end = float(track[i + 1]) if (i + 1) < len(track) else float(total_len)
+            if active_end <= active_start:
+                continue
+
+            for bi in range(len(bar_times) - 1):
+                bar_start = float(bar_times[bi])
+                bar_end = float(bar_times[bi + 1])
+                if bar_end <= active_start or bar_start >= active_end:
+                    continue
+                seg_start = max(bar_start, active_start)
+                seg_end = min(bar_end, active_end)
+                if seg_end <= seg_start:
+                    continue
+
+                k0 = int((seg_start - bar_start) // step)
+                if k0 < 0:
+                    k0 = 0
+                while True:
+                    b0 = bar_start + (float(k0) * step)
+                    b1 = b0 + step
+                    if b0 >= seg_end - 1e-6:
+                        break
+                    c0 = max(seg_start, b0)
+                    c1 = min(seg_end, b1)
+                    if c1 > c0 and (k0 % 2) == 0:
+                        out.append((float(c0), float(c1)))
+                    k0 += 1
+
+    # Build grid-band dark intervals with the same rules as editor drawer:
+    # - barline resets to dark,
+    # - marker start resets phase boundaries,
+    # - marker start preserves current color,
+    # - marker range truncates at next marker start.
+    def _build_grid_band_dark_intervals(markers: list, bars: list[float], total_len: float) -> list[tuple[float, float]]:
+        op = Operator()
+        if op.le(float(total_len), 0.0):
+            return []
+        if not markers:
+            return []
+
+        bar_times = [
+            float(b)
+            for b in (bars or [])
+            if op.ge(float(b), 0.0) and op.le(float(b), float(total_len))
+        ]
+        bar_times = sorted(list(dict.fromkeys(round(float(v), 6) for v in bar_times)))
+        if not bar_times or op.not_equal(float(bar_times[0]), 0.0):
+            bar_times = [0.0] + bar_times
+        if op.not_equal(float(bar_times[-1]), float(total_len)):
+            bar_times.append(float(total_len))
+
+        track: list[tuple[float, float, int]] = []
+        for mk in markers:
+            if not isinstance(mk, dict):
+                continue
+            try:
+                mt = float(mk.get('time', 0.0) or 0.0)
+                dur = float(mk.get('duration', 0.0) or 0.0)
+                mid = int(mk.get('_id', mk.get('id', 0)) or 0)
+            except Exception:
+                continue
+            if op.lt(dur, 0.0):
+                continue
+            if op.ge(mt, float(total_len)):
+                continue
+            track.append((max(0.0, mt), dur, mid))
+
+        if not track:
+            return []
+        track.sort(key=lambda x: (float(x[0]), int(x[2])))
+
+        segments: list[tuple[float, float, float]] = []
+        for i, (start, step, _mid) in enumerate(track):
+            end = float(track[i + 1][0]) if (i + 1) < len(track) else float(total_len)
+            if op.le(end, start):
+                continue
+            segments.append((float(start), float(end), float(step)))
+
+        if not segments:
+            return []
+
+        out: list[tuple[float, float]] = []
+        for bi in range(len(bar_times) - 1):
+            bar_start = float(bar_times[bi])
+            bar_end = float(bar_times[bi + 1])
+            if op.le(bar_end, bar_start):
+                continue
+
+            is_dark = True
+            for seg_start_raw, seg_end_raw, step in segments:
+                if op.le(seg_end_raw, bar_start):
+                    continue
+                if op.ge(seg_start_raw, bar_end):
+                    break
+
+                seg_start = max(float(seg_start_raw), float(bar_start))
+                seg_end = min(float(seg_end_raw), float(bar_end))
+                if op.le(seg_end, seg_start):
+                    continue
+
+                # duration == 0 means stop engraving bands for this segment.
+                if op.le(step, 0.0):
+                    # OFF marker: next resumed segment should start dark.
+                    is_dark = True
+                    continue
+
+                t0 = float(seg_start)
+                color = bool(is_dark)
+                while op.lt(t0, seg_end):
+                    t1 = min(float(seg_end), float(t0 + step))
+                    if color and op.gt(t1, t0):
+                        out.append((float(t0), float(t1)))
+                    t0 = float(t1)
+                    color = not color
+
+                is_dark = bool(color)
+
+        if not out:
+            return []
+
+        out.sort(key=lambda x: (float(x[0]), float(x[1])))
+        merged: list[list[float]] = []
+        for s, e in out:
+            fs = float(s)
+            fe = float(e)
+            if (not merged) or op.gt(fs, float(merged[-1][1])):
+                merged.append([fs, fe])
+            elif op.gt(fe, float(merged[-1][1])):
+                merged[-1][1] = fe
+
+        return [(a, b) for a, b in merged if op.gt(float(b), float(a))]
+
+    # Get grid band tracks from layout
+    left_bands = list(layout.get('grid_band_left_track', []) or [])
+    right_bands = list(layout.get('grid_band_right_track', []) or [])
+    left_dark_intervals_global = _build_grid_band_dark_intervals(left_bands, all_barlines, float(cur_bar))
+    right_dark_intervals_global = _build_grid_band_dark_intervals(right_bands, all_barlines, float(cur_bar))
+
+    # Problem solved: continuation dots count for sub-band pitch sizing by
+    # creating synthetic starts at beat-group boundaries crossed by held notes.
+    sub_band_starts_by_hand: dict[str, list[float]] = {'<': [], '>': []}
+    sub_band_pitches_by_hand: dict[str, list[int]] = {'<': [], '>': []}
+    for hk in ('<', '>'):
+        hand_notes = notes_by_hand.get(hk, []) or []
+        events: list[tuple[float, int]] = []
+        for item in hand_notes:
+            n_t = float(item.get('time', 0.0) or 0.0)
+            n_end = float(item.get('end', 0.0) or 0.0)
+            n_pitch = int(item.get('pitch', 0) or 0)
+            if n_pitch < 1 or n_pitch > PIANO_KEY_AMOUNT:
+                continue
+
+            # Real note start is always an event.
+            events.append((float(n_t), int(n_pitch)))
+
+            # Continuation-dot equivalent starts at crossed beat-group boundaries.
+            if n_end > n_t and group_boundary_times:
+                lo = bisect.bisect_right(group_boundary_times, float(n_t))
+                hi = bisect.bisect_left(group_boundary_times, float(n_end))
+                for bi in range(lo, hi):
+                    events.append((float(group_boundary_times[bi]), int(n_pitch)))
+
+        events.sort(key=lambda it: float(it[0]))
+        sub_band_starts_by_hand[hk] = [float(t) for (t, _p) in events]
+        sub_band_pitches_by_hand[hk] = [int(p) for (_t, p) in events]
 
     # Problem solved: precompute time signature segments for lane rendering.
     ts_segments: list[dict[str, float | int | list[int] | bool]] = []
@@ -1094,15 +1318,45 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                 rel = max(0.0, min(1.0, rel))
                 return y1 + (y2 - y1) * rel
 
-            def _normalized_sub_positions(raw_vals: list, measure_len_ticks: float) -> list[float]:
-                seq = [float(v) for v in (raw_vals or []) if isinstance(v, (int, float))]
-                valid = [v for v in seq if 0.0 <= float(v) < float(measure_len_ticks)]
-                valid.sort()
-                uniq: list[float] = []
-                for v in valid:
-                    if not uniq or abs(float(v) - float(uniq[-1])) > 1e-6:
-                        uniq.append(float(v))
-                return uniq
+            def _hand_band_x_span(hand_key: str, t0: float, t1: float) -> tuple[float, float] | None:
+                if hand_key == '<':
+                    # Left hand: fixed span from visible left stave edge to C4 (key 40).
+                    x0 = float(grid_left)
+                    x1 = float(_key_to_x(40))
+                else:
+                    # Right hand: fixed span from key 44 to visible right stave edge.
+                    x0 = float(_key_to_x(44))
+                    x1 = float(grid_right)
+
+                x0 = max(float(grid_left), min(float(grid_right), float(x0)))
+                x1 = max(float(grid_left), min(float(grid_right), float(x1)))
+                if x1 <= x0:
+                    return None
+                return (x0, x1)
+
+            def _clip_intervals(intervals: list[tuple[float, float]], t0: float, t1: float) -> list[tuple[float, float]]:
+                if not intervals:
+                    return []
+                out: list[tuple[float, float]] = []
+                for a, b in intervals:
+                    c0 = max(float(a), float(t0))
+                    c1 = min(float(b), float(t1))
+                    if c1 > c0:
+                        out.append((c0, c1))
+                return out
+
+            def _group_window_for_interval(boundaries: list[float], t0: float, t1: float) -> tuple[float, float]:
+                # Use interval midpoint to select the beat-group window used for width sizing.
+                if len(boundaries) < 2:
+                    return (float(t0), float(t1))
+                mid = (float(t0) + float(t1)) * 0.5
+                idx = bisect.bisect_right(boundaries, float(mid)) - 1
+                idx = max(0, min(len(boundaries) - 2, idx))
+                g0 = float(boundaries[idx])
+                g1 = float(boundaries[idx + 1])
+                if g1 <= g0:
+                    return (float(t0), float(t1))
+                return (g0, g1)
 
             def _mix_rgba(a: tuple[float, float, float, float], b: tuple[float, float, float, float], wa: float) -> tuple[float, float, float, float]:
                 wb = 1.0 - float(wa)
@@ -1113,8 +1367,12 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                     1.0,
                 )
 
-            left_hex = _normalize_hex_color(layout.get('sub_band_left_color', layout.get('note_midinote_left_color', '#cccccc'))) or '#cccccc'
-            right_hex = _normalize_hex_color(layout.get('sub_band_right_color', layout.get('note_midinote_right_color', '#cccccc'))) or '#cccccc'
+            left_hex = _normalize_hex_color(
+                layout.get('grid_band_left_color', layout.get('sub_band_left_color', layout.get('note_midinote_left_color', '#cccccc')))
+            ) or '#cccccc'
+            right_hex = _normalize_hex_color(
+                layout.get('grid_band_right_color', layout.get('sub_band_right_color', layout.get('note_midinote_right_color', '#cccccc')))
+            ) or '#cccccc'
             try:
                 lr, lg, lb, _ = hex_to_rgba(left_hex, 1.0)
                 rr, rg, rb, _ = hex_to_rgba(right_hex, 1.0)
@@ -1370,10 +1628,6 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                 frac = float(line_avg_split_pitch - float(split_lo))
                 sub_split_x = float(x_lo + (x_hi - x_lo) * frac)
             sub_split_x = max(float(grid_left), min(float(grid_right), float(sub_split_x)))
-            sub_left_x0 = float(grid_left)
-            sub_left_x1 = float(sub_split_x)
-            sub_right_x0 = float(sub_split_x)
-            sub_right_x1 = float(grid_right)
             ts_right_margin = max(0.0, 1.5 * scale)
             ts_lane_padding_mm = float(line.get('ts_lane_padding_mm', 0.0) or 0.0)
             ts_lane_width = float(line.get('ts_lane_width', 0.0) or 0.0)
@@ -1405,8 +1659,6 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                 denominator = int(bg.get('denominator', 4) or 4)
                 measure_amount = int(bg.get('measure_amount', 1) or 1)
                 beat_grouping = list(bg.get('beat_grouping', []) or [])
-                sub_band_left = list(bg.get('sub_band_left', []) or [])
-                sub_band_right = list(bg.get('sub_band_right', []) or [])
                 indicator_enabled = bool(bg.get('indicator_enabled', True))
                 bar_offsets, grid_offsets = resolve_grid_layer_offsets(beat_grouping, numerator, denominator)
                 if bar_offsets:
@@ -1432,70 +1684,61 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                     ov_start = max(float(line_start_ticks), float(m_start))
                     ov_end = min(float(line_end_ticks), float(m_end))
                     if sub_band_visible and (ov_end > ov_start):
-                        left_positions = _normalized_sub_positions(sub_band_left, float(measure_len))
-                        right_positions = _normalized_sub_positions(sub_band_right, float(measure_len))
+                        group_boundaries = [float(ov_start)]
+                        group_boundaries.extend(
+                            float(m_start + float(off))
+                            for off in grid_offsets
+                            if float(ov_start) < float(m_start + float(off)) < float(ov_end)
+                        )
+                        group_boundaries.append(float(ov_end))
+                        group_boundaries = sorted(list(dict.fromkeys(round(float(t), 6) for t in group_boundaries)))
 
-                        if left_positions and (sub_left_x1 > sub_left_x0):
-                            boundaries = [float(ov_start)]
-                            boundaries.extend(
-                                float(m_start + off)
-                                for off in left_positions
-                                if float(ov_start) < float(m_start + off) < float(ov_end)
-                            )
-                            boundaries.append(float(ov_end))
-                            boundaries = sorted(boundaries)
-                            for bi in range(len(boundaries) - 1):
-                                if (bi % 2) != 0:
+                        left_intervals = _clip_intervals(left_dark_intervals_global, float(ov_start), float(ov_end))
+                        right_intervals = _clip_intervals(right_dark_intervals_global, float(ov_start), float(ov_end))
+
+                        if left_intervals:
+                            for t0, t1 in left_intervals:
+                                g0, g1 = _group_window_for_interval(group_boundaries, t0, t1)
+                                left_span = _hand_band_x_span('<', g0, g1)
+                                if left_span is None:
                                     continue
-                                t0 = float(boundaries[bi])
-                                t1 = float(boundaries[bi + 1])
-                                if t1 <= t0:
-                                    continue
+                                left_x0, left_x1 = left_span
                                 y0 = _time_to_y(t0)
                                 y1b = _time_to_y(t1)
                                 if y1b < y0:
                                     y0, y1b = y1b, y0
                                 du.add_rectangle(
-                                    sub_left_x0,
+                                    left_x0,
                                     y0,
-                                    sub_left_x1,
+                                    left_x1,
                                     y1b,
                                     stroke_color=None,
                                     fill_color=sub_tint_left,
                                     id=0,
-                                    tags=['sub_band'],
+                                    tags=['grid_band'],
                                 )
                                 sub_dark_intervals['left'].append((t0, t1))
 
-                        if right_positions and (sub_right_x1 > sub_right_x0):
-                            boundaries = [float(ov_start)]
-                            boundaries.extend(
-                                float(m_start + off)
-                                for off in right_positions
-                                if float(ov_start) < float(m_start + off) < float(ov_end)
-                            )
-                            boundaries.append(float(ov_end))
-                            boundaries = sorted(boundaries)
-                            for bi in range(len(boundaries) - 1):
-                                if (bi % 2) != 0:
+                        if right_intervals:
+                            for t0, t1 in right_intervals:
+                                g0, g1 = _group_window_for_interval(group_boundaries, t0, t1)
+                                right_span = _hand_band_x_span('>', g0, g1)
+                                if right_span is None:
                                     continue
-                                t0 = float(boundaries[bi])
-                                t1 = float(boundaries[bi + 1])
-                                if t1 <= t0:
-                                    continue
+                                right_x0, right_x1 = right_span
                                 y0 = _time_to_y(t0)
                                 y1b = _time_to_y(t1)
                                 if y1b < y0:
                                     y0, y1b = y1b, y0
                                 du.add_rectangle(
-                                    sub_right_x0,
+                                    right_x0,
                                     y0,
-                                    sub_right_x1,
+                                    right_x1,
                                     y1b,
                                     stroke_color=None,
                                     fill_color=sub_tint_right,
                                     id=0,
-                                    tags=['sub_band'],
+                                    tags=['grid_band'],
                                 )
                                 sub_dark_intervals['right'].append((t0, t1))
 
@@ -2589,21 +2832,50 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                         bx, by = bezier_point(t, p0, p1, p2, p3)
                         pts.append((bx, by))
 
-                    for i in range(len(pts) - 1):
+                    if len(pts) < 2:
+                        continue
+
+                    left_edge: list[tuple[float, float]] = []
+                    right_edge: list[tuple[float, float]] = []
+                    last_nx, last_ny = 0.0, 1.0
+
+                    for i, (cx, cy) in enumerate(pts):
                         if n_seg <= 1:
-                            t_mid = 0.0
+                            t_cur = 0.0
                         else:
-                            t_mid = (i + 0.5) / float(n_seg - 1)
-                        w_slur = width_at(t_mid)
-                        x_a, y_a = pts[i]
-                        x_b, y_b = pts[i + 1]
-                        du.add_line(
-                            x_a,
-                            y_a,
-                            x_b,
-                            y_b,
-                            color=notation_color,
-                            width_mm=w_slur,
+                            t_cur = i / float(n_seg - 1)
+                        w_slur = max(0.0, float(width_at(t_cur)))
+                        half_w = 0.5 * w_slur
+
+                        if i == 0:
+                            px, py = pts[i]
+                            nxp, nyp = pts[i + 1]
+                        elif i == len(pts) - 1:
+                            px, py = pts[i - 1]
+                            nxp, nyp = pts[i]
+                        else:
+                            px, py = pts[i - 1]
+                            nxp, nyp = pts[i + 1]
+
+                        dx = float(nxp) - float(px)
+                        dy = float(nyp) - float(py)
+                        dlen = math.hypot(dx, dy)
+                        if dlen <= 1e-9:
+                            nx, ny = last_nx, last_ny
+                        else:
+                            nx = -dy / dlen
+                            ny = dx / dlen
+                            last_nx, last_ny = nx, ny
+
+                        left_edge.append((float(cx) + nx * half_w, float(cy) + ny * half_w))
+                        right_edge.append((float(cx) - nx * half_w, float(cy) - ny * half_w))
+
+                    slur_poly = left_edge + list(reversed(right_edge))
+                    if len(slur_poly) >= 3:
+                        du.add_polygon(
+                            slur_poly,
+                            stroke_color=None,
+                            fill_color=notation_color,
                             id=int(sl.get('id', 0) or 0),
                             tags=['slur'],
                         )

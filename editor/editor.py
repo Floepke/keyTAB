@@ -22,6 +22,7 @@ from editor.tool.dynamic_tool import DynamicTool
 from editor.tool.crescendo_tool import CrescendoTool
 from editor.tool.decrescendo_tool import DecrescendoTool
 from editor.tool.tempo_tool import TempoTool
+from editor.tool.grid_band_tool import GridBandTool
 from editor.ctlz import CtlZ
 from file_model.base_grid import BaseGrid, resolve_grid_layer_offsets
 from settings_manager import get_preferences_manager
@@ -30,6 +31,7 @@ from file_model.SCORE import SCORE
 from utils.CONSTANT import BE_KEYS, QUARTER_NOTE_UNIT
 from editor.drawers.stave_drawer import StaveDrawerMixin
 from editor.drawers.snap_drawer import SnapDrawerMixin
+from editor.drawers.grid_band_drawer import GridBandDrawerMixin
 from editor.drawers.grid_drawer import GridDrawerMixin
 from editor.drawers.note_drawer import NoteDrawerMixin
 from editor.drawers.grace_note_drawer import GraceNoteDrawerMixin
@@ -57,6 +59,7 @@ if TYPE_CHECKING:
 class Editor(QtCore.QObject,
              StaveDrawerMixin,
              SnapDrawerMixin,
+             GridBandDrawerMixin,
              GridDrawerMixin,
              TimeSignatureDrawerMixin,
              NoteDrawerMixin,
@@ -106,6 +109,7 @@ class Editor(QtCore.QObject,
             'crescendo': CrescendoTool,
             'decrescendo': DecrescendoTool,
             'tempo': TempoTool,
+            'grid_band': GridBandTool,
         }
         self._tm.set_tool(self._tool)
 
@@ -228,7 +232,7 @@ class Editor(QtCore.QObject,
 
     # ---- Drawing via mixins ----
     def draw_background_gray(self, du) -> None:
-        """Fill the current page with print-view grey (#7a7a7a)."""
+        """Fill the current page with print-view grey."""
         w_mm, h_mm = du.current_page_size_mm()
         du.add_rectangle(0.0, 0.0, w_mm, h_mm, stroke_color=None, fill_color=self.paper_color, id=0, tags=["background"])
 
@@ -252,6 +256,7 @@ class Editor(QtCore.QObject,
         # Call drawer mixin methods in order
         methods = [
             getattr(self, 'draw_snap', None),
+            getattr(self, 'draw_grid_band', None),
             getattr(self, 'draw_grid', None),
             getattr(self, 'draw_time_signature', None),
             getattr(self, 'draw_stave', None),
