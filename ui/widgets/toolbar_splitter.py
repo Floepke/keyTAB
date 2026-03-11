@@ -251,6 +251,7 @@ class ToolbarHandle(QtWidgets.QSplitterHandle):
         for d in defs or []:
             name = d.get('name', '')
             icon_name = d.get('icon', '')
+            text = str(d.get('text', '') or '')
             tooltip = str(d.get('tooltip', name) or '').replace(';', '.')
             tooltip = tooltip.strip()
             if tooltip and not tooltip.endswith('.'):
@@ -260,7 +261,11 @@ class ToolbarHandle(QtWidgets.QSplitterHandle):
             ic = get_qicon(icon_name, size=(64, 64))
             if ic:
                 btn.setIcon(ic)
+            if text:
+                btn.setText(text)
             btn.setToolTip(tooltip)
+            if text and not ic:
+                btn.setToolButtonStyle(QtCore.Qt.ToolButtonStyle.ToolButtonTextOnly)
             btn.setIconSize(QtCore.QSize(self._button_size - 6, self._button_size - 6))
             # Trim width by 1px to ensure the right outline remains visible inside the handle
             btn.setFixedSize(self._button_size - 1, self._button_size)

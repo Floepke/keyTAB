@@ -14,6 +14,10 @@ UTILS_SAVE_DIR: Path = Path(os.path.expanduser('~/.keyTAB'))
 # the meaning of time is defined in this constant.
 QUARTER_NOTE_UNIT: float = 256.0
 
+# Editor-only drawing setting: snap side-band width measured in semitone distances.
+# Used by drawer code only (not serialized in project files).
+EDITOR_SIDE_BAND_INSET_SEMITONES: int = 10
+
 # Drawing orders (single sources of truth)
 # Each string corresponds to a tag name used in the Editor and Engraver for layering.
 # Update these lists to control layer stacking in the Editor and Engraver.
@@ -21,6 +25,7 @@ EDITOR_LAYERING = [
     # layers from background to foreground
     'page_background',
     'snap_band',
+    'sub_band',
     'midi_note',
     'grid_line',
     'stave_three_line',
@@ -67,6 +72,7 @@ EDITOR_LAYERING = [
 ENGRAVER_LAYERING = [
     # layers from background to foreground
     'page_background',
+    'sub_band',
     'midi_note',
     'grid_line',
     'count_line',

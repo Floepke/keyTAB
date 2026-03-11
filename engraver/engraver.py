@@ -51,8 +51,17 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
         notation_color = (0.0, 0.0, 0.0, 1.0)
         paper_color = (1.0, 1.0, 1.0, 1.0)
 
+    def _is_light_paper(rgb_tuple: tuple[int, int, int]) -> bool:
+        r = float(rgb_tuple[0]) / 255.0
+        g = float(rgb_tuple[1]) / 255.0
+        b = float(rgb_tuple[2]) / 255.0
+        lum = 0.2126 * r + 0.7152 * g + 0.0722 * b
+        return lum >= 0.5
+
     def _midi_fill_from_rgb(rgb_tuple: tuple[int, int, int]) -> tuple[float, float, float, float]:
         if pdf_export:
+            return (rgb_tuple[0] / 255.0, rgb_tuple[1] / 255.0, rgb_tuple[2] / 255.0, 1.0)
+        if _is_light_paper(paper_rgb):
             return (rgb_tuple[0] / 255.0, rgb_tuple[1] / 255.0, rgb_tuple[2] / 255.0, 1.0)
         adjusted = Style.get_contrasting_midi_rgb(rgb_tuple)
         return (adjusted[0] / 255.0, adjusted[1] / 255.0, adjusted[2] / 255.0, 1.0)
@@ -1085,6 +1094,47 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                 rel = max(0.0, min(1.0, rel))
                 return y1 + (y2 - y1) * rel
 
+            def _normalized_sub_positions(raw_vals: list, measure_len_ticks: float) -> list[float]:
+                seq = [float(v) for v in (raw_vals or []) if isinstance(v, (int, float))]
+                valid = [v for v in seq if 0.0 <= float(v) < float(measure_len_ticks)]
+                valid.sort()
+                uniq: list[float] = []
+                for v in valid:
+                    if not uniq or abs(float(v) - float(uniq[-1])) > 1e-6:
+                        uniq.append(float(v))
+                return uniq
+
+            def _mix_rgba(a: tuple[float, float, float, float], b: tuple[float, float, float, float], wa: float) -> tuple[float, float, float, float]:
+                wb = 1.0 - float(wa)
+                return (
+                    (a[0] * wa) + (b[0] * wb),
+                    (a[1] * wa) + (b[1] * wb),
+                    (a[2] * wa) + (b[2] * wb),
+                    1.0,
+                )
+
+            left_hex = _normalize_hex_color(layout.get('sub_band_left_color', layout.get('note_midinote_left_color', '#cccccc'))) or '#cccccc'
+            right_hex = _normalize_hex_color(layout.get('sub_band_right_color', layout.get('note_midinote_right_color', '#cccccc'))) or '#cccccc'
+            try:
+                lr, lg, lb, _ = hex_to_rgba(left_hex, 1.0)
+                rr, rg, rb, _ = hex_to_rgba(right_hex, 1.0)
+            except Exception:
+                lr, lg, lb = (204, 204, 204)
+                rr, rg, rb = (204, 204, 204)
+            left_note_fill = _midi_fill_from_rgb((int(lr), int(lg), int(lb)))
+            right_note_fill = _midi_fill_from_rgb((int(rr), int(rg), int(rb)))
+            if pdf_export:
+                sub_tint_left = left_note_fill
+                sub_tint_right = right_note_fill
+            else:
+                sub_tint_left = _mix_rgba(left_note_fill, paper_color, 0.80)
+                sub_tint_right = _mix_rgba(right_note_fill, paper_color, 0.80)
+
+            line_start_ticks = float(line.get('time_start', 0.0) or 0.0)
+            line_end_ticks = float(line.get('time_end', 0.0) or 0.0)
+            sub_band_visible = bool(layout.get('sub_band_visible', True))
+            sub_dark_intervals: dict[str, list[tuple[float, float]]] = {'left': [], 'right': []}
+
             def _text_bbox(text_val: str, family: str, size_pt: float, italic: bool, bold: bool, angle_deg: float, padding_mm: float, corner_radius_mm: float) -> tuple[float, float, float, list[tuple[float, float]], list[tuple[float, float]]]:
                 xb, yb, w_mm, h_mm = du._get_text_extents_mm(text_val, family, size_pt, italic, bold)
                 pad = max(0.0, float(padding_mm))
@@ -1294,6 +1344,36 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
             # Problem solved: draw barlines and beat lines from the base grid.
             grid_left = line_x_start
             grid_right = line_x_start + float(line['stave_width'])
+
+            line_avg_split_pitch = 43.0
+            line_pitches: list[int] = []
+            for n_item in norm_notes:
+                n_t0 = float(n_item.get('time', 0.0) or 0.0)
+                n_t1 = float(n_item.get('end', 0.0) or 0.0)
+                n_pitch = int(n_item.get('pitch', 0) or 0)
+                if n_pitch < 1 or n_pitch > PIANO_KEY_AMOUNT:
+                    continue
+                if op_time.ge(n_t0, float(line['time_end'])) or op_time.le(n_t1, float(line['time_start'])):
+                    continue
+                line_pitches.append(int(n_pitch))
+            if line_pitches:
+                line_avg_split_pitch = float(sum(line_pitches)) / float(len(line_pitches))
+            line_avg_split_pitch = max(1.0, min(float(PIANO_KEY_AMOUNT), float(line_avg_split_pitch)))
+
+            split_lo = int(math.floor(line_avg_split_pitch))
+            split_hi = int(math.ceil(line_avg_split_pitch))
+            if split_hi <= split_lo:
+                sub_split_x = _key_to_x(split_lo)
+            else:
+                x_lo = _key_to_x(split_lo)
+                x_hi = _key_to_x(split_hi)
+                frac = float(line_avg_split_pitch - float(split_lo))
+                sub_split_x = float(x_lo + (x_hi - x_lo) * frac)
+            sub_split_x = max(float(grid_left), min(float(grid_right), float(sub_split_x)))
+            sub_left_x0 = float(grid_left)
+            sub_left_x1 = float(sub_split_x)
+            sub_right_x0 = float(sub_split_x)
+            sub_right_x1 = float(grid_right)
             ts_right_margin = max(0.0, 1.5 * scale)
             ts_lane_padding_mm = float(line.get('ts_lane_padding_mm', 0.0) or 0.0)
             ts_lane_width = float(line.get('ts_lane_width', 0.0) or 0.0)
@@ -1325,6 +1405,8 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                 denominator = int(bg.get('denominator', 4) or 4)
                 measure_amount = int(bg.get('measure_amount', 1) or 1)
                 beat_grouping = list(bg.get('beat_grouping', []) or [])
+                sub_band_left = list(bg.get('sub_band_left', []) or [])
+                sub_band_right = list(bg.get('sub_band_right', []) or [])
                 indicator_enabled = bool(bg.get('indicator_enabled', True))
                 bar_offsets, grid_offsets = resolve_grid_layer_offsets(beat_grouping, numerator, denominator)
                 if bar_offsets:
@@ -1344,6 +1426,79 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                 for _ in range(measure_amount):
                     if op_time.gt(time_cursor, float(line['time_end'])):
                         break
+
+                    m_start = float(time_cursor)
+                    m_end = float(time_cursor + measure_len)
+                    ov_start = max(float(line_start_ticks), float(m_start))
+                    ov_end = min(float(line_end_ticks), float(m_end))
+                    if sub_band_visible and (ov_end > ov_start):
+                        left_positions = _normalized_sub_positions(sub_band_left, float(measure_len))
+                        right_positions = _normalized_sub_positions(sub_band_right, float(measure_len))
+
+                        if left_positions and (sub_left_x1 > sub_left_x0):
+                            boundaries = [float(ov_start)]
+                            boundaries.extend(
+                                float(m_start + off)
+                                for off in left_positions
+                                if float(ov_start) < float(m_start + off) < float(ov_end)
+                            )
+                            boundaries.append(float(ov_end))
+                            boundaries = sorted(boundaries)
+                            for bi in range(len(boundaries) - 1):
+                                if (bi % 2) != 0:
+                                    continue
+                                t0 = float(boundaries[bi])
+                                t1 = float(boundaries[bi + 1])
+                                if t1 <= t0:
+                                    continue
+                                y0 = _time_to_y(t0)
+                                y1b = _time_to_y(t1)
+                                if y1b < y0:
+                                    y0, y1b = y1b, y0
+                                du.add_rectangle(
+                                    sub_left_x0,
+                                    y0,
+                                    sub_left_x1,
+                                    y1b,
+                                    stroke_color=None,
+                                    fill_color=sub_tint_left,
+                                    id=0,
+                                    tags=['sub_band'],
+                                )
+                                sub_dark_intervals['left'].append((t0, t1))
+
+                        if right_positions and (sub_right_x1 > sub_right_x0):
+                            boundaries = [float(ov_start)]
+                            boundaries.extend(
+                                float(m_start + off)
+                                for off in right_positions
+                                if float(ov_start) < float(m_start + off) < float(ov_end)
+                            )
+                            boundaries.append(float(ov_end))
+                            boundaries = sorted(boundaries)
+                            for bi in range(len(boundaries) - 1):
+                                if (bi % 2) != 0:
+                                    continue
+                                t0 = float(boundaries[bi])
+                                t1 = float(boundaries[bi + 1])
+                                if t1 <= t0:
+                                    continue
+                                y0 = _time_to_y(t0)
+                                y1b = _time_to_y(t1)
+                                if y1b < y0:
+                                    y0, y1b = y1b, y0
+                                du.add_rectangle(
+                                    sub_right_x0,
+                                    y0,
+                                    sub_right_x1,
+                                    y1b,
+                                    stroke_color=None,
+                                    fill_color=sub_tint_right,
+                                    id=0,
+                                    tags=['sub_band'],
+                                )
+                                sub_dark_intervals['right'].append((t0, t1))
+
                     for off in bar_offsets:
                         t = float(time_cursor + float(off))
                         if op_time.lt(t, float(line['time_start'])) or op_time.gt(t, float(line['time_end'])):
@@ -1903,6 +2058,41 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
             line_end = float(line.get('time_end', 0.0) or 0.0)
             black_rule = str(layout.get('black_note_rule', 'below_stem') or 'below_stem')
 
+            def _clip_poly_y(poly: list[tuple[float, float]], y_min: float, y_max: float) -> list[tuple[float, float]]:
+                if not poly:
+                    return []
+
+                def _clip(points: list[tuple[float, float]], keep_inside, intersect) -> list[tuple[float, float]]:
+                    if not points:
+                        return []
+                    out: list[tuple[float, float]] = []
+                    prev = points[-1]
+                    prev_in = keep_inside(prev)
+                    for cur in points:
+                        cur_in = keep_inside(cur)
+                        if cur_in:
+                            if not prev_in:
+                                out.append(intersect(prev, cur))
+                            out.append(cur)
+                        elif prev_in:
+                            out.append(intersect(prev, cur))
+                        prev = cur
+                        prev_in = cur_in
+                    return out
+
+                def _intersect_y(a: tuple[float, float], b: tuple[float, float], yv: float) -> tuple[float, float]:
+                    ay = float(a[1])
+                    by = float(b[1])
+                    if abs(by - ay) <= 1e-9:
+                        return (float(b[0]), float(yv))
+                    t = (float(yv) - ay) / (by - ay)
+                    x = float(a[0]) + t * (float(b[0]) - float(a[0]))
+                    return (x, float(yv))
+
+                clipped = _clip(poly, lambda p: float(p[1]) >= float(y_min), lambda a, b: _intersect_y(a, b, y_min))
+                clipped = _clip(clipped, lambda p: float(p[1]) <= float(y_max), lambda a, b: _intersect_y(a, b, y_max))
+                return clipped
+
             def _has_adjacent_white_same_hand(note_dict: dict) -> bool:
                 p0 = int(note_dict.get('pitch', 0) or 0)
                 t0 = float(note_dict.get('time', 0.0) or 0.0)
@@ -2016,19 +2206,42 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                     r_i, g_i, b_i = (204, 204, 204)
                 fill = _midi_fill_from_rgb((int(r_i), int(g_i), int(b_i)))
                 if bool(layout.get('note_midinote_visible', True)):
+                    midi_poly = [
+                        (x, y_start),
+                        (x - w, y_start + semitone_mm),
+                        (x - w, y_end),
+                        (x + w, y_end),
+                        (x + w, y_start + semitone_mm),
+                    ]
                     du.add_polygon(
-                        [
-                            (x, y_start),
-                            (x - w, y_start + semitone_mm),
-                            (x - w, y_end),
-                            (x + w, y_end),
-                            (x + w, y_start + semitone_mm),
-                        ],
+                        midi_poly,
                         stroke_color=None,
                         fill_color=fill,
                         id=int(item.get('id', 0) or 0),
                         tags=['midi_note'],
                     )
+
+                    side_key = 'left' if float(x) < float(sub_split_x) else 'right'
+                    dark_intervals = sub_dark_intervals.get(side_key, [])
+                    if dark_intervals:
+                        for t0, t1 in dark_intervals:
+                            seg_start = max(float(n_t), float(t0), float(line_start))
+                            seg_end = min(float(n_end), float(t1), float(line_end))
+                            if seg_end <= seg_start:
+                                continue
+                            y0 = _time_to_y(seg_start)
+                            y1_seg = _time_to_y(seg_end)
+                            if y1_seg < y0:
+                                y0, y1_seg = y1_seg, y0
+                            seg_poly = _clip_poly_y(midi_poly, y0, y1_seg)
+                            if len(seg_poly) >= 3:
+                                du.add_polygon(
+                                    seg_poly,
+                                    stroke_color=None,
+                                    fill_color=paper_color,
+                                    id=int(item.get('id', 0) or 0),
+                                    tags=['midi_note'],
+                                )
 
                 continues_from_prev_line = _is_line_continuation(item)
 

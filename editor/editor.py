@@ -934,7 +934,7 @@ class Editor(QtCore.QObject,
                     int(getattr(bg, 'numerator', 4) or 4),
                     int(getattr(bg, 'denominator', 4) or 4),
                     int(getattr(bg, 'measure_amount', 1) or 1),
-                    tuple(int(v) for v in positions_list),
+                    tuple(round(float(v), 6) for v in positions_list if isinstance(v, (int, float))),
                 )
             )
         grid_cache_key = tuple(grid_key_parts)

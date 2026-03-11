@@ -45,6 +45,12 @@ class ToolManager(QtCore.QObject):
     def _on_context_button_clicked(self, name: str) -> None:
         if self._tool is not None:
             self._tool.on_toolbar_button(name)
+            # Rebuild contextual toolbar to reflect dynamic labels/state.
+            try:
+                defs = self._tool.toolbar_spec() or []
+                self._splitter.set_context_buttons(defs)
+            except Exception:
+                pass
         # Force immediate visual feedback after any contextual button
         if self._editor is not None:
             if hasattr(self._editor, 'force_redraw_from_model'):

@@ -126,19 +126,13 @@ class CairoEditorWidget(QtWidgets.QWidget):
         vis_w_px = int(max(1, round(float(vp_w) * dpr)))
         vis_h_px = int(max(1, round(float(vp_h) * dpr)))
         # Update tiny mode based on device-pixel width (no DPI query needed)
-        try:
-            if self._editor is not None:
-                self._editor.update_tiny_mode_from_width(float(vis_w_px))
-        except Exception:
-            pass
+        if self._editor is not None:
+            self._editor.update_tiny_mode_from_width(float(vis_w_px))
         # Read continuous tiny-mode fade factor (1.0 = opaque, 0.0 = transparent)
         content_alpha = 1.0
         if self._editor is not None:
-            try:
-                # Preserve a true 0.0 instead of falling back via "or 1.0"
-                content_alpha = float(getattr(self._editor, 'tiny_mode_alpha', 1.0))
-            except Exception:
-                content_alpha = 1.0
+            # Preserve a true 0.0 instead of falling back via "or 1.0"
+            content_alpha = float(getattr(self._editor, 'tiny_mode_alpha', 1.0))
         # Prepare DrawUtil with page dimensions from SCORE/layout and Editor layout
         page_w_mm = 210.0
         page_h_mm = 297.0
@@ -150,10 +144,7 @@ class CairoEditorWidget(QtWidgets.QWidget):
                     page_w_mm = float(getattr(lay, 'page_width_mm', page_w_mm))
             # Calculate editor layout metrics (margin, stave_width, editor_height)
             self._editor._calculate_layout(page_w_mm)
-            try:
-                page_h_mm = float(getattr(self._editor, 'editor_height', page_h_mm) or page_h_mm)
-            except Exception:
-                page_h_mm = page_h_mm
+            page_h_mm = float(getattr(self._editor, 'editor_height', page_h_mm) or page_h_mm)
         # Invalidate cache when scale or page dimensions change
         # Derive px_per_mm from the actual backing image width to avoid anisotropy
         px_per_mm = (float(vis_w_px)) / page_w_mm

@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING, cast
 from utils.operator import Operator as OP
 
 from ui.widgets.draw_util import DrawUtil
-from utils.CONSTANT import QUARTER_NOTE_UNIT
+from utils.CONSTANT import QUARTER_NOTE_UNIT, EDITOR_SIDE_BAND_INSET_SEMITONES
 
 try:
     # Theme-aware editor background color
@@ -21,22 +21,31 @@ class SnapDrawerMixin:
         Draws:
             - Alternating light/darker snap bands along the vertical timeline the size of the snap.
     '''
+
+    SNAP_BAND_PAPER_DARKEN: float = 0.92
     
     def _editor_bg_tint_rgba(self) -> tuple[float, float, float, float]:
-        """Return a slightly darker tint than the editor background as RGBA floats.
+        """Return a configurable darker-than-paper tint as RGBA floats.
 
-        Uses the named 'editor' color from Style if available; otherwise falls back
-        to a neutral grey.
+        Darkening factor can be set by either:
+        - `self.snap_band_paper_darken` (runtime override), or
+        - `SNAP_BAND_PAPER_DARKEN` (class default).
         """
-        qc = Style.get_named_qcolor('editor')
-        r = max(0, min(255, qc.red()))
-        g = max(0, min(255, qc.green()))
-        b = max(0, min(255, qc.blue()))
-        # Slightly darker (about -7%)
-        dr = int(round(r * 0.92))
-        dg = int(round(g * 0.92))
-        db = int(round(b * 0.92))
-        return (dr / 255.0, dg / 255.0, db / 255.0, 1.0)
+
+        rgb = Style.get_named_rgb("accent", (200, 200, 200))
+        r = max(0, min(255, int(rgb[0])))
+        g = max(0, min(255, int(rgb[1])))
+        b = max(0, min(255, int(rgb[2])))
+
+        darken = float(getattr(self, 'snap_band_paper_darken', self.SNAP_BAND_PAPER_DARKEN))
+        darken = max(0.0, min(1.0, darken))
+
+        return (
+            (r / 255.0) * darken,
+            (g / 255.0) * darken,
+            (b / 255.0) * darken,
+            1.0,
+        )
 
     def draw_snap(self, du: DrawUtil) -> None:
         """Draw alternating light/darker snap bands along the vertical timeline.
@@ -49,7 +58,7 @@ class SnapDrawerMixin:
         score = self.current_score()
         if score is None:
             return
-        
+
         # if the snap size < 8.0 units, skip drawing snap bands for performance
         if self.snap_size_units < 8.0:
             return
@@ -60,9 +69,15 @@ class SnapDrawerMixin:
         page_w_mm, _page_h_mm = du.current_page_size_mm()
         margin = float(self.margin)
         
-        # Match horizontal span under the stave
-        stave_left = self.margin + self.semitone_dist
-        stave_right = page_w_mm - self.margin - self.semitone_dist * 2.0
+        # Draw snap pattern as two bands inside the stave edges.
+        # Band width is configurable in semitone distances.
+        stave_left = float(self.margin + self.semitone_dist)
+        stave_right = float(page_w_mm - self.margin - self.semitone_dist * 2.0)
+        inset_w = max(0.0, float(EDITOR_SIDE_BAND_INSET_SEMITONES) * float(self.semitone_dist))
+        left_x1 = stave_left
+        left_x2 = min(stave_right, stave_left + inset_w)
+        right_x1 = max(stave_left, stave_right - inset_w)
+        right_x2 = stave_right
         zpq = float(getattr(score.app_state, 'zoom_mm_per_quarter', 25.0) or 25.0)
 
         # Snap size in time units → mm
@@ -97,9 +112,19 @@ class SnapDrawerMixin:
                     h = min(snap_mm, measure_end_mm - sub_cursor)
                     if (seg_index % 2) == 0:
                         du.add_rectangle(
-                            stave_left,
+                            left_x1,
                             sub_cursor,
-                            stave_right,
+                            left_x2,
+                            sub_cursor + h,
+                            stroke_color=None,
+                            fill_color=fill_rgba,
+                            id=0,
+                            tags=["snap_band"],
+                        )
+                        du.add_rectangle(
+                            right_x1,
+                            sub_cursor,
+                            right_x2,
                             sub_cursor + h,
                             stroke_color=None,
                             fill_color=fill_rgba,

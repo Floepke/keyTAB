@@ -89,9 +89,13 @@ class Layout:
     stave_visible: bool = True
     barline_visible: bool = True
     grid_line_visible: bool = True
+    sub_band_visible: bool = True
     grid_barline_thickness_mm: float = 1.0
     grid_gridline_thickness_mm: float = 0.5
     grid_gridline_dash_pattern_mm: list[float] = field(default_factory=lambda: [2.5, 4.0])
+    sub_band_left_color: str = '#ccc'
+    sub_band_right_color: str = '#ccc'
+    
 
     # Time signature indicator type (global)
     time_signature_indicator_type: Literal['classical', 'klavarskribo', 'both'] = 'both'
