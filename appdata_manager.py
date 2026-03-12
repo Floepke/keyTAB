@@ -289,20 +289,11 @@ def get_appdata_manager() -> AppDataManager:
         # Removed window_state persistence to avoid saving/restoring dock/toolbar layout
         adm.load()
         # Strip any legacy keys from stored values
-        try:
-            adm._values.pop("window_state", None)
-        except Exception:
-            pass
-        try:
-            removed = adm._values.pop("layout_template", None)
-            if removed is not None:
-                adm.save()
-        except Exception:
-            pass
-        try:
-            for legacy_key in ("user_styles", "selected_style_name", "user_styles_version"):
-                adm._values.pop(legacy_key, None)
-        except Exception:
-            pass
+        adm._values.pop("window_state", None)
+        removed = adm._values.pop("layout_template", None)
+        if removed is not None:
+            adm.save()
+        for legacy_key in ("user_styles", "selected_style_name", "user_styles_version"):
+            adm._values.pop(legacy_key, None)
         _appdata_manager = adm
     return _appdata_manager

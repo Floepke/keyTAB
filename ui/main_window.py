@@ -1110,16 +1110,10 @@ class MainWindow(QtWidgets.QMainWindow):
             except Exception:
                 pass
             # Scroll restore (used when metrics arrive)
-            try:
-                self._pending_scroll_restore = int(app_state.editor_scroll_pos or 0)
-            except Exception:
-                pass
+            self._pending_scroll_restore = int(app_state.editor_scroll_pos or 0)
             # Print page restore
-            try:
-                self._page_counter = max(0, int(getattr(app_state, 'print_view_page_index', 0) or 0))
-                self._set_page_index(self._page_counter)
-            except Exception:
-                pass
+            self._page_counter = max(0, int(getattr(app_state, 'print_view_page_index', 0) or 0))
+            self._set_page_index(self._page_counter)
         finally:
             self._is_restoring_app_state = False
 
