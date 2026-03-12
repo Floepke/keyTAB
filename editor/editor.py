@@ -1,6 +1,6 @@
 from __future__ import annotations
 from typing import Literal, Optional, Tuple, Dict, Type, TYPE_CHECKING
-import math, bisect
+import math, bisect, copy
 from PySide6 import QtCore
 
 from editor.tool.base_tool import BaseTool
@@ -201,6 +201,8 @@ class Editor(QtCore.QObject,
         self._text_hit_rects: list[dict] = []
         # Per-frame tempo hit rectangles in absolute mm coordinates
         self._tempo_hit_rects: list[dict] = []
+        # Per-frame velocity handle hit rectangles
+        self._velocity_hit_rects: list[dict] = []
 
         # Tiny mode: toggled by viewport width (stage 1: simplified drawing,
         # stage 2: skip drawing). tiny_mode_alpha is a continuous fade factor
@@ -245,6 +247,7 @@ class Editor(QtCore.QObject,
         self._note_hit_rects = []
         self._text_hit_rects = []
         self._tempo_hit_rects = []
+        self._velocity_hit_rects = []
         # In tiny stage 2, skip drawing to keep closing smooth
         if self.is_tiny_mode_ultra():
             self._draw_cache = None
@@ -362,6 +365,21 @@ class Editor(QtCore.QObject,
             'cx': cx,
             'cy': cy,
             'kind': str(kind or 'body'),
+        })
+
+    # ---- Hit rectangles (velocity handles) ----
+    def register_velocity_hit_rect(self, note_id: int, x_left_mm: float, y_top_mm: float, x_right_mm: float, y_bottom_mm: float, hand: str) -> None:
+        cx = (float(x_left_mm) + float(x_right_mm)) * 0.5
+        cy = (float(y_top_mm) + float(y_bottom_mm)) * 0.5
+        self._velocity_hit_rects.append({
+            '_id': int(note_id),
+            'hand': str(hand or '<'),
+            'x1': float(x_left_mm),
+            'y1': float(y_top_mm),
+            'x2': float(x_right_mm),
+            'y2': float(y_bottom_mm),
+            'cx': cx,
+            'cy': cy,
         })
 
     # ---- Hit rectangles (tempo) ----
@@ -1286,6 +1304,87 @@ class Editor(QtCore.QObject,
                     tags=['cursor'],
                 )
 
+        # --- Velocity sliders (note tool only) ---
+        if isinstance(self._tool, NoteTool) and getattr(self._tool, 'velocity_mode', False):
+            self._velocity_hit_rects = []
+            score = self.current_score()
+            if score is not None:
+                top_mm = float(self._view_y_mm_offset or 0.0)
+                bottom_mm = top_mm + float(self._viewport_h_mm or 0.0)
+                bleed_mm = max(4.0, float(self.semitone_dist or 2.5) * 2.0)
+                margin = float(self.margin or 12.0)
+                stave_width = float(self.stave_width or 120.0)
+                max_len = max(2.0, margin * 0.85)
+                handle_r = max(1.5, float(self.semitone_dist or 2.5) * 0.45)
+                for n in getattr(score.events, 'note', []) or []:
+                    try:
+                        y_mm = float(self.time_to_mm(float(getattr(n, 'time', 0.0) or 0.0)))
+                        hand = str(getattr(n, 'hand', '<') or '<')
+                        nid = int(getattr(n, '_id', 0) or 0)
+                        vel = int(getattr(n, 'velocity', 64) or 0)
+                    except Exception:
+                        continue
+                    if y_mm < (top_mm - bleed_mm) or y_mm > (bottom_mm + bleed_mm):
+                        continue
+                    ratio = max(0.0, min(1.0, float(vel) / 127.0))
+                    if hand == '<':
+                        x_inner = margin
+                        x_outer = x_inner - max_len * ratio
+                        x1, x2 = x_outer, x_inner
+                    else:
+                        x_inner = margin + stave_width
+                        x_outer = x_inner + max_len * ratio
+                        x1, x2 = x_inner, x_outer
+                    du.add_line(
+                        x1,
+                        y_mm,
+                        x2,
+                        y_mm,
+                        color=self.accent_color,
+                        width_mm=1.0,
+                        dash_pattern=None,
+                        id=0,
+                        tags=['velocity_slider'],
+                    )
+                    du.add_oval(
+                        x_outer - handle_r,
+                        y_mm - handle_r,
+                        x_outer + handle_r,
+                        y_mm + handle_r,
+                        stroke_color=self.accent_color,
+                        fill_color=self.accent_color,
+                        stroke_width_mm=0.6,
+                        id=nid,
+                        tags=['velocity_slider_handle'],
+                    )
+                    self.register_velocity_hit_rect(
+                        nid,
+                        x_outer - handle_r * 1.4,
+                        y_mm - handle_r * 1.4,
+                        x_outer + handle_r * 1.4,
+                        y_mm + handle_r * 1.4,
+                        hand,
+                    )
+                    tool = self._tool
+                    if isinstance(tool, NoteTool) and getattr(tool, '_velocity_dragging', False):
+                        tgt = getattr(tool, '_velocity_target', None)
+                        if tgt is not None and int(getattr(tgt, '_id', -1) or -1) == nid:
+                            val = getattr(tool, '_velocity_display_value', None)
+                            if val is not None:
+                                offset = -3.0
+                                x_text = x_outer
+                                du.add_text(
+                                    x_text,
+                                    y_mm + offset,
+                                    str(int(val)),
+                                    size_pt=14,
+                                    family='Edwin',
+                                    color=self.accent_color,
+                                    anchor='s',
+                                    id=0,
+                                    tags=['velocity_slider_value'],
+                                )
+
         # --- Selection window overlay (always visible when active) ---
         if self._selection_active:
             # Compute absolute selection bounds in mm
@@ -1650,8 +1749,10 @@ class Editor(QtCore.QObject,
         if not self._selection_active:
             return None
         sel = self.detect_events_from_time_window(self._sel_start_units, self._sel_end_units - 0.1) # slight epsilon to not detect next event at end
-        self.clipboard = sel
-        return sel
+        # Deep copy so later edits (e.g., transpose via arrow keys) do not mutate the clipboard
+        safe_copy = copy.deepcopy(sel)
+        self.clipboard = safe_copy
+        return safe_copy
 
     def cut_selection(self) -> dict | None:
         """Cut current selection window events: copy to clipboard, then remove from SCORE."""

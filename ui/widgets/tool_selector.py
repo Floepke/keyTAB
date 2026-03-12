@@ -22,7 +22,7 @@ TOOL_ITEMS: list[dict] = [
     # layout elements
     { 'name': 'line_break',     'displayed_name': 'Line/Page Break','icon': 'line_break',     'tooltip': 'Line/Page Break tool. Insert system or page breaks. Click an existing break to edit its properties.' },
     { 'name': 'time_signature', 'displayed_name': 'Time Signature', 'icon': 'time_signature', 'tooltip': 'Time Signature tool. Configure meter and base grid subdivision.' },
-    { 'name': 'grid_band',      'displayed_name': 'Grid Band',      'icon': 'grid_band',      'tooltip': 'Grid Band tool. Add and edit grid band markers. Click below pitch 39 for left hand, above 45 for right hand, or between 39-45 for both. Drag to adjust duration. Right click deletes markers only.' },
+    { 'name': 'grid_band',      'displayed_name': 'Grid Band',      'icon': 'grid_band',      'tooltip': 'Grid Band tool. Add and edit grid band markers. Click below pitch 39 for left hand, above 45 for right hand, or between 39-45 for both. Drag a marker to set its length; snapping keeps ends on the current snap size. Drag back to its start for zero duration (renders a red line). Right click deletes markers only.' },
     { 'name': 'tempo',          'displayed_name': 'Tempo',          'icon': 'metronome',      'tooltip': 'Tempo tool. Add tempo regions in units per minute over a duration.'} ,
     { 'name': 'slur',           'displayed_name': 'Slur',           'icon': 'slur',           'tooltip': 'Slur tool. Place phrasing slurs.' },
     { 'name': 'text',           'displayed_name': 'Text',           'icon': 'text',           'tooltip': 'Text tool. Place text annotations.' },
@@ -110,6 +110,21 @@ class ToolSelectorWidget(QtWidgets.QListWidget):
                 # Emit selection to update editor
                 self._emit_selected()
                 break
+
+    def wheelEvent(self, ev: QtGui.QWheelEvent) -> None:
+        """Use wheel to move selection instead of scrolling."""
+        delta = ev.angleDelta().y()
+        if delta == 0:
+            delta = ev.pixelDelta().y()
+        if delta == 0:
+            ev.accept()
+            return
+        step = -1 if delta > 0 else 1
+        row = max(0, int(self.currentRow()))
+        new_row = max(0, min(self.count() - 1, row + step))
+        if new_row != row:
+            self.setCurrentRow(new_row)
+        ev.accept()
 
     def set_selected_tool(self, name: str, emit: bool = True) -> None:
         """Programmatically select a tool by its internal name and optionally emit."""

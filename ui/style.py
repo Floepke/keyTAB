@@ -266,21 +266,12 @@ class Style:
         if app is None:
             return
         # Use Fusion style across all platforms for consistent look
-        try:
-            QApplication.setStyle('Fusion')
-        except Exception:
-            pass
-        try:
-            base_style = app.style()
-            Style._APP_STYLE_PROXY = _InstantTooltipStyle(base_style)
-            app.setStyle(Style._APP_STYLE_PROXY)
-        except Exception:
-            pass
-        try:
-            QApplication.setEffectEnabled(Qt.UI_AnimateMenu, True)
-            QApplication.setEffectEnabled(Qt.UI_FadeMenu, True)
-        except Exception:
-            pass
+        QApplication.setStyle('Fusion')
+        base_style = app.style()
+        Style._APP_STYLE_PROXY = _InstantTooltipStyle(base_style)
+        app.setStyle(Style._APP_STYLE_PROXY)
+        QApplication.setEffectEnabled(Qt.UI_AnimateMenu, True)
+        QApplication.setEffectEnabled(Qt.UI_FadeMenu, True)
         # Clear any previous global stylesheet; we may set a minimal one below
         app.setStyleSheet("")
 
@@ -345,17 +336,6 @@ class Style:
             f"selection-background-color: rgb({accent.red()},{accent.green()},{accent.blue()});"
             f"selection-color: rgb({text.red()},{text.green()},{text.blue()});"
             f"border: 1px solid rgb({alt.red()},{alt.green()},{alt.blue()});"
-            "}"
-            "QDockWidget {"
-            f"background-color: rgb({bg.red()},{bg.green()},{bg.blue()});"
-            f"color: rgb({text.red()},{text.green()},{text.blue()});"
-            f"border: 1px solid rgb({alt.red()},{alt.green()},{alt.blue()});"
-            "}"
-            "QDockWidget::title {"
-            f"background-color: rgb({alt.red()},{alt.green()},{alt.blue()});"
-            f"color: rgb({text.red()},{text.green()},{text.blue()});"
-            "padding: 4px;"
-            "margin: 0px;"
             "}"
         )
 

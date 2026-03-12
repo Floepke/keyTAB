@@ -68,11 +68,6 @@ class MainWindow(QtWidgets.QMainWindow):
         self._create_menus()
 
         self.splitter = ToolbarSplitter(QtCore.Qt.Orientation.Horizontal)
-        # Hide handle indicator/grip but keep dragging functional
-        self.splitter.setStyleSheet(
-            "QSplitter::handle { background: transparent; image: none; }\n"
-            "QSplitter::handle:hover { background: transparent; }"
-        )
         
         # Editor view with external scrollbar for static viewport scrolling
         self.editor_canvas = CairoEditorWidget()
@@ -1090,6 +1085,7 @@ class MainWindow(QtWidgets.QMainWindow):
             app_state.snap_base = int(adm.get("snap_base", app_state.snap_base) or app_state.snap_base)
             app_state.snap_divide = int(adm.get("snap_divide", app_state.snap_divide) or app_state.snap_divide)
             app_state.selected_tool = str(adm.get("selected_tool", app_state.selected_tool) or app_state.selected_tool)
+            app_state.note_velocity_mode = bool(adm.get("note_velocity_mode", getattr(app_state, 'note_velocity_mode', False)))
         except Exception:
             pass
         return app_state
@@ -2085,7 +2081,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def _zoom_editor(self, steps: int) -> None:
         try:
-            if hasattr(self, 'editor') and hasattr(self.editor_canvas, 'apply_zoom_steps'):
+            if hasattr(self, 'editor_canvas') and hasattr(self.editor_canvas, 'apply_zoom_steps'):
                 self.editor_canvas.apply_zoom_steps(int(steps))
         except Exception:
             pass
@@ -2786,6 +2782,9 @@ class MainWindow(QtWidgets.QMainWindow):
         try:
             app_state = self._current_app_state()
             app_state.selected_tool = str(name)
+            if str(name) != 'note':
+                # Leave velocity mode state untouched; it is restored when returning to note tool
+                pass
         except Exception:
             pass
 

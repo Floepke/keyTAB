@@ -1515,23 +1515,70 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                 )
 
             def _draw_klavars_ts(numerator: int, denominator: int, enabled: bool, y_mm: float, grid_positions: list[int]) -> None:
+                """Match editor time-signature Klavarskribo indicator (three columns)."""
                 color = _ts_color(enabled)
                 quarters_per_measure = float(numerator) * (4.0 / max(1.0, float(denominator)))
                 measure_len_mm = quarters_per_measure * mm_per_quarter
                 beat_len_mm = measure_len_mm / max(1, int(numerator))
+                measure_len_ticks = float(numerator) * (4.0 / max(1.0, float(denominator))) * float(QUARTER_NOTE_UNIT)
+                beat_len_ticks = measure_len_ticks / max(1.0, float(numerator))
 
-                seq = [int(p) for p in (grid_positions or []) if 1 <= int(p) <= 9]
-                if len(seq) != int(numerator):
-                    seq = list(range(1, int(numerator) + 1))
+                op = Operator(float(SHORTEST_DURATION))
+                # Column positions: left (group count), middle (beat count), right (guides)
+                base_x = ts_x_mid
+                col_gap = 5.0 * scale
+                x_mid = base_x
+                x_right = base_x + (10.0 * scale)
+                x_left = base_x - col_gap
 
-                guide_half_len = min(ts_col_w * 0.45, 3.0 * scale) if ts_col_w > 0.0 else (3.0 * scale)
+                grid_bar_off, grid_off = resolve_grid_layer_offsets(
+                    [float(v) for v in (grid_positions or []) if isinstance(v, (int, float))],
+                    int(numerator),
+                    int(denominator),
+                )
+                grid1_positions = sorted(
+                    list(
+                        dict.fromkeys(
+                            [float(v) for v in (grid_bar_off + grid_off) if 0.0 <= float(v) < float(measure_len_ticks)]
+                        )
+                    )
+                )
+
+                beat_positions = [float(k) * float(beat_len_ticks) for k in range(0, int(numerator))]
+                beat_has_reset = [any(op.eq(float(bp), float(gp)) for gp in grid1_positions) for bp in beat_positions]
+                full_group_mode = bool(beat_has_reset) and all(bool(v) for v in beat_has_reset)
+
+                mid_values: list[int] = []
+                group_values: list[int] = []
+                group_starts: list[int] = []
+                cur_mid = 1
+                cur_group = 1
+                for k in range(1, int(numerator) + 1):
+                    if k == 1:
+                        reset_here = True
+                    elif full_group_mode:
+                        reset_here = False
+                    else:
+                        reset_here = bool(beat_has_reset[k - 1])
+
+                    if reset_here:
+                        cur_mid = 1
+                        if k > 1:
+                            cur_group += 1
+                        group_starts.append(k)
+                        group_values.append(cur_group)
+                    else:
+                        cur_mid += 1
+                    mid_values.append(cur_mid)
+
+                guide_half_len = 3.0 * scale
                 guide_width_mm = guide_thickness
-                for k, val in enumerate(seq, start=1):
+                for k in range(1, int(numerator) + 1):
                     y = y_mm + (k - 1) * beat_len_mm
                     du.add_line(
-                        ts_x_right - guide_half_len,
+                        x_right - guide_half_len,
                         y,
-                        ts_x_right + guide_half_len,
+                        x_right + guide_half_len,
                         y,
                         color=color,
                         width_mm=guide_width_mm,
@@ -1540,9 +1587,9 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                         dash_pattern=None,
                     )
                 du.add_line(
-                    ts_x_right - guide_half_len,
+                    x_right - guide_half_len,
                     y_mm + measure_len_mm,
-                    ts_x_right + guide_half_len,
+                    x_right + guide_half_len,
                     y_mm + measure_len_mm,
                     color=color,
                     width_mm=guide_width_mm,
@@ -1551,48 +1598,46 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                     dash_pattern=None,
                 )
 
-                for k, val in enumerate(seq, start=1):
+                for k, val in enumerate(mid_values, start=1):
                     y = y_mm + (k - 1) * beat_len_mm
                     du.add_text(
-                        ts_x_mid,
+                        x_mid,
                         y,
                         str(val),
                         size_pt=klav_size_pt,
                         color=color,
                         id=0,
                         tags=["ts_klavars_mid"],
-                        anchor='center',
+                        anchor='w',
                         family=klav_family,
                         bold=klav_bold,
                         italic=klav_italic,
                     )
                 du.add_text(
-                    ts_x_mid,
+                    x_mid,
                     y_mm + measure_len_mm,
                     "1",
-                        size_pt=klav_size_pt,
+                    size_pt=klav_size_pt,
                     color=color,
                     id=0,
                     tags=["ts_klavars_mid"],
-                    anchor='center',
-                        family=klav_family,
-                        bold=klav_bold,
-                        italic=klav_italic,
+                    anchor='w',
+                    family=klav_family,
+                    bold=klav_bold,
+                    italic=klav_italic,
                 )
-                group_starts = [i for i, v in enumerate(seq, start=1) if v == 1]
-                if not group_starts or group_starts[0] != 1:
-                    group_starts = [1] + group_starts
-                for gi, s in enumerate(group_starts, start=1):
+
+                for gi, s in zip(group_values, group_starts):
                     y = y_mm + (s - 1) * beat_len_mm
                     du.add_text(
-                        ts_x_left,
+                        x_left - (2.0 * scale),
                         y,
                         str(gi),
                         size_pt=klav_size_pt,
                         color=color,
                         id=0,
                         tags=["ts_klavars_left"],
-                        anchor='center',
+                        anchor='w',
                         family=klav_family,
                         bold=klav_bold,
                         italic=klav_italic,

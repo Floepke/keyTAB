@@ -1,5 +1,4 @@
 from __future__ import annotations
-import math
 from typing import TYPE_CHECKING, cast
 
 from PySide6 import QtGui
@@ -192,77 +191,25 @@ class GridBandDrawerMixin:
         self,
         du: DrawUtil,
         times: list[float],
-        x_mm: float,
+        _x_mm: float,
         color: tuple[float, float, float, float],
-        angle_deg: float,
+        _angle_deg: float,
     ) -> None:
         self = cast("Editor", self)
-        if not times:
-            return
-
-        def _rounded_badge_poly(cx: float, cy: float, text: str, angle: float, pad: float) -> list[tuple[float, float]]:
-            # Reuse text_drawer geometry idea: rounded rect then rotate around center.
-            _, _, w_mm, h_mm = du._get_text_extents_mm(text, 'Edwin', 16.0, False, False)
-            w_mm += 2.0 * pad
-            h_mm += 2.0 * pad
-            hw = 0.5 * w_mm
-            hh = 0.5 * h_mm
-            r = min(pad, hw, hh)
-
-            pts: list[tuple[float, float]] = []
-            if r <= 1e-6:
-                pts = [(-hw, -hh), (hw, -hh), (hw, hh), (-hw, hh)]
-            else:
-                corners = [
-                    (-hw + r, -hh + r, 180.0, 270.0),
-                    (hw - r, -hh + r, 270.0, 360.0),
-                    (hw - r, hh - r, 0.0, 90.0),
-                    (-hw + r, hh - r, 90.0, 180.0),
-                ]
-                step = 15.0
-                for ox, oy, a0, a1 in corners:
-                    deg = a0
-                    while deg <= a1 + 0.01:
-                        rad = math.radians(deg)
-                        pts.append((ox + r * math.cos(rad), oy + r * math.sin(rad)))
-                        deg += step
-
-            ang = math.radians(angle)
-            ca = math.cos(ang)
-            sa = math.sin(ang)
-            out: list[tuple[float, float]] = []
-            for dx, dy in pts:
-                rx = dx * ca - dy * sa
-                ry = dx * sa + dy * ca
-                out.append((cx + rx, cy + ry))
-            return out
-
+        x_min = float(min(self.pitch_to_x(2), self.pitch_to_x(86)))
+        x_max = float(max(self.pitch_to_x(2), self.pitch_to_x(86)))
         for t in times:
-            y = float(self.time_to_mm(float(t + self.snap_size_units * .5)))
-            text_x = float(x_mm) + self.semitone_dist * 24.0 if Operator(SHORTEST_DURATION).le(float(x_mm), 50.0) else float(x_mm) - self.semitone_dist * 24.0
-            text_anchor = 'center'
-
-            # White rounded mask behind OFF label
-            bg_poly = _rounded_badge_poly(text_x, y, 'Band OFF', float(angle_deg), pad=1.1)
-            du.add_polygon(
-                bg_poly,
-                stroke_color=None,
-                fill_color=(0.0, 0.0, 0.0, 1.0),
-                id=0,
-                tags=["grid_band_stop_bg"],
-            )
-
-            du.add_text(
-                text_x,
+            y = float(self.time_to_mm(float(t)))
+            du.add_line(
+                x_min,
                 y,
-                "Band OFF",
-                size_pt=16,
-                family='Edwin',
+                x_max,
+                y,
                 color=color,
-                anchor=text_anchor,
-                angle_deg=float(angle_deg),
+                width_mm=1.0,
+                dash_pattern=None,
                 id=0,
-                tags=["grid_band_stop"],
+                tags=["grid_band_stop_line"],
             )
 
     def _draw_grid_band_side(

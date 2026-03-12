@@ -261,6 +261,7 @@ def get_appdata_manager() -> AppDataManager:
         adm.register("snap_base", 8, "Last selected snap base (1,2,4,8,...) for editor snapping")
         adm.register("snap_divide", 1, "Last selected snap divide (tuplets factor) for editor snapping")
         adm.register("selected_tool", "note", "Last selected tool name in the tool selector")
+        adm.register("note_velocity_mode", False, "Last velocity editing toggle state for note tool")
         adm.register("editor_scroll_pos", 0, "Last editor scroll position (logical px)")
         adm.register(
             "show_install_question",

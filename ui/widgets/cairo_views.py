@@ -533,6 +533,28 @@ class CairoEditorWidget(QtWidgets.QWidget):
                     return
             except Exception:
                 pass
+            # Home/End stretch selection to song bounds
+            if key in (QtCore.Qt.Key_Home, QtCore.Qt.Key_End):
+                if getattr(self._editor, '_selection_active', False):
+                    snap = float(getattr(self._editor, 'snap_size_units', 0.0) or 1.0)
+                    start = float(getattr(self._editor, 'selection_window_start', 0.0) or 0.0)
+                    end = float(getattr(self._editor, 'selection_window_end', 0.0) or 0.0)
+                    total = float(self._editor._calc_base_grid_list_total_length()) if hasattr(self._editor, '_calc_base_grid_list_total_length') else end
+                    total = max(total, snap)
+                    if key == QtCore.Qt.Key_Home:
+                        self._editor.selection_window_start = 0.0
+                        if self._editor.selection_window_end <= self._editor.selection_window_start:
+                            self._editor.selection_window_end = self._editor.selection_window_start + snap
+                    else:  # End key
+                        self._editor.selection_window_end = total
+                        if self._editor.selection_window_end <= self._editor.selection_window_start:
+                            self._editor.selection_window_start = max(0.0, total - snap)
+                    if hasattr(self, 'request_overlay_refresh'):
+                        self.request_overlay_refresh()
+                    else:
+                        self.update()
+                    ev.accept()
+                    return
             if key in (QtCore.Qt.Key_BracketLeft, QtCore.Qt.Key_BracketRight):
                 try:
                     hand = '<' if key == QtCore.Qt.Key_BracketLeft else '>'

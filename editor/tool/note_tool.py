@@ -1,12 +1,11 @@
-import math
 from typing import Optional
+from appdata_manager import get_appdata_manager
 from editor.tool.base_tool import BaseTool
 from file_model.SCORE import SCORE
 from utils.operator import Operator
 from ui.widgets.draw_util import DrawUtil
 from utils.CONSTANT import QUARTER_NOTE_UNIT
 from file_model.events.note import Note
-from utils.CONSTANT import QUARTER_NOTE_UNIT
 
 
 class NoteTool(BaseTool):
@@ -24,6 +23,12 @@ class NoteTool(BaseTool):
         self._duration_edit_armed: bool = False
         self._last_audition_pitch: int | None = None
         self._move_pitch_time_mode: bool = False
+        self._velocity_mode: bool = False
+        self._velocity_dragging: bool = False
+        self._velocity_target: Note | None = None
+        self._velocity_display_value: int | None = None
+        self._velocity_display_x_mm: float | None = None
+        self._velocity_display_y_mm: float | None = None
 
     def _play_note_on_edit_enabled(self) -> bool:
         try:
@@ -45,7 +50,17 @@ class NoteTool(BaseTool):
         return [
             {'name': 'hand_left', 'icon': 'note_left', 'tooltip': 'Click to write left hand notes'},
             {'name': 'hand_right', 'icon': 'note_right', 'tooltip': 'Click to write right hand notes'},
+            {
+                'name': 'velocity_toggle',
+                'icon': 'dynamic',
+                'text': 'Vel',
+                'tooltip': f"Velocity editing is {'on' if self._velocity_mode else 'off'}. Toggle to edit note velocities with margin sliders.",
+            },
         ]
+
+    @property
+    def velocity_mode(self) -> bool:
+        return bool(self._velocity_mode)
 
     def _cursor_mm(self, x_px: float, y_px: float) -> tuple[float, float]:
         w_px_per_mm = float(getattr(self._editor, '_widget_px_per_mm', 1.0) or 1.0)
@@ -72,6 +87,82 @@ class NoteTool(BaseTool):
             if int(getattr(n, '_id', -1) or -1) == hit_id:
                 return n, hit_rect, y_mm
         return None, hit_rect, y_mm
+
+    def _hit_velocity_handle(self, score: SCORE, x_px: float, y_px: float):
+        x_mm, y_mm = self._cursor_mm(x_px, y_px)
+        matches = []
+        for r in (getattr(self._editor, '_velocity_hit_rects', []) or []):
+            if float(r['x1']) <= x_mm <= float(r['x2']) and float(r['y1']) <= y_mm <= float(r['y2']):
+                dx = x_mm - float(r['cx'])
+                dy = y_mm - float(r['cy'])
+                dist2 = dx * dx + dy * dy
+                matches.append((dist2, r))
+        if not matches:
+            return None, None, y_mm
+        matches.sort(key=lambda t: t[0])
+        hit_rect = matches[0][1]
+        hit_id = int(hit_rect.get('_id', -1) or -1)
+        for n in getattr(score.events, 'note', []) or []:
+            if int(getattr(n, '_id', -1) or -1) == hit_id:
+                return n, hit_rect, y_mm
+        return None, hit_rect, y_mm
+
+    def _apply_velocity_from_cursor(self, x_px: float) -> None:
+        if self._editor is None or self._velocity_target is None:
+            return
+        x_mm, _ = self._cursor_mm(x_px, 0.0)
+        margin = float(getattr(self._editor, 'margin', 12.0) or 12.0)
+        stave_width = float(getattr(self._editor, 'stave_width', 120.0) or 120.0)
+        max_len = max(2.0, margin * 0.85)
+        hand = str(getattr(self._velocity_target, 'hand', '<') or '<')
+        if hand == '<':
+            dist = max(0.0, float(margin) - float(x_mm))
+        else:
+            dist = max(0.0, float(x_mm) - float(margin + stave_width))
+        ratio = max(0.0, min(1.0, dist / max_len))
+        new_vel = int(round(ratio * 127.0))
+        self._velocity_target.velocity = new_vel
+        t = float(getattr(self._velocity_target, 'time', 0.0) or 0.0)
+        self._velocity_display_y_mm = float(self._editor.time_to_mm(t))
+        self._velocity_display_x_mm = x_mm
+        self._velocity_display_value = new_vel
+        if hasattr(self._editor, 'widget') and getattr(self._editor, 'widget', None) is not None:
+            w = getattr(self._editor, 'widget')
+            if hasattr(w, 'request_overlay_refresh'):
+                w.request_overlay_refresh()
+
+    def _persist_velocity_mode(self) -> None:
+        try:
+            score = self._editor.current_score()
+            if score is not None and getattr(score, 'app_state', None) is not None:
+                score.app_state.note_velocity_mode = bool(self._velocity_mode)
+        except Exception:
+            pass
+        try:
+            adm = get_appdata_manager()
+            adm.set("note_velocity_mode", bool(self._velocity_mode))
+            adm.save()
+        except Exception:
+            pass
+
+    def on_activate(self) -> None:
+        super().on_activate()
+        try:
+            score = self._editor.current_score()
+            if score is not None and getattr(score, 'app_state', None) is not None:
+                self._velocity_mode = bool(getattr(score.app_state, 'note_velocity_mode', False))
+        except Exception:
+            pass
+        self._velocity_dragging = False
+        self._velocity_target = None
+        self._velocity_display_value = None
+        self._velocity_display_x_mm = None
+        self._velocity_display_y_mm = None
+        # Refresh overlay to show saved velocity sliders state
+        if hasattr(self._editor, 'widget') and getattr(self._editor, 'widget', None) is not None:
+            w = getattr(self._editor, 'widget')
+            if hasattr(w, 'request_overlay_refresh'):
+                w.request_overlay_refresh()
 
     def _can_apply_duration(self, note: Note, candidate_duration: float) -> bool:
         score: SCORE = self._editor.current_score()
@@ -119,8 +210,27 @@ class NoteTool(BaseTool):
     def on_left_press(self, x: float, y: float) -> None:
         '''Detect existing note under cursor or create a new one, then enter edit mode'''
         super().on_left_press(x, y)
+        self._velocity_dragging = False
+        self._velocity_target = None
+        self._velocity_display_value = None
+        self._velocity_display_x_mm = None
+        self._velocity_display_y_mm = None
         
         score: SCORE = self._editor.current_score()
+
+        # Velocity handle hit test first when velocity editing is enabled
+        if self._velocity_mode and score is not None:
+            v_note, _v_rect, _y_mm = self._hit_velocity_handle(score, x, y)
+            if v_note is not None:
+                self._velocity_target = v_note
+                self._velocity_dragging = True
+                self._editing_existing = True
+                self.edit_note = v_note
+                # Do not arm duration edits while dragging velocity
+                self._duration_edit_armed = False
+                self._move_pitch_time_mode = False
+                self._apply_velocity_from_cursor(x)
+                return
 
         # Compute raw (non-snapped) time for detection and snapped for creation
         t_press_raw = float(self._editor.y_to_time(y))
@@ -178,6 +288,11 @@ class NoteTool(BaseTool):
     def on_left_unpress(self, x: float, y: float) -> None:
         super().on_left_unpress(x, y)
         # Keep last edit and clear the session handle
+        self._velocity_dragging = False
+        self._velocity_target = None
+        self._velocity_display_value = None
+        self._velocity_display_x_mm = None
+        self._velocity_display_y_mm = None
         self.edit_note = None
         self._editing_existing = False
         self._duration_edit_armed = False
@@ -207,6 +322,9 @@ class NoteTool(BaseTool):
 
     def on_left_drag(self, x: float, y: float, dx: float, dy: float) -> None:
         super().on_left_drag(x, y, dx, dy)
+        if self._velocity_dragging:
+            self._apply_velocity_from_cursor(x)
+            return
         # Update the in-progress note based on current mouse
         if self.edit_note is None:
             return
@@ -222,6 +340,7 @@ class NoteTool(BaseTool):
         # - Existing note: do NOT shorten to snap while within one snap from start; allow pitch-only there.
         start_t = float(getattr(note, 'time', 0.0) or 0.0)
         units = float(max(1e-6, getattr(self._editor, 'snap_size_units', 8.0)))
+        snapped_end = float(max(cur_t_snap, start_t + units))
         # Thresholded comparator to avoid floating-point jitter around band boundaries
         op = Operator(7)
 
@@ -233,16 +352,10 @@ class NoteTool(BaseTool):
                 if cur_pitch != prev_pitch and cur_pitch != self._last_audition_pitch:
                     self._audition_pitch(cur_pitch)
             else:
-                if op.lt(cur_t_raw, start_t + units):
-                    if self._can_apply_duration(note, units):
-                        note.duration = units
-                else:
-                    # Compute bands beyond the first using raw time to reduce snapping jitter
-                    ratio = max(0.0, (float(cur_t_raw) - float(start_t)) / max(1e-6, units))
-                    bands_beyond_first = int(math.floor(ratio + 1e-9))
-                    candidate = float(bands_beyond_first + 1) * float(units)
-                    if self._can_apply_duration(note, candidate):
-                        note.duration = candidate
+                # Always snap the end to the grid based on the current snap size
+                candidate = float(max(units, snapped_end - start_t))
+                if self._can_apply_duration(note, candidate):
+                    note.duration = candidate
         else:
             # Editing existing note:
             if self._move_pitch_time_mode:
@@ -273,21 +386,20 @@ class NoteTool(BaseTool):
                 if not self._duration_edit_armed:
                     if op.ge(cur_t_raw, start_t + units):
                         self._duration_edit_armed = True
-                else:
+                if self._duration_edit_armed:
                     # Armed: allow duration edits, including 1 snap when back inside first band
-                    if op.lt(cur_t_raw, start_t + units):
-                        if self._can_apply_duration(note, units):
-                            note.duration = units
-                    else:
-                        ratio = max(0.0, (float(cur_t_raw) - float(start_t)) / max(1e-6, units))
-                        bands_beyond_first = int(math.floor(ratio + 1e-9))
-                        candidate = float(bands_beyond_first + 1) * float(units)
-                        if self._can_apply_duration(note, candidate):
-                            note.duration = candidate
+                    candidate = float(max(units, snapped_end - start_t))
+                    if self._can_apply_duration(note, candidate):
+                        note.duration = candidate
 
     def on_left_drag_end(self, x: float, y: float) -> None:
         super().on_left_drag_end(x, y)
         # Finalize edit session
+        self._velocity_dragging = False
+        self._velocity_target = None
+        self._velocity_display_value = None
+        self._velocity_display_x_mm = None
+        self._velocity_display_y_mm = None
         self.edit_note = None
         self._editing_existing = False
         self._duration_edit_armed = False
@@ -392,6 +504,19 @@ class NoteTool(BaseTool):
             self._editor.hand_cursor = '<'
         elif name == 'hand_right':
             self._editor.hand_cursor = '>'
+        elif name == 'velocity_toggle':
+            self._velocity_mode = not self._velocity_mode
+            self._velocity_dragging = False
+            self._velocity_target = None
+            self._velocity_display_value = None
+            self._velocity_display_x_mm = None
+            self._velocity_display_y_mm = None
+            self._persist_velocity_mode()
+            # Refresh overlay to show or hide velocity sliders immediately
+            if hasattr(self._editor, 'widget') and getattr(self._editor, 'widget', None) is not None:
+                w = getattr(self._editor, 'widget')
+                if hasattr(w, 'request_overlay_refresh'):
+                    w.request_overlay_refresh()
         # Refresh overlay guides to reflect the change immediately
         if hasattr(self._editor, 'widget') and getattr(self._editor, 'widget', None) is not None:
             w = getattr(self._editor, 'widget')

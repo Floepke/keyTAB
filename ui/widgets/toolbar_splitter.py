@@ -1,5 +1,6 @@
 from PySide6 import QtCore, QtGui, QtWidgets
 from icons.icons import get_qicon
+from ui.style import Style
 
 
 class ToolbarHandle(QtWidgets.QSplitterHandle):
@@ -296,9 +297,16 @@ class ToolbarSplitter(QtWidgets.QSplitter):
         super().__init__(orientation, parent)
         assert orientation == QtCore.Qt.Orientation.Horizontal, \
             "ToolbarSplitter is intended for horizontal orientation"
+        self.setObjectName("ToolbarSplitter")
         # Allow dragging the sash to fully collapse either child
         self.setChildrenCollapsible(True)
         self.setHandleWidth(56)
+        # Hover cue driven by theme alternate background color
+        alt = Style.get_named_qcolor('alternate_background_color', (240, 240, 240))
+        self.setStyleSheet(
+            "#ToolbarSplitter::handle { background: transparent; image: none; }\n"
+            f"#ToolbarSplitter::handle:hover {{ background-color: rgb({alt.red()},{alt.green()},{alt.blue()}); }}"
+        )
 
     def createHandle(self):
         h = ToolbarHandle(self.orientation(), self)
