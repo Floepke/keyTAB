@@ -2972,7 +2972,7 @@ class MainWindow(QtWidgets.QMainWindow):
         layout.setContentsMargins(16, 16, 16, 16)
         layout.setSpacing(10)
 
-        label = QtWidgets.QLabel(f"Saving... {path_text}")
+        label = QtWidgets.QLabel(f"Saving...\n\n {path_text}")
         label.setWordWrap(True)
         bar = QtWidgets.QProgressBar()
         bar.setRange(0, 100)
