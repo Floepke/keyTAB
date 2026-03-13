@@ -465,18 +465,23 @@ def parse_musicxml(path: Path) -> tuple[SCORE, dict[str, int]]:
 
     score.events.tempo = []
     if tempo_unique:
+        if float(tempo_unique[0].time_units) > 0.0:
+            score.new_tempo(
+                time=0.0,
+                duration=float(max(1.0, tempo_unique[0].beat_duration_units)),
+                tempo=int(round(tempo_unique[0].bpm)),
+            )
         for t in tempo_unique:
             score.new_tempo(
                 time=float(t.time_units),
                 duration=float(max(1.0, t.beat_duration_units)),
                 tempo=int(round(t.bpm)),
             )
-        first = tempo_unique[0]
-        score.new_text(
-            text=f"{int(round(first.bpm))}/4",
-            time=float(first.time_units),
-            x_rpitch=0,
-            rotation=0.0,
+    else:
+        score.new_tempo(
+            time=0.0,
+            duration=float(QUARTER_NOTE_UNIT),
+            tempo=60,
         )
 
     if signature_by_measure:

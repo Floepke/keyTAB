@@ -2708,27 +2708,19 @@ class MainWindow(QtWidgets.QMainWindow):
             else:
                 self.editor_controller.draw_frame()
         # Also refresh the canvas overlays so guide stem direction updates instantly
-        try:
-            if hasattr(self, 'editor') and self.editor_canvas is not None:
-                if hasattr(self.editor_canvas, 'request_overlay_refresh'):
-                    self.editor_canvas.request_overlay_refresh()
-                else:
-                    # Fallback: normal repaint
-                    self.editor_canvas.update()
-        except Exception:
-            pass
+        if hasattr(self, 'editor') and self.editor_canvas is not None:
+            if hasattr(self.editor_canvas, 'request_overlay_refresh'):
+                self.editor_canvas.request_overlay_refresh()
+            else:
+                # Fallback: normal repaint
+                self.editor_canvas.update()
 
     def _adjust_docks_to_fit(self) -> None:
         # Ensure both docks are sized and locked to their fit dimensions
-        try:
-            if hasattr(self.snap_dock, 'selector'):
-                self.snap_dock.selector.adjust_to_fit()
-        except Exception:
-            pass
-        try:
+        if hasattr(self.snap_dock, 'selector'):
+            self.snap_dock.selector.adjust_to_fit()
+        if hasattr(self.tool_dock, 'adjust_to_fit'):
             self.tool_dock.adjust_to_fit()
-        except Exception:
-            pass
         self._freeze_left_panel_width_once()
 
     def _freeze_left_panel_width_once(self) -> None:
@@ -2748,11 +2740,8 @@ class MainWindow(QtWidgets.QMainWindow):
         target_width = max(120, pref_width, snap_width, tool_width)
         self.snap_dock.setMinimumWidth(target_width)
         self.tool_dock.setMinimumWidth(target_width)
-        try:
-            # Apply an initial width while still allowing user resizing afterward
-            self.resizeDocks([self.snap_dock, self.tool_dock], [target_width, target_width], QtCore.Qt.Orientation.Horizontal)
-        except Exception:
-            pass
+        # Apply an initial width while still allowing user resizing afterward
+        self.resizeDocks([self.snap_dock, self.tool_dock], [target_width, target_width], QtCore.Qt.Orientation.Horizontal)
         self._left_panel_width_frozen = True
 
     def resizeEvent(self, ev: QtGui.QResizeEvent) -> None:

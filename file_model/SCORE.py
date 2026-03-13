@@ -495,11 +495,8 @@ class SCORE:
 		self.meta_data.creation_timestamp = _timestamp_now()
 		self.info = Info()
 		self.analysis = Analysis()
-		try:
-			year = datetime.now().year
-			self.info.copyright = f"keyTAB all copyrights reserved {year}"
-		except Exception:
-			pass
+		year = datetime.now().year
+		self.info.copyright = f"keyTAB all copyrights reserved {year}"
 		self.base_grid = [BaseGrid()]
 		self.events = Events()
 		self.layout = Layout()
@@ -507,37 +504,25 @@ class SCORE:
 		self._next_id = 1
 		self._app_state_from_file = False
 		self._last_load_checks_report = {}
-		try:
-			self._ensure_line_break_zero()
-		except Exception:
-			pass
+		self._ensure_line_break_zero()
 		# Add an initial tempo at time 0 for a default 4/4 beat length
-		try:
-			numer = int(getattr(self.base_grid[0], 'numerator', 4) or 4) if self.base_grid else 4
-			denom = int(getattr(self.base_grid[0], 'denominator', 4) or 4) if self.base_grid else 4
-			measure_len = float(numer) * (4.0 / float(denom)) * float(QUARTER_NOTE_UNIT)
-			beat_len = measure_len / max(1, int(numer))
-			self.new_tempo(time=0.0, duration=float(beat_len), tempo=60)
-		except Exception:
-			pass
+		numer = int(getattr(self.base_grid[0], 'numerator', 4) or 4) if self.base_grid else 4
+		denom = int(getattr(self.base_grid[0], 'denominator', 4) or 4) if self.base_grid else 4
+		measure_len = float(numer) * (4.0 / float(denom)) * float(QUARTER_NOTE_UNIT)
+		beat_len = measure_len / max(1, int(numer))
+		self.new_tempo(time=0.0, duration=float(beat_len), tempo=60)
 		return self
 
 	def _ensure_line_break_zero(self) -> None:
 		"""Ensure there is always a line break at time 0."""
-		try:
-			lb_list = list(getattr(self.events, 'line_break', []) or [])
-		except Exception:
-			lb_list = []
+		lb_list = list(getattr(self.events, 'line_break', []) or [])
 		if not lb_list:
 			self.new_line_break(time=0.0)
 			return
 		tol = 1e-6
 		if not any(abs(float(getattr(lb, 'time', 0.0) or 0.0)) <= tol for lb in lb_list):
 			self.new_line_break(time=0.0)
-		try:
-			self.events.line_break.sort(key=lambda lb: float(getattr(lb, 'time', 0.0) or 0.0))
-		except Exception:
-			pass
+		self.events.line_break.sort(key=lambda lb: float(getattr(lb, 'time', 0.0) or 0.0))
 
 	def _normalize_events_after_load(self) -> None:
 		"""Normalize event fields after parsing and convert short notes to grace notes."""
@@ -550,20 +535,24 @@ class SCORE:
 			c = str(getattr(n, 'color', '') or '').strip()
 			if not c:
 				setattr(n, 'color', 'auto')
-			try:
-				dur = float(getattr(n, 'duration', 0.0) or 0.0)
-				if dur < float(GRACENOTE_THRESHOLD):
-					converted_grace.append(GraceNote(pitch=int(getattr(n, 'pitch', 40) or 40), time=float(getattr(n, 'time', 0.0) or 0.0)))
-				else:
-					remaining_notes.append(n)
-			except Exception:
+			dur = float(getattr(n, 'duration', 0.0) or 0.0)
+			if dur < float(GRACENOTE_THRESHOLD):
+				converted_grace.append(GraceNote(pitch=int(getattr(n, 'pitch', 40) or 40), time=float(getattr(n, 'time', 0.0) or 0.0)))
+			else:
 				remaining_notes.append(n)
 
 		# Replace original notes with remaining valid notes and add converted grace notes.
-		# De-duplicate notes that start at effectively the same time (with a small load-time threshold)
-		# and share the same pitch. Keep the shortest duration note among duplicates.
+		# De-duplicate notes that start at effectively the same time (with a small load-time threshold),
+		# share the same pitch, and are in the same hand. Keep the shortest duration note among duplicates.
 		op_load = Operator(0.1)
-		remaining_notes.sort(key=lambda n: (int(getattr(n, 'pitch', 0) or 0), float(getattr(n, 'time', 0.0) or 0.0), float(getattr(n, 'duration', 0.0) or 0.0)))
+		remaining_notes.sort(
+			key=lambda n: (
+				int(getattr(n, 'pitch', 0) or 0),
+				float(getattr(n, 'time', 0.0) or 0.0),
+				str(getattr(n, 'hand', '<') or '<'),
+				float(getattr(n, 'duration', 0.0) or 0.0),
+			)
+		)
 		deduped_notes: List[Note] = []
 		for n in remaining_notes:
 			if not deduped_notes:
@@ -572,9 +561,11 @@ class SCORE:
 			prev = deduped_notes[-1]
 			prev_pitch = int(getattr(prev, 'pitch', 0) or 0)
 			prev_time = float(getattr(prev, 'time', 0.0) or 0.0)
+			prev_hand = str(getattr(prev, 'hand', '<') or '<')
 			cur_pitch = int(getattr(n, 'pitch', 0) or 0)
 			cur_time = float(getattr(n, 'time', 0.0) or 0.0)
-			if cur_pitch == prev_pitch and op_load.eq(cur_time, prev_time):
+			cur_hand = str(getattr(n, 'hand', '<') or '<')
+			if cur_pitch == prev_pitch and op_load.eq(cur_time, prev_time) and cur_hand == prev_hand:
 				prev_dur = float(getattr(prev, 'duration', 0.0) or 0.0)
 				cur_dur = float(getattr(n, 'duration', 0.0) or 0.0)
 				if cur_dur < prev_dur:

@@ -532,6 +532,7 @@ class StyleDialog(QtWidgets.QDialog):
             'grid_gridline_thickness_mm': 'Grid',
             'grid_gridline_dash_pattern_mm': 'Grid',
             'grid_band_color': 'Grid',
+            'grid_band_start_phase': 'Grid',
             # Stave
             'stave_two_line_thickness_mm': 'Stave',
             'stave_three_line_thickness_mm': 'Stave',

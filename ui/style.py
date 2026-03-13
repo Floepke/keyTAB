@@ -101,7 +101,7 @@ class Style:
     }
     _THEME_SYNCED: bool = False
     _APP_STYLE_PROXY: QProxyStyle | None = None
-    MACOS_SCROLLBAR_WIDTH: int | None = 12
+    MACOS_SCROLLBAR_WIDTH: int | None = 14
 
     @classmethod
     def get_macos_scrollbar_width(cls, fallback: int) -> int:

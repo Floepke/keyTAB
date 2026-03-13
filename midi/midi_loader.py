@@ -4,10 +4,7 @@ from typing import Optional, Dict, List, Tuple
 import math
 
 import pretty_midi
-try:
-    import mido  # fallback parser
-except Exception:
-    mido = None
+import mido  # fallback parser
 
 from file_model.SCORE import SCORE
 from utils.CONSTANT import QUARTER_NOTE_UNIT, GRACENOTE_THRESHOLD
@@ -36,7 +33,7 @@ def midi_load(path: str) -> SCORE:
 
     - Notes mapped to SCORE.events.note with pitch/time/duration
     - Time mapping respects tempo changes via PrettyMIDI's tick conversion
-    - Inserts a tempo Text at time 0 using first tempo if available
+    - Imports tempo changes as SCORE tempo markers
     """
     p = Path(path)
     if not p.exists():
@@ -52,21 +49,29 @@ def midi_load(path: str) -> SCORE:
         return _midi_load_with_mido(str(p))
 
     score = SCORE().new()
-    try:
-        score.info.title = str(p.stem or score.info.title)
-    except Exception:
-        pass
+    # Replace SCORE.new() default tempo with imported tempo markers.
+    score.events.tempo = []
+    score.info.title = str(p.stem or score.info.title)
 
     # Tempo: map all tempo changes to tempo markers (fixed duration = one quarter unit)
     times_arr, tempi_arr = pm.get_tempo_changes()
     times = [float(t) for t in list(times_arr) if times_arr is not None] if times_arr is not None else []
     tempi = [float(tp) for tp in list(tempi_arr) if tempi_arr is not None] if tempi_arr is not None else []
     if len(tempi) > 0:
-        bpm_first = int(round(float(tempi[0])))
-        score.new_text(text=f"{bpm_first}/4", time=0.0, x_rpitch=0, rotation=0.0)
-        for t_sec, bpm_val in zip(times, tempi):
+        tempo_points = sorted(
+            [(float(t_sec), int(round(float(bpm_val)))) for t_sec, bpm_val in zip(times, tempi)],
+            key=lambda it: it[0],
+        )
+        if tempo_points and float(tempo_points[0][0]) > 0.0:
+            tempo_points.insert(0, (0.0, int(tempo_points[0][1])))
+        seen_times: set[int] = set()
+        for t_sec, bpm_val in tempo_points:
             start_units = _seconds_to_units(pm, float(t_sec))
-            score.new_tempo(time=float(start_units), duration=float(QUARTER_NOTE_UNIT), tempo=int(round(float(bpm_val))))
+            key = int(round(float(start_units) * 1000.0))
+            if key in seen_times:
+                continue
+            seen_times.add(key)
+            score.new_tempo(time=float(start_units), duration=float(QUARTER_NOTE_UNIT), tempo=int(bpm_val))
     else:
         bpm_guess = int(round(float(pm.estimate_tempo() or 120.0)))
         score.new_tempo(time=0.0, duration=float(QUARTER_NOTE_UNIT), tempo=bpm_guess)
@@ -153,7 +158,7 @@ def _midi_load_with_mido(path: str) -> SCORE:
     mid = mido.MidiFile(filename=path)
     tpq = int(getattr(mid, 'ticks_per_beat', 480) or 480)
     # Default tempo in microseconds per beat (500k = 120 BPM)
-    default_tempo = 500000
+    default_tempo = 500_000
 
     # Collect tempo changes from track 0 or meta across all tracks
     tempo_events: List[Tuple[int, int]] = []  # (abs_ticks, tempo)
@@ -195,14 +200,11 @@ def _midi_load_with_mido(path: str) -> SCORE:
 
     # Iterate messages to build absolute seconds timeline per track and pair notes
     score = SCORE().new()
-    try:
-        score.info.title = str(Path(path).stem or score.info.title)
-    except Exception:
-        pass
+    # Replace SCORE.new() default tempo with imported tempo markers.
+    score.events.tempo = []
+    score.info.title = str(Path(path).stem or score.info.title)
 
-    # First tempo for Text
     bpm0 = 60.0 / ((tempo_events[0][1] if tempo_events else default_tempo) / 1_000_000.0)
-    score.new_text(text=f"{int(round(bpm0))}/4", time=0.0, x_rpitch=0, rotation=0.0)
 
     # Helper: get current tempo at given absolute ticks
     def tempo_at_ticks(abs_ticks: int) -> int:
@@ -216,7 +218,12 @@ def _midi_load_with_mido(path: str) -> SCORE:
 
     # Tempo markers: one per tempo change, fixed duration = one quarter unit
     if tempo_events:
+        tempo_by_tick: Dict[int, int] = {}
+        if int(tempo_events[0][0]) > 0:
+            tempo_by_tick[0] = int(default_tempo)
         for tick_pos, tempo_us in tempo_events:
+            tempo_by_tick[int(max(0, tick_pos))] = int(tempo_us)
+        for tick_pos, tempo_us in sorted(tempo_by_tick.items(), key=lambda it: it[0]):
             bpm = int(round(60_000_000.0 / float(tempo_us)))
             t_units = ticks_to_units(tick_pos)
             score.new_tempo(time=float(t_units), duration=float(QUARTER_NOTE_UNIT), tempo=bpm)

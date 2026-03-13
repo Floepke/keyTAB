@@ -97,6 +97,7 @@ class Layout:
     grid_gridline_thickness_mm: float = 0.5
     grid_gridline_dash_pattern_mm: list[float] = field(default_factory=lambda: [2.5, 4.0])
     grid_band_color: str = '#ccc'
+    grid_band_start_phase: Literal['dark', 'light'] = 'dark'
     
 
     # Time signature indicator type (global)

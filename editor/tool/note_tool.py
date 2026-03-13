@@ -257,6 +257,7 @@ class NoteTool(BaseTool):
                 'name': 'velocity_toggle',
                 'icon': 'dynamic',
                 'text': 'Vel',
+                'active': bool(self._velocity_mode),
                 'tooltip': f"Velocity editing is {'on' if self._velocity_mode else 'off'}. Toggle to edit note velocities with margin sliders.",
             },
             {

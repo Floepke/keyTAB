@@ -253,12 +253,14 @@ class ToolbarHandle(QtWidgets.QSplitterHandle):
             name = d.get('name', '')
             icon_name = d.get('icon', '')
             text = str(d.get('text', '') or '')
+            active = bool(d.get('active', False))
             tooltip = str(d.get('tooltip', name) or '').replace(';', '.')
             tooltip = tooltip.strip()
             if tooltip and not tooltip.endswith('.'):
                 tooltip = f"{tooltip}."
             btn = QtWidgets.QToolButton(self._toolbar_area)
             btn.setFocusPolicy(QtCore.Qt.FocusPolicy.NoFocus)
+            btn.setAutoRaise(False)
             ic = get_qicon(icon_name, size=(64, 64))
             if ic:
                 btn.setIcon(ic)
@@ -270,11 +272,19 @@ class ToolbarHandle(QtWidgets.QSplitterHandle):
             btn.setIconSize(QtCore.QSize(self._button_size - 6, self._button_size - 6))
             # Trim width by 1px to ensure the right outline remains visible inside the handle
             btn.setFixedSize(self._button_size - 1, self._button_size)
+            if active:
+                accent = Style.get_named_qcolor('accent', (0, 120, 215))
+                border = accent.darker(120)
+                btn.setStyleSheet(
+                    "QToolButton {"
+                    f"background-color: rgb({accent.red()},{accent.green()},{accent.blue()});"
+                    "color: rgb(255,255,255);"
+                    f"border: 1px solid rgb({border.red()},{border.green()},{border.blue()});"
+                    "border-radius: 4px;"
+                    "}"
+                )
             # Emit contextButtonClicked(name) from parent splitter
-            try:
-                btn.clicked.connect(lambda _=False, n=name: self.parent().contextButtonClicked.emit(n))
-            except Exception:
-                pass
+            btn.clicked.connect(lambda _=False, n=name: self.parent().contextButtonClicked.emit(n))
             self._toolbar_layout.addWidget(btn)
 
 

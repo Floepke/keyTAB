@@ -34,7 +34,7 @@ class GridBandDrawerMixin:
         out = sorted(list(dict.fromkeys(round(float(v), 6) for v in bars)))
         return out if out else [0.0, 256.0]
 
-    def _build_repeating_dark_intervals(self, markers: list, barlines: list[float], score_end: float) -> list[tuple[float, float]]:
+    def _build_repeating_dark_intervals(self, markers: list, barlines: list[float], score_end: float, starts_dark: bool = True) -> list[tuple[float, float]]:
         """Build dark-band intervals using marker duration, resetting at each barline.
 
         Rules:
@@ -97,8 +97,8 @@ class GridBandDrawerMixin:
             if op.le(bar_end, bar_start):
                 continue
 
-            # Color resets at each barline.
-            is_dark = True
+            # Color resets at each barline to the configured phase.
+            is_dark = bool(starts_dark)
 
             for seg_start_raw, seg_end_raw, step in segments:
                 if op.le(seg_end_raw, bar_start):
@@ -113,8 +113,8 @@ class GridBandDrawerMixin:
 
                 # duration == 0 means stop engraving bands for this segment.
                 if op.le(step, 0.0):
-                    # OFF marker: next resumed segment should start dark.
-                    is_dark = True
+                    # OFF marker: next resumed segment should start with configured phase.
+                    is_dark = bool(starts_dark)
                     continue
 
                 # Marker start resets phase boundaries to seg_start,
@@ -266,8 +266,10 @@ class GridBandDrawerMixin:
             markers = list(getattr(layout, 'grid_band_left_track', []) or []) + list(getattr(layout, 'grid_band_right_track', []) or [])
         bars = self._all_barlines(score)
         score_end = float(bars[-1]) if bars else 0.0
+        phase = str(getattr(layout, 'grid_band_start_phase', 'dark') or 'dark').strip().lower()
+        starts_dark = phase != 'light'
 
-        intervals = self._build_repeating_dark_intervals(markers, bars, score_end)
+        intervals = self._build_repeating_dark_intervals(markers, bars, score_end, starts_dark=starts_dark)
 
         # Draw band
         fill = self._grid_band_fill_rgba(layout, 'grid_band_color', 'left')

@@ -22,9 +22,6 @@ class ToolManager(QtCore.QObject):
         if self._tool is not None:
             self._tool.on_deactivate()
         self._tool = tool
-        # Build contextual toolbar from tool.toolbar_spec()
-        defs = tool.toolbar_spec() or []
-        self._splitter.set_context_buttons(defs)
         # Activate new tool
         if self._tool is not None:
             # Provide editor reference for convenience wrappers
@@ -34,6 +31,9 @@ class ToolManager(QtCore.QObject):
             except Exception:
                 pass
             self._tool.on_activate()
+        # Build contextual toolbar after activation so stateful buttons reflect restored tool state.
+        defs = tool.toolbar_spec() or []
+        self._splitter.set_context_buttons(defs)
         name = getattr(tool, 'TOOL_NAME', 'unknown')
         self.toolChanged.emit(str(name))
         if self._editor is not None:

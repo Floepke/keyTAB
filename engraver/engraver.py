@@ -272,7 +272,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
     )
     all_barlines = sorted(list(dict.fromkeys([0.0] + [float(v) for v in barline_positions] + [float(cur_bar)])))
 
-    def _build_global_subband_intervals(
+    def _build_global_grid_bandband_intervals(
         raw_positions: list[float],
         bars: list[float],
         total_len: float,
@@ -300,10 +300,10 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
 
         out: list[tuple[float, float]] = []
         for i, cur in enumerate(track):
-            prev_sub = float(track[i - 1]) if i > 0 else 0.0
+            prev_grid_band = float(track[i - 1]) if i > 0 else 0.0
             prev_bar_idx = bisect.bisect_right(bar_times, float(cur)) - 1
             prev_bar = float(bar_times[max(0, prev_bar_idx)])
-            ref = max(float(prev_sub), float(prev_bar))
+            ref = max(float(prev_grid_band), float(prev_bar))
             step = float(cur) - float(ref)
             if step <= 1e-6:
                 continue
@@ -342,7 +342,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
     # - marker start resets phase boundaries,
     # - marker start preserves current color,
     # - marker range truncates at next marker start.
-    def _build_grid_band_dark_intervals(markers: list, bars: list[float], total_len: float) -> list[tuple[float, float]]:
+    def _build_grid_band_dark_intervals(markers: list, bars: list[float], total_len: float, starts_dark: bool = True) -> list[tuple[float, float]]:
         op = Operator()
         if op.le(float(total_len), 0.0):
             return []
@@ -400,7 +400,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
             if op.le(bar_end, bar_start):
                 continue
 
-            is_dark = True
+            is_dark = bool(starts_dark)
             for seg_start_raw, seg_end_raw, step in segments:
                 if op.le(seg_end_raw, bar_start):
                     continue
@@ -414,8 +414,8 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
 
                 # duration == 0 means stop engraving bands for this segment.
                 if op.le(step, 0.0):
-                    # OFF marker: next resumed segment should start dark.
-                    is_dark = True
+                    # OFF marker: next resumed segment should start with configured phase.
+                    is_dark = bool(starts_dark)
                     continue
 
                 t0 = float(seg_start)
@@ -444,16 +444,21 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
 
         return [(a, b) for a, b in merged if op.gt(float(b), float(a))]
 
-    # Get grid band track from layout (merge legacy left/right when present)
+    # Get grid band track from layout and precompute dark intervals for efficient lookup during engraving.
     grid_bands = list(layout.get('grid_band_track', []) or [])
-    if not grid_bands:
-        grid_bands = list(layout.get('grid_band_left_track', []) or []) + list(layout.get('grid_band_right_track', []) or [])
-    grid_dark_intervals_global = _build_grid_band_dark_intervals(grid_bands, all_barlines, float(cur_bar))
+    grid_band_start_phase = str(layout.get('grid_band_start_phase', 'dark') or 'dark').strip().lower()
+    grid_bands_start_dark = bool(grid_band_start_phase != 'light')
+    grid_dark_intervals_global = _build_grid_band_dark_intervals(
+        grid_bands,
+        all_barlines,
+        float(cur_bar),
+        starts_dark=grid_bands_start_dark,
+    )
 
-    # Problem solved: continuation dots count for sub-band pitch sizing by
+    # Problem solved: continuation dots count for grid_band pitch sizing by
     # creating synthetic starts at beat-group boundaries crossed by held notes.
-    sub_band_starts_by_hand: dict[str, list[float]] = {'<': [], '>': []}
-    sub_band_pitches_by_hand: dict[str, list[int]] = {'<': [], '>': []}
+    grid_band_starts_by_hand: dict[str, list[float]] = {'<': [], '>': []}
+    grid_band_pitches_by_hand: dict[str, list[int]] = {'<': [], '>': []}
     for hk in ('<', '>'):
         hand_notes = notes_by_hand.get(hk, []) or []
         events: list[tuple[float, int]] = []
@@ -475,8 +480,8 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                     events.append((float(group_boundary_times[bi]), int(n_pitch)))
 
         events.sort(key=lambda it: float(it[0]))
-        sub_band_starts_by_hand[hk] = [float(t) for (t, _p) in events]
-        sub_band_pitches_by_hand[hk] = [int(p) for (_t, p) in events]
+        grid_band_starts_by_hand[hk] = [float(t) for (t, _p) in events]
+        grid_band_pitches_by_hand[hk] = [int(p) for (_t, p) in events]
 
     # Problem solved: precompute time signature segments for lane rendering.
     ts_segments: list[dict[str, float | int | list[int] | bool]] = []
@@ -1370,15 +1375,15 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                 br, bg, bb = (204, 204, 204)
             band_note_fill = _midi_fill_from_rgb((int(br), int(bg), int(bb)))
             if pdf_export:
-                sub_tint = band_note_fill
+                grid_band_tint = band_note_fill
             else:
-                sub_tint = _mix_rgba(band_note_fill, paper_color, 0.80)
+                grid_band_tint = _mix_rgba(band_note_fill, paper_color, 0.80)
 
             line_start_ticks = float(line.get('time_start', 0.0) or 0.0)
             line_end_ticks = float(line.get('time_end', 0.0) or 0.0)
             grid_band_visible = bool(layout.get('grid_band_visible', True))
             shared_band_intervals: list[tuple[float, float]] = []
-            sub_dark_intervals: dict[str, list[tuple[float, float]]] = {'left': shared_band_intervals, 'right': shared_band_intervals}
+            grid_band_dark_intervals: dict[str, list[tuple[float, float]]] = {'left': shared_band_intervals, 'right': shared_band_intervals}
 
             def _text_bbox(text_val: str, family: str, size_pt: float, italic: bool, bold: bool, angle_deg: float, padding_mm: float, corner_radius_mm: float) -> tuple[float, float, float, list[tuple[float, float]], list[tuple[float, float]]]:
                 xb, yb, w_mm, h_mm = du._get_text_extents_mm(text_val, family, size_pt, italic, bold)
@@ -1653,13 +1658,13 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
             split_lo = int(math.floor(line_avg_split_pitch))
             split_hi = int(math.ceil(line_avg_split_pitch))
             if split_hi <= split_lo:
-                sub_split_x = _key_to_x(split_lo)
+                grid_band_split_x = _key_to_x(split_lo)
             else:
                 x_lo = _key_to_x(split_lo)
                 x_hi = _key_to_x(split_hi)
                 frac = float(line_avg_split_pitch - float(split_lo))
-                sub_split_x = float(x_lo + (x_hi - x_lo) * frac)
-            sub_split_x = max(float(grid_left), min(float(grid_right), float(sub_split_x)))
+                grid_band_split_x = float(x_lo + (x_hi - x_lo) * frac)
+            grid_band_split_x = max(float(grid_left), min(float(grid_right), float(grid_band_split_x)))
             ts_right_margin = max(0.0, 1.5 * scale)
             ts_lane_padding_mm = float(line.get('ts_lane_padding_mm', 0.0) or 0.0)
             ts_lane_width = float(line.get('ts_lane_width', 0.0) or 0.0)
@@ -1744,11 +1749,11 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                                     bx1,
                                     y1b,
                                     stroke_color=None,
-                                    fill_color=sub_tint,
+                                    fill_color=grid_band_tint,
                                     id=0,
                                     tags=['grid_band'],
                                 )
-                                sub_dark_intervals['left'].append((t0, t1))
+                                grid_band_dark_intervals['left'].append((t0, t1))
 
                     for off in bar_offsets:
                         t = float(time_cursor + float(off))
@@ -2472,8 +2477,8 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                         tags=['midi_note'],
                     )
 
-                    side_key = 'left' if float(x) < float(sub_split_x) else 'right'
-                    dark_intervals = sub_dark_intervals.get(side_key, [])
+                    side_key = 'left' if float(x) < float(grid_band_split_x) else 'right'
+                    dark_intervals = grid_band_dark_intervals.get(side_key, [])
                     if dark_intervals:
                         for t0, t1 in dark_intervals:
                             seg_start = max(float(n_t), float(t0), float(line_start))

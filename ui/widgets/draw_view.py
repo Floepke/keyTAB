@@ -160,6 +160,26 @@ class DrawUtilView(QtWidgets.QWidget):
             except Exception:
                 paper_qcolor = QtCore.Qt.GlobalColor.white
 
+            img_w = self._image.width() / self._image.devicePixelRatio()
+            img_h = self._image.height() / self._image.devicePixelRatio()
+            # During resize, scale current image to widget width to avoid re-engraving per frame
+            if self._resizing and img_w > 0:
+                scale = float(self.width()) / float(img_w)
+            else:
+                scale = 1.0
+            tgt_w = int(round(img_w * scale))
+            tgt_h = int(round(img_h * scale))
+            x = 0
+            if tgt_h <= self.height():
+                y = (self.height() - tgt_h) // 2
+            else:
+                max_scroll = max(0, tgt_h - self.height())
+                self._scroll_px = max(0.0, min(float(max_scroll), float(self._scroll_px)))
+                y = -int(round(self._scroll_px))
+
+            # Keep a permanent paper layer behind transition frames so cross-fades remain white.
+            painter.fillRect(QtCore.QRect(x, y, tgt_w, tgt_h), paper_qcolor)
+
             def _draw_image(img: QtGui.QImage, opacity: float) -> None:
                 painter.save()
                 painter.setOpacity(opacity)
@@ -179,13 +199,12 @@ class DrawUtilView(QtWidgets.QWidget):
                     max_scroll = max(0, tgt_h - self.height())
                     self._scroll_px = max(0.0, min(float(max_scroll), float(self._scroll_px)))
                     y = -int(round(self._scroll_px))
-                # Keep the page area light during fades to avoid a dark flash between frames.
-                painter.fillRect(QtCore.QRect(x, y, tgt_w, tgt_h), paper_qcolor)
                 painter.drawImage(QtCore.QRect(x, y, tgt_w, tgt_h), img)
                 painter.restore()
 
             if self._prev_image is not None and self._fade_progress < 1.0:
-                _draw_image(self._prev_image, 1.0 - self._fade_progress)
+                # Keep the old frame fully visible and fade only the new frame on top.
+                _draw_image(self._prev_image, 1.0)
                 _draw_image(self._image, self._fade_progress)
             else:
                 _draw_image(self._image, 1.0)
