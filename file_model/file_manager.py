@@ -174,172 +174,121 @@ class FileManager:
         )
         if not fname:
             return None
-        try:
-            suffix = Path(fname).suffix.lower()
-            if suffix in (".mid", ".midi"):
-                # Load MIDI via midi_loader to new SCORE; keep project path unset
-                try:
-                    from midi.midi_loader import midi_load
-                    self._current = midi_load(fname)
-                    if hasattr(self._current, '_normalize_events_after_load'):
-                        self._current._normalize_events_after_load()
-                except Exception as exc:
-                    raise RuntimeError(f"Failed to load MIDI: {exc}")
-                self._path = None
-                self._last_dir = Path(fname).parent
-                try:
-                    adm = get_appdata_manager()
-                    adm.set("last_file_dialog_dir", str(self._last_dir))
-                    adm.save()
-                except Exception:
-                    pass
-                # Imported from external format; mark dirty until explicitly saved
-                self._dirty = True
-                try:
-                    self.autosave_current()
-                except Exception:
-                    pass
-                try:
-                    adm = get_appdata_manager()
-                    adm.set("last_opened_file", str(fname))
-                    adm.save()
-                    self._push_recent_file(str(fname))
-                except Exception:
-                    pass
-                self._show_load_checks_info(self._current)
-                return self._current
-            elif suffix in (".musicxml", ".mxl", ".xml"):
-                # Load MusicXML via utils.musicxml2piano parser; keep project path unset
-                try:
-                    from utils.musicxml2piano import parse_musicxml
-                    self._current, _stats = parse_musicxml(Path(fname))
-                    if hasattr(self._current, '_normalize_events_after_load'):
-                        self._current._normalize_events_after_load()
-                except Exception as exc:
-                    raise RuntimeError(f"Failed to load MusicXML: {exc}")
-                self._path = None
-                self._last_dir = Path(fname).parent
-                try:
-                    adm = get_appdata_manager()
-                    adm.set("last_file_dialog_dir", str(self._last_dir))
-                    adm.save()
-                except Exception:
-                    pass
-                # Imported from external format; mark dirty until explicitly saved
-                self._dirty = True
-                try:
-                    self.autosave_current()
-                except Exception:
-                    pass
-                try:
-                    adm = get_appdata_manager()
-                    adm.set("last_opened_file", str(fname))
-                    adm.save()
-                    self._push_recent_file(str(fname))
-                except Exception:
-                    pass
-                self._show_load_checks_info(self._current)
-                return self._current
-            else:
-                # Native keyTAB file
-                self._current = SCORE().load(fname)
-                self._path = Path(fname)
-                self._last_dir = self._path.parent
-                try:
-                    adm = get_appdata_manager()
-                    adm.set("last_file_dialog_dir", str(self._last_dir))
-                    adm.save()
-                except Exception:
-                    pass
-                self._dirty = False
-                try:
-                    self.autosave_current()
-                except Exception:
-                    pass
-                # Track last opened file in appdata
-                try:
-                    adm = get_appdata_manager()
-                    adm.set("last_opened_file", str(self._path))
-                    adm.save()
-                    self._push_recent_file(str(self._path))
-                except Exception:
-                    pass
-                self._show_load_checks_info(self._current)
-                return self._current
-        except Exception as exc:
-            self._show_error("Failed to open score", f"{exc}")
-            return None
+        
+        # Run load
+        suffix = Path(fname).suffix.lower()
+        if suffix in (".mid", ".midi"):
+            # Load MIDI via midi_loader to new SCORE; keep project path unset
+            try:
+                from midi.midi_loader import midi_load
+                self._current = midi_load(fname)
+                if hasattr(self._current, '_normalize_events_after_load'):
+                    self._current._normalize_events_after_load()
+            except Exception as exc:
+                raise RuntimeError(f"Failed to load MIDI: {exc}")
+            self._path = None
+            self._last_dir = Path(fname).parent
+            adm = get_appdata_manager()
+            adm.set("last_file_dialog_dir", str(self._last_dir))
+            adm.save()
+            # Imported from external format; mark dirty until explicitly saved
+            self._dirty = True
+            self.autosave_current()
+            adm = get_appdata_manager()
+            adm.set("last_opened_file", str(fname))
+            adm.save()
+            self._push_recent_file(str(fname))
+            self._show_load_checks_info(self._current)
+            return self._current
+        elif suffix in (".musicxml", ".mxl", ".xml"):
+            # Load MusicXML via utils.musicxml2piano parser; keep project path unset
+            try:
+                from utils.musicxml2piano import parse_musicxml
+                self._current, _stats = parse_musicxml(Path(fname))
+                if hasattr(self._current, '_normalize_events_after_load'):
+                    self._current._normalize_events_after_load()
+            except Exception as exc:
+                raise RuntimeError(f"Failed to load MusicXML: {exc}")
+            self._path = None
+            self._last_dir = Path(fname).parent
+            adm = get_appdata_manager()
+            adm.set("last_file_dialog_dir", str(self._last_dir))
+            adm.save()
+            # Imported from external format; mark dirty until explicitly saved
+            self._dirty = True
+            self.autosave_current()
+            adm = get_appdata_manager()
+            adm.set("last_opened_file", str(fname))
+            adm.save()
+            self._push_recent_file(str(fname))
+            self._show_load_checks_info(self._current)
+            return self._current
+        else:
+            # Native keyTAB file
+            self._current = SCORE().load(fname)
+            self._path = Path(fname)
+            self._last_dir = self._path.parent
+            adm = get_appdata_manager()
+            adm.set("last_file_dialog_dir", str(self._last_dir))
+            adm.save()
+            self._dirty = False
+            self.autosave_current()
+            # Track last opened file in appdata
+            adm = get_appdata_manager()
+            adm.set("last_opened_file", str(self._path))
+            adm.save()
+            self._push_recent_file(str(self._path))
+            self._show_load_checks_info(self._current)
+            return self._current
 
     def open_path(self, path: str) -> Optional[SCORE]:
         """Programmatically open a .piano file from a given path.
 
         Returns the SCORE on success, None on failure.
         """
-        try:
-            suffix = Path(path).suffix.lower()
-            if suffix in (".mid", ".midi"):
-                from midi.midi_loader import midi_load
-                self._current = midi_load(path)
-                if hasattr(self._current, '_normalize_events_after_load'):
-                    self._current._normalize_events_after_load()
-                self._path = None
-                self._last_dir = Path(path).parent
-                self._dirty = True
-                try:
-                    self.autosave_current()
-                except Exception:
-                    pass
-                try:
-                    adm = get_appdata_manager()
-                    adm.set("last_opened_file", str(path))
-                    adm.save()
-                    self._push_recent_file(str(path))
-                except Exception:
-                    pass
-                self._show_load_checks_info(self._current)
-                return self._current
-            elif suffix in (".musicxml", ".mxl", ".xml"):
-                from utils.musicxml2piano import parse_musicxml
-                self._current, _stats = parse_musicxml(Path(path))
-                if hasattr(self._current, '_normalize_events_after_load'):
-                    self._current._normalize_events_after_load()
-                self._path = None
-                self._last_dir = Path(path).parent
-                self._dirty = True
-                try:
-                    self.autosave_current()
-                except Exception:
-                    pass
-                try:
-                    adm = get_appdata_manager()
-                    adm.set("last_opened_file", str(path))
-                    adm.save()
-                    self._push_recent_file(str(path))
-                except Exception:
-                    pass
-                self._show_load_checks_info(self._current)
-                return self._current
-            else:
-                self._current = SCORE().load(path)
-                self._path = Path(path)
-                self._last_dir = self._path.parent
-                self._dirty = False
-                try:
-                    self.autosave_current()
-                except Exception:
-                    pass
-                try:
-                    adm = get_appdata_manager()
-                    adm.set("last_opened_file", str(self._path))
-                    adm.save()
-                    self._push_recent_file(str(self._path))
-                except Exception:
-                    pass
-                self._show_load_checks_info(self._current)
-                return self._current
-        except Exception as exc:
-            self._show_error("Failed to open score", f"{exc}")
-            return None
+        suffix = Path(path).suffix.lower()
+        if suffix in (".mid", ".midi"):
+            from midi.midi_loader import midi_load
+            self._current = midi_load(path)
+            if hasattr(self._current, '_normalize_events_after_load'):
+                self._current._normalize_events_after_load()
+            self._path = None
+            self._last_dir = Path(path).parent
+            self._dirty = True
+            self.autosave_current()
+            adm = get_appdata_manager()
+            adm.set("last_opened_file", str(path))
+            adm.save()
+            self._push_recent_file(str(path))
+            self._show_load_checks_info(self._current)
+            return self._current
+        elif suffix in (".musicxml", ".mxl", ".xml"):
+            from utils.musicxml2piano import parse_musicxml
+            self._current, _stats = parse_musicxml(Path(path))
+            if hasattr(self._current, '_normalize_events_after_load'):
+                self._current._normalize_events_after_load()
+            self._path = None
+            self._last_dir = Path(path).parent
+            self._dirty = True
+            self.autosave_current()
+            adm = get_appdata_manager()
+            adm.set("last_opened_file", str(path))
+            adm.save()
+            self._push_recent_file(str(path))
+            self._show_load_checks_info(self._current)
+            return self._current
+        else:
+            self._current = SCORE().load(path)
+            self._path = Path(path)
+            self._last_dir = self._path.parent
+            self._dirty = False
+            self.autosave_current()
+            adm = get_appdata_manager()
+            adm.set("last_opened_file", str(self._path))
+            adm.save()
+            self._push_recent_file(str(self._path))
+            self._show_load_checks_info(self._current)
+            return self._current
 
     def save(self) -> bool:
         """Save to the current path, or prompt Save As if none."""
@@ -352,12 +301,9 @@ class FileManager:
                 return self.save_as(allow_export=False)
             self._current.save(str(self._path))
             self._dirty = False
-            try:
-                adm = get_appdata_manager()
-                adm.set("last_opened_file", str(self._path))
-                adm.save()
-            except Exception:
-                pass
+            adm = get_appdata_manager()
+            adm.set("last_opened_file", str(self._path))
+            adm.save()
             return True
         except Exception as exc:
             self._show_error("Failed to save score", f"{exc}")
@@ -389,39 +335,24 @@ class FileManager:
         if not fname:
             return False
         target = self._ensure_save_suffix(Path(fname), str(selected_filter or ''), allow_export=allow_export)
-        try:
-            self._refresh_analysis()
-            if str(target.suffix or '').lower() in ('.mid', '.midi'):
-                export_score_to_midi(self._current, target)
-                self._last_dir = target.parent
-                try:
-                    adm = get_appdata_manager()
-                    adm.set("last_file_dialog_dir", str(self._last_dir))
-                    adm.save()
-                except Exception:
-                    pass
-                return True
-            else:
-                self._current.save(str(target))
-            self._path = target
+        self._refresh_analysis()
+        if str(target.suffix or '').lower() in ('.mid', '.midi'):
+            export_score_to_midi(self._current, target)
             self._last_dir = target.parent
-            try:
-                adm = get_appdata_manager()
-                adm.set("last_file_dialog_dir", str(self._last_dir))
-                adm.save()
-            except Exception:
-                pass
-            self._dirty = False
-            try:
-                adm = get_appdata_manager()
-                adm.set("last_opened_file", str(self._path))
-                adm.save()
-            except Exception:
-                pass
+            adm = get_appdata_manager()
+            adm.set("last_file_dialog_dir", str(self._last_dir))
+            adm.save()
             return True
-        except Exception as exc:
-            self._show_error("Failed to save score", f"{exc}")
-            return False
+        else:
+            self._current.save(str(target))
+        self._path = target
+        self._last_dir = target.parent
+        adm = get_appdata_manager()
+        adm.set("last_file_dialog_dir", str(self._last_dir))
+        self._dirty = False
+        adm.set("last_opened_file", str(self._path))
+        adm.save()
+        return True
 
     # Confirmation helpers for destructive actions
     def confirm_save_for_action(self, action_description: str, force_prompt: bool = False) -> bool:
@@ -434,10 +365,7 @@ class FileManager:
         - Cancel: abort the action.
         """
         # Always snapshot the session so state can be restored even if action discards changes
-        try:
-            self.autosave_current()
-        except Exception:
-            pass
+        self.autosave_current()
 
         if not self.is_dirty():
             return True
@@ -519,20 +447,14 @@ class FileManager:
 
     # Autosave and error-backup utilities
     def autosave_current(self) -> None:
-        """Save the current SCORE to the session file in appdata (JSON)."""
+        """Save the current SCORE to the session file in session.piano (JSON)."""
         target = Path(UTILS_SAVE_DIR) / "session.piano"
-        try:
-            self._refresh_analysis()
-            self._current.save(str(target))
-        except Exception:
-            pass
+        self._refresh_analysis()
+        self._current.save(str(target))
 
     def autosave_all(self, force: bool = False) -> None:
         """Persist session snapshot and project file (if available) throttled by dirty flag."""
-        try:
-            self.autosave_current()
-        except Exception:
-            pass
+        self.autosave_current()
 
         if self._path is None:
             # No project path yet; keep dirty so user is warned until they save explicitly
@@ -549,44 +471,32 @@ class FileManager:
             self._dirty = True
 
     def _push_recent_file(self, path: str) -> None:
-        try:
-            p = str(path or "").strip()
-            if not p:
-                return
-            adm = get_appdata_manager()
-            recent = adm.get("recent_files", []) or []
-            if not isinstance(recent, list):
-                recent = []
-            recent = [str(x) for x in recent if str(x).strip()]
-            recent = [x for x in recent if x != p]
-            recent.insert(0, p)
-            recent = recent[:100]
-            adm.set("recent_files", recent)
-            adm.save()
-        except Exception:
-            pass
+        p = str(path or "").strip()
+        if not p:
+            return
+        adm = get_appdata_manager()
+        recent = adm.get("recent_files", []) or []
+        if not isinstance(recent, list):
+            recent = []
+        recent = [str(x) for x in recent if str(x).strip()]
+        recent = [x for x in recent if x != p]
+        recent.insert(0, p)
+        recent = recent[:100]
+        adm.set("recent_files", recent)
+        adm.save()
 
     def _refresh_analysis(self) -> None:
         """Recompute analysis so it persists in saved files.
 
         Retains existing engraved page counts when available.
         """
-        try:
-            sc = self._current
-        except Exception:
-            return
+        sc = self._current
         if sc is None:
             return
         existing = getattr(sc, "analysis", None)
         lines_hint = None  # always derive lines from events to stay fresh
-        try:
-            pages_hint = getattr(existing, "pages", None)
-        except Exception:
-            pages_hint = None
-        try:
-            sc.analysis = Analysis.compute(sc, lines_count=lines_hint, pages_count=pages_hint)
-        except Exception:
-            pass
+        pages_hint = getattr(existing, "pages", None)
+        sc.analysis = Analysis.compute(sc, lines_count=lines_hint, pages_count=pages_hint)
 
     def on_model_changed(self) -> None:
         """Handle model change: mark dirty; autosave now happens on a timer/on close."""
@@ -600,35 +510,28 @@ class FileManager:
         def _hook(exctype, value, tb):
             # Save timestamped error backup; format: dd-mm-YYYY-HH.MM.SS
             ts = datetime.now().strftime("%d-%m-%Y-%H.%M.%S")
-            fname = f"pianoscript_error_backup_{ts}.piano"
+            fname = f"keyTAB_error_backup_{ts}.piano"
             target = Path(UTILS_SAVE_DIR) / fname
-            try:
-                self._current.save(str(target))
-            except Exception:
-                # If backup saving itself fails, continue to report the exception
-                pass
+            self._current.save(str(target))
             # Delegate to original hook to print traceback to terminal
             original_hook(exctype, value, tb)
 
         sys.excepthook = _hook
 
     def load_session_if_available(self) -> bool:
-        """Load session.piano from appdata into current score; keep path unset.
+        """Load session.piano from ~/.keyTAB folder into current score; keep path unset.
 
         Returns True if a session was restored.
         """
         session_path = Path(UTILS_SAVE_DIR) / "session.piano"
         if not session_path.exists():
             return False
-        try:
-            sc = SCORE().load(str(session_path))
-            # Do not treat the session file as the project path
-            self._current = sc
-            self._path = None
-            self._dirty = True
-            return True
-        except Exception:
-            return False
+        sc = SCORE().load(str(session_path))
+        # Do not treat the session file as the project path
+        self._current = sc
+        self._path = None
+        self._dirty = True
+        return True
 
     # ---- Close confirmation ----
     def confirm_close(self) -> bool:
@@ -641,10 +544,7 @@ class FileManager:
         - Cancel: aborts closing
         """
         # Always snapshot the session so state restores exactly on next startup
-        try:
-            self.autosave_current()
-        except Exception:
-            pass
+        self.autosave_current()
 
         if self._parent is None:
             return True

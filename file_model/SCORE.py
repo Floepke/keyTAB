@@ -20,6 +20,7 @@ from file_model.events.count_line import CountLine
 from file_model.events.line_break import LineBreak
 from file_model.events.tempo import Tempo
 from file_model.events.grid_band import GridBand
+from file_model.events.arpeggio import Arpeggio
 from file_model.layout import Layout, LayoutFont
 from file_model.info import Info
 from file_model.analysis import Analysis
@@ -66,6 +67,7 @@ class Events:
 	count_line: List[CountLine] = field(default_factory=list)
 	line_break: List[LineBreak] = field(default_factory=list)
 	tempo: List[Tempo] = field(default_factory=list)
+	arpeggio: List[Arpeggio] = field(default_factory=list)
 
 
 def _defaults_for(dc_type):
@@ -269,6 +271,13 @@ class SCORE:
 		base.update(kwargs)
 		obj = Tempo(**base, _id=self._gen_id())
 		self.events.tempo.append(obj)
+		return obj
+
+	def new_arpeggio(self, **kwargs) -> Arpeggio:
+		base = {'time': 0.0, 'duration': 32.0, 'notes': [], 'type': 'up/starting'}
+		base.update(kwargs)
+		obj = Arpeggio(**base, _id=self._gen_id())
+		self.events.arpeggio.append(obj)
 		return obj
 
 	# ---- Dict conversion ----

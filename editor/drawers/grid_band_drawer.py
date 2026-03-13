@@ -251,67 +251,42 @@ class GridBandDrawerMixin:
         if score is None:
             return
         layout = score.layout
-        if not bool(getattr(layout, 'sub_band_visible', True)):
-            # Reuse sub_band_visible setting for grid_band visibility
+        if not bool(getattr(layout, 'grid_band_visible', True)):
             return
 
-        # Fixed horizontal spans requested:
-        # left: key 2 -> 44, right: key 44 -> 77
-        xx2 = float(self.pitch_to_x(2))
-        xx86 = float(self.pitch_to_x(86))
+        # Fixed horizontal span: draw a single band area from key 10 to key 77.
         x10 = float(self.pitch_to_x(10))
-        x44 = float(self.pitch_to_x(44))
         x77 = float(self.pitch_to_x(77))
-        left_band_x_a = min(x10, x44)
-        left_band_x_b = max(x10, x44)
-        right_band_x_a = min(x44, x77)
-        right_band_x_b = max(x44, x77)
+        band_x_a = min(x10, x77)
+        band_x_b = max(x10, x77)
 
-        # Get left and right band tracks
-        left_markers = list(getattr(layout, 'grid_band_left_track', []) or [])
-        right_markers = list(getattr(layout, 'grid_band_right_track', []) or [])
+        # Single grid band track with legacy fallback.
+        markers = list(getattr(layout, 'grid_band_track', []) or [])
+        if not markers:
+            markers = list(getattr(layout, 'grid_band_left_track', []) or []) + list(getattr(layout, 'grid_band_right_track', []) or [])
         bars = self._all_barlines(score)
         score_end = float(bars[-1]) if bars else 0.0
 
-        left_intervals = self._build_repeating_dark_intervals(left_markers, bars, score_end)
-        right_intervals = self._build_repeating_dark_intervals(right_markers, bars, score_end)
+        intervals = self._build_repeating_dark_intervals(markers, bars, score_end)
 
-        # Draw left band
-        left_fill = self._grid_band_fill_rgba(layout, 'grid_band_left_color', 'left')
+        # Draw band
+        fill = self._grid_band_fill_rgba(layout, 'grid_band_color', 'left')
         self._draw_grid_band_side(
             du,
-            left_intervals,
-            left_band_x_a,
-            left_band_x_b,
-            left_fill,
-        )
-
-        # Draw right band
-        right_fill = self._grid_band_fill_rgba(layout, 'grid_band_right_color', 'right')
-        self._draw_grid_band_side(
-            du,
-            right_intervals,
-            right_band_x_a,
-            right_band_x_b,
-            right_fill,
+            intervals,
+            band_x_a,
+            band_x_b,
+            fill,
         )
 
         active_tool = str(getattr(getattr(self, '_tool', None), 'TOOL_NAME', ''))
         if active_tool == 'grid_band':
             off_color = self._grid_band_off_rgba()
-            left_zero = self._zero_marker_times(left_markers, score_end)
-            right_zero = self._zero_marker_times(right_markers, score_end)
+            zero_markers = self._zero_marker_times(markers, score_end)
             self._draw_zero_off_indicators(
                 du,
-                left_zero,
-                float(self.pitch_to_x(2)),
-                off_color,
-                0.0,
-            )
-            self._draw_zero_off_indicators(
-                du,
-                right_zero,
-                float(self.pitch_to_x(86)),
+                zero_markers,
+                band_x_a,
                 off_color,
                 0.0,
             )

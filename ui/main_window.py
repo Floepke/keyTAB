@@ -1198,102 +1198,75 @@ class MainWindow(QtWidgets.QMainWindow):
         return "Playback using System Synth"
 
     def _get_playback_mode_from_appdata(self) -> str:
-        try:
-            adm = get_appdata_manager()
-            mode = str(adm.get("playback_mode", "system") or "system").strip().lower()
-            if mode in ("system", "external"):
-                return mode
-        except Exception:
-            pass
+        adm = get_appdata_manager()
+        mode = str(adm.get("playback_mode", "system") or "system").strip().lower()
+        if mode in ("system", "external"):
+            return mode
         return "system"
 
     def _set_playback_mode_to_appdata(self, mode: str) -> None:
-        try:
-            adm = get_appdata_manager()
-            adm.set("playback_mode", str(mode))
-            adm.save()
-        except Exception:
-            pass
+        adm = get_appdata_manager()
+        adm.set("playback_mode", str(mode))
+        adm.save()
 
     def _get_midi_out_port_from_appdata(self) -> str:
-        try:
-            adm = get_appdata_manager()
-            return str(adm.get("midi_out_port", "") or "")
-        except Exception:
-            return ""
+        adm = get_appdata_manager()
+        return str(adm.get("midi_out_port", "") or "")
 
     def _set_midi_out_port_to_appdata(self, port_name: str) -> None:
-        try:
-            adm = get_appdata_manager()
-            adm.set("midi_out_port", str(port_name or ""))
-            adm.save()
-        except Exception:
-            pass
+        adm = get_appdata_manager()
+        adm.set("midi_out_port", str(port_name or ""))
+        adm.save()
 
     def _rebuild_midi_port_menu(self) -> None:
-        try:
-            menu = getattr(self, '_midi_port_menu', None)
-            if menu is None:
-                return
-            menu.clear()
-            from midi.player import Player
-            ports = list(Player.list_midi_output_ports() or [])
-            selected = self._get_midi_out_port_from_appdata()
-            self._midi_port_group = QtGui.QActionGroup(self)
-            self._midi_port_group.setExclusive(True)
-            if not ports:
-                none_act = QtGui.QAction("(No MIDI output ports found)", self)
-                none_act.setEnabled(False)
-                menu.addAction(none_act)
-                return
-            for port_name in ports:
-                act = QtGui.QAction(str(port_name), self)
-                act.setCheckable(True)
-                act.setChecked(bool(selected) and str(selected) == str(port_name))
-                act.triggered.connect(
-                    lambda checked, p=str(port_name): self._select_external_midi_port(p) if checked else None
-                )
-                self._midi_port_group.addAction(act)
-                menu.addAction(act)
-        except Exception:
-            pass
+        menu = getattr(self, '_midi_port_menu', None)
+        if menu is None:
+            return
+        menu.clear()
+        from midi.player import Player
+        ports = list(Player.list_midi_output_ports() or [])
+        selected = self._get_midi_out_port_from_appdata()
+        self._midi_port_group = QtGui.QActionGroup(self)
+        self._midi_port_group.setExclusive(True)
+        if not ports:
+            none_act = QtGui.QAction("(No MIDI output ports found)", self)
+            none_act.setEnabled(False)
+            menu.addAction(none_act)
+            return
+        for port_name in ports:
+            act = QtGui.QAction(str(port_name), self)
+            act.setCheckable(True)
+            act.setChecked(bool(selected) and str(selected) == str(port_name))
+            act.triggered.connect(
+                lambda checked, p=str(port_name): self._select_external_midi_port(p) if checked else None
+            )
+            self._midi_port_group.addAction(act)
+            menu.addAction(act)
 
     def _send_playback_panic(self) -> None:
-        try:
-            if hasattr(self, 'player') and self.player is not None:
-                if hasattr(self.player, 'panic'):
-                    self.player.panic()
-                else:
-                    self.player.stop()
-        except Exception:
-            pass
+        if hasattr(self, 'player') and self.player is not None:
+            if hasattr(self.player, 'panic'):
+                self.player.panic()
+            else:
+                self.player.stop()
 
     def _dispose_player(self) -> None:
-        try:
-            if hasattr(self, 'player') and self.player is not None:
-                if hasattr(self.player, 'shutdown'):
-                    self.player.shutdown()
-                else:
-                    self.player.stop()
-        except Exception:
-            pass
+        if hasattr(self, 'player') and self.player is not None:
+            if hasattr(self.player, 'shutdown'):
+                self.player.shutdown()
+            else:
+                self.player.stop()
         self.player = None
         self._player_config = None
-        try:
-            if hasattr(self, 'editor_controller') and self.editor_controller is not None:
-                self.editor_controller.set_player(None)
-        except Exception:
-            pass
+        if hasattr(self, 'editor_controller') and self.editor_controller is not None:
+            self.editor_controller.set_player(None)
 
     def _select_external_midi_port(self, port_name: str) -> None:
         self._send_playback_panic()
         self._dispose_player()
         self._set_midi_out_port_to_appdata(str(port_name))
         self._status(f"External MIDI port: {port_name}", 2500)
-        try:
-            self._ensure_player()
-        except Exception:
-            pass
+        self._ensure_player()
 
     def _ensure_player(self) -> None:
         # Always ensure attribute exists and bubble up failures so callers can report
@@ -1302,57 +1275,33 @@ class MainWindow(QtWidgets.QMainWindow):
         playback_mode = self._get_playback_mode_from_appdata()
         midi_out_port = self._get_midi_out_port_from_appdata()
         cfg = (str(playback_mode), str(midi_out_port))
-        try:
-            if self.player is None or self._player_config != cfg:
-                from midi.player import Player
-                self.player = Player(
-                    soundfont_path=self._get_soundfont_path_from_appdata(),
-                    playback_mode=playback_mode,
-                    midi_out_port=(midi_out_port or None),
-                )
-                self._player_config = cfg
-            if hasattr(self.player, 'set_persist_settings'):
-                self.player.set_persist_settings(False)
-            try:
-                if hasattr(self, 'editor_controller') and self.editor_controller is not None:
-                    self.editor_controller.set_player(self.player)
-            except Exception:
-                pass
-        except Exception:
-            self.player = None
-            self._player_config = None
-            try:
-                if hasattr(self, 'editor_controller') and self.editor_controller is not None:
-                    self.editor_controller.set_player(None)
-            except Exception:
-                pass
-            raise
+        if self.player is None or self._player_config != cfg:
+            from midi.player import Player
+            self.player = Player(
+                soundfont_path=self._get_soundfont_path_from_appdata(),
+                playback_mode=playback_mode,
+                midi_out_port=(midi_out_port or None),
+            )
+            self._player_config = cfg
+        if hasattr(self, 'editor_controller') and self.editor_controller is not None:
+            self.editor_controller.set_player(self.player)
 
     def _get_soundfont_path_from_appdata(self) -> Optional[str]:
-        try:
-            adm = get_appdata_manager()
-            path = str(adm.get("user_soundfont_path", "") or "")
-            if path and Path(path).expanduser().is_file():
-                return str(Path(path).expanduser())
-        except Exception:
-            pass
+        adm = get_appdata_manager()
+        path = str(adm.get("user_soundfont_path", "") or "")
+        if path and Path(path).expanduser().is_file():
+            return str(Path(path).expanduser())
         return None
 
     def _set_soundfont_path_to_appdata(self, path: Optional[str]) -> None:
-        try:
-            adm = get_appdata_manager()
-            adm.set("user_soundfont_path", str(path or ""))
-            adm.save()
-        except Exception:
-            pass
+        adm = get_appdata_manager()
+        adm.set("user_soundfont_path", str(path or ""))
+        adm.save()
 
     def _unset_soundfont(self) -> None:
         """Clear custom FluidSynth soundfont and revert to default detection."""
         self._set_soundfont_path_to_appdata(None)
-        try:
-            self._dispose_player()
-        except Exception:
-            pass
+        self._dispose_player()
         self._status("Using default FluidSynth soundfont", 2500)
 
     def _prompt_for_soundfont(self, force_dialog: bool = False) -> Optional[str]:
@@ -1448,61 +1397,53 @@ class MainWindow(QtWidgets.QMainWindow):
         dlg.setNameFilter("PDF Files (*.pdf)")
         dlg.setDefaultSuffix("pdf")
         # Prefill filename with score title when available
-        try:
-            score_title = ""
-            try:
-                info = getattr(self.file_manager.current(), 'info', None)
-                score_title = str(getattr(info, 'title', "") or "") if info is not None else ""
-            except Exception:
-                score_title = ""
-            safe_title = "".join(ch for ch in score_title if ch not in r'\\/:*?"<>|').strip()
-            suggested_name = f"{safe_title or 'Untitled'}.pdf"
-        except Exception:
-            suggested_name = "Untitled.pdf"
-        try:
-            adm = get_appdata_manager()
-            last_dir = str(adm.get("last_export_pdf_dir", "") or "")
-            if last_dir:
-                dlg.setDirectory(last_dir)
-                dlg.selectFile(os.path.join(last_dir, suggested_name))
-            else:
-                dlg.selectFile(suggested_name)
-        except Exception:
-            pass
+        info = getattr(self.file_manager.current(), 'info', None)
+        score_title = str(getattr(info, 'title', "") or "") if info is not None else ""
+        safe_title = "".join(ch for ch in score_title if ch not in r'\\/:*?"<>|').strip()
+        suggested_name = f"{safe_title or 'Untitled'}.pdf"
+        adm = get_appdata_manager()
+        last_dir = str(adm.get("last_export_pdf_dir", "") or "")
+        if last_dir:
+            dlg.setDirectory(last_dir)
+            dlg.selectFile(os.path.join(last_dir, suggested_name))
+        else:
+            dlg.selectFile(suggested_name)
         if dlg.exec() == QtWidgets.QDialog.DialogCode.Accepted:
             out_path = dlg.selectedFiles()[0]
-            try:
-                out_dir = os.path.dirname(str(out_path))
-                if out_dir:
-                    adm = get_appdata_manager()
-                    adm.set("last_export_pdf_dir", out_dir)
-                    adm.save()
-            except Exception:
-                pass
+            out_dir = os.path.dirname(str(out_path))
+            if out_dir:
+                adm = get_appdata_manager()
+                adm.set("last_export_pdf_dir", out_dir)
+                adm.save()
             try:
                 from utils.CONSTANT import ENGRAVER_LAYERING
                 from engraver.engraver import do_engrave
                 export_du = DrawUtil()
                 do_engrave(self._current_score_dict(), export_du, pdf_export=True)
                 total_pages = max(1, export_du.page_count())
-                progress = QtWidgets.QProgressDialog("Exporting PDF...", None, 0, total_pages, self)
+                progress = QtWidgets.QProgressDialog("Exporting PDF...", None, 0, 100, self)
                 progress.setWindowTitle("Export PDF")
                 progress.setWindowModality(QtCore.Qt.WindowModality.WindowModal)
                 progress.setMinimumDuration(0)
                 progress.setValue(0)
                 progress.show()
 
+                base_percent = 46
+                remaining_percent = 100 - base_percent
+                self._prime_export_progress(progress, target_percent=base_percent, duration_ms=400)
+
                 def _on_progress(done: int, total: int) -> None:
-                    if progress.maximum() != int(total):
-                        progress.setMaximum(int(total))
-                    progress.setValue(int(done))
+                    safe_total = max(1, int(total))
+                    ratio = max(0.0, min(1.0, float(done) / float(safe_total)))
+                    value = int(round(base_percent + (remaining_percent * ratio)))
+                    progress.setValue(value)
                     QtWidgets.QApplication.processEvents()
 
                 export_du.save_pdf(out_path, layering=ENGRAVER_LAYERING, progress_cb=_on_progress)
-                progress.setValue(total_pages)
+                progress.setValue(100)
                 progress.close()
             except Exception as e:
-                QtWidgets.QMessageBox.critical(self, "Export PDF failed", str(e))
+                QtWidgets.QMessageBox.critical(self, "Export PDF failed, please contact the developer and send this error: ", str(e))
 
     def _export_image_pdf(self) -> None:
         dpi_options = [300, 600, 1200]
@@ -1565,24 +1506,45 @@ class MainWindow(QtWidgets.QMainWindow):
                 export_du = DrawUtil()
                 do_engrave(self._current_score_dict(), export_du, pdf_export=True)
                 total_pages = max(1, export_du.page_count())
-                progress = QtWidgets.QProgressDialog(f"Exporting rasterized PDF ({selected_dpi} DPI)...", None, 0, total_pages, self)
+                progress = QtWidgets.QProgressDialog(f"Exporting rasterized PDF ({selected_dpi} DPI)...", None, 0, 100, self)
                 progress.setWindowTitle("Export Image PDF")
                 progress.setWindowModality(QtCore.Qt.WindowModality.WindowModal)
                 progress.setMinimumDuration(0)
                 progress.setValue(0)
                 progress.show()
 
+                base_percent = 46
+                remaining_percent = 100 - base_percent
+                self._prime_export_progress(progress, target_percent=base_percent, duration_ms=400)
+
                 def _on_progress(done: int, total: int) -> None:
-                    if progress.maximum() != int(total):
-                        progress.setMaximum(int(total))
-                    progress.setValue(int(done))
+                    safe_total = max(1, int(total))
+                    ratio = max(0.0, min(1.0, float(done) / float(safe_total)))
+                    value = int(round(base_percent + (remaining_percent * ratio)))
+                    progress.setValue(value)
                     QtWidgets.QApplication.processEvents()
 
                 export_du.save_pdf_rasterized(out_path, dpi=selected_dpi, layering=ENGRAVER_LAYERING, progress_cb=_on_progress)
-                progress.setValue(total_pages)
+                progress.setValue(100)
                 progress.close()
             except Exception as e:
                 QtWidgets.QMessageBox.critical(self, "Export Image PDF failed", str(e))
+
+    def _prime_export_progress(self, progress: QtWidgets.QProgressDialog, target_percent: int = 46, duration_ms: int = 400) -> None:
+        """Animate the progress bar to a target percentage over a fixed duration."""
+        target = max(0, min(100, int(target_percent)))
+        total_ms = max(1, int(duration_ms))
+        timer = QtCore.QElapsedTimer()
+        timer.start()
+        while True:
+            elapsed = timer.elapsed()
+            ratio = min(1.0, float(elapsed) / float(total_ms))
+            value = int(round(target * ratio))
+            progress.setValue(value)
+            QtWidgets.QApplication.processEvents(QtCore.QEventLoop.ProcessEventsFlag.AllEvents, 15)
+            if ratio >= 1.0:
+                break
+            QtCore.QThread.msleep(15)
 
     def _status(self, message: str, timeout_ms: int = 3000) -> None:
         """Show a transient message on the status bar."""
@@ -2458,20 +2420,66 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def _play_midi_with_prompt(self, start_units: Optional[float]) -> None:
         """Play the SCORE from start or the editor time cursor using active backend."""
-        try:
+        def _start_playback() -> None:
             self._ensure_player_with_soundfont()
             sc = self.file_manager.current()
             if start_units is None:
                 self._scroll_editor_to_start()
-            if start_units is None:
                 self.player.play_score(sc)
             else:
                 self.player.play_from_time_cursor(float(start_units or 0.0), sc)
             self._start_playhead_timer()
             self._show_play_debug_status()
+
+        def _system_method_name() -> str:
+            return str(self._playback_system_label()).replace("Playback using ", "").strip() or "system playback"
+
+        try:
+            _start_playback()
         except Exception as exc:
+            # If external port playback fails, switch to system playback automatically.
+            if self._get_playback_mode_from_appdata() == 'external':
+                switched_to = _system_method_name()
+                try:
+                    self._set_playback_mode('system', show_status=False)
+                    _start_playback()
+                    try:
+                        QtWidgets.QMessageBox.warning(
+                            self,
+                            "Playback",
+                            (
+                                f"External MIDI playback failed: {exc}\n\n"
+                                f"Switched automatically to {switched_to}."
+                            ),
+                        )
+                    except Exception:
+                        print(
+                            "External MIDI playback failed: "
+                            f"{exc}. Switched automatically to {switched_to}."
+                        )
+                    return
+                except Exception as fallback_exc:
+                    try:
+                        QtWidgets.QMessageBox.critical(
+                            self,
+                            "Playback",
+                            (
+                                f"External MIDI playback failed: {exc}\n\n"
+                                f"Automatic fallback to {switched_to} also failed: {fallback_exc}"
+                            ),
+                        )
+                    except Exception:
+                        print(
+                            "External MIDI playback failed: "
+                            f"{exc}. Automatic fallback to {switched_to} also failed: {fallback_exc}"
+                        )
+                    return
             try:
-                QtWidgets.QMessageBox.critical(self, "Playback", f"Playback failed: {exc}")
+                QtWidgets.QMessageBox.critical(
+                    self,
+                    "Playback",
+                    f"Playback failed: {exc}\n\nTry '{_system_method_name()}' from the Playback menu.",
+                )
             except Exception:
                 print(f"Playback failed: {exc}")
 
@@ -2924,109 +2932,93 @@ class MainWindow(QtWidgets.QMainWindow):
         self._prepare_close_done = True
         # Ensure worker threads are stopped before application exits
         # Persist window state to appdata
-        try:
-            adm = get_appdata_manager()
-            adm.set("window_maximized", bool(self.isMaximized()))
-            try:
-                geom_b64 = bytes(self.saveGeometry().toBase64()).decode("ascii")
-                adm.set("window_geometry", geom_b64)
-            except Exception:
-                pass
-            # Save current splitter sizes for next startup
-            try:
-                sp = self.centralWidget()
-                if sp is not None and hasattr(sp, 'sizes'):
-                    sizes = list(sp.sizes())
-                    adm.set("splitter_sizes", [int(sizes[0]) if sizes else 0, int(sizes[1]) if len(sizes) > 1 else 0])
-            except Exception:
-                pass
-            # Remember left panel width for next launch
-            try:
-                lw = 0
-                if hasattr(self, 'snap_dock'):
-                    lw = max(lw, int(self.snap_dock.width()))
-                if hasattr(self, 'tool_dock'):
-                    lw = max(lw, int(self.tool_dock.width()))
-                if lw > 0:
-                    adm.set("left_panel_width_px", int(lw))
-            except Exception:
-                pass
-            # Persist whether the session is currently saved to a project file
-            try:
-                fm = getattr(self, 'file_manager', None)
-                if fm is not None:
-                    # Session considered saved if we have a project path and it's not dirty
-                    was_saved = bool(fm.path() is not None and not fm.is_dirty())
-                    adm.set("last_session_saved", was_saved)
-                    adm.set("last_session_path", str(fm.path() or ""))
-            except Exception:
-                pass
-            adm.save()
-        except Exception:
-            pass
+        adm = get_appdata_manager()
+        adm.set("window_maximized", bool(self.isMaximized()))
+        geom_b64 = bytes(self.saveGeometry().toBase64()).decode("ascii")
+        adm.set("window_geometry", geom_b64)
+        # Save current splitter sizes for next startup
+        sp = self.centralWidget()
+        if sp is not None and hasattr(sp, 'sizes'):
+            sizes = list(sp.sizes())
+            adm.set("splitter_sizes", [int(sizes[0]) if sizes else 0, int(sizes[1]) if len(sizes) > 1 else 0])
+        # Remember left panel width for next launch
+        lw = 0
+        if hasattr(self, 'snap_dock'):
+            lw = max(lw, int(self.snap_dock.width()))
+        if hasattr(self, 'tool_dock'):
+            lw = max(lw, int(self.tool_dock.width()))
+        if lw > 0:
+            adm.set("left_panel_width_px", int(lw))
+        # Persist whether the session is currently saved to a project file
+        fm = getattr(self, 'file_manager', None)
+        if fm is not None:
+            # Session considered saved if we have a project path and it's not dirty
+            was_saved = bool(fm.path() is not None and not fm.is_dirty())
+            adm.set("last_session_saved", was_saved)
+            adm.set("last_session_path", str(fm.path() or ""))
+        adm.save()
         # Stop clock timer gracefully
-        try:
-            if hasattr(self, "_clock_timer") and self._clock_timer is not None:
-                self._clock_timer.stop()
-        except Exception:
-            pass
+        if hasattr(self, "_clock_timer") and self._clock_timer is not None:
+            self._clock_timer.stop()
         # Fully dispose audio/MIDI backend so CoreMIDI/AudioToolbox threads are released
-        try:
-            self._dispose_player()
-        except Exception:
-            pass
+        self._dispose_player()
         # Stop playhead timer and clear overlay
-        try:
-            self._clear_playhead_overlay()
-        except Exception:
-            pass
+        self._clear_playhead_overlay()
         # Close FX dialog if open
-        try:
-            if hasattr(self, '_fx_dialog') and self._fx_dialog is not None:
-                self._fx_dialog.close()
-                self._fx_dialog = None
-        except Exception:
-            pass
+        if hasattr(self, '_fx_dialog') and self._fx_dialog is not None:
+            self._fx_dialog.close()
+            self._fx_dialog = None
         if hasattr(self, "print_view") and self.print_view is not None:
-            try:
-                self.print_view.shutdown()
-            except Exception:
-                pass
+            self.print_view.shutdown()
         if hasattr(self, "engraver") and self.engraver is not None:
-            try:
-                self.engraver.shutdown()
-            except Exception:
-                pass
+            self.engraver.shutdown()
+
+    def _run_close_progress(self, path_text: str) -> None:
+        """Show a short closing progress animation (~0.4s)."""
+        dlg = QtWidgets.QDialog(self)
+        dlg.setWindowTitle("Closing")
+        dlg.setModal(True)
+        dlg.setFixedWidth(380)
+        layout = QtWidgets.QVBoxLayout(dlg)
+        layout.setContentsMargins(16, 16, 16, 16)
+        layout.setSpacing(10)
+
+        label = QtWidgets.QLabel(f"Saving... {path_text}")
+        label.setWordWrap(True)
+        bar = QtWidgets.QProgressBar()
+        bar.setRange(0, 100)
+        bar.setValue(0)
+
+        layout.addWidget(label)
+        layout.addWidget(bar)
+
+        dlg.show()
+        QtWidgets.QApplication.processEvents(QtCore.QEventLoop.ProcessEventsFlag.AllEvents, 50)
+
+        steps = 30
+        interval_ms = max(1, int(400 / steps))
+        for i in range(steps + 1):
+            bar.setValue(int((i / steps) * 100))
+            QtWidgets.QApplication.processEvents(QtCore.QEventLoop.ProcessEventsFlag.AllEvents, interval_ms)
+            QtCore.QThread.msleep(interval_ms)
+        dlg.accept()
 
     def closeEvent(self, ev: QtGui.QCloseEvent) -> None:
         # Unified close handling: save session and close without prompting.
-        try:
-            self.file_manager.autosave_current()
-        except Exception:
-            pass
-
-        save_on_exit = True
-        try:
-            pm = get_preferences_manager()
-            save_on_exit = bool(pm.get("save_on_exit", True))
-        except Exception:
-            pass
+        self.file_manager.autosave_current()
+        pm = get_preferences_manager()
+        save_on_exit = bool(pm.get("save_on_exit", True))
         if save_on_exit:
-            try:
-                if self.file_manager.path() is not None:
-                    self.file_manager.save()
-            except Exception:
-                pass
-        try:
-            adm = get_appdata_manager()
-            was_saved = bool(self.file_manager.path() is not None and not self.file_manager.is_dirty())
-            adm.set("last_session_saved", was_saved)
-            adm.set("last_session_path", str(self.file_manager.path() or ""))
-            adm.save()
-        except Exception:
-            pass
+            if self.file_manager.path() is not None:
+                self.file_manager.save()
+        adm = get_appdata_manager()
+        was_saved = bool(self.file_manager.path() is not None and not self.file_manager.is_dirty())
+        adm.set("last_session_saved", was_saved)
+        adm.set("last_session_path", str(self.file_manager.path() or ""))
+        adm.save()
+        # Show short closing progress animation
+        path_text = str(self.file_manager.path() or "unsaved session")
+        self._run_close_progress(path_text)
         # Persist sizes via prepare_close
-        try:
-            self.prepare_close()
-        except Exception:
-            pass
+        self.prepare_close()
+        super().closeEvent(ev)

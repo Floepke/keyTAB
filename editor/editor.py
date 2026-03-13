@@ -28,7 +28,7 @@ from file_model.base_grid import BaseGrid, resolve_grid_layer_offsets
 from settings_manager import get_preferences_manager
 from ui.style import Style
 from file_model.SCORE import SCORE
-from utils.CONSTANT import BE_KEYS, QUARTER_NOTE_UNIT
+from utils.CONSTANT import BE_KEYS, QUARTER_NOTE_UNIT, SHORTEST_DURATION
 from editor.drawers.stave_drawer import StaveDrawerMixin
 from editor.drawers.snap_drawer import SnapDrawerMixin
 from editor.drawers.grid_band_drawer import GridBandDrawerMixin
@@ -48,6 +48,7 @@ from editor.drawers.dynamic_drawer import DynamicDrawerMixin
 from editor.drawers.crescendo_drawer import CrescendoDrawerMixin
 from editor.drawers.decrescendo_drawer import DecrescendoDrawerMixin
 from editor.drawers.time_signature_drawer import TimeSignatureDrawerMixin
+from editor.drawers.arpeggio_drawer import ArpeggioDrawerMixin
 from utils.CONSTANT import PIANO_KEY_AMOUNT, BLACK_KEYS
 from utils.operator import Operator
 
@@ -63,6 +64,7 @@ class Editor(QtCore.QObject,
              GridDrawerMixin,
              TimeSignatureDrawerMixin,
              NoteDrawerMixin,
+             ArpeggioDrawerMixin,
              GraceNoteDrawerMixin,
              BeamDrawerMixin,
              SlurDrawerMixin,
@@ -203,6 +205,8 @@ class Editor(QtCore.QObject,
         self._tempo_hit_rects: list[dict] = []
         # Per-frame velocity handle hit rectangles
         self._velocity_hit_rects: list[dict] = []
+        # Per-frame arpeggio handle hit rectangles
+        self._arpeggio_hit_rects: list[dict] = []
 
         # Tiny mode: toggled by viewport width (stage 1: simplified drawing,
         # stage 2: skip drawing). tiny_mode_alpha is a continuous fade factor
@@ -248,6 +252,7 @@ class Editor(QtCore.QObject,
         self._text_hit_rects = []
         self._tempo_hit_rects = []
         self._velocity_hit_rects = []
+        self._arpeggio_hit_rects = []
         # In tiny stage 2, skip drawing to keep closing smooth
         if self.is_tiny_mode_ultra():
             self._draw_cache = None
@@ -264,6 +269,7 @@ class Editor(QtCore.QObject,
             getattr(self, 'draw_time_signature', None),
             getattr(self, 'draw_stave', None),
             getattr(self, 'draw_note', None),
+            getattr(self, 'draw_arpeggio', None),
             getattr(self, 'draw_grace_note', None),
             getattr(self, 'draw_beam', None),
             getattr(self, 'draw_pedal', None),
@@ -381,6 +387,39 @@ class Editor(QtCore.QObject,
             'cx': cx,
             'cy': cy,
         })
+
+    # ---- Hit rectangles (arpeggio handles) ----
+    def register_arpeggio_hit_rect(self, arp_id: int, x_left_mm: float, y_top_mm: float, x_right_mm: float, y_bottom_mm: float) -> None:
+        cx = (float(x_left_mm) + float(x_right_mm)) * 0.5
+        cy = (float(y_top_mm) + float(y_bottom_mm)) * 0.5
+        self._arpeggio_hit_rects.append({
+            '_id': int(arp_id),
+            'x1': float(x_left_mm),
+            'y1': float(y_top_mm),
+            'x2': float(x_right_mm),
+            'y2': float(y_bottom_mm),
+            'cx': cx,
+            'cy': cy,
+        })
+
+    def hit_test_arpeggio_handle(self, x_px: float, y_px: float) -> int | None:
+        w_px_per_mm = float(getattr(self, '_widget_px_per_mm', 1.0) or 1.0)
+        if w_px_per_mm <= 0:
+            return None
+        x_mm = float(x_px) / w_px_per_mm
+        y_mm_local = float(y_px) / w_px_per_mm
+        y_mm = y_mm_local + float(getattr(self, '_view_y_mm_offset', 0.0) or 0.0)
+        matches = []
+        for r in (self._arpeggio_hit_rects or []):
+            if float(r['x1']) <= x_mm <= float(r['x2']) and float(r['y1']) <= y_mm <= float(r['y2']):
+                dx = x_mm - float(r['cx'])
+                dy = y_mm - float(r['cy'])
+                dist2 = dx * dx + dy * dy
+                matches.append((dist2, int(r['_id'])))
+        if not matches:
+            return None
+        matches.sort(key=lambda t: t[0])
+        return matches[0][1]
 
     # ---- Hit rectangles (tempo) ----
     def register_tempo_hit_rect(self, tempo_id: int, x_left_mm: float, y_top_mm: float, x_right_mm: float, y_bottom_mm: float) -> None:
@@ -899,6 +938,17 @@ class Editor(QtCore.QObject,
         starts = [float(n.time) for n in notes_sorted]
         ends = [float(n.time + n.duration) for n in notes_sorted]
 
+        # Collect arpeggio member note IDs for quick skip in note drawer
+        arpeggio_note_ids: set[int] = set()
+        try:
+            arp_op = getattr(self, '_arp_time_op', Operator(float(SHORTEST_DURATION)))
+            for arp in getattr(score.events, 'arpeggio', []) or []:
+                for n in self._resolve_arpeggio_notes(arp, notes_sorted, arp_op):
+                    nid = int(getattr(n, '_id', 0) or 0)
+                    arpeggio_note_ids.add(nid)
+        except Exception:
+            arpeggio_note_ids = set()
+
         # Candidate indices: include
         # 1) notes with start in [time_begin, time_end]
         # 2) notes with end in   [time_begin, time_end] (requires ends sorted by value)
@@ -1001,6 +1051,7 @@ class Editor(QtCore.QObject,
             'beam_by_hand': beam_by_hand,
             'grid_den_times': grid_den_times,
             'barline_times': barline_times,
+            'arpeggio_note_ids': arpeggio_note_ids,
         }
 
     # ---- Tiny mode (viewport-based) ----
@@ -1822,6 +1873,9 @@ class Editor(QtCore.QObject,
         # Iterate types from clipboard dynamically
         for ev_type, items in (self.clipboard.items() if isinstance(self.clipboard, dict) else []):
             if not items:
+                continue
+            if ev_type == 'arpeggio':
+                # Arpeggios reference note ids; skip pasting to avoid dangling references.
                 continue
             ctor = getattr(score, f"new_{ev_type}", None)
             if ctor is None:

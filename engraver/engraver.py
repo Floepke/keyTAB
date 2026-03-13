@@ -362,12 +362,15 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
 
         track: list[tuple[float, float, int]] = []
         for mk in markers:
-            if not isinstance(mk, dict):
-                continue
             try:
-                mt = float(mk.get('time', 0.0) or 0.0)
-                dur = float(mk.get('duration', 0.0) or 0.0)
-                mid = int(mk.get('_id', mk.get('id', 0)) or 0)
+                if isinstance(mk, dict):
+                    mt = float(mk.get('time', 0.0) or 0.0)
+                    dur = float(mk.get('duration', 0.0) or 0.0)
+                    mid = int(mk.get('_id', mk.get('id', 0)) or 0)
+                else:
+                    mt = float(getattr(mk, 'time', 0.0) or 0.0)
+                    dur = float(getattr(mk, 'duration', 0.0) or 0.0)
+                    mid = int(getattr(mk, '_id', getattr(mk, 'id', 0)) or 0)
             except Exception:
                 continue
             if op.lt(dur, 0.0):
@@ -441,11 +444,11 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
 
         return [(a, b) for a, b in merged if op.gt(float(b), float(a))]
 
-    # Get grid band tracks from layout
-    left_bands = list(layout.get('grid_band_left_track', []) or [])
-    right_bands = list(layout.get('grid_band_right_track', []) or [])
-    left_dark_intervals_global = _build_grid_band_dark_intervals(left_bands, all_barlines, float(cur_bar))
-    right_dark_intervals_global = _build_grid_band_dark_intervals(right_bands, all_barlines, float(cur_bar))
+    # Get grid band track from layout (merge legacy left/right when present)
+    grid_bands = list(layout.get('grid_band_track', []) or [])
+    if not grid_bands:
+        grid_bands = list(layout.get('grid_band_left_track', []) or []) + list(layout.get('grid_band_right_track', []) or [])
+    grid_dark_intervals_global = _build_grid_band_dark_intervals(grid_bands, all_barlines, float(cur_bar))
 
     # Problem solved: continuation dots count for sub-band pitch sizing by
     # creating synthetic starts at beat-group boundaries crossed by held notes.
@@ -1317,16 +1320,10 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                 rel = max(0.0, min(1.0, rel))
                 return y1 + (y2 - y1) * rel
 
-            def _hand_band_x_span(hand_key: str, t0: float, t1: float) -> tuple[float, float] | None:
-                if hand_key == '<':
-                    # Left hand: fixed span from visible left stave edge to key 42.
-                    x0 = float(grid_left)
-                    x1 = float(_key_to_x(42))
-                else:
-                    # Right hand: fixed span from key 42 to visible right stave edge.
-                    x0 = float(_key_to_x(42))
-                    x1 = float(grid_right)
-
+            def _hand_band_x_span(_hand_key: str, _t0: float, _t1: float) -> tuple[float, float] | None:
+                # Single band span from key 10 to key 77.
+                x0 = float(_key_to_x(10))
+                x1 = float(_key_to_x(77))
                 x0 = max(float(grid_left), min(float(grid_right), float(x0)))
                 x1 = max(float(grid_left), min(float(grid_right), float(x1)))
                 if x1 <= x0:
@@ -1366,31 +1363,22 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                     1.0,
                 )
 
-            left_hex = _normalize_hex_color(
-                layout.get('grid_band_left_color', layout.get('sub_band_left_color', layout.get('note_midinote_left_color', '#cccccc')))
-            ) or '#cccccc'
-            right_hex = _normalize_hex_color(
-                layout.get('grid_band_right_color', layout.get('sub_band_right_color', layout.get('note_midinote_right_color', '#cccccc')))
-            ) or '#cccccc'
+            band_hex = _normalize_hex_color(layout.get('grid_band_color', '#cccccc')) or '#cccccc'
             try:
-                lr, lg, lb, _ = hex_to_rgba(left_hex, 1.0)
-                rr, rg, rb, _ = hex_to_rgba(right_hex, 1.0)
+                br, bg, bb, _ = hex_to_rgba(band_hex, 1.0)
             except Exception:
-                lr, lg, lb = (204, 204, 204)
-                rr, rg, rb = (204, 204, 204)
-            left_note_fill = _midi_fill_from_rgb((int(lr), int(lg), int(lb)))
-            right_note_fill = _midi_fill_from_rgb((int(rr), int(rg), int(rb)))
+                br, bg, bb = (204, 204, 204)
+            band_note_fill = _midi_fill_from_rgb((int(br), int(bg), int(bb)))
             if pdf_export:
-                sub_tint_left = left_note_fill
-                sub_tint_right = right_note_fill
+                sub_tint = band_note_fill
             else:
-                sub_tint_left = _mix_rgba(left_note_fill, paper_color, 0.80)
-                sub_tint_right = _mix_rgba(right_note_fill, paper_color, 0.80)
+                sub_tint = _mix_rgba(band_note_fill, paper_color, 0.80)
 
             line_start_ticks = float(line.get('time_start', 0.0) or 0.0)
             line_end_ticks = float(line.get('time_end', 0.0) or 0.0)
-            sub_band_visible = bool(layout.get('sub_band_visible', True))
-            sub_dark_intervals: dict[str, list[tuple[float, float]]] = {'left': [], 'right': []}
+            grid_band_visible = bool(layout.get('grid_band_visible', True))
+            shared_band_intervals: list[tuple[float, float]] = []
+            sub_dark_intervals: dict[str, list[tuple[float, float]]] = {'left': shared_band_intervals, 'right': shared_band_intervals}
 
             def _text_bbox(text_val: str, family: str, size_pt: float, italic: bool, bold: bool, angle_deg: float, padding_mm: float, corner_radius_mm: float) -> tuple[float, float, float, list[tuple[float, float]], list[tuple[float, float]]]:
                 xb, yb, w_mm, h_mm = du._get_text_extents_mm(text_val, family, size_pt, italic, bold)
@@ -1727,7 +1715,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                     m_end = float(time_cursor + measure_len)
                     ov_start = max(float(line_start_ticks), float(m_start))
                     ov_end = min(float(line_end_ticks), float(m_end))
-                    if sub_band_visible and (ov_end > ov_start):
+                    if grid_band_visible and (ov_end > ov_start):
                         group_boundaries = [float(ov_start)]
                         group_boundaries.extend(
                             float(m_start + float(off))
@@ -1737,54 +1725,30 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                         group_boundaries.append(float(ov_end))
                         group_boundaries = sorted(list(dict.fromkeys(round(float(t), 6) for t in group_boundaries)))
 
-                        left_intervals = _clip_intervals(left_dark_intervals_global, float(ov_start), float(ov_end))
-                        right_intervals = _clip_intervals(right_dark_intervals_global, float(ov_start), float(ov_end))
+                        dark_intervals = _clip_intervals(grid_dark_intervals_global, float(ov_start), float(ov_end))
 
-                        if left_intervals:
-                            for t0, t1 in left_intervals:
+                        if dark_intervals:
+                            for t0, t1 in dark_intervals:
                                 g0, g1 = _group_window_for_interval(group_boundaries, t0, t1)
-                                left_span = _hand_band_x_span('<', g0, g1)
-                                if left_span is None:
+                                span = _hand_band_x_span('<', g0, g1)
+                                if span is None:
                                     continue
-                                left_x0, left_x1 = left_span
+                                bx0, bx1 = span
                                 y0 = _time_to_y(t0)
                                 y1b = _time_to_y(t1)
                                 if y1b < y0:
                                     y0, y1b = y1b, y0
                                 du.add_rectangle(
-                                    left_x0,
+                                    bx0,
                                     y0,
-                                    left_x1,
+                                    bx1,
                                     y1b,
                                     stroke_color=None,
-                                    fill_color=sub_tint_left,
+                                    fill_color=sub_tint,
                                     id=0,
                                     tags=['grid_band'],
                                 )
                                 sub_dark_intervals['left'].append((t0, t1))
-
-                        if right_intervals:
-                            for t0, t1 in right_intervals:
-                                g0, g1 = _group_window_for_interval(group_boundaries, t0, t1)
-                                right_span = _hand_band_x_span('>', g0, g1)
-                                if right_span is None:
-                                    continue
-                                right_x0, right_x1 = right_span
-                                y0 = _time_to_y(t0)
-                                y1b = _time_to_y(t1)
-                                if y1b < y0:
-                                    y0, y1b = y1b, y0
-                                du.add_rectangle(
-                                    right_x0,
-                                    y0,
-                                    right_x1,
-                                    y1b,
-                                    stroke_color=None,
-                                    fill_color=sub_tint_right,
-                                    id=0,
-                                    tags=['grid_band'],
-                                )
-                                sub_dark_intervals['right'].append((t0, t1))
 
                     for off in bar_offsets:
                         t = float(time_cursor + float(off))

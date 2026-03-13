@@ -90,15 +90,13 @@ class Layout:
     stave_visible: bool = True
     barline_visible: bool = True
     grid_line_visible: bool = True
-    sub_band_visible: bool = True
-    # Grid Band tracks (Grid 2). Left and right hand grid band markers.
-    grid_band_left_track: list[GridBand] = field(default_factory=list)
-    grid_band_right_track: list[GridBand] = field(default_factory=list)
+    grid_band_visible: bool = True
+    # Grid Band track (Grid 2). Single track for alternating bands.
+    grid_band_track: list[GridBand] = field(default_factory=list)
     grid_barline_thickness_mm: float = 1.0
     grid_gridline_thickness_mm: float = 0.5
     grid_gridline_dash_pattern_mm: list[float] = field(default_factory=lambda: [2.5, 4.0])
-    grid_band_left_color: str = '#ccc'
-    grid_band_right_color: str = '#ccc'
+    grid_band_color: str = '#ccc'
     
 
     # Time signature indicator type (global)

@@ -42,7 +42,7 @@ class Style:
         "alternate_background_color": (215, 215, 215),
         "text_color": (0, 0, 0),
         "accent_color": (30, 104, 255),
-        "paper_color": (240, 240, 240),
+        "paper_color": (255, 255, 255),
         "notation_color": (0, 0, 30),
         "left_midi_color": (153, 179, 204),
         "right_midi_color": (204, 179, 153),

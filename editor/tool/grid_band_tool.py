@@ -33,54 +33,31 @@ class GridBandTool(BaseTool):
             return None
 
     def _current_hand(self) -> str:
-        pitch = getattr(self._editor, 'pitch_cursor', None)
-        if pitch is None:
-            return self._hand
-        pitch_val = float(pitch)
-        if pitch_val < 34:
-            return '<'
-        elif 34 <= pitch_val <= 50:
-            # For both-hand zones, use the previous hand or default to left
-            return self._hand
-        else:
-            return '>'
+        # Single-track mode: hand is irrelevant; keep a fixed marker.
+        return '<'
 
-    def _hand_for_x(self, x: float) -> str:
-        """Resolve hand from click x-position to avoid stale cursor-hand state."""
-        pitch_val = float(self._editor.x_to_pitch(x))
-        if pitch_val < 34:
-            return '<'
-        if 34 <= pitch_val <= 50:
-            return self._hand
-        return '>'
+    def _hand_for_x(self, _x: float) -> str:
+        # Single-track mode: always use one shared track.
+        return '<'
 
-    def _hands_for_x(self, x: float) -> list[str]:
-        """Resolve edit hands from click x-position.
+    def _hands_for_x(self, _x: float) -> list[str]:
+        # Single-track mode: operate on a single track.
+        return ['*']
 
-        In center zone (34..50), edit both tracks simultaneously.
-        """
-        pitch_val = float(self._editor.x_to_pitch(x))
-        if pitch_val < 34:
-            return ['<']
-        if 34 <= pitch_val <= 50:
-            return ['<', '>']
-        return ['>']
-
-    def _get_hand_tracks(self, hand: str) -> Tuple[str, list]:
-        """Get the track name and list for the given hand."""
+    def _get_hand_tracks(self, _hand: str) -> Tuple[str, list]:
+        """Get the single grid band track (merging legacy tracks when present)."""
         score = self._score()
         if score is None:
             return (None, [])
         layout = getattr(score, 'layout', None)
         if layout is None:
             return (None, [])
-        
-        if hand == '<':
-            track_name = 'grid_band_left_track'
-        else:
-            track_name = 'grid_band_right_track'
 
-        raw_markers = list(getattr(layout, track_name, []) or [])
+        raw_markers = list(getattr(layout, 'grid_band_track', []) or [])
+        if not raw_markers:
+            legacy_left = list(getattr(layout, 'grid_band_left_track', []) or [])
+            legacy_right = list(getattr(layout, 'grid_band_right_track', []) or [])
+            raw_markers = legacy_left + legacy_right
         markers: list[GridBand] = []
         changed = False
         for mk in raw_markers:
@@ -104,25 +81,32 @@ class GridBandTool(BaseTool):
             changed = True
 
         if changed:
-            setattr(layout, track_name, markers)
-        return (track_name, markers)
+            setattr(layout, 'grid_band_track', markers)
+            try:
+                setattr(layout, 'grid_band_left_track', [])
+                setattr(layout, 'grid_band_right_track', [])
+            except Exception:
+                pass
+        return ('grid_band_track', markers)
 
     def _marker_field(self, marker, name: str, default):
         if isinstance(marker, dict):
             return marker.get(name, default)
         return getattr(marker, name, default)
 
-    def _set_hand_track(self, hand: str, markers: list[GridBand]) -> None:
+    def _set_hand_track(self, _hand: str, markers: list[GridBand]) -> None:
         score = self._score()
         if score is None:
             return
         layout = getattr(score, 'layout', None)
         if layout is None:
             return
-        if hand == '<':
-            setattr(layout, 'grid_band_left_track', markers)
-        else:
-            setattr(layout, 'grid_band_right_track', markers)
+        setattr(layout, 'grid_band_track', markers)
+        try:
+            setattr(layout, 'grid_band_left_track', [])
+            setattr(layout, 'grid_band_right_track', [])
+        except Exception:
+            pass
 
     def _normalize_markers(self, markers: list[GridBand], active: GridBand | None = None) -> list[GridBand]:
         """Return a valid marker list: sorted, de-duplicated, and overlap-pruned."""

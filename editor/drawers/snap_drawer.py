@@ -18,8 +18,7 @@ class SnapDrawerMixin:
 
     def _side_band_tint_rgba(self, layout, side: str) -> tuple[float, float, float, float]:
         """Return the exact left/right grid band color for snap bands."""
-        field_name = 'grid_band_left_color' if str(side).lower().startswith('l') else 'grid_band_right_color'
-        return self._grid_band_fill_rgba(layout, field_name, side)
+        return self._grid_band_fill_rgba(layout, 'grid_band_color', side)
 
     def draw_snap(self, du: DrawUtil) -> None:
         """Draw alternating light/darker snap bands along the vertical timeline.
@@ -68,7 +67,7 @@ class SnapDrawerMixin:
         layout = getattr(score, 'layout', None)
         left_fill_rgba = self._side_band_tint_rgba(layout, 'left')
         right_fill_rgba = self._side_band_tint_rgba(layout, 'right')
-        sub_band_visible = bool(getattr(layout, 'sub_band_visible', True))
+        grid_band_visible = bool(getattr(layout, 'grid_band_visible', True))
 
         # Walk the base grid (measures) and draw darker rectangles on every other snap step
         time_cursor_mm = margin
@@ -88,7 +87,7 @@ class SnapDrawerMixin:
                 while op.less(sub_cursor, measure_end_mm):
                     h = min(snap_mm, measure_end_mm - sub_cursor)
                     if (seg_index % 2) == 0:
-                        if not sub_band_visible:
+                        if not grid_band_visible:
                             du.add_rectangle(
                                 left_x1,
                                 sub_cursor,

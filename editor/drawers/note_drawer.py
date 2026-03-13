@@ -68,6 +68,7 @@ class NoteDrawerMixin:
             self._cached_notes_sorted = cache.get('notes_sorted') or []
             self._cached_notes_starts = cache.get('starts') or []
             self._cached_barline_positions = cache.get('barline_positions') or []
+            skip_ids = set(cache.get('arpeggio_note_ids') or [])
         else:
             # Fallback: minimal local candidate selection (start-only)
             notes_sorted = sorted(score.events.note or [], key=lambda n: (n.time, n.pitch))
@@ -77,12 +78,15 @@ class NoteDrawerMixin:
             candidate_indices = list(range(max(0, lo - 1), hi))
             self._cached_notes_view = [notes_sorted[i] for i in candidate_indices]
             self._cached_barline_positions = self._get_barline_positions()
+            skip_ids = set()
 
         # Iterate candidate set only
         for idx in candidate_indices:
             if idx < 0 or idx >= len(notes_sorted):
                 continue
             n = notes_sorted[idx]
+            if skip_ids and int(getattr(n, '_id', -1) or -1) in skip_ids:
+                continue
             # Final interval intersection test in time domain
             n_start = float(n.time)
             n_end = float(n.time + n.duration)

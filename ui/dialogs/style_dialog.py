@@ -452,9 +452,9 @@ class StyleDialog(QtWidgets.QDialog):
 
         tab_order = [
             "Page",
+            "Stave",
             "Grid",
             "Time signature",
-            "Stave",
             "Fonts",
             "Note",
             "Grace note",
@@ -522,22 +522,21 @@ class StyleDialog(QtWidgets.QDialog):
             # Countline
             'countline_dash_pattern': 'Countline',
             'countline_thickness_mm': 'Countline',
-            # Grid
-            'grid_barline_thickness_mm': 'Grid',
-            'grid_gridline_thickness_mm': 'Grid',
-            'grid_gridline_dash_pattern_mm': 'Grid',
             # Time signature
             'time_signature_indicator_type': 'Time signature',
             'time_signature_indicator_lane_width_mm': 'Time signature',
             'time_signature_indicator_guide_thickness_mm': 'Time signature',
             'time_signature_indicator_divide_guide_thickness_mm': 'Time signature',
+            # Grid
+            'grid_barline_thickness_mm': 'Grid',
+            'grid_gridline_thickness_mm': 'Grid',
+            'grid_gridline_dash_pattern_mm': 'Grid',
+            'grid_band_color': 'Grid',
             # Stave
             'stave_two_line_thickness_mm': 'Stave',
             'stave_three_line_thickness_mm': 'Stave',
             'stave_clef_line_thickness_mm': 'Stave',
             'stave_clef_line_dash_pattern_mm': 'Stave',
-            'grid_band_left_color': 'Stave',
-            'grid_band_right_color': 'Stave',
             # Fonts
             'font_text': 'Fonts',
             'font_title': 'Fonts',
@@ -557,7 +556,7 @@ class StyleDialog(QtWidgets.QDialog):
             'stave_visible': 'Visibility',
             'barline_visible': 'Visibility',
             'grid_line_visible': 'Visibility',
-            'sub_band_visible': 'Visibility',
+            'grid_band_visible': 'Visibility',
             'beam_visible': 'Visibility',
             'grace_note_visible': 'Visibility',
             'pedal_lane_enabled': 'Visibility',
@@ -755,6 +754,12 @@ class StyleDialog(QtWidgets.QDialog):
                 fixed["font_text"] = LayoutFont(family=fam, size_pt=size)
             except Exception:
                 pass
+        # Legacy migration: merge left/right grid band tracks into the unified track
+        if not fixed.get("grid_band_track"):
+            legacy_left = data.get("grid_band_left_track", []) or []
+            legacy_right = data.get("grid_band_right_track", []) or []
+            if legacy_left or legacy_right:
+                fixed["grid_band_track"] = list(legacy_left) + list(legacy_right)
         return Layout(**fixed)
 
     def _load_layout_from_file(self, stem: str | None) -> Layout:
@@ -873,27 +878,24 @@ class StyleDialog(QtWidgets.QDialog):
         return None
 
     def _wire_editor_change(self, editor: QtWidgets.QWidget) -> None:
-        try:
-            if isinstance(editor, QtWidgets.QCheckBox):
-                editor.stateChanged.connect(lambda _v: self.values_changed.emit())
-            elif isinstance(editor, QtWidgets.QSpinBox):
-                editor.valueChanged.connect(lambda _v: self.values_changed.emit())
-                try:
-                    editor.editingFinished.connect(lambda: self.values_changed.emit())
-                except Exception:
-                    pass
-            elif isinstance(editor, FloatSliderEdit):
-                editor.valueChanged.connect(lambda _v: self.values_changed.emit())
-            elif isinstance(editor, FontPicker):
-                editor.valueChanged.connect(lambda: self.values_changed.emit())
-            elif isinstance(editor, QtWidgets.QComboBox):
-                editor.currentTextChanged.connect(lambda _v: self.values_changed.emit())
-            elif isinstance(editor, QtWidgets.QLineEdit):
-                editor.textChanged.connect(lambda _v: self.values_changed.emit())
-            elif isinstance(editor, ColorPickerEdit):
-                editor.valueChanged.connect(lambda _v: self.values_changed.emit())
-        except Exception:
-            pass
+        if isinstance(editor, QtWidgets.QCheckBox):
+            editor.stateChanged.connect(lambda _v: self.values_changed.emit())
+        elif isinstance(editor, QtWidgets.QSpinBox):
+            editor.valueChanged.connect(lambda _v: self.values_changed.emit())
+            try:
+                editor.editingFinished.connect(lambda: self.values_changed.emit())
+            except Exception:
+                pass
+        elif isinstance(editor, FloatSliderEdit):
+            editor.valueChanged.connect(lambda _v: self.values_changed.emit())
+        elif isinstance(editor, FontPicker):
+            editor.valueChanged.connect(lambda: self.values_changed.emit())
+        elif isinstance(editor, QtWidgets.QComboBox):
+            editor.currentTextChanged.connect(lambda _v: self.values_changed.emit())
+        elif isinstance(editor, QtWidgets.QLineEdit):
+            editor.textChanged.connect(lambda _v: self.values_changed.emit())
+        elif isinstance(editor, ColorPickerEdit):
+            editor.valueChanged.connect(lambda _v: self.values_changed.emit())
 
     def _add_all_fonts_control(self, form: QtWidgets.QFormLayout | None) -> None:
         if form is None:
