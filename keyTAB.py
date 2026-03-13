@@ -236,11 +236,22 @@ def main(argv: list[str] | None = None):
         os.environ["QT_SCALE_FACTOR"] = str(ui_scale)
     # On macOS, force menus to render inside the window instead of the global menu bar
     elif sys.platform == "darwin":
+        # Force Fusion style in-process to avoid accidental fallback to native style
+        # from shell/launchd environment overrides.
+        os.environ["QT_STYLE_OVERRIDE"] = "Fusion"
+        os.environ.pop("QT_QPA_PLATFORMTHEME", None)
         QtCore.QCoreApplication.setAttribute(
             QtCore.Qt.ApplicationAttribute.AA_DontUseNativeMenuBar, False
         )
     # Create QApplication with argv to ensure proper initialization paths on macOS
     app = KeyTabApplication([sys.argv[0], *qt_args])
+
+    # Belt-and-suspenders: explicitly pick Fusion when available on macOS.
+    if sys.platform == "darwin":
+        styles = {str(s).lower(): str(s) for s in QtWidgets.QStyleFactory.keys()}
+        fusion_name = styles.get("fusion")
+        if fusion_name:
+            QtWidgets.QApplication.setStyle(fusion_name)
     
     # Enforce arrow cursor globally: app never changes the mouse pointer
     QtGui.QGuiApplication.setOverrideCursor(QtGui.QCursor(QtCore.Qt.CursorShape.ArrowCursor))
