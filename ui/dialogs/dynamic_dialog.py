@@ -101,7 +101,7 @@ class DynamicDialog(QtWidgets.QDialog):
 
         lay.addWidget(self.listbox)
 
-        hint = QtWidgets.QLabel('Listbox is rendered with LelandText so all dynamic symbols are visible.', self)
+        hint = QtWidgets.QLabel('We use font LelandText for all dynamic symbols. LelandText is the music font from Musescore 3.', self)
         hint.setWordWrap(True)
         lay.addWidget(hint)
 
