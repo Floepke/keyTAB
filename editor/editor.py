@@ -332,7 +332,6 @@ class Editor(QtCore.QObject,
         """Request a full widget repaint from SCORE without prebuilding a duplicate frame."""
         from ui.widgets.cairo_views import CairoEditorWidget
         w: CairoEditorWidget = getattr(self, 'widget', None)
-        print("Editor: forcing redraw from model", w)
         if w is not None and hasattr(w, 'force_full_redraw'):
             w.force_full_redraw()
         elif w is not None and hasattr(w, 'update'):
