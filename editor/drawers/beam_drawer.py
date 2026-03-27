@@ -305,8 +305,9 @@ class BeamDrawerMixin:
         # X positions: start at the highest pitch's stem tip (pitch_x + stem_len),
         # and end at x1 + semitone_dist to give a gentle diagonal.
         stem_len = float(layout.note_stem_length_semitone or 3) * float(self.semitone_dist or 0.5)
-        beam_w = 1.5
-        stem_w = .75
+        style_scale = float(getattr(layout, 'scale', 1.0) or 1.0)
+        beam_w = max(0.2, float(getattr(layout, 'beam_thickness_mm', 1.5) or 1.5) * style_scale)
+        stem_w = max(0.1, float(getattr(layout, 'note_stem_thickness_mm', 0.75) or 0.75) * style_scale)
 
         # Iterate windows in lockstep with groups for right hand
         right_groups = groups_all.get('r') or []

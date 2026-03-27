@@ -71,7 +71,9 @@ class GridDrawerMixin:
             meas_family = getattr(meas_font, 'family', 'Courier New') if meas_font is not None else 'Courier New'
         meas_size = 20.0
         color = self.notation_color
-        bar_width_mm = 0.25
+        style_scale = float(getattr(layout, 'scale', 1.0) or 1.0) if layout is not None else 1.0
+        bar_width_mm = (float(getattr(layout, 'grid_barline_thickness_mm', 0.25) or 0.25) * style_scale) if layout is not None else 0.25
+        grid_width_mm = (float(getattr(layout, 'grid_gridline_thickness_mm', 0.15) or 0.15) * style_scale) if layout is not None else 0.15
 
         cache = getattr(self, '_draw_cache', None) or {}
         grid_den_times = list(cache.get('grid_den_times') or [])
@@ -111,9 +113,9 @@ class GridDrawerMixin:
         semitone_mm = float(self.semitone_dist or 0.5)
         stem_len_mm = float(getattr(layout, 'note_stem_length_semitone', 3) or 3) * semitone_mm if layout is not None else (3.0 * semitone_mm)
         note_head_half_w = semitone_mm * float(getattr(layout, 'note_width_scaling', 0.75) or 0.75) if layout is not None else (semitone_mm * 0.75)
-        stem_collision_pad = max(0.15, float(getattr(layout, 'note_stem_thickness_mm', 0.5) or 0.5)) if layout is not None else 0.5
+        stem_collision_pad = max(0.15, float(getattr(layout, 'note_stem_thickness_mm', 0.5) or 0.5) * style_scale) if layout is not None else 0.5
         head_collision_pad = max(0.15, semitone_mm * 0.15)
-        beam_collision_pad = max(0.2, 1.05)
+        beam_collision_pad = max(0.2, float(getattr(layout, 'beam_thickness_mm', 1.0) or 1.0) * style_scale * 0.7) if layout is not None else 0.2
         barline_symbol_gap_mm = max(0.0, semitone_mm)
         barline_time_eps = 1e-4
 
@@ -169,17 +171,18 @@ class GridDrawerMixin:
                 grp = []
                 for n in notes:
                     nt = float(getattr(n, 'time', 0.0) or 0.0)
-                    ne = float(getattr(n, 'time', 0.0) or 0.0) + float(getattr(n, 'duration', 0.0) or 0.0)
                     starts_in = op.ge(float(nt), float(w0)) and op.lt(float(nt), float(w1))
-                    spans_in = op.lt(float(nt), float(w0)) and op.gt(float(ne), float(w0))
-                    if starts_in or spans_in:
+                    if starts_in:
                         grp.append(n)
                 groups.append(grp)
             return groups
 
         beam_segments: list[dict[str, float]] = []
         beam_connect_segments: list[dict[str, float]] = []
-        grid_windows = _build_grid_windows(barline_times)
+        # Use the same timeline source as beam drawing so collision beams are
+        # grouped per grid subdivision, not per measure barline only.
+        beam_time_boundaries = grid_den_times if grid_den_times else barline_times
+        grid_windows = _build_grid_windows(beam_time_boundaries)
         for hand_norm in ('r', 'l'):
             notes_hand = notes_by_norm.get(hand_norm, [])
             markers_hand = markers_by_norm.get(hand_norm, [])
@@ -233,6 +236,7 @@ class GridDrawerMixin:
                         'time': float(mt),
                         'x0': float(min(x_tip, x_on_beam)),
                         'x1': float(max(x_tip, x_on_beam)),
+                        'beam_start': float(t_first),
                     })
 
         stave_left = float(stave_left_position)
@@ -282,6 +286,8 @@ class GridDrawerMixin:
             for seg in beam_segments:
                 t0 = float(seg.get('t_start', 0.0) or 0.0)
                 t1 = float(seg.get('t_end', 0.0) or 0.0)
+                if not _barline_time_eq(float(t0), float(ticks)):
+                    continue
                 if not _barline_time_in_range(float(ticks), float(t0), float(t1)):
                     continue
                 dt = float(t1 - t0)
@@ -295,6 +301,9 @@ class GridDrawerMixin:
                 ))
             for conn in beam_connect_segments:
                 c_t = float(conn.get('time', 0.0) or 0.0)
+                c_bstart = float(conn.get('beam_start', -1.0) or -1.0)
+                if not _barline_time_eq(float(c_bstart), float(ticks)):
+                    continue
                 if not _barline_time_eq(float(c_t), float(ticks)):
                     continue
                 c_x0 = float(conn.get('x0', 0.0) or 0.0)
@@ -388,7 +397,7 @@ class GridDrawerMixin:
                     stave_right_position,
                     y_mm,
                     color=color,
-                    width_mm=bar_width_mm / 2,
+                    width_mm=grid_width_mm,
                     id=0,
                     tags=["grid_line"],
                     dash_pattern=[2.0, 2.0],

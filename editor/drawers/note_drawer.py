@@ -187,7 +187,8 @@ class NoteDrawerMixin:
             return
         w = float(self.semitone_dist or 0.5)
         stem_len = float(layout.note_stem_length_semitone or 3) * w
-        thickness = float(layout.grid_barline_thickness_mm or 0.25)
+        style_scale = float(getattr(layout, 'scale', 1.0) or 1.0)
+        thickness = float(layout.grid_barline_thickness_mm or 0.25) * style_scale
         hand = getattr(n, 'hand', '<')
         if hand in ('l', '<'):
             x1 = x
@@ -297,7 +298,8 @@ class NoteDrawerMixin:
         self = cast("Editor", self)
         layout = self.current_score().layout
         stem_len = float(layout.note_stem_length_semitone or 3) * float(self.semitone_dist or 0.5)
-        stem_w = 0.75
+        style_scale = float(getattr(layout, 'scale', 1.0) or 1.0)
+        stem_w = max(0.1, float(getattr(layout, 'note_stem_thickness_mm', 0.75) or 0.75) * style_scale)
         # Stem direction based on hand
         if getattr(n, 'hand', '<') in ('l', '<'):
             x2 = x - stem_len
@@ -366,7 +368,9 @@ class NoteDrawerMixin:
     def _draw_connect_stem(self, du: DrawUtil, n, x: float, y1: float, draw_mode: str) -> None:
         self = cast("Editor", self)
         # Connect notes in a chord (same start time, same hand)
-        stem_w = 0.75
+        layout = self.current_score().layout
+        style_scale = float(getattr(layout, 'scale', 1.0) or 1.0)
+        stem_w = max(0.1, float(getattr(layout, 'note_stem_thickness_mm', 0.75) or 0.75) * style_scale)
         hand = getattr(n, 'hand', '<')
         t = float(n.time)
         cache = cast("Editor", self)._draw_cache or {}

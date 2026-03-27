@@ -1703,6 +1703,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                             'time': float(mt),
                             'x0': float(min(x_tip, x_on_beam)),
                             'x1': float(max(x_tip, x_on_beam)),
+                            'beam_start': float(t_first),
                         })
 
             def _merge_intervals(intervals: list[tuple[float, float]]) -> list[tuple[float, float]]:
@@ -1750,6 +1751,8 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                 for seg in beam_segments_for_barlines:
                     t0 = float(seg.get('t_start', 0.0) or 0.0)
                     t1 = float(seg.get('t_end', 0.0) or 0.0)
+                    if not op_time.eq(float(t0), float(ticks)):
+                        continue
                     if op_time.lt(float(ticks), t0) or op_time.gt(float(ticks), t1):
                         continue
                     dt = t1 - t0
@@ -1764,6 +1767,9 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
 
                 for conn in beam_connect_segments_for_barlines:
                     c_t = float(conn.get('time', 0.0) or 0.0)
+                    c_bstart = float(conn.get('beam_start', -1.0) or -1.0)
+                    if not op_time.eq(c_bstart, float(ticks)):
+                        continue
                     if not op_time.eq(c_t, float(ticks)):
                         continue
                     c_x0 = float(conn.get('x0', 0.0) or 0.0)
