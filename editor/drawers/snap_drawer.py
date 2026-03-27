@@ -81,7 +81,7 @@ class SnapDrawerMixin:
         snap_mm = (snap_units / float(QUARTER_NOTE_UNIT)) * zpq
 
         layout = getattr(score, 'layout', None)
-        left_fill_rgba = self._side_band_tint_rgba(layout, 'left')
+        left_fill_rgba = (.9,.9,.9,1)
 
         # Walk the base grid (measures) and draw darker rectangles on every other snap step
         time_cursor_mm = margin

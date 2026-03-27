@@ -1616,6 +1616,220 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
             grid_line_visible = bool(layout.get('grid_line_visible', True))
             dash_pattern_raw = list(layout.get('grid_gridline_dash_pattern_mm', []) or [])
             dash_pattern = [float(v) * scale for v in dash_pattern_raw] if dash_pattern_raw else None
+
+            # Build collision geometry for constructive barline drawing.
+            line_start_ticks_local = float(line.get('time_start', 0.0) or 0.0)
+            line_end_ticks_local = float(line.get('time_end', 0.0) or 0.0)
+            line_notes_for_barlines: list[dict] = []
+            for item in norm_notes:
+                n_t = float(item.get('time', 0.0) or 0.0)
+                n_end = float(item.get('end', 0.0) or 0.0)
+                p = int(item.get('pitch', 0) or 0)
+                if op_time.ge(n_t, line_end_ticks_local) or op_time.le(n_end, line_start_ticks_local):
+                    continue
+                if p < 1 or p > PIANO_KEY_AMOUNT:
+                    continue
+                line_notes_for_barlines.append(item)
+
+            stem_len_units_for_barlines = float(layout.get('note_stem_length_semitone', 3) or 3)
+            stem_len_mm_for_barlines = stem_len_units_for_barlines * semitone_mm
+            note_head_half_w = semitone_mm * float(layout.get('note_width_scaling', 0.75) or 0.75)
+            stem_collision_pad = max(0.15, float(layout.get('note_stem_thickness_mm', 0.5) or 0.5) * scale)
+            head_collision_pad = max(0.15, semitone_mm * 0.15)
+            beam_collision_pad = max(0.2, float(layout.get('beam_thickness_mm', 1.0) or 1.0) * scale * 0.7)
+            barline_symbol_gap_mm = max(0.0, semitone_mm)
+
+            beam_segments_for_barlines: list[dict[str, float]] = []
+            beam_connect_segments_for_barlines: list[dict[str, float]] = []
+            for hand_norm in ('r', 'l'):
+                notes_for_hand = [
+                    n for n in line_notes_for_barlines
+                    if ('l' if str(n.get('hand', '<') or '<') in ('<', 'l') else 'r') == hand_norm
+                ]
+                markers_for_hand = beam_by_hand.get(hand_norm, [])
+                groups, windows = _group_by_beam_markers(notes_for_hand, markers_for_hand, line_start_ticks_local, line_end_ticks_local)
+                for idx, grp in enumerate(groups):
+                    if not grp or idx >= len(windows):
+                        continue
+                    t0, t1 = windows[idx]
+                    starts_in = [
+                        float(n.get('time', 0.0) or 0.0)
+                        for n in grp
+                        if op_time.ge(float(n.get('time', 0.0) or 0.0), float(t0))
+                        and op_time.lt(float(n.get('time', 0.0) or 0.0), float(t1))
+                    ]
+                    if not starts_in:
+                        continue
+                    s_min, s_max = min(starts_in), max(starts_in)
+                    if op_time.eq(float(s_min), float(s_max)):
+                        continue
+                    t_first = float(s_min)
+                    t_last = float(s_max)
+                    if hand_norm == 'r':
+                        highest = max(grp, key=lambda n: int(n.get('pitch', 0) or 0))
+                        x1b = _key_to_x(int(highest.get('pitch', 0) or 0)) + float(stem_len_mm_for_barlines)
+                        x2b = x1b + float(semitone_mm)
+                    else:
+                        lowest = min(grp, key=lambda n: int(n.get('pitch', 0) or 0))
+                        x1b = _key_to_x(int(lowest.get('pitch', 0) or 0)) - float(stem_len_mm_for_barlines)
+                        x2b = x1b - float(semitone_mm)
+                    yb1 = _time_to_y(float(t_first))
+                    yb2 = _time_to_y(float(t_last))
+                    beam_segments_for_barlines.append({
+                        't_start': float(t_first),
+                        't_end': float(t_last),
+                        'x1': float(x1b),
+                        'x2': float(x2b),
+                    })
+
+                    # Beam connection lines (note stem tip to beam line) are part of beam drawing.
+                    # Record their x-ranges at each note start so barline cuts include them.
+                    for m in grp:
+                        mt = float(m.get('time', t_first) or t_first)
+                        if not (op_time.ge(mt, float(t0)) and op_time.lt(mt, float(t1))):
+                            continue
+                        y_note = _time_to_y(float(mt))
+                        x_note = _key_to_x(int(m.get('pitch', 0) or 0))
+                        if hand_norm == 'r':
+                            x_tip = x_note + float(stem_len_mm_for_barlines)
+                        else:
+                            x_tip = x_note - float(stem_len_mm_for_barlines)
+                        if abs(yb2 - yb1) > 1e-9:
+                            t_ratio = (y_note - yb1) / (yb2 - yb1)
+                            x_on_beam = x1b + t_ratio * (x2b - x1b)
+                        else:
+                            x_on_beam = x1b
+                        beam_connect_segments_for_barlines.append({
+                            'time': float(mt),
+                            'x0': float(min(x_tip, x_on_beam)),
+                            'x1': float(max(x_tip, x_on_beam)),
+                        })
+
+            def _merge_intervals(intervals: list[tuple[float, float]]) -> list[tuple[float, float]]:
+                if not intervals:
+                    return []
+                clipped: list[tuple[float, float]] = []
+                for a, b in intervals:
+                    x0 = max(float(grid_left), min(float(grid_right), float(min(a, b))))
+                    x1 = max(float(grid_left), min(float(grid_right), float(max(a, b))))
+                    if x1 <= x0:
+                        continue
+                    clipped.append((x0, x1))
+                if not clipped:
+                    return []
+                clipped.sort(key=lambda it: it[0])
+                merged: list[tuple[float, float]] = [clipped[0]]
+                for a, b in clipped[1:]:
+                    la, lb = merged[-1]
+                    if a <= lb:
+                        merged[-1] = (la, max(lb, b))
+                    else:
+                        merged.append((a, b))
+                return merged
+
+            def _barline_cut_intervals(ticks: float) -> list[tuple[float, float]]:
+                intervals: list[tuple[float, float]] = []
+                for item in line_notes_for_barlines:
+                    n_t = float(item.get('time', 0.0) or 0.0)
+                    if not op_time.eq(n_t, float(ticks)):
+                        continue
+                    p = int(item.get('pitch', 0) or 0)
+                    x_note = _key_to_x(p)
+                    intervals.append((
+                        x_note - note_head_half_w - head_collision_pad - barline_symbol_gap_mm,
+                        x_note + note_head_half_w + head_collision_pad + barline_symbol_gap_mm,
+                    ))
+                    if bool(layout.get('note_stem_visible', True)):
+                        hand_key = str(item.get('hand', '<') or '<')
+                        x_stem_tip = x_note - stem_len_mm_for_barlines if hand_key in ('<', 'l') else x_note + stem_len_mm_for_barlines
+                        intervals.append((
+                            min(x_note, x_stem_tip) - stem_collision_pad - barline_symbol_gap_mm,
+                            max(x_note, x_stem_tip) + stem_collision_pad + barline_symbol_gap_mm,
+                        ))
+
+                for seg in beam_segments_for_barlines:
+                    t0 = float(seg.get('t_start', 0.0) or 0.0)
+                    t1 = float(seg.get('t_end', 0.0) or 0.0)
+                    if op_time.lt(float(ticks), t0) or op_time.gt(float(ticks), t1):
+                        continue
+                    dt = t1 - t0
+                    if abs(dt) <= 1e-9:
+                        continue
+                    ratio = (float(ticks) - t0) / dt
+                    x_on_beam = float(seg.get('x1', 0.0) or 0.0) + ratio * (float(seg.get('x2', 0.0) or 0.0) - float(seg.get('x1', 0.0) or 0.0))
+                    intervals.append((
+                        x_on_beam - beam_collision_pad - barline_symbol_gap_mm,
+                        x_on_beam + beam_collision_pad + barline_symbol_gap_mm,
+                    ))
+
+                for conn in beam_connect_segments_for_barlines:
+                    c_t = float(conn.get('time', 0.0) or 0.0)
+                    if not op_time.eq(c_t, float(ticks)):
+                        continue
+                    c_x0 = float(conn.get('x0', 0.0) or 0.0)
+                    c_x1 = float(conn.get('x1', 0.0) or 0.0)
+                    intervals.append((
+                        c_x0 - beam_collision_pad - barline_symbol_gap_mm,
+                        c_x1 + beam_collision_pad + barline_symbol_gap_mm,
+                    ))
+
+                return _merge_intervals(intervals)
+
+            def _draw_barline_segments(yb: float, cuts: list[tuple[float, float]], width_mm: float, tags: list[str], item_id: int = 0) -> None:
+                if not cuts:
+                    du.add_line(
+                        grid_left,
+                        yb,
+                        grid_right,
+                        yb,
+                        color=grid_color,
+                        width_mm=width_mm,
+                        id=item_id,
+                        tags=tags,
+                        dash_pattern=None,
+                    )
+                    return
+                x_cursor_seg = float(grid_left)
+                min_seg = max(0.05, width_mm * 0.5)
+                for c0, c1 in cuts:
+                    if c0 - x_cursor_seg > min_seg:
+                        du.add_line(
+                            x_cursor_seg,
+                            yb,
+                            c0,
+                            yb,
+                            color=grid_color,
+                            width_mm=width_mm,
+                            id=item_id,
+                            tags=tags,
+                            dash_pattern=None,
+                        )
+                    x_cursor_seg = max(x_cursor_seg, c1)
+                if float(grid_right) - x_cursor_seg > min_seg:
+                    du.add_line(
+                        x_cursor_seg,
+                        yb,
+                        grid_right,
+                        yb,
+                        color=grid_color,
+                        width_mm=width_mm,
+                        id=item_id,
+                        tags=tags,
+                        dash_pattern=None,
+                    )
+
+            def _draw_barline_constructive(ticks: float, width_mm: float, tag: str = 'barline') -> None:
+                yb = _time_to_y(float(ticks))
+                cuts = _barline_cut_intervals(float(ticks))
+                _draw_barline_segments(float(yb), cuts, float(width_mm), [tag], 0)
+
+            def _draw_double_bar_constructive(ticks: float, width_mm: float, gap_mm: float, ev_id: int = 0) -> None:
+                yb = _time_to_y(float(ticks))
+                cuts = _barline_cut_intervals(float(ticks))
+                gap = max(0.1, float(gap_mm))
+                tags = ['barline', 'double_barline']
+                _draw_barline_segments(float(yb + gap), cuts, float(width_mm), tags, int(ev_id))
+
             time_cursor = 0.0
             has_any_barlines = False
             for bg in base_grid:
@@ -1688,18 +1902,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                             continue
                         if not barline_visible:
                             continue
-                        y = _time_to_y(t)
-                        du.add_line(
-                            grid_left,
-                            y,
-                            grid_right,
-                            y,
-                            color=grid_color,
-                            width_mm=bar_width_mm,
-                            id=0,
-                            tags=['barline'],
-                            dash_pattern=None,
-                        )
+                        _draw_barline_constructive(t, bar_width_mm, tag='barline')
                     for off in grid_offsets:
                         t = float(time_cursor + float(off))
                         if op_time.lt(t, float(line['time_start'])) or op_time.gt(t, float(line['time_end'])):
@@ -1723,18 +1926,23 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                     break
 
             if barline_visible and has_any_barlines and op_time.ge(total_ticks, float(line['time_start'])) and op_time.le(total_ticks, float(line['time_end'])):
-                y_end_bar = _time_to_y(float(total_ticks))
-                du.add_line(
-                    grid_left,
-                    y_end_bar,
-                    grid_right,
-                    y_end_bar,
-                    color=grid_color,
-                    width_mm=bar_width_mm * 2.0,
-                    id=0,
-                    tags=['grid_line'],
-                    dash_pattern=None,
-                )
+                _draw_barline_constructive(float(total_ticks), bar_width_mm * 2.0, tag='grid_line')
+
+            if barline_visible and bool(layout.get('double_bar_visible', True)) and norm_double_bars:
+                double_w_mm = max(0.1, bar_width_mm)
+                # Keep visible whitespace between lines after increasing line thickness.
+                inner_clear_gap_mm = max(0.35, semitone_mm * 0.5)
+                double_gap_mm = max(double_w_mm * 2.0, inner_clear_gap_mm + double_w_mm)
+                for ev in norm_double_bars:
+                    ev_t = float(ev.get('time', 0.0) or 0.0)
+                    if op_time.lt(ev_t, float(line['time_start'])) or op_time.gt(ev_t, float(line['time_end'])):
+                        continue
+                    _draw_double_bar_constructive(
+                        float(ev_t),
+                        float(double_w_mm),
+                        float(double_gap_mm),
+                        int(ev.get('id', 0) or 0),
+                    )
 
             if bool(layout.get('pedal_lane_enabled', False)):
                 lane_offset = max(1.0 * scale, float(layout.get('pedal_lane_width_mm', 2.5) or 2.5) * scale)
@@ -2145,29 +2353,6 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                             id=ev_id,
                             tags=['barline_symbol_dot', 'end_repeat_dot'],
                         )
-                elif kind == 'double':
-                    du.add_line(
-                        x_left,
-                        y_rep - symbol_gap,
-                        x_right,
-                        y_rep - symbol_gap,
-                        color=notation_color,
-                        width_mm=symbol_thin_w,
-                        id=ev_id,
-                        tags=['barline_symbol', 'double_bar'],
-                        dash_pattern=None,
-                    )
-                    du.add_line(
-                        x_left,
-                        y_rep + symbol_gap,
-                        x_right,
-                        y_rep + symbol_gap,
-                        color=notation_color,
-                        width_mm=symbol_thin_w,
-                        id=ev_id,
-                        tags=['barline_symbol', 'double_bar'],
-                        dash_pattern=None,
-                    )
 
             if bool(layout.get('repeat_start_visible', True)) and norm_start_repeats:
                 for ev in norm_start_repeats:
@@ -2183,14 +2368,6 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                         int(ev.get('id', 0) or 0),
                         'end',
                     )
-            if bool(layout.get('double_bar_visible', True)) and norm_double_bars:
-                for ev in norm_double_bars:
-                    _draw_repeat_symbol(
-                        float(ev.get('time', 0.0) or 0.0),
-                        int(ev.get('id', 0) or 0),
-                        'double',
-                    )
-
             if bool(layout.get('stave_visible', True)):
                 visible_keys = list(line.get('visible_keys', []))
                 if not visible_keys:
@@ -2504,35 +2681,6 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                                 )
 
                 continues_from_prev_line = _is_line_continuation(item)
-
-                on_barline = False
-                for bt in barline_positions:
-                    if op_time.eq(float(bt), n_t):
-                        on_barline = True
-                        break
-                if on_barline and bool(layout.get('barline_visible', True)):
-                    stem_len_units = float(layout.get('note_stem_length_semitone', 3) or 3)
-                    stem_len = stem_len_units * semitone_mm
-                    thickness = float(layout.get('grid_barline_thickness_mm', 0.25) or 0.25) * scale + 0.1
-                    if hand_key in ('l', '<'):
-                        x1 = x
-                        x2 = x + (w * 1.5)
-                    else:
-                        x1 = x
-                        x2 = x - (w * 1.5)
-                    
-                    if not continues_from_prev_line:
-                        du.add_line(
-                            x1,
-                            y_start,
-                            x2,
-                            y_start,
-                            color=paper_color,
-                            width_mm=thickness,
-                            line_cap="butt",
-                            id=0,
-                            tags=['stem_hand_split'],
-                        )
 
                 # Problem solved: avoid duplicated heads on continuations.
                 if not continues_from_prev_line and bool(layout.get('note_head_visible', True)):

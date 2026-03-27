@@ -47,7 +47,7 @@ class TimeSignatureDialog(QtWidgets.QDialog):
         ts_row.addWidget(self.ts_edit, 1)
         lay.addLayout(ts_row)
 
-        self.indicator_enabled_cb = QtWidgets.QCheckBox("Indicator enabled", self)
+        self.indicator_enabled_cb = QtWidgets.QCheckBox("Time-signature indicator enabled", self)
         self.indicator_enabled_cb.setChecked(self._indicator_enabled)
         lay.addWidget(self.indicator_enabled_cb)
 

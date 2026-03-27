@@ -117,7 +117,6 @@ class NoteDrawerMixin:
 
         # Draw all parts of the note
         self._draw_midinote(du, n, x, y1, y2, draw_mode)
-        self._draw_hand_split_indicator(du, n, x, y1)
         self._draw_notehead(du, n, x, y1, draw_mode)
         self._draw_notestop(du, n, x, y2, draw_mode)
         self._draw_stem(du, n, x, y1, draw_mode)
@@ -153,11 +152,16 @@ class NoteDrawerMixin:
         # Register a clickable rectangle covering the main midinote body
         x_left = x - w
         x_right = x + w
-        # Shift hit-rect origin up by one semitone distance so the top aligns with notehead.
-        y1_hit = y1 - w
-        y2_hit = y2 - w
-        y_top = y1_hit + w
-        y_bottom = y2_hit
+        # Include full notehead bounds so border clicks are reliably detected.
+        # For short durations, the body can be smaller than the head, so use a union.
+        y_head_top = y1
+        y_head_bottom = y1 + (w * 2.0)
+        y_body_bottom = y2 - w
+        hit_pad = max(0.05, w * 0.08)
+        y_top = min(y_head_top, y_body_bottom) - hit_pad
+        y_bottom = max(y_head_bottom, y_body_bottom) + hit_pad
+        x_left -= hit_pad
+        x_right += hit_pad
         if x_left > x_right:
             x_left, x_right = x_right, x_left
         if y_top > y_bottom:
@@ -391,6 +395,8 @@ class NoteDrawerMixin:
         if getattr(n, 'hand', '<') not in ('l', '<'):
             return
         layout = self.current_score().layout
+        if not bool(getattr(layout, 'note_leftdot_visible', False)):
+            return
         if n.pitch in BLACK_KEYS and self._black_note_above_stem(n, layout):
             y1 = y1 - (float(self.semitone_dist or 0.5) * 2.0)
         w = float(self.semitone_dist or 0.5) * 2.0
