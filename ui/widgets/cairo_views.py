@@ -36,14 +36,11 @@ class CairoEditorWidget(QtWidgets.QWidget):
         # Ensure this widget can receive keyboard focus for shortcuts
         self.setFocusPolicy(QtCore.Qt.FocusPolicy.StrongFocus)
         # Apply the dedicated DrawUtil background color to the editor widget, too
-        try:
-            color = Style.get_named_qcolor('editor')
-            pal = self.palette()
-            pal.setColor(QtGui.QPalette.Window, color)
-            self.setPalette(pal)
-            self.setAutoFillBackground(True)
-        except Exception:
-            pass
+        color = Style.get_named_qcolor('editor')
+        pal = self.palette()
+        pal.setColor(QtGui.QPalette.Window, color)
+        self.setPalette(pal)
+        self.setAutoFillBackground(True)
         self._current_tool: str | None = None
         self._editor: Optional[Editor] = None
         self._last_pos: QtCore.QPointF | None = None
@@ -357,29 +354,20 @@ class CairoEditorWidget(QtWidgets.QWidget):
         current = float(getattr(app_state, 'zoom_mm_per_quarter', 25.0) or 25.0)
         factor = (1.10 ** steps)
         new_zoom = max(10.0, min(200.0, current * factor))
-        try:
-            app_state.zoom_mm_per_quarter = float(new_zoom)
-        except Exception:
-            pass
+        app_state.zoom_mm_per_quarter = float(new_zoom)
         if anchor_y_logical_px is not None:
-            try:
-                abs_mm_after = self._editor.time_to_mm(float(anchor_units))
-                new_clip_y_mm = abs_mm_after - (float(anchor_y_logical_px) * float(self._last_dpr) / max(1e-6, float(self._last_px_per_mm)))
-                new_scroll = int(round(new_clip_y_mm * float(self._last_px_per_mm) / max(1e-6, float(self._last_dpr))))
-                new_scroll = max(0, new_scroll)
-                vp_h_px = int(max(1, self.size().height() * float(self._last_dpr)))
-                max_scroll = max(0, int(round((int(self._content_h_px) - vp_h_px) / max(1.0, float(self._last_dpr)))))
-                if new_scroll > max_scroll:
-                    new_scroll = max_scroll
-                if new_scroll != self._scroll_logical_px:
-                    self._scroll_logical_px = new_scroll
-                    self.scrollLogicalPxChanged.emit(new_scroll)
-            except Exception:
-                pass
-        try:
-            self.scrollWheelUsed.emit()
-        except Exception:
-            pass
+            abs_mm_after = self._editor.time_to_mm(float(anchor_units))
+            new_clip_y_mm = abs_mm_after - (float(anchor_y_logical_px) * float(self._last_dpr) / max(1e-6, float(self._last_px_per_mm)))
+            new_scroll = int(round(new_clip_y_mm * float(self._last_px_per_mm) / max(1e-6, float(self._last_dpr))))
+            new_scroll = max(0, new_scroll)
+            vp_h_px = int(max(1, self.size().height() * float(self._last_dpr)))
+            max_scroll = max(0, int(round((int(self._content_h_px) - vp_h_px) / max(1.0, float(self._last_dpr)))))
+            if new_scroll > max_scroll:
+                new_scroll = max_scroll
+            if new_scroll != self._scroll_logical_px:
+                self._scroll_logical_px = new_scroll
+                self.scrollLogicalPxChanged.emit(new_scroll)
+        self.scrollWheelUsed.emit()
         # Repaint; metrics will be recomputed and emitted in paintEvent
         self.update()
 
@@ -613,6 +601,8 @@ class CairoEditorWidget(QtWidgets.QWidget):
                     pass
             if key == QtCore.Qt.Key_Comma:
                 self._editor.hand_cursor = 'l'
+                if hasattr(self._editor, 'refresh_context_toolbar'):
+                    self._editor.refresh_context_toolbar()
                 # Overlay-only guide refresh is enough
                 if hasattr(self, 'request_overlay_refresh'):
                     self.request_overlay_refresh()
@@ -620,6 +610,8 @@ class CairoEditorWidget(QtWidgets.QWidget):
                 return
             if key == QtCore.Qt.Key_Period:
                 self._editor.hand_cursor = 'r'
+                if hasattr(self._editor, 'refresh_context_toolbar'):
+                    self._editor.refresh_context_toolbar()
                 if hasattr(self, 'request_overlay_refresh'):
                     self.request_overlay_refresh()
                 ev.accept()

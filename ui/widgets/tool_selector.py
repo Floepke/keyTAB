@@ -27,7 +27,7 @@ TOOL_ITEMS: list[dict] = [
     { 'name': 'slur',           'displayed_name': 'Slur',           'icon': 'slur',           'tooltip': 'Slur tool. Place phrasing slurs.' },
     { 'name': 'text',           'displayed_name': 'Text',           'icon': 'text',           'tooltip': 'Text tool. Place text annotations.' },
     { 'name': 'barline',        'displayed_name': 'Barline',        'icon': 'repeats',        'tooltip': 'Barline tool. Insert start repeat, end repeat, and double barline symbols at barline positions.' },
-    { 'name': 'dynamic',        'displayed_name': 'Dynamics',       'icon': 'dynamic',        'tooltip': 'Dynamics tool. Insert crescendo (<) and decrescendo (>) hairpins. Select the hairpin type in the toolbar, then left click to place. Drag handles to adjust time and position. Right click a handle to delete.' },
+    { 'name': 'dynamic',        'displayed_name': 'Dynamics',       'icon': 'dynamics',       'tooltip': 'Dynamics tool. Insert crescendo (<) and decrescendo (>) hairpins. Select the hairpin type in the toolbar, then left click to place. Drag handles to adjust time and position. Right click a handle to delete. Double click on a handle to insert a dynamic marking (e.g., p, mf, f).' },
     { 'name': 'pedal',          'displayed_name': 'Pedal',          'icon': 'pedal',          'tooltip': 'Pedal tool. Add pedal markings.' },
 ]
 

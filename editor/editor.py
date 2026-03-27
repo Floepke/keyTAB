@@ -259,10 +259,10 @@ class Editor(QtCore.QObject,
         if self.is_tiny_mode_ultra():
             self._draw_cache = None
             return
-        
+
         # Build shared render cache for this draw pass (fresh each frame)
         self._build_render_cache()
-        
+
         # Call drawer mixin methods in order
         methods = [
             getattr(self, 'draw_snap', None),
@@ -294,6 +294,14 @@ class Editor(QtCore.QObject,
         # Keep render cache available for hit detection until next frame rebuild
         # (cleared at the start of _build_render_cache)
 
+    def refresh_context_toolbar(self) -> None:
+        """Ask ToolManager to rebuild contextual toolbar from current tool state."""
+        try:
+            if self._tm is not None and hasattr(self._tm, 'refresh_context_buttons'):
+                self._tm.refresh_context_buttons()
+        except Exception:
+            pass
+
     def draw_frame(self) -> None:
         """Build a full frame immediately (cache + drawer registration) without painting.
 
@@ -322,7 +330,9 @@ class Editor(QtCore.QObject,
 
     def force_redraw_from_model(self) -> None:
         """Request a full widget repaint from SCORE without prebuilding a duplicate frame."""
-        w = getattr(self, 'widget', None)
+        from ui.widgets.cairo_views import CairoEditorWidget
+        w: CairoEditorWidget = getattr(self, 'widget', None)
+        print("Editor: forcing redraw from model", w)
         if w is not None and hasattr(w, 'force_full_redraw'):
             w.force_full_redraw()
         elif w is not None and hasattr(w, 'update'):
@@ -809,8 +819,17 @@ class Editor(QtCore.QObject,
             # Store cursor mm relative to viewport (local mm)
             abs_mm = self.time_to_mm(float(t))
             self.mm_cursor = abs_mm - float(self._view_y_mm_offset or 0.0)
-            # Also track pitch under cursor (logical px → key number)
-            self.pitch_cursor = self.x_to_pitch(x)
+            # Track pitch under cursor only when X is within the piano key span.
+            # This keeps the preview note hidden while the mouse is out of range.
+            x_mm = float(x) / max(1e-6, self._widget_px_per_mm)
+            if self._x_positions is None:
+                self._rebuild_x_positions()
+            min_x = float(self._x_positions[1])
+            max_x = float(self._x_positions[PIANO_KEY_AMOUNT])
+            if min_x <= x_mm <= max_x:
+                self.pitch_cursor = self.x_to_pitch(x)
+            else:
+                self.pitch_cursor = None
             self._tool.on_mouse_move(x, y)
 
     def mouse_release(self, button: int, x: float, y: float) -> None:

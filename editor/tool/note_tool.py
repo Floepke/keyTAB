@@ -250,15 +250,36 @@ class NoteTool(BaseTool):
     def toolbar_spec(self) -> list[dict]:
         # Two explicit hand selectors for quick switching
         _text, _tip = self._arpeggio_button_text()
+        hand = str(getattr(self._editor, 'hand_cursor', self._hand) or self._hand)
         return [
-            {'name': 'hand_left', 'icon': 'note_left', 'tooltip': 'Click to write left hand notes'},
-            {'name': 'hand_right', 'icon': 'note_right', 'tooltip': 'Click to write right hand notes'},
+            {
+                'name': 'hand_left',
+                'icon': 'note_left',
+                'active': hand == 'l',
+                'tooltip': 'Click to write left hand notes (shortcut: , )',
+            },
+            {
+                'name': 'hand_right',
+                'icon': 'note_right',
+                'active': hand == 'r',
+                'tooltip': 'Click to write right hand notes (shortcut: . )',
+            },
+            {
+                'name': 'selection_left',
+                'icon': 'selection_left',
+                'tooltip': 'Set selected notes to left hand (shortcut: [ )',
+            },
+            {
+                'name': 'selection_right',
+                'icon': 'selection_right',
+                'tooltip': 'Set selected notes to right hand (shortcut: ] )',
+            },
             {
                 'name': 'velocity_toggle',
-                'icon': 'dynamic',
+                'icon': 'velocity',
                 'text': 'Vel',
                 'active': bool(self._velocity_mode),
-                'tooltip': f"Velocity editing is {'on' if self._velocity_mode else 'off'}. Toggle to edit note velocities with margin sliders.",
+                'tooltip': f"Velocity editing is {'on' if self._velocity_mode else 'off'}. Toggle on/off to edit the note velocities using the sliders on the sides of the editor.",
             },
             {
                 'name': 'arpeggio_toggle',
@@ -739,6 +760,16 @@ class NoteTool(BaseTool):
             self._editor.hand_cursor = 'l'
         elif name == 'hand_right':
             self._editor.hand_cursor = 'r'
+        elif name == 'selection_left':
+            try:
+                self._editor.set_selected_notes_hand('l')
+            except Exception:
+                pass
+        elif name == 'selection_right':
+            try:
+                self._editor.set_selected_notes_hand('r')
+            except Exception:
+                pass
         elif name == 'velocity_toggle':
             self._velocity_mode = not self._velocity_mode
             self._velocity_dragging = False

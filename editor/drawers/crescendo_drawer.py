@@ -88,9 +88,9 @@ class CrescendoDrawerMixin:
                 du.add_rectangle(
                     x_mm - handle_r, y_start - handle_r,
                     x_mm + handle_r, y_start + handle_r,
-                    stroke_color=self.accent_color,
+                    stroke_color=(.5, 0.0, 0.0, 1.0),
                     stroke_width_mm=0.5,
-                    fill_color=self.accent_color,
+                    fill_color=(.5, 0.0, 0.0, 1.0),
                     id=ev_id,
                     tags=['crescendo', 'crescendo_handle'],
                 )
@@ -103,9 +103,9 @@ class CrescendoDrawerMixin:
                 du.add_rectangle(
                     x_mm - handle_r, y_end - handle_r,
                     x_mm + handle_r, y_end + handle_r,
-                    stroke_color=self.accent_color,
+                    stroke_color=(.5, 0.0, 0.0, 1.0),
                     stroke_width_mm=0.5,
-                    fill_color=self.accent_color,
+                    fill_color=(.5, 0.0, 0.0, 1.0),
                     id=ev_id,
                     tags=['crescendo', 'crescendo_handle'],
                 )

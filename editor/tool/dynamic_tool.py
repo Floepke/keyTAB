@@ -32,12 +32,14 @@ class DynamicTool(BaseTool):
         return [
             {
                 'name': self._MODE_CRESCENDO,
+                'icon': 'crescendo',
                 'text': '<',
                 'tooltip': 'Crescendo hairpin',
                 'active': self._mode == self._MODE_CRESCENDO,
             },
             {
                 'name': self._MODE_DECRESCENDO,
+                'icon': 'decrescendo',
                 'text': '>',
                 'tooltip': 'Decrescendo hairpin',
                 'active': self._mode == self._MODE_DECRESCENDO,

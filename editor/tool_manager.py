@@ -25,11 +25,8 @@ class ToolManager(QtCore.QObject):
         # Activate new tool
         if self._tool is not None:
             # Provide editor reference for convenience wrappers
-            try:
-                if self._editor is not None and hasattr(self._tool, 'set_editor'):
-                    self._tool.set_editor(self._editor)
-            except Exception:
-                pass
+            if self._editor is not None and hasattr(self._tool, 'set_editor'):
+                self._tool.set_editor(self._editor)
             self._tool.on_activate()
         # Build contextual toolbar after activation so stateful buttons reflect restored tool state.
         defs = tool.toolbar_spec() or []
@@ -46,17 +43,21 @@ class ToolManager(QtCore.QObject):
         if self._tool is not None:
             self._tool.on_toolbar_button(name)
             # Rebuild contextual toolbar to reflect dynamic labels/state.
-            try:
-                defs = self._tool.toolbar_spec() or []
-                self._splitter.set_context_buttons(defs)
-            except Exception:
-                pass
+            defs = self._tool.toolbar_spec() or []
+            self._splitter.set_context_buttons(defs)
         # Force immediate visual feedback after any contextual button
         if self._editor is not None:
             if hasattr(self._editor, 'force_redraw_from_model'):
                 self._editor.force_redraw_from_model()
             elif hasattr(self._editor, 'draw_frame'):
                 self._editor.draw_frame()
+
+    def refresh_context_buttons(self) -> None:
+        """Rebuild contextual toolbar from current tool state."""
+        if self._tool is None:
+            return
+        defs = self._tool.toolbar_spec() or []
+        self._splitter.set_context_buttons(defs)
 
     def set_editor(self, editor) -> None:
         """Bind the active Editor so tools can access conversion wrappers."""

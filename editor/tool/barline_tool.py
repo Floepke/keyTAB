@@ -4,7 +4,7 @@ from typing import Optional
 
 from editor.tool.base_tool import BaseTool
 from file_model.base_grid import resolve_grid_layer_offsets
-from utils.CONSTANT import QUARTER_NOTE_UNIT
+from utils.CONSTANT import QUARTER_NOTE_UNIT, SHORTEST_DURATION
 from utils.operator import Operator
 
 
@@ -35,6 +35,7 @@ class BarlineTool(BaseTool):
             },
             {
                 "name": self._MODE_DOUBLE,
+                "icon": "double_bar",
                 "text": "d",
                 "tooltip": "Insert double barline symbol",
                 "active": self._mode == self._MODE_DOUBLE,
@@ -104,18 +105,6 @@ class BarlineTool(BaseTool):
         else:
             score.new_double_bar(time=float(t))
 
-    def _time_tol(self) -> float:
-        if self._editor is None:
-            return 1e-6
-        score = self._editor.current_score()
-        snap_units = max(1e-6, float(getattr(self._editor, "snap_size_units", QUARTER_NOTE_UNIT) or QUARTER_NOTE_UNIT))
-        try:
-            zpq = float(getattr(score.app_state, "zoom_mm_per_quarter", 25.0) or 25.0)
-            mm_tol_ticks = (3.0 / max(1e-6, zpq)) * float(QUARTER_NOTE_UNIT)
-        except Exception:
-            mm_tol_ticks = snap_units * 0.2
-        return max(1e-6, min(snap_units * 0.45, max(mm_tol_ticks, 1e-3)))
-
     def on_left_click(self, x: float, y: float) -> None:
         if self._editor is None:
             return
@@ -124,7 +113,7 @@ class BarlineTool(BaseTool):
         t_bar = self._nearest_barline_time(t_click)
         if t_bar is None:
             return
-        op = Operator(self._time_tol())
+        op = Operator(SHORTEST_DURATION)
         for ev in self._event_list(score):
             if op.eq(float(getattr(ev, "time", 0.0) or 0.0), float(t_bar)):
                 return
@@ -143,7 +132,7 @@ class BarlineTool(BaseTool):
         t_bar = self._nearest_barline_time(t_click)
         if t_bar is None:
             return
-        op = Operator(self._time_tol())
+        op = Operator(SHORTEST_DURATION)
         removed = False
 
         # Right-click is global delete for any barline symbol type at this position.
@@ -164,6 +153,8 @@ class BarlineTool(BaseTool):
 
         if not removed:
             return
+
+        # ctlz snapshot with coalescing to merge multiple deletes in the same area into one undo step
         self._editor._snapshot_if_changed(coalesce=False, label="barline_symbol_delete")
         if hasattr(self._editor, "force_redraw_from_model"):
             self._editor.force_redraw_from_model()
