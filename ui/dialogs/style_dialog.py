@@ -855,10 +855,7 @@ class StyleDialog(QtWidgets.QDialog):
             combo = QtWidgets.QComboBox(self)
             options = [str(a) for a in args]
             combo.addItems(options)
-            try:
-                combo.setCurrentText(str(value))
-            except Exception:
-                pass
+            combo.setCurrentText(str(value))
             return combo
 
         if field_type is bool:
@@ -870,11 +867,8 @@ class StyleDialog(QtWidgets.QDialog):
             sb = QtWidgets.QSpinBox(self)
             sb.setRange(-1000000, 1000000)
             sb.setValue(int(value))
-            try:
-                # Ensure immediate updates while typing
-                sb.setKeyboardTracking(True)
-            except Exception:
-                pass
+            # Ensure immediate updates while typing
+            sb.setKeyboardTracking(True)
             return sb
 
         if field_type is float:
@@ -921,10 +915,7 @@ class StyleDialog(QtWidgets.QDialog):
             editor.stateChanged.connect(lambda _v: self.values_changed.emit())
         elif isinstance(editor, QtWidgets.QSpinBox):
             editor.valueChanged.connect(lambda _v: self.values_changed.emit())
-            try:
-                editor.editingFinished.connect(lambda: self.values_changed.emit())
-            except Exception:
-                pass
+            editor.editingFinished.connect(lambda: self.values_changed.emit())
         elif isinstance(editor, FloatSliderEdit):
             editor.valueChanged.connect(lambda _v: self.values_changed.emit())
         elif isinstance(editor, FontPicker):
@@ -942,11 +933,8 @@ class StyleDialog(QtWidgets.QDialog):
         label = QtWidgets.QLabel("Apply family to all fonts:", self)
         combo = QtWidgets.QFontComboBox(self)
         self._all_fonts_combo = combo
-        try:
-            font_title = getattr(self._layout, 'font_title', LayoutFont())
-            combo.setCurrentFont(QtGui.QFont(str(font_title.family)))
-        except Exception:
-            pass
+        font_title = getattr(self._layout, 'font_title', LayoutFont())
+        combo.setCurrentFont(QtGui.QFont(str(font_title.family)))
         combo.currentFontChanged.connect(lambda f: self._set_all_font_families(f.family()))
         try:
             form.insertRow(0, label, combo)
@@ -961,10 +949,7 @@ class StyleDialog(QtWidgets.QDialog):
                 editor.blockSignals(True)
                 editor.set_family(family)
                 editor.blockSignals(False)
-                try:
-                    editor.valueChanged.emit()
-                except Exception:
-                    pass
+                editor.valueChanged.emit()
         self.values_changed.emit()
 
     def _set_editor_value(self, editor: QtWidgets.QWidget, field_type: Any, value: Any) -> None:
@@ -973,43 +958,25 @@ class StyleDialog(QtWidgets.QDialog):
         if isinstance(editor, QtWidgets.QCheckBox):
             editor.setChecked(bool(value))
         elif isinstance(editor, QtWidgets.QSpinBox):
-            try:
-                editor.setValue(int(value))
-            except Exception:
-                pass
+            editor.setValue(int(value))
         elif isinstance(editor, FloatSliderEdit):
-            try:
-                editor.set_value(float(value))
-            except Exception:
-                pass
+            editor.set_value(float(value))
         elif isinstance(editor, FontPicker):
-            try:
-                # Convert dict payloads to LayoutFont when loading from appdata
-                if isinstance(value, dict):
-                    try:
-                        value = LayoutFont(**value)
-                    except Exception:
-                        pass
-                editor.set_value(value)
-            except Exception:
-                pass
+            # Convert dict payloads to LayoutFont when loading from appdata
+            if isinstance(value, dict):
+                value = LayoutFont(**value)
+            editor.set_value(value)
         elif isinstance(editor, ColorPickerEdit):
             editor.set_value(str(value or ''))
         elif origin is list and args and args[0] is float and isinstance(editor, QtWidgets.QLineEdit):
             editor.setText(self._format_float_list(value))
         elif isinstance(editor, QtWidgets.QComboBox):
-            try:
-                editor.setCurrentText(str(value))
-            except Exception:
-                pass
+            editor.setCurrentText(str(value))
         elif isinstance(editor, QtWidgets.QLineEdit):
             editor.setText(str(value) if value is not None else "")
 
     def _save_style_to_disk(self) -> None:
-        try:
-            name, ok = QtWidgets.QInputDialog.getText(self, "Save Style", "Style name (no extension):")
-        except Exception:
-            return
+        name, ok = QtWidgets.QInputDialog.getText(self, "Save Style", "Enter your custom style name here:")
         if not ok:
             return
         stem = str(name or "").strip()
