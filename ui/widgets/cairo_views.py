@@ -49,17 +49,11 @@ class CairoEditorWidget(QtWidgets.QWidget):
         self._last_sent_pos: QtCore.QPointF | None = None
         self._move_timer: QtCore.QTimer | None = QtCore.QTimer(self)
         self._fps_interval_ms: int = 33
-        try:
-            self._move_timer.setTimerType(QtCore.Qt.TimerType.PreciseTimer)
-            self._move_timer.setInterval(self._fps_interval_ms)  # default ~30 FPS
-            self._move_timer.timeout.connect(self._dispatch_throttled_move)
-        except Exception:
-            pass
+        self._move_timer.setTimerType(QtCore.Qt.TimerType.PreciseTimer)
+        self._move_timer.setInterval(self._fps_interval_ms)  # default ~30 FPS
+        self._move_timer.timeout.connect(self._dispatch_throttled_move)
         # Load FPS limit from preferences
-        try:
-            self._configure_move_timer_from_prefs()
-        except Exception:
-            pass
+        self._configure_move_timer_from_prefs()
         self._du: DrawUtil | None = None
         self._last_px_per_mm: float = 1.0
         self._last_dpr: float = 1.0
@@ -88,20 +82,14 @@ class CairoEditorWidget(QtWidgets.QWidget):
 
         Sets a hint to reuse cached content and redraw only guides on next paint.
         """
-        try:
-            self._overlay_only_repaint = True
-        except Exception:
-            pass
+        self._overlay_only_repaint = True
         self.update()
 
     def force_full_redraw(self) -> None:
         """Invalidate cached content and request a full repaint from the model."""
-        try:
-            self._content_cache_image = None
-            self._content_cache_key = None
-            self._overlay_only_repaint = False
-        except Exception:
-            pass
+        self._content_cache_image = None
+        self._content_cache_key = None
+        self._overlay_only_repaint = False
         self.update()
 
     def set_tool(self, tool_name: str | None) -> None:
@@ -186,46 +174,31 @@ class CairoEditorWidget(QtWidgets.QWidget):
         # Static viewport: tiling disabled and not used
 
         # Emit metrics so a container can configure an external scrollbar
-        try:
-            self.viewportMetricsChanged.emit(h_px_content, vis_h_px, px_per_mm, dpr)
-        except Exception:
-            print('CairoEditorWidget.paintEvent: Warning: failed to emit viewportMetricsChanged')
+        self.viewportMetricsChanged.emit(h_px_content, vis_h_px, px_per_mm, dpr)
         
         # Provide view metrics to the editor for fast px↔mm/time conversions
-        try:
-            if self._editor is not None:
-                widget_px_per_mm = float(vis_w_px) / max(1e-6, page_w_mm) / max(1e-6, dpr)
-                self._editor.set_view_metrics(px_per_mm, widget_px_per_mm, dpr)
-                # Provide current clip origin offset and viewport height in mm so drawers can cull
-                self._editor.set_view_offset_mm(clip_y_mm)
-                try:
-                    self._editor.set_viewport_height_mm(clip_h_mm)
-                except Exception:
-                    pass
-                # Recompute cursor from last mouse position so guides follow scroll
-                if self._last_pos is not None:
-                    try:
-                        t = self._editor.y_to_time(self._last_pos.y())
-                        t = self._editor.snap_time(t)
-                        self._editor.time_cursor = t
-                        abs_mm = self._editor.time_to_mm(float(t))
-                        self._editor.mm_cursor = abs_mm - float(getattr(self._editor, '_view_y_mm_offset', 0.0) or 0.0)
-                    except Exception:
-                        pass
-        except Exception:
-            pass
+        if self._editor is not None:
+            widget_px_per_mm = float(vis_w_px) / max(1e-6, page_w_mm) / max(1e-6, dpr)
+            self._editor.set_view_metrics(px_per_mm, widget_px_per_mm, dpr)
+            # Provide current clip origin offset and viewport height in mm so drawers can cull
+            self._editor.set_view_offset_mm(clip_y_mm)
+            self._editor.set_viewport_height_mm(clip_h_mm)
+            # Recompute cursor from last mouse position so guides follow scroll
+            if self._last_pos is not None and self._editor is not None:
+                t = self._editor.y_to_time(self._last_pos.y())
+                t = self._editor.snap_time(t)
+                self._editor.time_cursor = t
+                abs_mm = self._editor.time_to_mm(float(t))
+                self._editor.mm_cursor = abs_mm - float(getattr(self._editor, '_view_y_mm_offset', 0.0) or 0.0)
 
         # Compute a stable cache key for the current content viewport
         cache_key = (round(px_per_mm, 6), round(dpr, 3), vis_w_px, vis_h_px,
                      round(clip_x_mm, 3), round(clip_y_mm, 3), round(clip_w_mm, 3), round(clip_h_mm, 3))
 
         painter = QtGui.QPainter(self)
-        try:
-            painter.setRenderHint(QtGui.QPainter.RenderHint.Antialiasing, True)
-            painter.setRenderHint(QtGui.QPainter.RenderHint.TextAntialiasing, True)
-            painter.setRenderHint(QtGui.QPainter.RenderHint.SmoothPixmapTransform, True)
-        except Exception:
-            print('CairoEditorWidget.paintEvent: Warning: failed to set QPainter render hints')
+        painter.setRenderHint(QtGui.QPainter.RenderHint.Antialiasing, True)
+        painter.setRenderHint(QtGui.QPainter.RenderHint.TextAntialiasing, True)
+        painter.setRenderHint(QtGui.QPainter.RenderHint.SmoothPixmapTransform, True)
         try:
             # Use a pure viewport clip rect (no bleed). Overscan applied only inside DrawUtil if needed.
             clip_mm = (clip_x_mm, clip_y_mm, clip_w_mm, clip_h_mm)
@@ -240,10 +213,7 @@ class CairoEditorWidget(QtWidgets.QWidget):
                 if content_alpha > 0.0:
                     if content_alpha < 0.999:
                         painter.save()
-                        try:
-                            painter.setOpacity(content_alpha)
-                        except Exception:
-                            pass
+                        painter.setOpacity(content_alpha)
                         painter.drawImage(QtCore.QRectF(0.0, 0.0, float(vp_w), float(vp_h)), content_img)
                         painter.restore()
                     else:
@@ -254,17 +224,11 @@ class CairoEditorWidget(QtWidgets.QWidget):
                 du_guides.set_line_width_factor(EDITOR_LINE_WIDTH_FACTOR)
                 du_guides.set_current_page_size_mm(page_w_mm, page_h_mm)
                 if self._editor is not None:
-                    try:
-                        self._editor.draw_guides(du_guides)
-                    except Exception:
-                        pass
+                    self._editor.draw_guides(du_guides)
                 # Offscreen buffer for overlays
                 ov_img, ov_surf, _ov_buf = make_image_surface(vis_w_px, vis_h_px)
                 ov_ctx = cairo.Context(ov_surf)
-                try:
-                    ov_ctx.set_antialias(cairo.ANTIALIAS_BEST)
-                except Exception:
-                    pass
+                ov_ctx.set_antialias(cairo.ANTIALIAS_BEST)
                 du_guides.render_to_cairo(ov_ctx, du_guides.current_page_index(), px_per_mm, clip_mm, overscan_mm=0.0)
                 ov_img_detached = finalize_image_surface(ov_img, device_pixel_ratio=dpr)
                 painter.drawImage(QtCore.QRectF(0.0, 0.0, float(vp_w), float(vp_h)), ov_img_detached)
@@ -281,10 +245,7 @@ class CairoEditorWidget(QtWidgets.QWidget):
                     # Rasterize content to cache image
                     c_img, c_surf, _c_buf = make_image_surface(vis_w_px, vis_h_px)
                     c_ctx = cairo.Context(c_surf)
-                    try:
-                        c_ctx.set_antialias(cairo.ANTIALIAS_BEST)
-                    except Exception:
-                        print('CairoEditorWidget.paintEvent: Warning: failed to set antialiasing mode')
+                    c_ctx.set_antialias(cairo.ANTIALIAS_BEST)
                     du_content.render_to_cairo(c_ctx, du_content.current_page_index(), px_per_mm, clip_mm, overscan_mm=0.0)
                     c_img_detached = finalize_image_surface(c_img, device_pixel_ratio=dpr)
                     # Cache the content layer for overlay-only repaints
@@ -292,10 +253,7 @@ class CairoEditorWidget(QtWidgets.QWidget):
                     self._content_cache_key = cache_key
                     if content_alpha < 0.999:
                         painter.save()
-                        try:
-                            painter.setOpacity(content_alpha)
-                        except Exception:
-                            pass
+                        painter.setOpacity(content_alpha)
                         painter.drawImage(QtCore.QRectF(0.0, 0.0, float(vp_w), float(vp_h)), c_img_detached)
                         painter.restore()
                     else:
@@ -306,27 +264,13 @@ class CairoEditorWidget(QtWidgets.QWidget):
                 du_guides.set_line_width_factor(EDITOR_LINE_WIDTH_FACTOR)
                 du_guides.set_current_page_size_mm(page_w_mm, page_h_mm)
                 if self._editor is not None:
-                    try:
-                        self._editor.draw_guides(du_guides)
-                    except Exception:
-                        pass
+                    self._editor.draw_guides(du_guides)
                 g_img, g_surf, _g_buf = make_image_surface(vis_w_px, vis_h_px)
                 g_ctx = cairo.Context(g_surf)
-                try:
-                    g_ctx.set_antialias(cairo.ANTIALIAS_BEST)
-                except Exception:
-                    pass
+                g_ctx.set_antialias(cairo.ANTIALIAS_BEST)
                 du_guides.render_to_cairo(g_ctx, du_guides.current_page_index(), px_per_mm, clip_mm, overscan_mm=0.0)
                 g_img_detached = finalize_image_surface(g_img, device_pixel_ratio=dpr)
                 painter.drawImage(QtCore.QRectF(0.0, 0.0, float(vp_w), float(vp_h)), g_img_detached)
-
-            # Optional viewport debug overlay: draw a red border around viewport
-            if os.getenv('PIANOSCRIPT_DEBUG_VIEWPORT', '0') in ('1', 'true', 'True'):
-                pen = QtGui.QPen(QtGui.QColor(220, 40, 40))
-                pen.setWidth(1)
-                painter.setPen(pen)
-                painter.setBrush(QtGui.QBrush())
-                painter.drawRect(QtCore.QRectF(0.5, 0.5, float(vp_w) - 1.0, float(vp_h) - 1.0))
         finally:
             painter.end()
         # Reset the overlay-only hint after a paint pass
@@ -344,15 +288,12 @@ class CairoEditorWidget(QtWidgets.QWidget):
             return
         anchor_units = getattr(self._editor, 'time_cursor', None)
         anchor_y_logical_px = None
-        if anchor_units is not None:
-            try:
-                abs_mm_before = self._editor.time_to_mm(float(anchor_units))
-                clip_y_mm = float(self._scroll_logical_px) * float(self._last_dpr) / max(1e-6, float(self._last_px_per_mm))
-                anchor_y_logical_px = (abs_mm_before - clip_y_mm) * (float(self._last_px_per_mm) / max(1e-6, float(self._last_dpr)))
-            except Exception:
-                anchor_y_logical_px = None
+        if anchor_units is not None and self._editor is not None:
+            abs_mm_before = self._editor.time_to_mm(float(anchor_units))
+            clip_y_mm = float(self._scroll_logical_px) * float(self._last_dpr) / max(1e-6, float(self._last_px_per_mm))
+            anchor_y_logical_px = (abs_mm_before - clip_y_mm) * (float(self._last_px_per_mm) / max(1e-6, float(self._last_dpr)))
         current = float(getattr(app_state, 'zoom_mm_per_quarter', 25.0) or 25.0)
-        factor = (1.10 ** steps)
+        factor = (1.05 ** steps)
         new_zoom = max(10.0, min(200.0, current * factor))
         app_state.zoom_mm_per_quarter = float(new_zoom)
         if anchor_y_logical_px is not None:
@@ -413,15 +354,13 @@ class CairoEditorWidget(QtWidgets.QWidget):
         self._last_pos = ev.position()
         self._last_sent_pos = ev.position()
         # Update modifier state on editor (Shift/Ctrl tracking)
-        try:
-            mods = ev.modifiers()
-            shift_down = bool(mods & QtCore.Qt.KeyboardModifier.ShiftModifier)
-            ctrl_down = bool(mods & QtCore.Qt.KeyboardModifier.ControlModifier)
-            if self._editor is not None:
-                self._editor.set_shift_down(shift_down)
-                self._editor.set_ctrl_down(ctrl_down)
-        except Exception:
-            pass
+        mods = ev.modifiers()
+            
+        shift_down = bool(mods & QtCore.Qt.KeyboardModifier.ShiftModifier)
+        ctrl_down = bool(mods & QtCore.Qt.KeyboardModifier.ControlModifier)
+        if self._editor is not None:
+            self._editor.set_shift_down(shift_down)
+            self._editor.set_ctrl_down(ctrl_down)
         # On content changes, invalidate cached content
         self._content_cache_image = None
         self._content_cache_key = None
@@ -445,15 +384,12 @@ class CairoEditorWidget(QtWidgets.QWidget):
         # Always record last raw position
         self._last_pos = ev.position()
         # Update modifier state continuously during drag/move
-        try:
-            mods = ev.modifiers()
-            shift_down = bool(mods & QtCore.Qt.KeyboardModifier.ShiftModifier)
-            ctrl_down = bool(mods & QtCore.Qt.KeyboardModifier.ControlModifier)
-            if self._editor is not None:
-                self._editor.set_shift_down(shift_down)
-                self._editor.set_ctrl_down(ctrl_down)
-        except Exception:
-            pass
+        mods = ev.modifiers()
+        shift_down = bool(mods & QtCore.Qt.KeyboardModifier.ShiftModifier)
+        ctrl_down = bool(mods & QtCore.Qt.KeyboardModifier.ControlModifier)
+        if self._editor is not None:
+            self._editor.set_shift_down(shift_down)
+            self._editor.set_ctrl_down(ctrl_down)
         # Coalesce moves and dispatch at most 30 times/sec
         self._pending_move = ev.position()
         try:
