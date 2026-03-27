@@ -18,6 +18,7 @@ TOOL_ITEMS: list[dict] = [
     { 'name': 'note',           'displayed_name': 'Note',           'icon': 'note',           'tooltip': 'Note tool. Enter and edit notes. To edit duration, click and drag on a colored midi-rectangle and move down/up. To edit pitch+time, click and drag on the notehead. To delete, right click on a note.' },
     { 'name': 'grace_note',     'displayed_name': 'Grace Note',     'icon': 'grace_note',     'tooltip': 'Grace Note tool. Enter small ornamental notes without normal rhythmic duration. Use this for trills, mordents, and similar decorations. Click in empty space to add. Drag on existing grace note to edit time+pitch. Right click to delete.' },
     { 'name': 'count_line',     'displayed_name': 'Count Line',     'icon': 'count_line',     'tooltip': 'Count Line tool. Draw guide lines to highlight rhythmic grid subdivisions. Left click on empty space to add. Drag on a handle to edit. Right click on a handle to delete.' },
+    { 'name': 'dynamic',        'displayed_name': 'Dynamics',       'icon': 'dynamics',       'tooltip': 'Dynamics tool. Insert crescendo (<) and decrescendo (>) hairpins. Select the hairpin type in the toolbar, then left click to place. Drag handles to adjust time and position. Right click a handle to delete. Double click on a handle to insert a dynamic marking (e.g., p, mf, f).' },
     { 'name': 'beam',           'displayed_name': 'Beam Grouping',  'icon': 'beam',           'tooltip': 'Beam Grouping tool. Overwrite the default time signature beam grouping by placing beam markers. Click/drag to the left/right of the clef to add/edit for left/right hand. Right click left/right of the clef in a marker time range to delete. ' },
     # layout elements
     { 'name': 'line_break',     'displayed_name': 'Line/Page Break','icon': 'line_break',     'tooltip': 'Line/Page Break tool. Insert system or page breaks. Click an existing break to edit its properties.' },
@@ -27,7 +28,6 @@ TOOL_ITEMS: list[dict] = [
     { 'name': 'slur',           'displayed_name': 'Slur',           'icon': 'slur',           'tooltip': 'Slur tool. Place phrasing slurs.' },
     { 'name': 'text',           'displayed_name': 'Text',           'icon': 'text',           'tooltip': 'Text tool. Place text annotations.' },
     { 'name': 'barline',        'displayed_name': 'Barline',        'icon': 'repeats',        'tooltip': 'Barline tool. Insert start repeat, end repeat, and double barline symbols at barline positions.' },
-    { 'name': 'dynamic',        'displayed_name': 'Dynamics',       'icon': 'dynamics',       'tooltip': 'Dynamics tool. Insert crescendo (<) and decrescendo (>) hairpins. Select the hairpin type in the toolbar, then left click to place. Drag handles to adjust time and position. Right click a handle to delete. Double click on a handle to insert a dynamic marking (e.g., p, mf, f).' },
     { 'name': 'pedal',          'displayed_name': 'Pedal',          'icon': 'pedal',          'tooltip': 'Pedal tool. Add pedal markings.' },
 ]
 

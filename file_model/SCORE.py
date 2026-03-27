@@ -94,9 +94,24 @@ def _apply_legacy_conversion(data: dict) -> dict:
 	"""Apply legacy file conversions (fail-open)."""
 	try:
 		from scripts.old_file_conversion import convert_legacy_piano_data
-		return convert_legacy_piano_data(data)
+		data = convert_legacy_piano_data(data)
 	except Exception:
-		return data
+		pass
+
+	# Layout key migration: dynamic symbol background padding rename.
+	try:
+		if isinstance(data, dict):
+			layout = data.get('layout', None)
+			if isinstance(layout, dict):
+				if 'dynamic_symbol_background_padding_mm' not in layout:
+					if 'dynamic_symbol_background_padding' in layout:
+						layout['dynamic_symbol_background_padding_mm'] = layout.get('dynamic_symbol_background_padding')
+					elif 'dynamic_background_padding' in layout:
+						layout['dynamic_symbol_background_padding_mm'] = layout.get('dynamic_background_padding')
+	except Exception:
+		pass
+
+	return data
 
 
 def _merge_with_defaults(dc_type, incoming: dict, context: str, skip_keys: set = {'id', '_id'}) -> dict:
@@ -298,14 +313,14 @@ class SCORE:
 		return obj
 
 	def new_crescendo(self, **kwargs) -> Crescendo:
-		base = {'time': 0.0, 'duration': 256.0, 'x_rpitch': 0}
+		base = {'time': 0.0, 'duration': 256.0, 'x_rpitch': 0, 'start_text': '', 'end_text': ''}
 		base.update(kwargs)
 		obj = Crescendo(**base, _id=self._gen_id())
 		self.events.crescendo.append(obj)
 		return obj
 
 	def new_decrescendo(self, **kwargs) -> Decrescendo:
-		base = {'time': 0.0, 'duration': 256.0, 'x_rpitch': 0}
+		base = {'time': 0.0, 'duration': 256.0, 'x_rpitch': 0, 'start_text': '', 'end_text': ''}
 		base.update(kwargs)
 		obj = Decrescendo(**base, _id=self._gen_id())
 		self.events.decrescendo.append(obj)

@@ -221,6 +221,7 @@ class DrawUtil:
                       fill_color: Optional[Color] = None,
                       dash_pattern: Optional[Sequence[float]] = None,
                       dash_offset_mm: float = 0.0,
+                      corner_radius: Optional[float] = None,
                       id: int = 0,
                       tags: Optional[List[str]] = None,
                       hit_rect_mm: Optional[Tuple[float, float, float, float]] = None) -> None:
@@ -246,7 +247,61 @@ class DrawUtil:
 
         if hit_rect_mm is None:
             hit_rect_mm = (rx, ry, rw, rh)
+
+        radius = None
+        if corner_radius is not None:
+            try:
+                radius = max(0.0, float(corner_radius))
+            except Exception:
+                radius = 0.0
+
+        # Rounded corners are emitted as a polygon so this can be reused by all callers.
+        if radius is not None and radius > 0.0 and rw > 0.0 and rh > 0.0:
+            r = min(radius, rw * 0.5, rh * 0.5)
+            points = self._rounded_rect_points(rx, ry, rw, rh, r, points_per_corner=20)
+            self._pages[self._current_index].items.append(Polyline(points, True, stroke, fill, id, tags, hit_rect_mm))
+            return
+
         self._pages[self._current_index].items.append(Rect(rx, ry, rw, rh, stroke, fill, id, tags, hit_rect_mm))
+
+    def _rounded_rect_points(
+        self,
+        x_mm: float,
+        y_mm: float,
+        w_mm: float,
+        h_mm: float,
+        r_mm: float,
+        points_per_corner: int = 20,
+    ) -> List[Tuple[float, float]]:
+        """Return polygon points for a rounded rectangle.
+
+        Uses quarter-circle interpolation with `points_per_corner` samples per corner.
+        """
+        ppc = max(2, int(points_per_corner))
+        x0 = float(x_mm)
+        y0 = float(y_mm)
+        x1 = x0 + float(w_mm)
+        y1 = y0 + float(h_mm)
+        r = max(0.0, float(r_mm))
+        r = min(r, float(w_mm) * 0.5, float(h_mm) * 0.5)
+        if r <= 0.0:
+            return [(x0, y0), (x1, y0), (x1, y1), (x0, y1)]
+
+        def arc(cx: float, cy: float, a0: float, a1: float) -> List[Tuple[float, float]]:
+            out: List[Tuple[float, float]] = []
+            for i in range(ppc):
+                t = float(i) / float(ppc - 1)
+                a = a0 + (a1 - a0) * t
+                out.append((cx + (r * math.cos(a)), cy + (r * math.sin(a))))
+            return out
+
+        pts: List[Tuple[float, float]] = []
+        # Top-right, bottom-right, bottom-left, top-left (clockwise)
+        pts.extend(arc(x1 - r, y0 + r, -math.pi * 0.5, 0.0))
+        pts.extend(arc(x1 - r, y1 - r, 0.0, math.pi * 0.5)[1:])
+        pts.extend(arc(x0 + r, y1 - r, math.pi * 0.5, math.pi)[1:])
+        pts.extend(arc(x0 + r, y0 + r, math.pi, math.pi * 1.5)[1:])
+        return pts
 
     def add_oval(self,
                  x1_mm: float,

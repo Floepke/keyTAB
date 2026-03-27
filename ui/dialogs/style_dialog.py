@@ -538,6 +538,9 @@ class StyleDialog(QtWidgets.QDialog):
             # Hairpin
             'hairpin_line_width_mm': 'Hairpin',
             'hairpin_spread_mm': 'Hairpin',
+            'hairpin_text_size_pt': 'Hairpin',
+            'hairpin_text_gap_mm': 'Hairpin',
+            'dynamic_symbol_background_padding_mm': 'Hairpin',
             # Pedal
             'pedal_lane_width_mm': 'Pedal',
             # Grace note
@@ -761,6 +764,12 @@ class StyleDialog(QtWidgets.QDialog):
     def _layout_from_dict(self, data: dict) -> Layout:
         if not isinstance(data, dict):
             raise ValueError("Invalid style payload")
+        data = dict(data)
+        if 'dynamic_symbol_background_padding_mm' not in data:
+            if 'dynamic_symbol_background_padding' in data:
+                data['dynamic_symbol_background_padding_mm'] = data.get('dynamic_symbol_background_padding')
+            elif 'dynamic_background_padding' in data:
+                data['dynamic_symbol_background_padding_mm'] = data.get('dynamic_background_padding')
         # Coerce known LayoutFont fields back to dataclasses to keep typing consistent
         fixed: dict[str, Any] = {}
         defaults = Layout()

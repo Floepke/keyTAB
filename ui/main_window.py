@@ -551,9 +551,9 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def _create_menus(self) -> None:
         menubar = self.menuBar()
-        # Ensure macOS uses the native system menubar
+        # Keep menu inside the app window on macOS.
         if sys.platform == "darwin":
-            menubar.setNativeMenuBar(True)
+            menubar.setNativeMenuBar(False)
 
         # Create menus in normal left-to-right order (File, Edit, Selection, Document, Tools, View, Playback, About)
         file_menu = menubar.addMenu("&File")

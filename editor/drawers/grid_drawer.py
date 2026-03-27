@@ -410,7 +410,7 @@ class GridDrawerMixin:
                 _draw_barline_constructive(
                     float(t),
                     (bar_width_mm * 3.0) if is_last else bar_width_mm,
-                    ["end_barline" if is_last else "barline"],
+                    (["barline", "end_barline"] if is_last else ["barline"]),
                 )
 
         if barline_visible and bool(getattr(layout, 'double_bar_visible', True)) and layout is not None:

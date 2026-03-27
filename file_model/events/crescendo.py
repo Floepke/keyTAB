@@ -12,4 +12,6 @@ class Crescendo:
     time: float = 0.0
     duration: float = 256.0
     x_rpitch: int = 0
+    start_text: str = ""
+    end_text: str = ""
     _id: int = 0

@@ -177,6 +177,8 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
             'duration': dur,
             'end': t0 + dur,
             'x_rpitch': float(ev.get('x_rpitch', 0) or 0),
+            'start_text': str(ev.get('start_text', '') or ''),
+            'end_text': str(ev.get('end_text', '') or ''),
             'id': int(ev.get('_id', 0) or 0),
             'idx': int(idx),
         })
@@ -194,6 +196,8 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
             'duration': dur,
             'end': t0 + dur,
             'x_rpitch': float(ev.get('x_rpitch', 0) or 0),
+            'start_text': str(ev.get('start_text', '') or ''),
+            'end_text': str(ev.get('end_text', '') or ''),
             'id': int(ev.get('_id', 0) or 0),
             'idx': int(idx),
         })
@@ -2952,84 +2956,181 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
             if bool(layout.get('hairpin_visible', True)) and (line_crescendos or line_decrescendos):
                 hairpin_w = float(layout.get('hairpin_line_width_mm', 0.5) or 0.5) * scale
                 hairpin_spread = float(layout.get('hairpin_spread_mm', 5.0) or 5.0) * scale
+                text_size_pt = float(layout.get('hairpin_text_size_pt', 12.0) or 12.0)
+                text_gap = float(layout.get('hairpin_text_gap_mm', 1.2) or 1.2) * scale
+                dynamic_bg_pad = float(
+                    layout.get(
+                        'dynamic_symbol_background_padding_mm',
+                        layout.get('dynamic_symbol_background_padding', layout.get('dynamic_background_padding', layout.get('text_background_padding_mm', 0.5))),
+                    ) or 0.0
+                ) * scale
+                text_family = 'LelandText'
+                text_color = notation_color
+                eps = 1e-6
+                all_hairpins = list(norm_crescendos) + list(norm_decrescendos)
 
-                def _clip_progress(hp: dict) -> tuple[float, float, float, float] | None:
-                    hp_start = float(hp.get('time', 0.0) or 0.0)
-                    hp_end = float(hp.get('end', hp_start) or hp_start)
-                    hp_dur = max(1e-6, float(hp.get('duration', hp_end - hp_start) or (hp_end - hp_start)))
-                    seg_start = max(hp_start, float(line_start))
-                    seg_end = min(hp_end, float(line_end))
+                def _text_w_mm(txt: str) -> float:
+                    if not txt:
+                        return 0.0
+                    try:
+                        _xb, _yb, w, _h = du._get_text_extents_mm(txt, text_family, text_size_pt, False, False)
+                        return float(max(0.0, w))
+                    except Exception:
+                        return max(1.0, (text_size_pt / 72.0) * 25.4)
+
+                def _text_h_mm(txt: str) -> float:
+                    if not txt:
+                        return 0.0
+                    try:
+                        _xb, _yb, _w, h = du._get_text_extents_mm(txt, text_family, text_size_pt, False, False)
+                        return float(max(0.0, h))
+                    except Exception:
+                        return max(1.0, (text_size_pt / 72.0) * 25.4 * 0.8)
+
+                def _draw_text_centered_at(xc_mm: float, yc_mm: float, txt: str, ev_id: int, ev_tags: list[str]) -> None:
+                    if not txt:
+                        return
+                    try:
+                        xb, yb, w, h = du._get_text_extents_mm(txt, text_family, text_size_pt, False, False)
+                    except Exception:
+                        xb, yb, w, h = 0.0, 0.0, _text_w_mm(txt), _text_h_mm(txt)
+                    bx = float(xc_mm) - (float(xb) + (float(w) * 0.5))
+                    by = float(yc_mm) - (float(yb) + (float(h) * 0.5))
+
+                    # Paper knockout behind dynamic symbols for readability.
+                    rx = bx + float(xb)
+                    ry = by + float(yb)
+                    du.add_rectangle(
+                        rx - dynamic_bg_pad,
+                        ry - dynamic_bg_pad,
+                        rx + float(w) + dynamic_bg_pad,
+                        ry + float(h) + dynamic_bg_pad,
+                        stroke_color=None,
+                        fill_color=paper_color,
+                        id=ev_id,
+                        tags=ev_tags + ['dynamic_text_bg'],
+                    )
+
+                    du.add_text(
+                        bx,
+                        by,
+                        txt,
+                        family=text_family,
+                        size_pt=text_size_pt,
+                        italic=False,
+                        bold=False,
+                        color=text_color,
+                        anchor=None,
+                        id=ev_id,
+                        tags=ev_tags,
+                    )
+
+                def _join_peers(hp: dict) -> tuple[list[dict], list[dict]]:
+                    x_rpitch = int(float(hp.get('x_rpitch', 0.0) or 0.0))
+                    t_start = float(hp.get('time', 0.0) or 0.0)
+                    t_end = float(hp.get('end', t_start) or t_start)
+                    end_join_peers = [
+                        peer for peer in all_hairpins
+                        if peer is not hp
+                        and int(float(peer.get('x_rpitch', 0.0) or 0.0)) == x_rpitch
+                        and abs(float(peer.get('time', 0.0) or 0.0) - t_end) <= eps
+                    ]
+                    start_join_peers = [
+                        peer for peer in all_hairpins
+                        if peer is not hp
+                        and int(float(peer.get('x_rpitch', 0.0) or 0.0)) == x_rpitch
+                        and abs(float(peer.get('end', float(peer.get('time', 0.0) or 0.0)) or 0.0) - t_start) <= eps
+                    ]
+                    return end_join_peers, start_join_peers
+
+                def _draw_hairpin(hp: dict, is_crescendo: bool) -> None:
+                    t_start = float(hp.get('time', 0.0) or 0.0)
+                    t_end = float(hp.get('end', t_start) or t_start)
+                    dur = max(1e-6, float(hp.get('duration', t_end - t_start) or (t_end - t_start)))
+                    if t_end <= t_start:
+                        return
+
+                    x_mm = rpitch_to_x(float(hp.get('x_rpitch', 0.0) or 0.0))
+                    y_start = _time_to_y(t_start)
+                    y_end = _time_to_y(t_end)
+                    y_span = max(1e-6, y_end - y_start)
+                    half_spread = hairpin_spread * 0.5
+
+                    start_text = str(hp.get('start_text', '') or '')
+                    end_text = str(hp.get('end_text', '') or '')
+                    end_join_peers, start_join_peers = _join_peers(hp)
+
+                    start_h = _text_h_mm(start_text)
+                    end_h = _text_h_mm(end_text)
+                    peer_start_h = max([_text_h_mm(str(peer.get('start_text', '') or '')) for peer in end_join_peers] or [0.0])
+                    peer_end_h = max([_text_h_mm(str(peer.get('end_text', '') or '')) for peer in start_join_peers] or [0.0])
+
+                    start_pad = ((start_h * 0.5) + text_gap) if start_text else 0.0
+                    end_pad = ((end_h * 0.5) + text_gap) if end_text else 0.0
+                    if start_join_peers and (start_h > 0.0 or peer_end_h > 0.0):
+                        start_pad = max(start_pad, text_gap + (max(start_h, peer_end_h) * 0.5))
+                    if end_join_peers and (end_h > 0.0 or peer_start_h > 0.0):
+                        end_pad = max(end_pad, text_gap + (max(end_h, peer_start_h) * 0.5))
+
+                    t_draw_start = t_start + (dur * (start_pad / y_span))
+                    t_draw_end = t_end - (dur * (end_pad / y_span))
+                    if t_draw_end <= t_draw_start:
+                        return
+
+                    seg_start = max(t_draw_start, float(line_start))
+                    seg_end = min(t_draw_end, float(line_end))
                     if seg_end <= seg_start:
-                        return None
-                    p0 = (seg_start - hp_start) / hp_dur
-                    p1 = (seg_end - hp_start) / hp_dur
-                    return (seg_start, seg_end, max(0.0, min(1.0, p0)), max(0.0, min(1.0, p1)))
+                        return
+
+                    draw_dur = max(1e-6, t_draw_end - t_draw_start)
+                    prog0 = max(0.0, min(1.0, (seg_start - t_draw_start) / draw_dur))
+                    prog1 = max(0.0, min(1.0, (seg_end - t_draw_start) / draw_dur))
+                    y0 = _time_to_y(seg_start)
+                    y1 = _time_to_y(seg_end)
+
+                    if is_crescendo:
+                        half0 = half_spread * prog0
+                        half1 = half_spread * prog1
+                        tags = ['crescendo']
+                    else:
+                        half0 = half_spread * (1.0 - prog0)
+                        half1 = half_spread * (1.0 - prog1)
+                        tags = ['decrescendo']
+
+                    hp_id = int(hp.get('id', 0) or 0)
+                    du.add_line(
+                        x_mm - half0,
+                        y0,
+                        x_mm - half1,
+                        y1,
+                        color=notation_color,
+                        width_mm=hairpin_w,
+                        line_cap='round',
+                        id=hp_id,
+                        tags=tags,
+                    )
+                    du.add_line(
+                        x_mm + half0,
+                        y0,
+                        x_mm + half1,
+                        y1,
+                        color=notation_color,
+                        width_mm=hairpin_w,
+                        line_cap='round',
+                        id=hp_id,
+                        tags=tags,
+                    )
+
+                    if start_text and (float(line_start) - eps) <= t_start < (float(line_end) + eps):
+                        _draw_text_centered_at(x_mm, y_start, start_text, hp_id, tags + [f"{tags[0]}_text"])
+                    if end_text and (float(line_start) - eps) <= t_end < (float(line_end) + eps):
+                        _draw_text_centered_at(x_mm, y_end, end_text, hp_id, tags + [f"{tags[0]}_text"])
 
                 for hp in line_crescendos:
-                    clipped = _clip_progress(hp)
-                    if clipped is None:
-                        continue
-                    seg_start, seg_end, prog0, prog1 = clipped
-                    x_mm = rpitch_to_x(float(hp.get('x_rpitch', 0.0) or 0.0))
-                    y0 = _time_to_y(seg_start)
-                    y1_hp = _time_to_y(seg_end)
-                    half0 = hairpin_spread * 0.5 * prog0
-                    half1 = hairpin_spread * 0.5 * prog1
-                    du.add_line(
-                        x_mm - half0,
-                        y0,
-                        x_mm - half1,
-                        y1_hp,
-                        color=notation_color,
-                        width_mm=hairpin_w,
-                        line_cap='round',
-                        id=int(hp.get('id', 0) or 0),
-                        tags=['crescendo'],
-                    )
-                    du.add_line(
-                        x_mm + half0,
-                        y0,
-                        x_mm + half1,
-                        y1_hp,
-                        color=notation_color,
-                        width_mm=hairpin_w,
-                        line_cap='round',
-                        id=int(hp.get('id', 0) or 0),
-                        tags=['crescendo'],
-                    )
+                    _draw_hairpin(hp, True)
 
                 for hp in line_decrescendos:
-                    clipped = _clip_progress(hp)
-                    if clipped is None:
-                        continue
-                    seg_start, seg_end, prog0, prog1 = clipped
-                    x_mm = rpitch_to_x(float(hp.get('x_rpitch', 0.0) or 0.0))
-                    y0 = _time_to_y(seg_start)
-                    y1_hp = _time_to_y(seg_end)
-                    half0 = hairpin_spread * 0.5 * (1.0 - prog0)
-                    half1 = hairpin_spread * 0.5 * (1.0 - prog1)
-                    du.add_line(
-                        x_mm - half0,
-                        y0,
-                        x_mm - half1,
-                        y1_hp,
-                        color=notation_color,
-                        width_mm=hairpin_w,
-                        line_cap='round',
-                        id=int(hp.get('id', 0) or 0),
-                        tags=['decrescendo'],
-                    )
-                    du.add_line(
-                        x_mm + half0,
-                        y0,
-                        x_mm + half1,
-                        y1_hp,
-                        color=notation_color,
-                        width_mm=hairpin_w,
-                        line_cap='round',
-                        id=int(hp.get('id', 0) or 0),
-                        tags=['decrescendo'],
-                    )
+                    _draw_hairpin(hp, False)
 
             if bool(layout.get('text_visible', True)) and line_texts:
                 default_font = layout.get('font_text', {}) or {}

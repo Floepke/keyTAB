@@ -74,6 +74,11 @@ EDITOR_LAYERING = [
     'decrescendo_handle',
     'crescendo',
     'decrescendo',
+    'dynamic_text_bg',
+    'crescendo_text',
+    'decrescendo_text',
+    'dynamic_symbol_bg_top',
+    'dynamic_symbol_text_top',
 ]
 
 ENGRAVER_LAYERING = [
@@ -113,6 +118,11 @@ ENGRAVER_LAYERING = [
     'crescendo_handle',
     'decrescendo',
     'decrescendo_handle',
+    'dynamic_text_bg',
+    'crescendo_text',
+    'decrescendo_text',
+    'dynamic_symbol_bg_top',
+    'dynamic_symbol_text_top',
 ]
 
 # Keyboard constants
