@@ -7,14 +7,13 @@ from editor.tool.base_tool import BaseTool
 from editor.tool_manager import ToolManager
 # Import tool templates
 from editor.tool.beam_tool import BeamTool
+from editor.tool.barline_tool import BarlineTool
 from editor.tool.count_line_tool import CountLineTool
-from editor.tool.end_repeat_tool import EndRepeatTool
 from editor.tool.grace_note_tool import GraceNoteTool
 from editor.tool.line_break_tool import LineBreakTool
 from editor.tool.note_tool import NoteTool
 from editor.tool.pedal_tool import PedalTool
 from editor.tool.slur_tool import SlurTool
-from editor.tool.start_repeat_tool import StartRepeatTool
 from editor.tool.text_tool import TextTool
 from editor.tool.base_grid_tool import BaseGridTool
 from editor.tool.time_signature_tool import TimeSignatureTool
@@ -41,6 +40,7 @@ from editor.drawers.text_drawer import TextDrawerMixin
 from editor.drawers.slur_drawer import SlurDrawerMixin
 from editor.drawers.start_repeat_drawer import StartRepeatDrawerMixin
 from editor.drawers.end_repeat_drawer import EndRepeatDrawerMixin
+from editor.drawers.double_bar_drawer import DoubleBarDrawerMixin
 from editor.drawers.count_line_drawer import CountLineDrawerMixin
 from editor.drawers.line_break_drawer import LineBreakDrawerMixin
 from editor.drawers.tempo_drawer import TempoDrawerMixin
@@ -75,6 +75,7 @@ class Editor(QtCore.QObject,
              DecrescendoDrawerMixin,
              StartRepeatDrawerMixin,
              EndRepeatDrawerMixin,
+             DoubleBarDrawerMixin,
              CountLineDrawerMixin,
              LineBreakDrawerMixin,
              TempoDrawerMixin):
@@ -96,14 +97,16 @@ class Editor(QtCore.QObject,
         self._score: SCORE = None
         self._tool_classes: Dict[str, Type[BaseTool]] = {
             'beam': BeamTool,
+            'barline': BarlineTool,
             'count_line': CountLineTool,
-            'end_repeat': EndRepeatTool,
             'grace_note': GraceNoteTool,
             'line_break': LineBreakTool,
             'note': NoteTool,
             'pedal': PedalTool,
             'slur': SlurTool,
-            'start_repeat': StartRepeatTool,
+            # Backward compatibility: legacy tool names map to the unified barline tool.
+            'start_repeat': BarlineTool,
+            'end_repeat': BarlineTool,
             'text': TextTool,
             'base_grid': BaseGridTool,
             'time_signature': TimeSignatureTool,
@@ -280,6 +283,7 @@ class Editor(QtCore.QObject,
             getattr(self, 'draw_slur', None),
             getattr(self, 'draw_start_repeat', None),
             getattr(self, 'draw_end_repeat', None),
+            getattr(self, 'draw_double_bar', None),
             getattr(self, 'draw_count_line', None),
             getattr(self, 'draw_tempo', None),
             getattr(self, 'draw_line_break', None),

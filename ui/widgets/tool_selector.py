@@ -26,8 +26,7 @@ TOOL_ITEMS: list[dict] = [
     { 'name': 'tempo',          'displayed_name': 'Tempo',          'icon': 'metronome',      'tooltip': 'Tempo tool. Add tempo regions in units per minute over a duration.'} ,
     { 'name': 'slur',           'displayed_name': 'Slur',           'icon': 'slur',           'tooltip': 'Slur tool. Place phrasing slurs.' },
     { 'name': 'text',           'displayed_name': 'Text',           'icon': 'text',           'tooltip': 'Text tool. Place text annotations.' },
-    { 'name': 'start_repeat',   'displayed_name': 'Start Repeat',   'icon': 'start_repeat',   'tooltip': 'Start Repeat tool. Insert a repeat start mark.' },
-    { 'name': 'end_repeat',     'displayed_name': 'End Repeat',     'icon': 'end_repeat',     'tooltip': 'End Repeat tool. Insert a repeat end mark.' },
+    { 'name': 'barline',        'displayed_name': 'Barline',        'icon': 'repeats',        'tooltip': 'Barline tool. Insert start repeat, end repeat, and double barline symbols at barline positions.' },
     { 'name': 'dynamic',        'displayed_name': 'Dynamics',       'icon': 'dynamic',        'tooltip': 'Dynamics tool. Place dynamic markings.' },
     { 'name': 'crescendo',      'displayed_name': 'Crescendo',      'icon': 'crescendo',      'tooltip': 'Crescendo tool. Place a hairpin for increasing volume.' },
     { 'name': 'decrescendo',    'displayed_name': 'Decrescendo',    'icon': 'decrescendo',    'tooltip': 'Decrescendo tool. Place a hairpin for decreasing volume.' },
@@ -132,6 +131,8 @@ class ToolSelectorWidget(QtWidgets.QListWidget):
             name = str(name)
         except Exception:
             return
+        if name in ('start_repeat', 'end_repeat'):
+            name = 'barline'
         for i in range(self.count()):
             it = self.item(i)
             if it.data(QtCore.Qt.ItemDataRole.UserRole) == name:

@@ -37,6 +37,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
     texts = list(events.get('text', []) or [])
     start_repeats = list(events.get('start_repeat', []) or [])
     end_repeats = list(events.get('end_repeat', []) or [])
+    double_bars = list(events.get('double_bar', []) or [])
     pedals = list(events.get('pedal', []) or [])
 
     # Theme colors
@@ -187,6 +188,18 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
     if norm_end_repeats:
         norm_end_repeats = sorted(norm_end_repeats, key=lambda m: float(m.get('time', 0.0) or 0.0))
 
+    norm_double_bars: list[dict] = []
+    for idx, ev in enumerate(double_bars):
+        if not isinstance(ev, dict):
+            continue
+        norm_double_bars.append({
+            'time': float(ev.get('time', 0.0) or 0.0),
+            'id': int(ev.get('_id', 0) or 0),
+            'idx': int(idx),
+        })
+    if norm_double_bars:
+        norm_double_bars = sorted(norm_double_bars, key=lambda m: float(m.get('time', 0.0) or 0.0))
+
     norm_pedals: list[dict] = []
     for idx, ev in enumerate(pedals):
         if not isinstance(ev, dict):
@@ -234,6 +247,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
     stave_two_w = float(layout.get('stave_two_line_thickness_mm', 0.5) or 0.5) * scale
     stave_three_w = float(layout.get('stave_three_line_thickness_mm', 0.5) or 0.5) * scale
     stave_clef_w = float(layout.get('stave_clef_line_thickness_mm', 0.5) or 0.5) * scale
+    stave_ledger_len = float(layout.get('stave_ledger_line_length_mm', 7.0) or 7.0) * scale
     clef_dash_raw = list(layout.get('stave_clef_line_dash_pattern_mm', []) or [])
     clef_dash = [float(v) * scale for v in clef_dash_raw] if clef_dash_raw else None
     op_time = Operator(SHORTEST_DURATION)
@@ -271,71 +285,6 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
         list(dict.fromkeys(round(float(t), 6) for t in group_boundary_times))
     )
     all_barlines = sorted(list(dict.fromkeys([0.0] + [float(v) for v in barline_positions] + [float(cur_bar)])))
-
-    def _build_global_grid_bandband_intervals(
-        raw_positions: list[float],
-        bars: list[float],
-        total_len: float,
-    ) -> list[tuple[float, float]]:
-        if total_len <= 1e-6:
-            return []
-
-        track = sorted(
-            list(
-                dict.fromkeys(
-                    round(float(v), 6)
-                    for v in (raw_positions or [])
-                    if 0.0 < float(v) < float(total_len)
-                )
-            )
-        )
-        if not track:
-            return []
-
-        bar_times = sorted(list(dict.fromkeys(round(float(b), 6) for b in bars if 0.0 <= float(b) <= float(total_len))))
-        if not bar_times or abs(float(bar_times[0])) > 1e-6:
-            bar_times = [0.0] + bar_times
-        if abs(float(bar_times[-1]) - float(total_len)) > 1e-6:
-            bar_times.append(float(total_len))
-
-        out: list[tuple[float, float]] = []
-        for i, cur in enumerate(track):
-            prev_grid_band = float(track[i - 1]) if i > 0 else 0.0
-            prev_bar_idx = bisect.bisect_right(bar_times, float(cur)) - 1
-            prev_bar = float(bar_times[max(0, prev_bar_idx)])
-            ref = max(float(prev_grid_band), float(prev_bar))
-            step = float(cur) - float(ref)
-            if step <= 1e-6:
-                continue
-
-            active_start = 0.0 if i == 0 else float(cur)
-            active_end = float(track[i + 1]) if (i + 1) < len(track) else float(total_len)
-            if active_end <= active_start:
-                continue
-
-            for bi in range(len(bar_times) - 1):
-                bar_start = float(bar_times[bi])
-                bar_end = float(bar_times[bi + 1])
-                if bar_end <= active_start or bar_start >= active_end:
-                    continue
-                seg_start = max(bar_start, active_start)
-                seg_end = min(bar_end, active_end)
-                if seg_end <= seg_start:
-                    continue
-
-                k0 = int((seg_start - bar_start) // step)
-                if k0 < 0:
-                    k0 = 0
-                while True:
-                    b0 = bar_start + (float(k0) * step)
-                    b1 = b0 + step
-                    if b0 >= seg_end - 1e-6:
-                        break
-                    c0 = max(seg_start, b0)
-                    c1 = min(seg_end, b1)
-                    if c1 > c0 and (k0 % 2) == 0:
-                        out.append((float(c0), float(c1)))
-                    k0 += 1
 
     # Build grid-band dark intervals with the same rules as editor drawer:
     # - barline resets to dark,
@@ -542,12 +491,6 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
             hex_part = hex_part[:6]
         return f"#{hex_part}"
 
-    def _hex_to_rgba01(hex_color: str, alpha: float = 1.0) -> tuple[float, float, float, float]:
-        """Convert a hex color into RGBA floats in the 0..1 range."""
-        rgba = hex_to_rgba(hex_color, alpha)
-        r, g, b, a = rgba
-        return (float(r) / 255.0, float(g) / 255.0, float(b) / 255.0, float(a))
-
     def _allow_font_registry() -> bool:
         """Return True when it is safe to access QFontDatabase (GUI process only)."""
         return mp.current_process().name == "MainProcess"
@@ -672,22 +615,6 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                     if op_time.lt(w0, w1):
                         windows.append((w0, w1))
                 cur = m_end
-        return windows
-
-    def _build_duration_windows(start: float, end: float, dur: float) -> list[tuple[float, float]]:
-        """Build consecutive windows of fixed duration between start and end.
-
-        Problem solved: marker-defined windows can override grid grouping with
-        explicit durations, enabling custom beam spans.
-        """
-        if dur <= 0:
-            return [(start, end)]
-        windows: list[tuple[float, float]] = []
-        t = float(start)
-        while op_time.lt(t, float(end)):
-            t1 = min(float(end), t + float(dur))
-            windows.append((t, t1))
-            t = t1
         return windows
 
     def _process_beam_marker_override(default_windows: list[tuple[float, float]], markers: list[dict]) -> list[tuple[float, float]]:
@@ -1809,70 +1736,6 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                     dash_pattern=None,
                 )
 
-            if bool(layout.get('repeat_start_visible', True)) and norm_start_repeats:
-                repeat_bar_w = max(bar_width_mm * 1.8, 0.2)
-                dot_d = max(0.5, 0.8 * scale)
-                x_center = grid_right - max(1.2 * scale, semitone_mm * 0.5)
-                for ev in norm_start_repeats:
-                    rep_t = float(ev.get('time', 0.0) or 0.0)
-                    if op_time.lt(rep_t, float(line['time_start'])) or op_time.gt(rep_t, float(line['time_end'])):
-                        continue
-                    y_rep = _time_to_y(rep_t)
-                    du.add_line(
-                        grid_left,
-                        y_rep,
-                        grid_right,
-                        y_rep,
-                        color=notation_color,
-                        width_mm=repeat_bar_w,
-                        id=int(ev.get('id', 0) or 0),
-                        tags=['start_repeat'],
-                        dash_pattern=None,
-                    )
-                    for dy in (-dot_d * 0.9, dot_d * 0.9):
-                        du.add_oval(
-                            x_center - (dot_d / 2.0),
-                            y_rep + dy - (dot_d / 2.0),
-                            x_center + (dot_d / 2.0),
-                            y_rep + dy + (dot_d / 2.0),
-                            stroke_color=None,
-                            fill_color=notation_color,
-                            id=int(ev.get('id', 0) or 0),
-                            tags=['start_repeat_dot'],
-                        )
-
-            if bool(layout.get('repeat_end_visible', True)) and norm_end_repeats:
-                repeat_bar_w = max(bar_width_mm * 1.8, 0.2)
-                dot_d = max(0.5, 0.8 * scale)
-                x_center = grid_left + max(1.2 * scale, semitone_mm * 0.5)
-                for ev in norm_end_repeats:
-                    rep_t = float(ev.get('time', 0.0) or 0.0)
-                    if op_time.lt(rep_t, float(line['time_start'])) or op_time.gt(rep_t, float(line['time_end'])):
-                        continue
-                    y_rep = _time_to_y(rep_t)
-                    du.add_line(
-                        grid_left,
-                        y_rep,
-                        grid_right,
-                        y_rep,
-                        color=notation_color,
-                        width_mm=repeat_bar_w,
-                        id=int(ev.get('id', 0) or 0),
-                        tags=['end_repeat'],
-                        dash_pattern=None,
-                    )
-                    for dy in (-dot_d * 0.9, dot_d * 0.9):
-                        du.add_oval(
-                            x_center - (dot_d / 2.0),
-                            y_rep + dy - (dot_d / 2.0),
-                            x_center + (dot_d / 2.0),
-                            y_rep + dy + (dot_d / 2.0),
-                            stroke_color=None,
-                            fill_color=notation_color,
-                            id=int(ev.get('id', 0) or 0),
-                            tags=['end_repeat_dot'],
-                        )
-
             if bool(layout.get('pedal_lane_enabled', False)):
                 lane_offset = max(1.0 * scale, float(layout.get('pedal_lane_width_mm', 2.5) or 2.5) * scale)
                 x_lane = min(page_w - page_right, grid_right + lane_offset)
@@ -2088,6 +1951,8 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
             mm_per_pt = 25.4 / 72.0
             text_h_mm = size_pt * mm_per_pt
             measure_pad = 1.5
+            measure_symbol_anchor: dict[float, tuple[float, float, float]] = {}
+            measure_number_y_nudge = max(0.4, 0.9 * scale)
 
             def _note_x_range(it: dict, include_stem: bool) -> tuple[float, float]:
                 p = int(it.get('pitch', 0) or 0)
@@ -2139,7 +2004,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                 text_w_mm = max(1.0, text_h_mm * 0.6 * len(num_txt))
                 t0 = m_start
                 t1 = min(float(line['time_end']), m_start + (text_h_mm * tick_per_mm))
-                y_text = _time_to_y(t0) + 1.0
+                y_text = _time_to_y(t0) + 1.0 + measure_number_y_nudge
 
                 # Default outside-right; only move further right on collision
                 base_right = grid_right + measure_pad
@@ -2186,6 +2051,137 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                     bold=mn_bold,
                     italic=mn_italic,
                 )
+                measure_symbol_anchor[round(float(m_start), 6)] = (
+                    float(x_pos),
+                    float(text_w_mm),
+                    float(y_text),
+                )
+
+            symbol_width = max(3.0, semitone_mm * 2.8)
+            symbol_gap = max(0.6, semitone_mm * 0.35)
+            symbol_thin_w = max(0.15, bar_width_mm * 0.9)
+            symbol_thick_w = max(0.2, semitone_mm * 0.24)
+            symbol_dot_d = max(1.0, semitone_mm * 0.6)
+            symbol_dot_y = max(0.8, semitone_mm * 0.55)
+
+            def _symbol_anchor_x(rep_t: float) -> float:
+                key = round(float(rep_t), 6)
+                anchored = measure_symbol_anchor.get(key)
+                if anchored is not None:
+                    x_num, w_num, _y_num = anchored
+                    return float(x_num + max(0.0, (w_num - symbol_width) * 0.5))
+                return float(grid_right + measure_pad * 2.0)
+
+            def _symbol_y(rep_t: float, kind: str) -> float:
+                if kind not in ('start', 'end'):
+                    return _time_to_y(rep_t)
+                key = round(float(rep_t), 6)
+                anchored = measure_symbol_anchor.get(key)
+                if anchored is None:
+                    return _time_to_y(rep_t)
+                _x_num, _w_num, y_num = anchored
+                sep = max(0.2, 0.2 * scale)
+                return float(y_num - (symbol_dot_y + (symbol_dot_d * 0.5) + sep))
+
+            def _draw_repeat_symbol(rep_t: float, ev_id: int, kind: str) -> None:
+                if op_time.lt(rep_t, float(line['time_start'])) or op_time.gt(rep_t, float(line['time_end'])):
+                    return
+                y_rep = _symbol_y(rep_t, kind)
+                x_left = _symbol_anchor_x(rep_t)
+                x_right = x_left + symbol_width
+                dot_x1 = x_left + (symbol_width * 0.25)
+                dot_x2 = x_left + (symbol_width * 0.75)
+                if kind == 'start':
+                    du.add_line(
+                        x_left,
+                        y_rep,
+                        x_right,
+                        y_rep,
+                        color=notation_color,
+                        width_mm=symbol_thick_w,
+                        id=ev_id,
+                        tags=['barline_symbol', 'start_repeat'],
+                        dash_pattern=None,
+                    )
+                    for dot_x in (dot_x1, dot_x2):
+                        du.add_oval(
+                            dot_x - (symbol_dot_d / 2.0),
+                            y_rep + symbol_dot_y - (symbol_dot_d / 2.0),
+                            dot_x + (symbol_dot_d / 2.0),
+                            y_rep + symbol_dot_y + (symbol_dot_d / 2.0),
+                            stroke_color=None,
+                            fill_color=notation_color,
+                            id=ev_id,
+                            tags=['barline_symbol_dot', 'start_repeat_dot'],
+                        )
+                elif kind == 'end':
+                    du.add_line(
+                        x_left,
+                        y_rep,
+                        x_right,
+                        y_rep,
+                        color=notation_color,
+                        width_mm=symbol_thick_w,
+                        id=ev_id,
+                        tags=['barline_symbol', 'end_repeat'],
+                        dash_pattern=None,
+                    )
+                    for dot_x in (dot_x1, dot_x2):
+                        du.add_oval(
+                            dot_x - (symbol_dot_d / 2.0),
+                            y_rep - symbol_dot_y - (symbol_dot_d / 2.0),
+                            dot_x + (symbol_dot_d / 2.0),
+                            y_rep - symbol_dot_y + (symbol_dot_d / 2.0),
+                            stroke_color=None,
+                            fill_color=notation_color,
+                            id=ev_id,
+                            tags=['barline_symbol_dot', 'end_repeat_dot'],
+                        )
+                elif kind == 'double':
+                    du.add_line(
+                        x_left,
+                        y_rep - symbol_gap,
+                        x_right,
+                        y_rep - symbol_gap,
+                        color=notation_color,
+                        width_mm=symbol_thin_w,
+                        id=ev_id,
+                        tags=['barline_symbol', 'double_bar'],
+                        dash_pattern=None,
+                    )
+                    du.add_line(
+                        x_left,
+                        y_rep + symbol_gap,
+                        x_right,
+                        y_rep + symbol_gap,
+                        color=notation_color,
+                        width_mm=symbol_thin_w,
+                        id=ev_id,
+                        tags=['barline_symbol', 'double_bar'],
+                        dash_pattern=None,
+                    )
+
+            if bool(layout.get('repeat_start_visible', True)) and norm_start_repeats:
+                for ev in norm_start_repeats:
+                    _draw_repeat_symbol(
+                        float(ev.get('time', 0.0) or 0.0),
+                        int(ev.get('id', 0) or 0),
+                        'start',
+                    )
+            if bool(layout.get('repeat_end_visible', True)) and norm_end_repeats:
+                for ev in norm_end_repeats:
+                    _draw_repeat_symbol(
+                        float(ev.get('time', 0.0) or 0.0),
+                        int(ev.get('id', 0) or 0),
+                        'end',
+                    )
+            if bool(layout.get('double_bar_visible', True)) and norm_double_bars:
+                for ev in norm_double_bars:
+                    _draw_repeat_symbol(
+                        float(ev.get('time', 0.0) or 0.0),
+                        int(ev.get('id', 0) or 0),
+                        'double',
+                    )
 
             if bool(layout.get('stave_visible', True)):
                 visible_keys = list(line.get('visible_keys', []))
@@ -2609,9 +2605,8 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                             ledger_groups = line_groups[g_start:g_end + 1]
                     if ledger_groups:
                         y_center = note_y + w
-                        seg_half = w
-                        y_seg1 = y_center - seg_half
-                        y_seg2 = y_center + seg_half + seg_half + (seg_half / 2.0)
+                        y_seg1 = y_center - w
+                        y_seg2 = y_seg1 + max(0.0, stave_ledger_len)
                         for grp in ledger_groups:
                             for key in grp.get('keys', []):
                                 x_pos = _key_to_x(int(key))

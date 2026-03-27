@@ -247,6 +247,10 @@ class GridBandDrawerMixin:
     def draw_grid_band(self, du: DrawUtil) -> None:
         """Draw all grid band markers (Grid Band tool visualization)."""
         self = cast("Editor", self)
+        active_tool = str(getattr(getattr(self, '_tool', None), 'TOOL_NAME', ''))
+        if active_tool != 'grid_band':
+            return
+
         score = self.current_score()
         if score is None:
             return
@@ -281,7 +285,6 @@ class GridBandDrawerMixin:
             fill,
         )
 
-        active_tool = str(getattr(getattr(self, '_tool', None), 'TOOL_NAME', ''))
         if active_tool == 'grid_band':
             off_color = self._grid_band_off_rgba()
             zero_markers = self._zero_marker_times(markers, score_end)

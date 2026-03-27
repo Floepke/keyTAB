@@ -6,7 +6,7 @@ from file_model.events.grid_band import GridBand
 
 @dataclass
 class LayoutFont:
-    family: str = "Latin Modern Roman"
+    family: str = "Edwin"
     size_pt: float = 12.0
     bold: bool = False
     italic: bool = False
@@ -45,9 +45,9 @@ class Layout:
     note_stem_length_semitone: int = 5
     note_stem_thickness_mm: float = 0.75 # Thickness of the stem as well the notehead outline width
     note_stopsign_thickness_mm: float = 1.0
-    note_leftdot_visible: bool = True
+    note_leftdot_visible: bool = False
     note_continuation_dot_size_mm: float = 2.5
-    note_midinote_visible: bool = True
+    note_midinote_visible: bool = False
     note_midinote_left_color: str = '#ccc'
     note_midinote_right_color: str = '#ccc'
     note_width_scaling: float = 1.0 # Scaling factor for black noteheads when it sits under the stem while a white note sits next to it (0.05 to 1.0)
@@ -77,6 +77,7 @@ class Layout:
     # Repeat markers
     repeat_start_visible: bool = True
     repeat_end_visible: bool = True
+    double_bar_visible: bool = True
     
     # Measure grouping (prefill for line break tool; not applied automatically)
     measure_grouping: str = ""
@@ -108,24 +109,24 @@ class Layout:
     time_signature_indicator_guide_thickness_mm: float = 0.5
     time_signature_indicator_divide_guide_thickness_mm: float = 1.0
     time_signature_indicator_classic_font: LayoutFont = field(default_factory=lambda: LayoutFont(
-        family="LM Roman Caps 10",
+        family="Edwin",
         size_pt=40.0,
         bold=True,
     ))
     time_signature_indicator_klavarskribo_font: LayoutFont = field(default_factory=lambda: LayoutFont(
-        family="LM Roman Caps 10",
+        family="Edwin",
         size_pt=25.0,
         bold=True,
     ))
     measure_numbering_font: LayoutFont = field(default_factory=lambda: LayoutFont(
-        family="LM Roman Caps 10",
+        family="Edwin",
         size_pt=25.0,
         bold=True,
         italic=True,
     ))
 
     font_text: LayoutFont = field(default_factory=lambda: LayoutFont(
-        family="LM Roman Caps 10",
+        family="Edwin",
         size_pt=15.0,
         bold=True,
         italic=False,
@@ -133,25 +134,25 @@ class Layout:
 
     # Info fonts
     font_title: LayoutFont = field(default_factory=lambda: LayoutFont(
-        family="LM Roman Caps 10",
+        family="Edwin",
         size_pt=25.0,
         bold=True,
     ))
     font_composer: LayoutFont = field(default_factory=lambda: LayoutFont(
-        family="LM Roman Caps 10",
+        family="Edwin",
         size_pt=15.0,
     ))
     font_copyright: LayoutFont = field(default_factory=lambda: LayoutFont(
-        family="LM Roman Caps 10",
-        size_pt=11.0,
+        family="Edwin",
+        size_pt=12.0,
         italic=True,
     ))
     font_arranger: LayoutFont = field(default_factory=lambda: LayoutFont(
-        family="LM Roman Caps 10",
+        family="Edwin",
         size_pt=12.0,
     ))
     font_lyricist: LayoutFont = field(default_factory=lambda: LayoutFont(
-        family="LM Roman Caps 10",
+        family="Edwin",
         size_pt=12.0,
     ))
 
@@ -159,6 +160,7 @@ class Layout:
     stave_two_line_thickness_mm: float = 0.5
     stave_three_line_thickness_mm: float = 1.1
     stave_clef_line_thickness_mm: float = 0.5
+    stave_ledger_line_length_mm: float = 10.0
     stave_clef_line_dash_pattern_mm: list[float] = field(default_factory=lambda: [5.0, 3.0])  # Dash pattern for clef lines (e.g., [dash_length, gap_length])
 
 
@@ -193,4 +195,5 @@ LAYOUT_FLOAT_CONFIG: dict[str, dict[str, float]] = {
     'stave_two_line_thickness_mm': {'min': 0.05, 'max': 5.0, 'step': 0.05},
     'stave_three_line_thickness_mm': {'min': 0.05, 'max': 5.0, 'step': 0.05},
     'stave_clef_line_thickness_mm': {'min': 0.05, 'max': 5.0, 'step': 0.05},
+    'stave_ledger_line_length_mm': {'min': 0.05, 'max': 100.0, 'step': 0.05},
 }

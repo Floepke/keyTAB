@@ -537,6 +537,7 @@ class StyleDialog(QtWidgets.QDialog):
             'stave_two_line_thickness_mm': 'Stave',
             'stave_three_line_thickness_mm': 'Stave',
             'stave_clef_line_thickness_mm': 'Stave',
+            'stave_ledger_line_length_mm': 'Stave',
             'stave_clef_line_dash_pattern_mm': 'Stave',
             # Fonts
             'font_text': 'Fonts',
@@ -566,6 +567,7 @@ class StyleDialog(QtWidgets.QDialog):
             'countline_visible': 'Visibility',
             'repeat_start_visible': 'Visibility',
             'repeat_end_visible': 'Visibility',
+            'double_bar_visible': 'Visibility',
         }
 
         type_hints = {}

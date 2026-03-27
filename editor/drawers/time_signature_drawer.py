@@ -23,16 +23,16 @@ class TimeSignatureDrawerMixin:
         indicator_type = getattr(layout, 'time_signature_indicator_type', 'classical')
 
         def _resolve_font_family(font) -> str:
-            family = str(getattr(font, 'family', 'Latin Modern Roman') or 'Latin Modern Roman')
-            if family != 'Latin Modern Roman':
+            family = str(getattr(font, 'family', 'Edwin') or 'Edwin')
+            if family != 'Edwin':
                 return family
-            reg = register_font_from_bytes('Latin Modern Roman') if register_font_from_bytes else 'Latin Modern Roman'
-            return reg or 'Latin Modern Roman'
+            reg = register_font_from_bytes('Edwin') if register_font_from_bytes else 'Edwin'
+            return reg or 'Edwin'
 
         classic_font = getattr(layout, 'time_signature_indicator_classic_font', None)
         klav_font = getattr(layout, 'time_signature_indicator_klavarskribo_font', None)
-        classic_requested = str(getattr(classic_font, 'family', 'Latin Modern Roman') or 'Latin Modern Roman')
-        klav_requested = str(getattr(klav_font, 'family', 'Latin Modern Roman') or 'Latin Modern Roman')
+        classic_requested = str(getattr(classic_font, 'family', 'Edwin') or 'Edwin')
+        klav_requested = str(getattr(klav_font, 'family', 'Edwin') or 'Edwin')
 
         if getattr(self, '_ts_cached_classic_requested', None) != classic_requested:
             self._ts_cached_classic_requested = classic_requested

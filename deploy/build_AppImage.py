@@ -47,8 +47,8 @@ APP_SUMMARY = (
 )
 APP_DESCRIPTION = (
     "keyTAB is a professional engraver for engraving MIDI files as music notation. "
-    "It is based on the Klavarskribo notation system and revised by"
-    "Philip Bergwerf to be more clear and flexible.\n"
+    "It is based on the Klavarskribo notation system and revised by "
+    "Philip Bergwerf to be more flexible.\n"
     "\n"
     "Import a .mid file and keyTAB converts it instantly into a readable MIDI notation sheet. "
     "Use the mouse-centric editor to refine layout, design, and musical details."

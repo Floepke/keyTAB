@@ -19,7 +19,7 @@ class Text:
     
     # font settings
     font: LayoutFont = field(default_factory=lambda: LayoutFont(
-        family="Latin Modern Roman Caps",
+        family="Edwin",
         size_pt=12.0,
         bold=False,
         italic=True,

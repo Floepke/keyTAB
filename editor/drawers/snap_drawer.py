@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING, cast
 from utils.operator import Operator as OP
 
 from ui.widgets.draw_util import DrawUtil
-from utils.CONSTANT import QUARTER_NOTE_UNIT, EDITOR_SIDE_BAND_INSET_SEMITONES
+from utils.CONSTANT import QUARTER_NOTE_UNIT
 
 if TYPE_CHECKING:
     from editor.editor import Editor
@@ -17,8 +17,23 @@ class SnapDrawerMixin:
     '''
 
     def _side_band_tint_rgba(self, layout, side: str) -> tuple[float, float, float, float]:
-        """Return the exact left/right grid band color for snap bands."""
-        return self._grid_band_fill_rgba(layout, 'grid_band_color', side)
+        """Return a very light accent-derived tint for snap bands.
+
+        Snap bands are a subtle timing aid and should not reuse grid-band styling.
+        """
+        _layout = layout  # kept for signature compatibility
+        _side = side
+        try:
+            ar, ag, ab, _aa = tuple(getattr(self, 'accent_color', (0.2, 0.5, 1.0, 1.0)))
+            pr, pg, pb, _pa = tuple(getattr(self, 'paper_color', (1.0, 1.0, 1.0, 1.0)))
+        except Exception:
+            ar, ag, ab = (0.2, 0.5, 1.0)
+            pr, pg, pb = (1.0, 1.0, 1.0)
+        mix = 0.16  # keep tint very light: mostly paper, slight accent cast
+        r = pr * (1.0 - mix) + ar * mix
+        g = pg * (1.0 - mix) + ag * mix
+        b = pb * (1.0 - mix) + ab * mix
+        return (float(r), float(g), float(b), 0.18)
 
     def draw_snap(self, du: DrawUtil) -> None:
         """Draw alternating light/darker snap bands along the vertical timeline.
@@ -32,6 +47,11 @@ class SnapDrawerMixin:
         if score is None:
             return
 
+        # Snap-size side bands are visible in all tools except Grid Band mode.
+        active_tool = str(getattr(getattr(self, '_tool', None), 'TOOL_NAME', ''))
+        if active_tool == 'grid_band':
+            return
+
         # if the snap size < 8.0 units, skip drawing snap bands for performance
         if self.snap_size_units < 8.0:
             return
@@ -42,14 +62,10 @@ class SnapDrawerMixin:
         page_w_mm, _page_h_mm = du.current_page_size_mm()
         margin = float(self.margin)
         
-        # Draw snap pattern as two bands inside the stave edges.
-        # Band width is configurable in semitone distances.
+        # Draw snap pattern across the full stave width.
         stave_left = float(self.margin + self.semitone_dist)
         stave_right = float(page_w_mm - self.margin - self.semitone_dist * 2.0)
-        inset_w = max(0.0, float(EDITOR_SIDE_BAND_INSET_SEMITONES) * float(self.semitone_dist))
         left_x1 = stave_left
-        left_x2 = min(stave_right, stave_left + inset_w)
-        right_x1 = max(stave_left, stave_right - inset_w)
         right_x2 = stave_right
         zpq = float(getattr(score.app_state, 'zoom_mm_per_quarter', 25.0) or 25.0)
 
@@ -66,8 +82,6 @@ class SnapDrawerMixin:
 
         layout = getattr(score, 'layout', None)
         left_fill_rgba = self._side_band_tint_rgba(layout, 'left')
-        right_fill_rgba = self._side_band_tint_rgba(layout, 'right')
-        grid_band_visible = bool(getattr(layout, 'grid_band_visible', True))
 
         # Walk the base grid (measures) and draw darker rectangles on every other snap step
         time_cursor_mm = margin
@@ -87,38 +101,16 @@ class SnapDrawerMixin:
                 while op.less(sub_cursor, measure_end_mm):
                     h = min(snap_mm, measure_end_mm - sub_cursor)
                     if (seg_index % 2) == 0:
-                        if not grid_band_visible:
-                            du.add_rectangle(
-                                left_x1,
-                                sub_cursor,
-                                right_x2,
-                                sub_cursor + h,
-                                stroke_color=None,
-                                fill_color=left_fill_rgba,
-                                id=0,
-                                tags=["snap_band"],
-                            )
-                        else:
-                            du.add_rectangle(
-                                left_x1,
-                                sub_cursor,
-                                left_x2,
-                                sub_cursor + h,
-                                stroke_color=None,
-                                fill_color=left_fill_rgba,
-                                id=0,
-                                tags=["snap_band"],
-                            )
-                            du.add_rectangle(
-                                right_x1,
-                                sub_cursor,
-                                right_x2,
-                                sub_cursor + h,
-                                stroke_color=None,
-                                fill_color=right_fill_rgba,
-                                id=0,
-                                tags=["snap_band"],
-                            )
+                        du.add_rectangle(
+                            left_x1,
+                            sub_cursor,
+                            right_x2,
+                            sub_cursor + h,
+                            stroke_color=None,
+                            fill_color=left_fill_rgba,
+                            id=0,
+                            tags=["snap_band"],
+                        )
                     seg_index += 1
                     sub_cursor += h
 

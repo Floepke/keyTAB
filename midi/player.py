@@ -10,6 +10,10 @@ from typing import List, Optional, Tuple
 import mido
 import traceback
 
+fluidsynth = None
+_FLUIDSYNTH_AVAILABLE = True
+_FLUIDSYNTH_IMPORT_ERROR = ""
+
 
 def _mido_io_backend():
     """Prefer explicit RtMidi backend; fall back to mido default backend."""
@@ -84,13 +88,32 @@ def _ensure_fluidsynth_lib() -> None:
 
 
 if sys.platform.startswith("linux"):
-    _ensure_fluidsynth_lib()
     try:
-        import fluidsynth  # type: ignore
+        _ensure_fluidsynth_lib()
+        import fluidsynth as _fluidsynth  # type: ignore
+
+        fluidsynth = _fluidsynth
+        _FLUIDSYNTH_AVAILABLE = True
+        _FLUIDSYNTH_IMPORT_ERROR = ""
     except Exception as exc:  # pragma: no cover - environment specific
-        raise ImportError(
-            "FluidSynth native library not available. Install it with 'sudo apt-get install fluidsynth libfluidsynth3' (or the equivalent for your distro) and ensure pyfluidsynth is installed."
-        ) from exc
+        _FLUIDSYNTH_AVAILABLE = False
+        _FLUIDSYNTH_IMPORT_ERROR = (
+            "FluidSynth native library not available. Install it with "
+            "'sudo apt-get install fluidsynth libfluidsynth3' (or the equivalent for your distro) "
+            "and ensure pyfluidsynth is installed."
+        )
+        try:
+            sys.stderr.write(f"[midi] {_FLUIDSYNTH_IMPORT_ERROR} ({exc})\n")
+        except Exception:
+            pass
+
+
+def fluidsynth_available() -> bool:
+    return bool(_FLUIDSYNTH_AVAILABLE)
+
+
+def fluidsynth_unavailable_reason() -> str:
+    return str(_FLUIDSYNTH_IMPORT_ERROR or "FluidSynth not available.")
 
 from utils.CONSTANT import QUARTER_NOTE_UNIT
 
@@ -117,7 +140,9 @@ class _Backend:
 
 class _FluidsynthBackend(_Backend):
     def __init__(self, soundfont_path: Optional[str]) -> None:
-        if not hasattr(sys.modules.get('fluidsynth'), "Synth"):
+        if not fluidsynth_available():
+            raise ImportError(fluidsynth_unavailable_reason())
+        if not hasattr(fluidsynth, "Synth"):
             raise ImportError(
                 "FluidSynth not available. Install it with 'sudo apt-get install fluidsynth libfluidsynth3' and ensure pyfluidsynth is installed."
             )

@@ -16,6 +16,7 @@ from file_model.events.slur import Slur
 from file_model.events.beam import Beam
 from file_model.events.start_repeat import StartRepeat
 from file_model.events.end_repeat import EndRepeat
+from file_model.events.double_bar import DoubleBar
 from file_model.events.count_line import CountLine
 from file_model.events.line_break import LineBreak
 from file_model.events.tempo import Tempo
@@ -64,6 +65,7 @@ class Events:
 	grid_band: List[GridBand] = field(default_factory=list)
 	start_repeat: List[StartRepeat] = field(default_factory=list)
 	end_repeat: List[EndRepeat] = field(default_factory=list)
+	double_bar: List[DoubleBar] = field(default_factory=list)
 	count_line: List[CountLine] = field(default_factory=list)
 	line_break: List[LineBreak] = field(default_factory=list)
 	tempo: List[Tempo] = field(default_factory=list)
@@ -242,6 +244,13 @@ class SCORE:
 		base.update(kwargs)
 		obj = EndRepeat(**base, _id=self._gen_id())
 		self.events.end_repeat.append(obj)
+		return obj
+
+	def new_double_bar(self, **kwargs) -> DoubleBar:
+		base = {'time': 0.0}
+		base.update(kwargs)
+		obj = DoubleBar(**base, _id=self._gen_id())
+		self.events.double_bar.append(obj)
 		return obj
 
 	def new_count_line(self, **kwargs) -> CountLine:

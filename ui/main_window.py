@@ -33,6 +33,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.setAcceptDrops(True)
         # Ensure player attribute always exists
         self.player = None
+        self._fluidsynth_missing_warned = False
         self._player_config: tuple[str, str] | None = None
         self._left_panel_width_frozen = False
         self._prepare_close_done = False
@@ -370,9 +371,10 @@ class MainWindow(QtWidgets.QMainWindow):
                     self.editor_controller.set_player(self.player)
             except Exception:
                 pass
-        except Exception:
+        except Exception as exc:
             # Player initialization is optional at startup; keep attribute defined
             self.player = None
+            self._notify_fluidsynth_missing(exc)
         # Playhead overlay timer (60 Hz)
         try:
             self._playhead_timer = QtCore.QTimer(self)
@@ -1218,6 +1220,38 @@ class MainWindow(QtWidgets.QMainWindow):
         adm.set("midi_out_port", str(port_name or ""))
         adm.save()
 
+    def _is_fluidsynth_missing_error(self, exc: Exception) -> bool:
+        if not sys.platform.startswith('linux'):
+            return False
+        if self._get_playback_mode_from_appdata() != 'system':
+            return False
+        text = str(exc or '').lower()
+        if 'fluidsynth' not in text:
+            return False
+        needles = ('not available', 'not installed', 'install', 'pyfluidsynth', 'libfluidsynth')
+        return any(n in text for n in needles)
+
+    def _notify_fluidsynth_missing(self, exc: Exception | None = None) -> None:
+        if self._fluidsynth_missing_warned:
+            return
+        if exc is not None and not self._is_fluidsynth_missing_error(exc):
+            return
+        self._fluidsynth_missing_warned = True
+        msg = (
+            "FluidSynth is not installed on this system.\n\n"
+            "System playback is unavailable. Install it with:\n"
+            "sudo apt-get install fluidsynth libfluidsynth3\n\n"
+            "You can still use External MIDI playback from the Playback menu."
+        )
+        try:
+            QtWidgets.QMessageBox.warning(self, "FluidSynth not installed", msg)
+        except Exception:
+            pass
+        try:
+            self._status("FluidSynth missing: install fluidsynth/libfluidsynth3 or use External MIDI", 7000)
+        except Exception:
+            pass
+
     def _rebuild_midi_port_menu(self) -> None:
         menu = getattr(self, '_midi_port_menu', None)
         if menu is None:
@@ -1341,6 +1375,7 @@ class MainWindow(QtWidgets.QMainWindow):
             self._ensure_player()
             return
         except Exception as exc:
+            self._notify_fluidsynth_missing(exc)
             # If missing soundfont, prompt the user and retry once
             msg = str(exc).lower()
             if "soundfont" in msg:
@@ -2679,7 +2714,8 @@ class MainWindow(QtWidgets.QMainWindow):
         try:
             # Recreate backend immediately so audition/test tone keep working after a mode switch.
             self._ensure_player_with_soundfont()
-        except Exception:
+        except Exception as exc:
+            self._notify_fluidsynth_missing(exc)
             pass
 
     def _set_send_midi_transport(self, enabled: bool) -> None:
@@ -2691,7 +2727,8 @@ class MainWindow(QtWidgets.QMainWindow):
             self._ensure_player_with_soundfont()
             self.player.audition_note(pitch=49, velocity=100, duration_sec=1.0)
             self._status("Test tone", 1500)
-        except Exception:
+        except Exception as exc:
+            self._notify_fluidsynth_missing(exc)
             self._status("Test tone unavailable", 2000)
 
     def _choose_audio_device(self) -> None:
