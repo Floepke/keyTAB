@@ -29,11 +29,11 @@ class SnapDrawerMixin:
         except Exception:
             ar, ag, ab = (0.2, 0.5, 1.0)
             pr, pg, pb = (1.0, 1.0, 1.0)
-        mix = 0.16  # keep tint very light: mostly paper, slight accent cast
+        mix = 0.20  # keep tint very light: mostly paper, slight accent cast
         r = pr * (1.0 - mix) + ar * mix
         g = pg * (1.0 - mix) + ag * mix
         b = pb * (1.0 - mix) + ab * mix
-        return (float(r), float(g), float(b), 0.18)
+        return (float(r), float(g), float(b), 1.0)
 
     def draw_snap(self, du: DrawUtil) -> None:
         """Draw alternating light/darker snap bands along the vertical timeline.

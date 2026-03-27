@@ -135,32 +135,9 @@ class ToolbarHandle(QtWidgets.QSplitterHandle):
         sep.setStyleSheet(f"background-color: rgb({line_r}, {line_g}, {line_b});")
         layout.addWidget(sep)
 
-        self.info_btn = QtWidgets.QToolButton(self)
-        self.info_btn.setFocusPolicy(QtCore.Qt.FocusPolicy.NoFocus)
-        self.info_btn.setText('T')
-        try:
-            f = self.info_btn.font()
-            sz = f.pointSizeF()
-            if sz <= 0:
-                sz = float(f.pointSize())
-            if sz <= 0:
-                sz = 10.0
-            f.setPointSizeF(sz * 2.0)
-            self.info_btn.setFont(f)
-        except Exception:
-            pass
-        self.info_btn.setToolTip('Title info. Edit title, composer, and copyright. View analysis information.')
-        self.info_btn.setIconSize(QtCore.QSize(self._button_size - 6, self._button_size - 6))
-        self.info_btn.setFixedSize(self._button_size, self._button_size)
-        layout.addWidget(self.info_btn)
-        try:
-            self.info_btn.clicked.connect(parent.infoRequested.emit)
-        except Exception:
-            pass
-
         self.style_btn = QtWidgets.QToolButton(self)
         self.style_btn.setFocusPolicy(QtCore.Qt.FocusPolicy.NoFocus)
-        self.style_btn.setText('A')
+        self.style_btn.setText('S')
         try:
             f = self.style_btn.font()
             sz = f.pointSizeF()
@@ -181,10 +158,33 @@ class ToolbarHandle(QtWidgets.QSplitterHandle):
         except Exception:
             pass
 
+        self.info_btn = QtWidgets.QToolButton(self)
+        self.info_btn.setFocusPolicy(QtCore.Qt.FocusPolicy.NoFocus)
+        self.info_btn.setText('I')
+        try:
+            f = self.info_btn.font()
+            sz = f.pointSizeF()
+            if sz <= 0:
+                sz = float(f.pointSize())
+            if sz <= 0:
+                sz = 10.0
+            f.setPointSizeF(sz * 2.0)
+            self.info_btn.setFont(f)
+        except Exception:
+            pass
+        self.info_btn.setToolTip('Title info. Edit title, composer, and copyright. View analysis information.')
+        self.info_btn.setIconSize(QtCore.QSize(self._button_size - 6, self._button_size - 6))
+        self.info_btn.setFixedSize(self._button_size, self._button_size)
+        layout.addWidget(self.info_btn)
+        try:
+            self.info_btn.clicked.connect(parent.infoRequested.emit)
+        except Exception:
+            pass
+
         # Quick dialogs: Title info, Appearance, Line Breaks
         self.line_break_btn = QtWidgets.QToolButton(self)
         self.line_break_btn.setFocusPolicy(QtCore.Qt.FocusPolicy.NoFocus)
-        self.line_break_btn.setText('B')
+        self.line_break_btn.setText('L')
         try:
             f = self.line_break_btn.font()
             sz = f.pointSizeF()

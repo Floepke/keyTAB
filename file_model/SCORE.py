@@ -47,7 +47,7 @@ def _timestamp_now() -> str:
 
 @dataclass
 class MetaData:
-	description: str = 'This is a .piano score file created with keyTAB. keyTAB is a free and open-source Syntheasia like notation editor and basic MIDI sequencer.'
+	description: str = 'This is a .piano score file created with keyTAB.'
 	extension: str = '.piano'
 	format: str = 'json'
 	creation_timestamp: str = ''

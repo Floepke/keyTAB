@@ -1953,6 +1953,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
             measure_pad = 1.5
             measure_symbol_anchor: dict[float, tuple[float, float, float]] = {}
             measure_number_y_nudge = max(0.4, 0.9 * scale)
+            measure_symbol_default_right_x = float(grid_right + measure_pad * 2.0)
 
             def _note_x_range(it: dict, include_stem: bool) -> tuple[float, float]:
                 p = int(it.get('pitch', 0) or 0)
@@ -2056,6 +2057,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                     float(text_w_mm),
                     float(y_text),
                 )
+                measure_symbol_default_right_x = float(x_pos + text_w_mm)
 
             symbol_width = max(3.0, semitone_mm * 2.8)
             symbol_gap = max(0.6, semitone_mm * 0.35)
@@ -2064,13 +2066,13 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
             symbol_dot_d = max(1.0, semitone_mm * 0.6)
             symbol_dot_y = max(0.8, semitone_mm * 0.55)
 
-            def _symbol_anchor_x(rep_t: float) -> float:
+            def _symbol_right_x(rep_t: float) -> float:
                 key = round(float(rep_t), 6)
                 anchored = measure_symbol_anchor.get(key)
                 if anchored is not None:
                     x_num, w_num, _y_num = anchored
-                    return float(x_num + max(0.0, (w_num - symbol_width) * 0.5))
-                return float(grid_right + measure_pad * 2.0)
+                    return float(x_num + w_num)
+                return float(measure_symbol_default_right_x)
 
             def _symbol_y(rep_t: float, kind: str) -> float:
                 if kind not in ('start', 'end'):
@@ -2078,7 +2080,13 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                 key = round(float(rep_t), 6)
                 anchored = measure_symbol_anchor.get(key)
                 if anchored is None:
-                    return _time_to_y(rep_t)
+                    y_base = _time_to_y(rep_t)
+                    # Keep original placement behavior, but ensure end-repeat symbols
+                    # at system bottoms use the same vertical offset as other end repeats.
+                    if kind == 'end':
+                        sep = max(0.2, 0.2 * scale)
+                        return float(y_base)
+                    return y_base
                 _x_num, _w_num, y_num = anchored
                 sep = max(0.2, 0.2 * scale)
                 return float(y_num - (symbol_dot_y + (symbol_dot_d * 0.5) + sep))
@@ -2087,8 +2095,8 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                 if op_time.lt(rep_t, float(line['time_start'])) or op_time.gt(rep_t, float(line['time_end'])):
                     return
                 y_rep = _symbol_y(rep_t, kind)
-                x_left = _symbol_anchor_x(rep_t)
-                x_right = x_left + symbol_width
+                x_right = _symbol_right_x(rep_t)
+                x_left = x_right - symbol_width
                 dot_x1 = x_left + (symbol_width * 0.25)
                 dot_x2 = x_left + (symbol_width * 0.75)
                 if kind == 'start':
