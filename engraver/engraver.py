@@ -75,16 +75,16 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
             continue
         bt = float(b.get('time', 0.0) or 0.0)
         bd = float(b.get('duration', 0.0) or 0.0)
-        hand_raw = str(b.get('hand', '<') or '<')
-        hand_key = 'l' if hand_raw in ('<', 'l') else 'r'
+        hand_raw = str(b.get('hand', 'l') or 'l')
+        hand_key = 'l' if hand_raw == 'l' else 'r'
         beam_by_hand[hand_key].append({'time': bt, 'duration': bd})
     for hk in beam_by_hand:
         beam_by_hand[hk] = sorted(beam_by_hand[hk], key=lambda m: float(m.get('time', 0.0)))
 
     # Problem solved: normalize notes once to avoid repeated dict parsing in loops.
     norm_notes: list[dict] = []  # Normalized notes for processing
-    notes_by_hand: dict[str, list[dict]] = {'<': [], '>': []}
-    starts_by_hand: dict[str, list[float]] = {'<': [], '>': []}
+    notes_by_hand: dict[str, list[dict]] = {'l': [], 'r': []}
+    starts_by_hand: dict[str, list[float]] = {'l': [], 'r': []}
     for idx, n in enumerate(notes):
         if not isinstance(n, dict):
             continue
@@ -92,8 +92,8 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
         n_d = float(n.get('duration', 0.0) or 0.0)
         n_end = n_t + n_d
         p = int(n.get('pitch', 0) or 0)
-        hand_raw = str(n.get('hand', '<') or '<')
-        hand_key = '<' if hand_raw in ('<', 'l') else '>'
+        hand_raw = str(n.get('hand', 'l') or 'l')
+        hand_key = 'l' if hand_raw == 'l' else 'r'
         item = {
             'time': n_t,
             'end': n_end,
@@ -442,9 +442,9 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
 
     # Problem solved: continuation dots count for grid_band pitch sizing by
     # creating synthetic starts at beat-group boundaries crossed by held notes.
-    grid_band_starts_by_hand: dict[str, list[float]] = {'<': [], '>': []}
-    grid_band_pitches_by_hand: dict[str, list[int]] = {'<': [], '>': []}
-    for hk in ('<', '>'):
+    grid_band_starts_by_hand: dict[str, list[float]] = {'l': [], 'r': []}
+    grid_band_pitches_by_hand: dict[str, list[int]] = {'l': [], 'r': []}
+    for hk in ('l', 'r'):
         hand_notes = notes_by_hand.get(hk, []) or []
         events: list[tuple[float, int]] = []
         for item in hand_notes:
@@ -714,13 +714,13 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
             return False
         if rule != 'above_stem_if_chord_and_white_note_same_hand':
             return False
-        hand0 = str(item.get('hand', '<') or '<')
+        hand0 = str(item.get('hand', 'l') or 'l')
         for n in notes:
             if int(n.get('idx', -2) or -2) == idx0:
                 continue
             if not op.eq(float(n.get('time', 0.0) or 0.0), t0):
                 continue
-            if str(n.get('hand', '<') or '<') != hand0:
+            if str(n.get('hand', 'l') or 'l') != hand0:
                 continue
             np = int(n.get('pitch', 0) or 0)
             if np not in BLACK_KEYS and np != p0:
@@ -733,7 +733,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
         Problem solved: stop-signs should mark a gap in the same hand, not
         simply the end of a note.
         """
-        hand_key = str(item.get('hand', '<') or '<')
+        hand_key = str(item.get('hand', 'l') or 'l')
         hand_list = notes_by_hand.get(hand_key, [])
         starts = starts_by_hand.get(hand_key, [])
         if not hand_list or not starts:
@@ -1680,7 +1680,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
             for hand_norm in ('r', 'l'):
                 notes_for_hand = [
                     n for n in line_notes_for_barlines
-                    if ('l' if str(n.get('hand', '<') or '<') in ('<', 'l') else 'r') == hand_norm
+                    if ('l' if str(n.get('hand', 'l') or 'l') == 'l' else 'r') == hand_norm
                 ]
                 markers_for_hand = beam_by_hand.get(hand_norm, [])
                 groups, windows = _group_by_beam_markers(notes_for_hand, markers_for_hand, line_start_ticks_local, line_end_ticks_local)
@@ -1777,8 +1777,8 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                         x_note + note_head_half_w + head_collision_pad + barline_symbol_gap_mm,
                     ))
                     if bool(layout.get('note_stem_visible', True)):
-                        hand_key = str(item.get('hand', '<') or '<')
-                        x_stem_tip = x_note - stem_len_mm_for_barlines if hand_key in ('<', 'l') else x_note + stem_len_mm_for_barlines
+                        hand_key = str(item.get('hand', 'l') or 'l')
+                        x_stem_tip = x_note - stem_len_mm_for_barlines if hand_key == 'l' else x_note + stem_len_mm_for_barlines
                         intervals.append((
                             min(x_note, x_stem_tip) - stem_collision_pad - barline_symbol_gap_mm,
                             max(x_note, x_stem_tip) + stem_collision_pad + barline_symbol_gap_mm,
@@ -1918,7 +1918,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                         if dark_intervals:
                             for t0, t1 in dark_intervals:
                                 g0, g1 = _group_window_for_interval(group_boundaries, t0, t1)
-                                span = _hand_band_x_span('<', g0, g1)
+                                span = _hand_band_x_span('l', g0, g1)
                                 if span is None:
                                     continue
                                 bx0, bx1 = span
@@ -2137,8 +2137,8 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
 
             notes_by_hand_line: dict[str, list[dict]] = {'l': [], 'r': []}
             for item in line_notes:
-                hk = str(item.get('hand', '<') or '<')
-                hand_norm = 'l' if hk in ('<', 'l') else 'r'
+                hk = str(item.get('hand', 'l') or 'l')
+                hand_norm = 'l' if hk == 'l' else 'r'
                 notes_by_hand_line[hand_norm].append(item)
 
             beam_groups_by_hand: dict[str, tuple[list[list[dict]], list[tuple[float, float]]]] = {}
@@ -2231,9 +2231,9 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                 p = int(it.get('pitch', 0) or 0)
                 x = _key_to_x(p)
                 w = semitone_mm
-                hand_key = str(it.get('hand', '<') or '<')
+                hand_key = str(it.get('hand', 'l') or 'l')
                 beam_ext = semitone_mm if include_stem else 0.0
-                if hand_key in ('l', '<'):
+                if hand_key == 'l':
                     x_min = x - (max(w, stem_len_mm + beam_ext) if include_stem else w)
                     x_max = x + w
                 else:
@@ -2483,8 +2483,8 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
             if bool(layout.get('beam_visible', True)):
                 notes_by_hand_line: dict[str, list[dict]] = {'l': [], 'r': []}
                 for item in line_notes:
-                    hk = str(item.get('hand', '<') or '<')
-                    hand_norm = 'l' if hk in ('<', 'l') else 'r'
+                    hk = str(item.get('hand', 'l') or 'l')
+                    hand_norm = 'l' if hk == 'l' else 'r'
                     notes_by_hand_line[hand_norm].append(item)
 
                 stem_len_units = float(layout.get('note_stem_length_semitone', 3) or 3)
@@ -2597,12 +2597,12 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
             def _has_adjacent_white_same_hand(note_dict: dict) -> bool:
                 p0 = int(note_dict.get('pitch', 0) or 0)
                 t0 = float(note_dict.get('time', 0.0) or 0.0)
-                h0 = str(note_dict.get('hand', '<') or '<')
+                h0 = str(note_dict.get('hand', 'l') or 'l')
                 idx0 = int(note_dict.get('idx', -1) or -1)
                 for m in line_notes:
                     if int(m.get('idx', -2) or -2) == idx0:
                         continue
-                    if str(m.get('hand', '<') or '<') != h0:
+                    if str(m.get('hand', 'l') or 'l') != h0:
                         continue
                     if not op_time.eq(float(m.get('time', 0.0) or 0.0), t0):
                         continue
@@ -2677,7 +2677,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                 n_t = float(item.get('time', 0.0) or 0.0)
                 n_end = float(item.get('end', 0.0) or 0.0)
                 p = int(item.get('pitch', 0) or 0)
-                hand_key = str(item.get('hand', '<') or '<')
+                hand_key = str(item.get('hand', 'l') or 'l')
                 n = item.get('raw', {}) or {}
                 x = _key_to_x(p)
                 y_start = _time_to_y(n_t)
@@ -2692,7 +2692,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                 # Problem solved: draw the note body with auto-by-hand or explicit hex color.
                 raw_color = n.get('color', 'auto')
                 color_txt = str(raw_color).strip() if isinstance(raw_color, str) else 'auto'
-                fallback = 'note_midinote_left_color' if hand_key in ('l', '<') else 'note_midinote_right_color'
+                fallback = 'note_midinote_left_color' if hand_key == 'l' else 'note_midinote_right_color'
                 if color_txt == 'auto':
                     base = _normalize_hex_color(layout.get(fallback, '#cccccc'))
                 else:
@@ -2780,7 +2780,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                     stem_len_units = float(layout.get('note_stem_length_semitone', 3) or 3)
                     stem_len = stem_len_units * semitone_mm
                     stem_w = float(layout.get('note_stem_thickness_mm', 0.5) or 0.5) * scale
-                    x2 = x - stem_len if hand_key in ('l', '<') else x + stem_len
+                    x2 = x - stem_len if hand_key == 'l' else x + stem_len
                     du.add_line(
                         x,
                         y_start,
@@ -2793,7 +2793,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                     )
 
                 # Problem solved: left-hand dot uses inverse fill on black keys.
-                if (not continues_from_prev_line) and bool(layout.get('note_leftdot_visible', True)) and hand_key in ('l', '<'):
+                if (not continues_from_prev_line) and bool(layout.get('note_leftdot_visible', True)) and hand_key == 'l':
                     w2 = w * 2.0
                     dot_d = w2 * 0.3
                     cy = note_y + (w2 / 2.0)
@@ -2863,7 +2863,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                 for m in line_notes:
                     if int(m.get('idx', -1) or -1) == int(item.get('idx', -2) or -2):
                         continue
-                    if str(m.get('hand', '<') or '<') != hand_key:
+                    if str(m.get('hand', 'l') or 'l') != hand_key:
                         continue
                     s = float(m.get('time', 0.0) or 0.0)
                     e = float(m.get('end', 0.0) or 0.0)
@@ -2902,7 +2902,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                 same_time = [
                     m
                     for m in line_notes
-                    if str(m.get('hand', '<') or '<') == hand_key
+                    if str(m.get('hand', 'l') or 'l') == hand_key
                     and op_time.eq(float(m.get('time', 0.0) or 0.0), n_t)
                     and not _is_line_continuation(m)
                 ]

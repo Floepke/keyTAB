@@ -87,7 +87,7 @@ def midi_load(path: str) -> SCORE:
             # MIDI A4 (69) -> app A4 (49): subtract 20
             app_pitch = int(n.pitch) - 20
             # Simple left/right hand heuristic around app middle C (~40)
-            hand = '<' if int(app_pitch) < 40 else '>'
+            hand = 'l' if int(app_pitch) < 40 else 'r'
             vel = int(getattr(n, 'velocity', 64) or 64)
             vel = max(0, min(127, vel))
             if duration_units < float(GRACENOTE_THRESHOLD):
@@ -261,7 +261,7 @@ def _midi_load_with_mido(path: str) -> SCORE:
                     end_units = (end_sec / (60.0 / bpm0)) * QUARTER_NOTE_UNIT
                     duration_units = max(0.0, float(end_units) - float(start_units))
                     app_pitch = int(msg.note) - 20
-                    hand = '<' if int(app_pitch) < 40 else '>'
+                    hand = 'l' if int(app_pitch) < 40 else 'r'
                     if duration_units < float(GRACENOTE_THRESHOLD):
                         score.new_grace_note(pitch=int(app_pitch), time=float(start_units))
                     else:
@@ -275,7 +275,7 @@ def _midi_load_with_mido(path: str) -> SCORE:
                 end_units = (end_sec / (60.0 / bpm0)) * QUARTER_NOTE_UNIT
                 duration_units = max(0.0, float(end_units) - float(start_units))
                 app_pitch2 = int(pitch) - 20
-                hand = '<' if int(app_pitch2) < 40 else '>'
+                hand = 'l' if int(app_pitch2) < 40 else 'r'
             # If velocity not retained (should be), default to 64
             default_vel = 64
             if duration_units < float(GRACENOTE_THRESHOLD):

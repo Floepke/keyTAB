@@ -17,7 +17,7 @@ class NoteTool(BaseTool):
         super().__init__()
         # Currently edited/created note during a press/drag session
         self.edit_note = None
-        self._hand: str = '<'
+        self._hand: str = 'l'
         self.expanded_score_flag: bool = False
         # Drag-session context
         self._editing_existing: bool = False
@@ -98,7 +98,7 @@ class NoteTool(BaseTool):
             t0, members = clusters[0]
             if len(members) < 2:
                 return ([], None)
-            hands = {str(getattr(m, 'hand', '<') or '<') for m in members}
+            hands = {str(getattr(m, 'hand', 'l') or 'l') for m in members}
             if len(hands) > 1:
                 return ([], None)
             return (members, float(t0))
@@ -132,7 +132,7 @@ class NoteTool(BaseTool):
         t_sel, lst = grouped_items[0]
         if len(lst) < 2:
             return ([], None)
-        hands = {str(getattr(m, 'hand', '<') or '<') for m in lst}
+        hands = {str(getattr(m, 'hand', 'l') or 'l') for m in lst}
         if len(hands) > 1:
             return ([], None)
         return (lst, float(t_sel))
@@ -324,8 +324,8 @@ class NoteTool(BaseTool):
         margin = float(getattr(self._editor, 'margin', 12.0) or 12.0)
         stave_width = float(getattr(self._editor, 'stave_width', 120.0) or 120.0)
         max_len = max(2.0, margin * 0.85)
-        hand = str(getattr(self._velocity_target, 'hand', '<') or '<')
-        if hand == '<':
+        hand = str(getattr(self._velocity_target, 'hand', 'l') or 'l')
+        if hand == 'l':
             dist = max(0.0, float(margin) - float(x_mm))
         else:
             dist = max(0.0, float(x_mm) - float(margin + stave_width))
@@ -457,7 +457,7 @@ class NoteTool(BaseTool):
         t_press_raw = float(self._editor.y_to_time(y))
         t_press_snap = float(self._editor.snap_time(t_press_raw))
         pitch_press = int(self._editor.x_to_pitch(x))
-        self._hand = str(getattr(self._editor, 'hand_cursor', '<') or '<')
+        self._hand = str(getattr(self._editor, 'hand_cursor', 'l') or 'l')
 
         # Rectangle-based hit detection for precise clickable area
         found, hit_rect, y_mm_abs = self._hit_note_and_rect(score, x, y)
@@ -736,9 +736,9 @@ class NoteTool(BaseTool):
         if self._editor is None:
             return
         if name == 'hand_left':
-            self._editor.hand_cursor = '<'
+            self._editor.hand_cursor = 'l'
         elif name == 'hand_right':
-            self._editor.hand_cursor = '>'
+            self._editor.hand_cursor = 'r'
         elif name == 'velocity_toggle':
             self._velocity_mode = not self._velocity_mode
             self._velocity_dragging = False

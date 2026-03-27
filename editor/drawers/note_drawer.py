@@ -128,8 +128,8 @@ class NoteDrawerMixin:
     def _midinote_color(self, n, draw_mode: str) -> tuple[float, float, float, float]:
         if draw_mode in ('cursor', 'edit', 'selected'):
             return self.accent_color
-        hand = getattr(n, 'hand', '<')
-        key = 'midi_left' if hand in ('l', '<') else 'midi_right'
+        hand = getattr(n, 'hand', 'l')
+        key = 'midi_left' if hand == 'l' else 'midi_right'
         r, g, b = Style.get_named_rgb(key, (153, 179, 204))
         return (float(r) / 255.0, float(g) / 255.0, float(b) / 255.0, 1.0)
 
@@ -190,8 +190,8 @@ class NoteDrawerMixin:
         stem_len = float(layout.note_stem_length_semitone or 3) * w
         style_scale = float(getattr(layout, 'scale', 1.0) or 1.0)
         thickness = float(layout.grid_barline_thickness_mm or 0.25) * style_scale
-        hand = getattr(n, 'hand', '<')
-        if hand in ('l', '<'):
+        hand = getattr(n, 'hand', 'l')
+        if hand == 'l':
             x1 = x
             x2 = x + (w * 2.0)
             x3 = x - stem_len
@@ -302,7 +302,7 @@ class NoteDrawerMixin:
         style_scale = float(getattr(layout, 'scale', 1.0) or 1.0)
         stem_w = max(0.1, float(getattr(layout, 'note_stem_thickness_mm', 0.75) or 0.75) * style_scale * self._STEM_WIDTH_FACTOR)
         # Stem direction based on hand
-        if getattr(n, 'hand', '<') in ('l', '<'):
+        if getattr(n, 'hand', 'l') == 'l':
             x2 = x - stem_len
         else:
             x2 = x + stem_len
@@ -322,7 +322,7 @@ class NoteDrawerMixin:
         if getattr(self, 'is_tiny_mode', None) and self.is_tiny_mode():
             return
         # Draw dots where other notes in same hand start or end within this note duration
-        hand = getattr(n, 'hand', '<')
+        hand = getattr(n, 'hand', 'l')
         start = float(n.time)
         end = float(n.time + n.duration)
         w = float(self.semitone_dist or 0.5)
@@ -333,7 +333,7 @@ class NoteDrawerMixin:
         cache = cast("Editor", self)._draw_cache or {}
         notes_view = cache.get('notes_view') or (self._cached_notes_view or [])
         for m in notes_view:
-            if m._id == n._id or getattr(m, 'hand', '<') != hand:
+            if m._id == n._id or getattr(m, 'hand', 'l') != hand:
                 continue
             s = float(m.time)
             e = float(m.time + m.duration)
@@ -372,11 +372,11 @@ class NoteDrawerMixin:
         layout = self.current_score().layout
         style_scale = float(getattr(layout, 'scale', 1.0) or 1.0)
         stem_w = max(0.1, float(getattr(layout, 'note_stem_thickness_mm', 0.75) or 0.75) * style_scale * self._STEM_WIDTH_FACTOR)
-        hand = getattr(n, 'hand', '<')
+        hand = getattr(n, 'hand', 'l')
         t = float(n.time)
         cache = cast("Editor", self)._draw_cache or {}
         notes_view = cache.get('notes_view') or (self._cached_notes_view or [])
-        same_time = [m for m in notes_view if getattr(m, 'hand', '<') == hand and self._time_op.eq(float(m.time), t)]
+        same_time = [m for m in notes_view if getattr(m, 'hand', 'l') == hand and self._time_op.eq(float(m.time), t)]
         if len(same_time) < 2:
             return
         lowest = min(same_time, key=lambda m: m.pitch)
@@ -397,7 +397,7 @@ class NoteDrawerMixin:
     def _draw_left_dot(self, du: DrawUtil, n, x: float, y1: float, draw_mode: str) -> None:
         self = cast("Editor", self)
         # Simple left-hand indicator dot in notehead (optional)
-        if getattr(n, 'hand', '<') not in ('l', '<'):
+        if getattr(n, 'hand', 'l') != 'l':
             return
         layout = self.current_score().layout
         if not bool(getattr(layout, 'note_leftdot_visible', False)):
@@ -462,13 +462,13 @@ class NoteDrawerMixin:
             return False
         if rule != 'above_stem_if_chord_and_white_note_same_hand':
             return False
-        hand0 = str(getattr(n, 'hand', '<') or '<')
+        hand0 = str(getattr(n, 'hand', 'l') or 'l')
         for m in notes_view:
             if getattr(m, '_id', None) == getattr(n, '_id', None):
                 continue
             if not self._time_op.eq(float(getattr(m, 'time', 0.0) or 0.0), t0):
                 continue
-            if str(getattr(m, 'hand', '<') or '<') != hand0:
+            if str(getattr(m, 'hand', 'l') or 'l') != hand0:
                 continue
             mp = int(getattr(m, 'pitch', 0) or 0)
             if mp not in BLACK_KEYS and mp != p0:
@@ -483,11 +483,11 @@ class NoteDrawerMixin:
             notes_view = self._cached_notes_view or []
         t0 = float(getattr(n, 'time', 0.0) or 0.0)
         p0 = int(getattr(n, 'pitch', 0) or 0)
-        h0 = str(getattr(n, 'hand', '<') or '<')
+        h0 = str(getattr(n, 'hand', 'l') or 'l')
         for m in notes_view:
             if getattr(m, '_id', None) == getattr(n, '_id', None):
                 continue
-            if str(getattr(m, 'hand', '<') or '<') != h0:
+            if str(getattr(m, 'hand', 'l') or 'l') != h0:
                 continue
             if not self._time_op.eq(float(getattr(m, 'time', 0.0) or 0.0), t0):
                 continue
@@ -511,7 +511,7 @@ class NoteDrawerMixin:
     def _is_followed_by_rest(self, n) -> bool:
         # True if there is a gap after this note before next note in same hand
         self = cast("Editor", self)
-        hand = getattr(n, 'hand', '<')
+        hand = getattr(n, 'hand', 'l')
         end = float(n.time + n.duration)
         cache = getattr(self, '_draw_cache', None) or {}
         op: Operator = cache.get('op') or self._time_op
@@ -547,7 +547,7 @@ class NoteDrawerMixin:
         min_delta = None
         for j in range(idx, len(notes_sorted)):
             m = notes_sorted[j]
-            if m._id == n._id or getattr(m, 'hand', '<') != hand:
+            if m._id == n._id or getattr(m, 'hand', 'l') != hand:
                 continue
             delta = float(m.time) - end
             if delta >= -thr:

@@ -434,7 +434,9 @@ class StyleDialog(QtWidgets.QDialog):
         self._score: SCORE | None = score
         self._tab_scrolls: list[QtWidgets.QScrollArea] = []
         self._tab_contents: list[QtWidgets.QWidget] = []
-        self._tabs: QtWidgets.QTabWidget | None = None
+        self._category_list: QtWidgets.QListWidget | None = None
+        self._stack: QtWidgets.QStackedWidget | None = None
+        self._tab_titles: list[str] = []
         self._all_fonts_combo: QtWidgets.QFontComboBox | None = None
         self._field_tabs: dict[str, str] = {}
 
@@ -442,13 +444,30 @@ class StyleDialog(QtWidgets.QDialog):
         lay.setContentsMargins(8, 8, 8, 8)
         lay.setSpacing(8)
 
-        tabs = QtWidgets.QTabWidget(self)
-        self._tabs = tabs
-        lay.addWidget(tabs, 1)
-        try:
-            tabs.currentChanged.connect(self.tab_changed.emit)
-        except Exception:
-            pass
+        pages_row = QtWidgets.QHBoxLayout()
+        pages_row.setContentsMargins(0, 0, 0, 0)
+        pages_row.setSpacing(8)
+        lay.addLayout(pages_row, 1)
+
+        category_list = QtWidgets.QListWidget(self)
+        category_list.setSelectionMode(QtWidgets.QAbstractItemView.SelectionMode.SingleSelection)
+        category_list.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        category_list.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        category_list.setMinimumWidth(150)
+        category_list.setMaximumWidth(220)
+        self._category_list = category_list
+        pages_row.addWidget(category_list, 0)
+
+        stack = QtWidgets.QStackedWidget(self)
+        self._stack = stack
+        pages_row.addWidget(stack, 1)
+
+        def _on_category_changed(index: int) -> None:
+            if self._stack is not None and 0 <= int(index) < self._stack.count():
+                self._stack.setCurrentIndex(int(index))
+            self.tab_changed.emit(max(0, int(index)))
+
+        category_list.currentRowChanged.connect(_on_category_changed)
 
         tab_order = [
             "Page",
@@ -468,11 +487,11 @@ class StyleDialog(QtWidgets.QDialog):
         ]
 
         def _make_tab(title: str) -> QtWidgets.QFormLayout:
-            tab = QtWidgets.QWidget(self)
-            tab_layout = QtWidgets.QVBoxLayout(tab)
-            tab_layout.setContentsMargins(0, 0, 0, 0)
-            tab_layout.setSpacing(6)
-            scroll = QtWidgets.QScrollArea(tab)
+            page = QtWidgets.QWidget(self)
+            page_layout = QtWidgets.QVBoxLayout(page)
+            page_layout.setContentsMargins(0, 0, 0, 0)
+            page_layout.setSpacing(6)
+            scroll = QtWidgets.QScrollArea(page)
             scroll.setWidgetResizable(True)
             content = QtWidgets.QWidget(scroll)
             form = QtWidgets.QFormLayout(content)
@@ -480,13 +499,19 @@ class StyleDialog(QtWidgets.QDialog):
             form.setSpacing(6)
             content.setLayout(form)
             scroll.setWidget(content)
-            tab_layout.addWidget(scroll, 1)
-            tabs.addTab(tab, title)
+            page_layout.addWidget(scroll, 1)
+            if self._stack is not None:
+                self._stack.addWidget(page)
+            if self._category_list is not None:
+                self._category_list.addItem(title)
+            self._tab_titles.append(title)
             self._tab_scrolls.append(scroll)
             self._tab_contents.append(content)
             return form
 
         tab_forms: dict[str, QtWidgets.QFormLayout] = {t: _make_tab(t) for t in tab_order}
+        if self._category_list is not None and self._category_list.count() > 0:
+            self._category_list.setCurrentRow(0)
 
         field_tabs: dict[str, str] = {
             # Page
@@ -642,8 +667,9 @@ class StyleDialog(QtWidgets.QDialog):
         QtCore.QTimer.singleShot(0, self._fit_to_contents)
 
     def _fit_to_contents(self) -> None:
-        tabs = self._tabs
-        if tabs is None or not self._tab_scrolls or not self._tab_contents:
+        category_list = self._category_list
+        stack = self._stack
+        if category_list is None or stack is None or not self._tab_scrolls or not self._tab_contents:
             return
         try:
             screen = QtWidgets.QApplication.primaryScreen()
@@ -662,8 +688,9 @@ class StyleDialog(QtWidgets.QDialog):
             except Exception:
                 continue
 
-        tab_bar_h = int(tabs.tabBar().sizeHint().height())
-        tab_bar_w = int(tabs.tabBar().sizeHint().width())
+        list_w = int(max(140, min(220, category_list.sizeHintForColumn(0) + 28 if category_list.count() > 0 else 170)))
+        category_list.setMinimumWidth(list_w)
+        category_list.setMaximumWidth(list_w)
         action_h = int(getattr(self, 'save_style_btn', QtWidgets.QPushButton()).sizeHint().height())
         action_w = int(getattr(self, 'save_style_btn', QtWidgets.QPushButton()).sizeHint().width()) * 3
         msg_h = int(self.msg_label.sizeHint().height())
@@ -676,21 +703,20 @@ class StyleDialog(QtWidgets.QDialog):
         spacing = int(lay.spacing()) if lay is not None else 0
         gaps = 3
 
-        non_scroll_h = margins.top() + margins.bottom() + tab_bar_h + action_h + msg_h + btns_h + (spacing * gaps)
+        non_scroll_h = margins.top() + margins.bottom() + action_h + msg_h + btns_h + (spacing * gaps)
         desired_scroll_h = max_content_h
         max_scroll_h = max(1, max_h - non_scroll_h)
         scroll_h = min(desired_scroll_h, max_scroll_h)
 
         non_scroll_w = margins.left() + margins.right()
-        desired_w = max(tab_bar_w, max_content_w, action_w, msg_w, btns_w) + non_scroll_w
+        right_w = max(420, min(max_content_w, int(max_w * 0.6)))
+        desired_w = list_w + right_w + non_scroll_w + spacing
         total_w = min(desired_w, max_w)
 
         for scroll in self._tab_scrolls:
             frame = int(scroll.frameWidth()) * 2
             scroll.setMinimumHeight(scroll_h + frame)
             scroll.setMaximumHeight(scroll_h + frame)
-            scroll.setMinimumWidth(total_w - non_scroll_w + frame)
-            scroll.setMaximumWidth(total_w - non_scroll_w + frame)
 
         total_h = non_scroll_h + scroll_h
         if total_h > max_h:
@@ -702,23 +728,17 @@ class StyleDialog(QtWidgets.QDialog):
         self.resize(total_w, total_h)
 
     def set_current_tab(self, index: int) -> None:
-        tabs = self._tabs
-        if tabs is None:
+        category_list = self._category_list
+        if category_list is None:
             return
-        try:
-            safe = max(0, min(int(index), tabs.count() - 1))
-            tabs.setCurrentIndex(safe)
-        except Exception:
-            pass
+        safe = max(0, min(int(index), category_list.count() - 1))
+        category_list.setCurrentRow(safe)
 
     def current_tab_index(self) -> int:
-        tabs = self._tabs
-        if tabs is None:
+        category_list = self._category_list
+        if category_list is None:
             return 0
-        try:
-            return int(tabs.currentIndex())
-        except Exception:
-            return 0
+        return int(max(0, category_list.currentRow()))
 
     def _pstyle_dir(self) -> Path:
         root = Path.home() / ".keyTAB" / "pstyle"
@@ -781,11 +801,13 @@ class StyleDialog(QtWidgets.QDialog):
         return self._layout_from_dict(data)
 
     def _current_tab_name(self) -> str:
-        tabs = self._tabs
-        if tabs is None:
+        idx = self.current_tab_index()
+        if not self._tab_titles:
             return ""
         try:
-            return str(tabs.tabText(int(tabs.currentIndex())) or "")
+            if 0 <= int(idx) < len(self._tab_titles):
+                return str(self._tab_titles[int(idx)] or "")
+            return ""
         except Exception:
             return ""
 

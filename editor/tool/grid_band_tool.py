@@ -18,7 +18,7 @@ class GridBandTool(BaseTool):
         self._drag_start_time: float = 0.0
         self._drag_press_time: float = 0.0
         self._drag_initial_duration: float = 0.0
-        self._hand: str = '<'
+        self._hand: str = 'l'
         self._press_hit = None
         self._min_duration_val: float = 8.0
         self._drag_markers: dict[str, GridBand] = {}
@@ -34,11 +34,11 @@ class GridBandTool(BaseTool):
 
     def _current_hand(self) -> str:
         # Single-track mode: hand is irrelevant; keep a fixed marker.
-        return '<'
+        return 'l'
 
     def _hand_for_x(self, _x: float) -> str:
         # Single-track mode: always use one shared track.
-        return '<'
+        return 'l'
 
     def _hands_for_x(self, _x: float) -> list[str]:
         # Single-track mode: operate on a single track.

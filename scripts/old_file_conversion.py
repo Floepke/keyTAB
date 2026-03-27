@@ -2,14 +2,16 @@ from __future__ import annotations
 
 
 def _normalize_hand_value(raw_hand: object) -> str:
-    hand = str(raw_hand or '<').strip()
+    hand = str(raw_hand or 'l').strip()
+    if hand == '<':
+        return 'l'
+    if hand == '>':
+        return 'r'
     if hand.lower() == 'l':
-        return '<'
+        return 'l'
     if hand.lower() == 'r':
-        return '>'
-    if hand not in ('<', '>'):
-        return '<'
-    return hand
+        return 'r'
+    return 'l'
 
 
 def _normalize_color_value(raw_color: object) -> str:
@@ -51,7 +53,8 @@ def convert_legacy_piano_data(data: dict) -> dict:
     Current migration:
     - events.note[].color: '<'/'>'/empty/default -> 'auto'
     - events.note[].notehead: empty/default -> 'auto'
-    - events.note[].hand: legacy 'l'/'r' -> '<'/'>'
+    - events.note[].hand: legacy '<'/'>' -> 'l'/'r'
+    - events.beam[].hand: legacy '<'/'>' -> 'l'/'r'
 
     This function is intentionally idempotent.
     """
@@ -82,8 +85,15 @@ def convert_legacy_piano_data(data: dict) -> dict:
     for note in notes:
         if not isinstance(note, dict):
             continue
-        note['hand'] = _normalize_hand_value(note.get('hand', '<'))
+        note['hand'] = _normalize_hand_value(note.get('hand', 'l'))
         note['color'] = _normalize_color_value(note.get('color', None))
         note['notehead'] = _normalize_notehead_value(note.get('notehead', None))
+
+    beams = events.get('beam', None)
+    if isinstance(beams, list):
+        for beam in beams:
+            if not isinstance(beam, dict):
+                continue
+            beam['hand'] = _normalize_hand_value(beam.get('hand', 'l'))
 
     return data

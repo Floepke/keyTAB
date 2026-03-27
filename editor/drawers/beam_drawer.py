@@ -213,7 +213,7 @@ class BeamDrawerMixin:
             return groups, windows
 
         def norm_hand(h: str) -> str:
-            return 'l' if h in ('<', 'l') else 'r'
+            return 'l' if h == 'l' else 'r'
 
         # Normalize hand keys for notes and markers
         notes_by_norm: dict[str, list] = {'l': [], 'r': []}

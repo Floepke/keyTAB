@@ -13,7 +13,7 @@ class BeamTool(BaseTool):
         self._drag_start_time: float = 0.0
         self._drag_press_time: float = 0.0
         self._drag_initial_duration: float = 0.0
-        self._hand: str = '<'
+        self._hand: str = 'l'
         self._press_hit = None
         self._min_duration_val: float = 8.0
 
@@ -28,7 +28,7 @@ class BeamTool(BaseTool):
         pitch = getattr(self._editor, 'pitch_cursor', None)
         if pitch is None:
             return self._hand
-        return '<' if float(pitch) < 40.0 else '>'
+        return 'l' if float(pitch) < 40.0 else 'r'
 
     def _barlines(self) -> list[float]:
         score = self._score()
@@ -71,7 +71,7 @@ class BeamTool(BaseTool):
     def _find_hit(self, hand: str, t_raw: float, markers: list):
         eps = 1e-6
         for mk in markers:
-            if str(getattr(mk, 'hand', '<')) != hand:
+            if str(getattr(mk, 'hand', 'l')) != hand:
                 continue
             mt = float(getattr(mk, 'time', 0.0) or 0.0)
             dur = float(getattr(mk, 'duration', 0.0) or 0.0)

@@ -15,7 +15,7 @@ class SlurTool(BaseTool):
         self._active_handle: Optional[int] = None  # 1..4
         self._hit_threshold_mm: float = 4.0
         self._created_on_press: bool = False
-        self._hand: str = '<'
+        self._hand: str = 'l'
         self._pressed_existing: bool = False
 
     def toolbar_spec(self) -> list[dict]:
@@ -89,7 +89,7 @@ class SlurTool(BaseTool):
         ]
 
     def _apply_drag(self, sl, handle: int, rpitch: int, time_val: float) -> None:
-        offset = 6 if str(self._hand) == '>' else -6
+        offset = 6 if str(self._hand) == 'r' else -6
         if handle == 1:
             sl.x1_rpitch = rpitch
             sl.y1_time = time_val
@@ -236,11 +236,11 @@ class SlurTool(BaseTool):
         if self._editor is None:
             return
         if name == 'slur_hand_left':
-            self._hand = '<'
-            self._editor.hand_cursor = '<'
+            self._hand = 'l'
+            self._editor.hand_cursor = 'l'
         elif name == 'slur_hand_right':
-            self._hand = '>'
-            self._editor.hand_cursor = '>'
+            self._hand = 'r'
+            self._editor.hand_cursor = 'r'
         # Refresh overlay so visual aids reflect the chosen direction
         if hasattr(self._editor, 'widget') and getattr(self._editor, 'widget', None) is not None:
             w = getattr(self._editor, 'widget')

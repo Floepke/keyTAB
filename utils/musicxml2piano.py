@@ -437,7 +437,7 @@ def parse_musicxml(path: Path) -> tuple[SCORE, dict[str, int]]:
 
     for n in sorted(notes, key=lambda it: (it.time_units, it.midi_pitch)):
         app_pitch = int(n.midi_pitch) - 20
-        hand = ">" if n.stave_key == right_stave else "<"
+        hand = "r" if n.stave_key == right_stave else "l"
         score.new_note(
             pitch=int(app_pitch),
             time=float(n.time_units),

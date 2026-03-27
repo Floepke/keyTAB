@@ -177,7 +177,7 @@ class Editor(QtCore.QObject,
         self.time_cursor: Optional[float] = None
         self.mm_cursor: Optional[float] = None
         self.pitch_cursor: Optional[int] = None
-        self.hand_cursor: Literal['<', '>'] = '<'  # default hand for cursor overlays
+        self.hand_cursor: Literal['l', 'r'] = 'l'  # default hand for cursor overlays
         # show/hide guides depending on mouse over editor
         self.guides_active: bool = True
         # Playhead position (app time units). When set, draws a red line overlay.
@@ -382,7 +382,7 @@ class Editor(QtCore.QObject,
         cy = (float(y_top_mm) + float(y_bottom_mm)) * 0.5
         self._velocity_hit_rects.append({
             '_id': int(note_id),
-            'hand': str(hand or '<'),
+            'hand': str(hand or 'l'),
             'x1': float(x_left_mm),
             'y1': float(y_top_mm),
             'x2': float(x_right_mm),
@@ -1032,14 +1032,14 @@ class Editor(QtCore.QObject,
         # Group by hand for convenience
         notes_by_hand: dict[str, list] = {}
         for m in notes_view:
-            h = str(getattr(m, 'hand', '<'))
+            h = str(getattr(m, 'hand', 'l'))
             notes_by_hand.setdefault(h, []).append(m)
 
         # Beam markers (optional; future use)
         beam_markers = list(getattr(score.events, 'beam', []) or [])
         beam_by_hand: dict[str, list] = {}
         for b in beam_markers:
-            h = str(getattr(b, 'hand', '<'))
+            h = str(getattr(b, 'hand', 'l'))
             beam_by_hand.setdefault(h, []).append(b)
         for h in beam_by_hand:
             beam_by_hand[h] = sorted(beam_by_hand[h], key=lambda b: float(getattr(b, 'time', 0.0)))
@@ -1356,7 +1356,7 @@ class Editor(QtCore.QObject,
                 du.add_line(
                     x_mm,
                     y_mm,
-                    x_mm + l if self.hand_cursor == '>' else x_mm - l,
+                    x_mm + l if self.hand_cursor == 'r' else x_mm - l,
                     y_mm,
                     color=self.accent_color,
                     width_mm=0.75,
@@ -1364,7 +1364,7 @@ class Editor(QtCore.QObject,
                     tags=['cursor'],
                 )
                 # draw the left hand dot indicator
-                if self.hand_cursor == '<':
+                if self.hand_cursor == 'l':
                     w = float(self.semitone_dist or 0.5) * 2.0
                     dot_d = w * 0.35
                     cy = y_mm + (w / 2.0)
@@ -1419,7 +1419,7 @@ class Editor(QtCore.QObject,
                 for n in getattr(score.events, 'note', []) or []:
                     try:
                         y_mm = float(self.time_to_mm(float(getattr(n, 'time', 0.0) or 0.0)))
-                        hand = str(getattr(n, 'hand', '<') or '<')
+                        hand = str(getattr(n, 'hand', 'l') or 'l')
                         nid = int(getattr(n, '_id', 0) or 0)
                         vel = int(getattr(n, 'velocity', 64) or 0)
                     except Exception:
@@ -1427,7 +1427,7 @@ class Editor(QtCore.QObject,
                     if y_mm < (top_mm - bleed_mm) or y_mm > (bottom_mm + bleed_mm):
                         continue
                     ratio = max(0.0, min(1.0, float(vel) / 127.0))
-                    if hand == '<':
+                    if hand == 'l':
                         x_inner = margin
                         x_outer = x_inner - max_len * ratio
                         x1, x2 = x_outer, x_inner
@@ -1717,7 +1717,7 @@ class Editor(QtCore.QObject,
         if score is None or not self._selection_active:
             return False
         h = str(hand)
-        if h not in ('<', '>'):
+        if h not in ('l', 'r'):
             return False
         sel = self.detect_events_from_time_window(self._sel_start_units, self._sel_end_units - 0.1)
         notes = sel.get('note', []) if isinstance(sel, dict) else []

@@ -563,7 +563,7 @@ class CairoEditorWidget(QtWidgets.QWidget):
                     return
             if key in (QtCore.Qt.Key_BracketLeft, QtCore.Qt.Key_BracketRight):
                 try:
-                    hand = '<' if key == QtCore.Qt.Key_BracketLeft else '>'
+                    hand = 'l' if key == QtCore.Qt.Key_BracketLeft else 'r'
                     if self._editor.set_selected_notes_hand(hand):
                         # Force full redraw (not overlay-only) so note styling updates immediately
                         self._content_cache_image = None
@@ -612,14 +612,14 @@ class CairoEditorWidget(QtWidgets.QWidget):
                 except Exception:
                     pass
             if key == QtCore.Qt.Key_Comma:
-                self._editor.hand_cursor = '<'
+                self._editor.hand_cursor = 'l'
                 # Overlay-only guide refresh is enough
                 if hasattr(self, 'request_overlay_refresh'):
                     self.request_overlay_refresh()
                 ev.accept()
                 return
             if key == QtCore.Qt.Key_Period:
-                self._editor.hand_cursor = '>'
+                self._editor.hand_cursor = 'r'
                 if hasattr(self, 'request_overlay_refresh'):
                     self.request_overlay_refresh()
                 ev.accept()

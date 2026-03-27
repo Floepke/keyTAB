@@ -128,11 +128,11 @@ class GridDrawerMixin:
             return lo <= float(t) <= hi
 
         def _norm_hand_key(v: str) -> str:
-            return 'l' if v in ('<', 'l') else 'r'
+            return 'l' if v == 'l' else 'r'
 
         notes_by_norm: dict[str, list] = {'l': [], 'r': []}
         for n in notes_view:
-            notes_by_norm[_norm_hand_key(str(getattr(n, 'hand', '<') or '<'))].append(n)
+            notes_by_norm[_norm_hand_key(str(getattr(n, 'hand', 'l') or 'l'))].append(n)
 
         markers_by_norm: dict[str, list] = {'l': [], 'r': []}
         for hand, markers in beam_markers.items():
@@ -277,8 +277,8 @@ class GridDrawerMixin:
                     x_note + note_head_half_w + head_collision_pad + barline_symbol_gap_mm,
                 ))
                 if note_stem_visible:
-                    hand_key = str(getattr(n, 'hand', '<') or '<')
-                    x_stem_tip = x_note - stem_len_mm if hand_key in ('<', 'l') else x_note + stem_len_mm
+                    hand_key = str(getattr(n, 'hand', 'l') or 'l')
+                    x_stem_tip = x_note - stem_len_mm if hand_key == 'l' else x_note + stem_len_mm
                     intervals.append((
                         min(x_note, x_stem_tip) - stem_collision_pad - barline_symbol_gap_mm,
                         max(x_note, x_stem_tip) + stem_collision_pad + barline_symbol_gap_mm,

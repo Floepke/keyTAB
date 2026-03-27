@@ -105,9 +105,9 @@ def _merge_with_defaults(dc_type, incoming: dict, context: str, skip_keys: set =
 		incoming = {}
 	if dc_type is Note:
 		incoming = dict(incoming)
-		h = str(incoming.get('hand', '<') or '<').strip()
-		if h not in ('<', '>'):
-			h = '<'
+		h = str(incoming.get('hand', 'l') or 'l').strip()
+		if h not in ('l', 'r'):
+			h = 'l'
 		incoming['hand'] = h
 		raw_color = incoming.get('color', 'auto')
 		if isinstance(raw_color, str):
@@ -167,11 +167,11 @@ class SCORE:
 		return i
 
 	def new_note(self, **kwargs) -> Note:
-		base = {'pitch': 40, 'time': 0.0, 'duration': 100.0, 'hand': '<', 'color': 'auto'}
+		base = {'pitch': 40, 'time': 0.0, 'duration': 100.0, 'hand': 'l', 'color': 'auto'}
 		base.update(kwargs)
-		h = str(base.get('hand', '<') or '<').strip()
-		if h not in ('<', '>'):
-			h = '<'
+		h = str(base.get('hand', 'l') or 'l').strip()
+		if h not in ('l', 'r'):
+			h = 'l'
 		base['hand'] = h
 		raw_color = base.get('color', 'auto')
 		if isinstance(raw_color, str):
@@ -230,8 +230,12 @@ class SCORE:
 		return obj
 
 	def new_beam(self, **kwargs) -> Beam:
-		base = {'time': 0.0, 'duration': 100.0, 'hand': '<'}
+		base = {'time': 0.0, 'duration': 100.0, 'hand': 'l'}
 		base.update(kwargs)
+		h = str(base.get('hand', 'l') or 'l').strip()
+		if h not in ('l', 'r'):
+			h = 'l'
+		base['hand'] = h
 		obj = Beam(**base, _id=self._gen_id())
 		self.events.beam.append(obj)
 		return obj
@@ -556,9 +560,10 @@ class SCORE:
 		converted_grace: List[GraceNote] = []
 		remaining_notes: List[Note] = []
 		for n in getattr(self.events, 'note', []) or []:
-			h = str(getattr(n, 'hand', '<') or '<').strip()
-			if h not in ('<', '>'):
-				setattr(n, 'hand', '<')
+			h = str(getattr(n, 'hand', 'l') or 'l').strip()
+			if h not in ('l', 'r'):
+				h = 'l'
+			setattr(n, 'hand', h)
 			c = str(getattr(n, 'color', '') or '').strip()
 			if not c:
 				setattr(n, 'color', 'auto')
@@ -576,7 +581,7 @@ class SCORE:
 			key=lambda n: (
 				int(getattr(n, 'pitch', 0) or 0),
 				float(getattr(n, 'time', 0.0) or 0.0),
-				str(getattr(n, 'hand', '<') or '<'),
+				str(getattr(n, 'hand', 'l') or 'l'),
 				float(getattr(n, 'duration', 0.0) or 0.0),
 			)
 		)
@@ -588,10 +593,10 @@ class SCORE:
 			prev = deduped_notes[-1]
 			prev_pitch = int(getattr(prev, 'pitch', 0) or 0)
 			prev_time = float(getattr(prev, 'time', 0.0) or 0.0)
-			prev_hand = str(getattr(prev, 'hand', '<') or '<')
+			prev_hand = str(getattr(prev, 'hand', 'l') or 'l')
 			cur_pitch = int(getattr(n, 'pitch', 0) or 0)
 			cur_time = float(getattr(n, 'time', 0.0) or 0.0)
-			cur_hand = str(getattr(n, 'hand', '<') or '<')
+			cur_hand = str(getattr(n, 'hand', 'l') or 'l')
 			if cur_pitch == prev_pitch and op_load.eq(cur_time, prev_time) and cur_hand == prev_hand:
 				prev_dur = float(getattr(prev, 'duration', 0.0) or 0.0)
 				cur_dur = float(getattr(n, 'duration', 0.0) or 0.0)
@@ -643,9 +648,10 @@ class SCORE:
 	
 		# Normalize beam hand values as well.
 		for b in getattr(self.events, 'beam', []) or []:
-			h = str(getattr(b, 'hand', '<') or '<').strip()
-			if h not in ('<', '>'):
-				setattr(b, 'hand', '<')
+			h = str(getattr(b, 'hand', 'l') or 'l').strip()
+			if h not in ('l', 'r'):
+				h = 'l'
+			setattr(b, 'hand', h)
 
 	def get_load_checks_report(self) -> dict:
 		report = getattr(self, '_last_load_checks_report', None)
