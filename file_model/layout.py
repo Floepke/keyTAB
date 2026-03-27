@@ -74,6 +74,11 @@ class Layout:
     slur_width_sides_mm: float = 0.3
     slur_width_middle_mm: float = 1.5
 
+    # Hairpin (crescendo / decrescendo) appearance
+    hairpin_visible: bool = True
+    hairpin_line_width_mm: float = 0.75
+    hairpin_spread_mm: float = 10.0  # width of the open end of the hairpin in mm
+
     # Repeat markers
     repeat_start_visible: bool = True
     repeat_end_visible: bool = True
@@ -184,6 +189,8 @@ LAYOUT_FLOAT_CONFIG: dict[str, dict[str, float]] = {
     'grace_note_scale': {'min': 0.05, 'max': 1.0, 'step': 0.05},
     'pedal_lane_width_mm': {'min': 0.05, 'max': 20.0, 'step': 0.05},
     'text_background_padding_mm': {'min': 0.0, 'max': 20.0, 'step': 0.1},
+    'hairpin_line_width_mm': {'min': 0.05, 'max': 5.0, 'step': 0.05},
+    'hairpin_spread_mm': {'min': 0.05, 'max': 20.0, 'step': 0.05},
     'slur_width_sides_mm': {'min': 0.05, 'max': 5.0, 'step': 0.05},
     'slur_width_middle_mm': {'min': 0.05, 'max': 5.0, 'step': 0.05},
     'countline_thickness_mm': {'min': 0.05, 'max': 5.0, 'step': 0.05},

@@ -459,6 +459,7 @@ class StyleDialog(QtWidgets.QDialog):
             "Note",
             "Grace note",
             "Beam",
+            "Hairpin",
             "Slur",
             "Text",
             "Countline",
@@ -509,6 +510,9 @@ class StyleDialog(QtWidgets.QDialog):
             'note_midinote_right_color': 'Note',
             # Beam
             'beam_thickness_mm': 'Beam',
+            # Hairpin
+            'hairpin_line_width_mm': 'Hairpin',
+            'hairpin_spread_mm': 'Hairpin',
             # Pedal
             'pedal_lane_width_mm': 'Pedal',
             # Grace note
@@ -563,6 +567,7 @@ class StyleDialog(QtWidgets.QDialog):
             'grace_note_visible': 'Visibility',
             'pedal_lane_enabled': 'Visibility',
             'text_visible': 'Visibility',
+            'hairpin_visible': 'Visibility',
             'slur_visible': 'Visibility',
             'countline_visible': 'Visibility',
             'repeat_start_visible': 'Visibility',

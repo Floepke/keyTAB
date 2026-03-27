@@ -70,6 +70,10 @@ EDITOR_LAYERING = [
     'text_bg',
     'text',
     'text_handle',
+    'crescendo_handle',
+    'decrescendo_handle',
+    'crescendo',
+    'decrescendo',
 ]
 
 ENGRAVER_LAYERING = [
@@ -105,6 +109,10 @@ ENGRAVER_LAYERING = [
     'text_bg',
     'text',
     'slur',
+    'crescendo',
+    'crescendo_handle',
+    'decrescendo',
+    'decrescendo_handle',
 ]
 
 # Keyboard constants

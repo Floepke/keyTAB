@@ -18,8 +18,6 @@ from editor.tool.text_tool import TextTool
 from editor.tool.base_grid_tool import BaseGridTool
 from editor.tool.time_signature_tool import TimeSignatureTool
 from editor.tool.dynamic_tool import DynamicTool
-from editor.tool.crescendo_tool import CrescendoTool
-from editor.tool.decrescendo_tool import DecrescendoTool
 from editor.tool.tempo_tool import TempoTool
 from editor.tool.grid_band_tool import GridBandTool
 from editor.ctlz import CtlZ
@@ -84,7 +82,7 @@ class Editor(QtCore.QObject,
     Handles click vs drag classification using a 3px threshold.
     """
 
-    DRAG_THRESHOLD: int = 2
+    DRAG_THRESHOLD: int = 1
 
     score_changed = QtCore.Signal()
 
@@ -111,8 +109,6 @@ class Editor(QtCore.QObject,
             'base_grid': BaseGridTool,
             'time_signature': TimeSignatureTool,
             'dynamic': DynamicTool,
-            'crescendo': CrescendoTool,
-            'decrescendo': DecrescendoTool,
             'tempo': TempoTool,
             'grid_band': GridBandTool,
         }
@@ -210,6 +206,8 @@ class Editor(QtCore.QObject,
         self._velocity_hit_rects: list[dict] = []
         # Per-frame arpeggio handle hit rectangles
         self._arpeggio_hit_rects: list[dict] = []
+        # Per-frame hairpin (crescendo/decrescendo) handle hit rectangles
+        self._hairpin_hit_rects: list[dict] = []
 
         # Tiny mode: toggled by viewport width (stage 1: simplified drawing,
         # stage 2: skip drawing). tiny_mode_alpha is a continuous fade factor
@@ -256,6 +254,7 @@ class Editor(QtCore.QObject,
         self._tempo_hit_rects = []
         self._velocity_hit_rects = []
         self._arpeggio_hit_rects = []
+        self._hairpin_hit_rects = []
         # In tiny stage 2, skip drawing to keep closing smooth
         if self.is_tiny_mode_ultra():
             self._draw_cache = None
@@ -424,6 +423,52 @@ class Editor(QtCore.QObject,
             return None
         matches.sort(key=lambda t: t[0])
         return matches[0][1]
+
+    # ---- Hit rectangles (hairpin crescendo/decrescendo) ----
+    def register_hairpin_hit_rect(self, hairpin_id: int, hairpin_type: str, handle: str,
+                                   x_left_mm: float, y_top_mm: float, x_right_mm: float, y_bottom_mm: float) -> None:
+        cx = (float(x_left_mm) + float(x_right_mm)) * 0.5
+        cy = (float(y_top_mm) + float(y_bottom_mm)) * 0.5
+        self._hairpin_hit_rects.append({
+            '_id': int(hairpin_id),
+            'type': str(hairpin_type),
+            'handle': str(handle),
+            'x1': float(x_left_mm),
+            'y1': float(y_top_mm),
+            'x2': float(x_right_mm),
+            'y2': float(y_bottom_mm),
+            'cx': cx,
+            'cy': cy,
+        })
+
+    def hit_test_hairpin_mm(self, x_mm: float, y_mm: float):
+        """Return (hairpin_event, hairpin_type, handle_kind) for absolute mm coordinates.
+
+        Returns (None, None, None) if no handle is hit.
+        handle_kind is 'start' or 'end'.
+        """
+        candidates = []
+        for r in (self._hairpin_hit_rects or []):
+            if float(r['x1']) <= x_mm <= float(r['x2']) and float(r['y1']) <= y_mm <= float(r['y2']):
+                dx = x_mm - float(r['cx'])
+                dy = y_mm - float(r['cy'])
+                dist2 = dx * dx + dy * dy
+                candidates.append((dist2, r))
+        if not candidates:
+            return (None, None, None)
+        candidates.sort(key=lambda t: t[0])
+        r = candidates[0][1]
+        hp_id = int(r['_id'])
+        hp_type = str(r['type'])
+        handle = str(r['handle'])
+        score = self.current_score()
+        if score is None:
+            return (None, None, None)
+        event_list = getattr(score.events, hp_type, []) or []
+        for ev in event_list:
+            if int(getattr(ev, '_id', -1) or -1) == hp_id:
+                return (ev, hp_type, handle)
+        return (None, None, None)
 
     # ---- Hit rectangles (tempo) ----
     def register_tempo_hit_rect(self, tempo_id: int, x_left_mm: float, y_top_mm: float, x_right_mm: float, y_bottom_mm: float) -> None:

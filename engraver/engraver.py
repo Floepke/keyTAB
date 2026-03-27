@@ -35,6 +35,8 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
     beam_markers = list(events.get('beam', []) or [])
     slurs = list(events.get('slur', []) or [])
     texts = list(events.get('text', []) or [])
+    crescendos = list(events.get('crescendo', []) or [])
+    decrescendos = list(events.get('decrescendo', []) or [])
     start_repeats = list(events.get('start_repeat', []) or [])
     end_repeats = list(events.get('end_repeat', []) or [])
     double_bars = list(events.get('double_bar', []) or [])
@@ -163,6 +165,40 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
         })
     if norm_texts:
         norm_texts = sorted(norm_texts, key=lambda m: float(m.get('time', 0.0) or 0.0))
+
+    norm_crescendos: list[dict] = []
+    for idx, ev in enumerate(crescendos):
+        if not isinstance(ev, dict):
+            continue
+        t0 = float(ev.get('time', 0.0) or 0.0)
+        dur = float(ev.get('duration', 0.0) or 0.0)
+        norm_crescendos.append({
+            'time': t0,
+            'duration': dur,
+            'end': t0 + dur,
+            'x_rpitch': float(ev.get('x_rpitch', 0) or 0),
+            'id': int(ev.get('_id', 0) or 0),
+            'idx': int(idx),
+        })
+    if norm_crescendos:
+        norm_crescendos = sorted(norm_crescendos, key=lambda m: float(m.get('time', 0.0) or 0.0))
+
+    norm_decrescendos: list[dict] = []
+    for idx, ev in enumerate(decrescendos):
+        if not isinstance(ev, dict):
+            continue
+        t0 = float(ev.get('time', 0.0) or 0.0)
+        dur = float(ev.get('duration', 0.0) or 0.0)
+        norm_decrescendos.append({
+            'time': t0,
+            'duration': dur,
+            'end': t0 + dur,
+            'x_rpitch': float(ev.get('x_rpitch', 0) or 0),
+            'id': int(ev.get('_id', 0) or 0),
+            'idx': int(idx),
+        })
+    if norm_decrescendos:
+        norm_decrescendos = sorted(norm_decrescendos, key=lambda m: float(m.get('time', 0.0) or 0.0))
 
     norm_start_repeats: list[dict] = []
     for idx, ev in enumerate(start_repeats):
@@ -2077,6 +2113,28 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                         continue
                     line_texts.append(tx)
 
+            line_crescendos: list[dict] = []
+            if norm_crescendos:
+                line_start = float(line.get('time_start', 0.0) or 0.0)
+                line_end = float(line.get('time_end', 0.0) or 0.0)
+                for hp in norm_crescendos:
+                    hp_start = float(hp.get('time', 0.0) or 0.0)
+                    hp_end = float(hp.get('end', hp_start) or hp_start)
+                    if op_time.ge(hp_start, float(line_end)) or op_time.le(hp_end, float(line_start)):
+                        continue
+                    line_crescendos.append(hp)
+
+            line_decrescendos: list[dict] = []
+            if norm_decrescendos:
+                line_start = float(line.get('time_start', 0.0) or 0.0)
+                line_end = float(line.get('time_end', 0.0) or 0.0)
+                for hp in norm_decrescendos:
+                    hp_start = float(hp.get('time', 0.0) or 0.0)
+                    hp_end = float(hp.get('end', hp_start) or hp_start)
+                    if op_time.ge(hp_start, float(line_end)) or op_time.le(hp_end, float(line_start)):
+                        continue
+                    line_decrescendos.append(hp)
+
             notes_by_hand_line: dict[str, list[dict]] = {'l': [], 'r': []}
             for item in line_notes:
                 hk = str(item.get('hand', '<') or '<')
@@ -2890,6 +2948,88 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
 
             def rpitch_to_x(rp: float) -> float:
                 return clamp_x(base_x_c4 + float(rp) * semitone_mm)
+
+            if bool(layout.get('hairpin_visible', True)) and (line_crescendos or line_decrescendos):
+                hairpin_w = float(layout.get('hairpin_line_width_mm', 0.5) or 0.5) * scale
+                hairpin_spread = float(layout.get('hairpin_spread_mm', 5.0) or 5.0) * scale
+
+                def _clip_progress(hp: dict) -> tuple[float, float, float, float] | None:
+                    hp_start = float(hp.get('time', 0.0) or 0.0)
+                    hp_end = float(hp.get('end', hp_start) or hp_start)
+                    hp_dur = max(1e-6, float(hp.get('duration', hp_end - hp_start) or (hp_end - hp_start)))
+                    seg_start = max(hp_start, float(line_start))
+                    seg_end = min(hp_end, float(line_end))
+                    if seg_end <= seg_start:
+                        return None
+                    p0 = (seg_start - hp_start) / hp_dur
+                    p1 = (seg_end - hp_start) / hp_dur
+                    return (seg_start, seg_end, max(0.0, min(1.0, p0)), max(0.0, min(1.0, p1)))
+
+                for hp in line_crescendos:
+                    clipped = _clip_progress(hp)
+                    if clipped is None:
+                        continue
+                    seg_start, seg_end, prog0, prog1 = clipped
+                    x_mm = rpitch_to_x(float(hp.get('x_rpitch', 0.0) or 0.0))
+                    y0 = _time_to_y(seg_start)
+                    y1_hp = _time_to_y(seg_end)
+                    half0 = hairpin_spread * 0.5 * prog0
+                    half1 = hairpin_spread * 0.5 * prog1
+                    du.add_line(
+                        x_mm - half0,
+                        y0,
+                        x_mm - half1,
+                        y1_hp,
+                        color=notation_color,
+                        width_mm=hairpin_w,
+                        line_cap='round',
+                        id=int(hp.get('id', 0) or 0),
+                        tags=['crescendo'],
+                    )
+                    du.add_line(
+                        x_mm + half0,
+                        y0,
+                        x_mm + half1,
+                        y1_hp,
+                        color=notation_color,
+                        width_mm=hairpin_w,
+                        line_cap='round',
+                        id=int(hp.get('id', 0) or 0),
+                        tags=['crescendo'],
+                    )
+
+                for hp in line_decrescendos:
+                    clipped = _clip_progress(hp)
+                    if clipped is None:
+                        continue
+                    seg_start, seg_end, prog0, prog1 = clipped
+                    x_mm = rpitch_to_x(float(hp.get('x_rpitch', 0.0) or 0.0))
+                    y0 = _time_to_y(seg_start)
+                    y1_hp = _time_to_y(seg_end)
+                    half0 = hairpin_spread * 0.5 * (1.0 - prog0)
+                    half1 = hairpin_spread * 0.5 * (1.0 - prog1)
+                    du.add_line(
+                        x_mm - half0,
+                        y0,
+                        x_mm - half1,
+                        y1_hp,
+                        color=notation_color,
+                        width_mm=hairpin_w,
+                        line_cap='round',
+                        id=int(hp.get('id', 0) or 0),
+                        tags=['decrescendo'],
+                    )
+                    du.add_line(
+                        x_mm + half0,
+                        y0,
+                        x_mm + half1,
+                        y1_hp,
+                        color=notation_color,
+                        width_mm=hairpin_w,
+                        line_cap='round',
+                        id=int(hp.get('id', 0) or 0),
+                        tags=['decrescendo'],
+                    )
 
             if bool(layout.get('text_visible', True)) and line_texts:
                 default_font = layout.get('font_text', {}) or {}
