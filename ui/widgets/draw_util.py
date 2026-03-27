@@ -114,6 +114,15 @@ class DrawUtil:
     def __init__(self) -> None:
         self._pages: List[Page] = []
         self._current_index: int = -1
+        self._line_width_factor: float = 1.0
+
+    def set_line_width_factor(self, factor: float) -> None:
+        """Set a global line width multiplier for this DrawUtil instance."""
+        try:
+            val = float(factor)
+        except Exception:
+            val = 1.0
+        self._line_width_factor = max(0.01, val)
 
     @staticmethod
     def _safe_dash(pattern: Optional[Sequence[float]], offset: float) -> tuple[Optional[List[float]], float]:
@@ -702,7 +711,7 @@ class DrawUtil:
 
     def _apply_stroke(self, ctx: cairo.Context, stroke: Stroke):
         ctx.set_source_rgba(*stroke.color)
-        ctx.set_line_width(stroke.width_mm)
+        ctx.set_line_width(float(stroke.width_mm) * float(self._line_width_factor))
         ctx.set_line_join(cairo.LINE_JOIN_ROUND)
         if stroke.line_cap == "butt":
             ctx.set_line_cap(cairo.LINE_CAP_BUTT)

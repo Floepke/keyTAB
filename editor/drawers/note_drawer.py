@@ -33,6 +33,7 @@ class NoteDrawerMixin:
     _cached_window_hi: int | None = None
     _cached_notes_view: list | None = None
     _cached_barline_positions: list[float] | None = None
+    _STEM_WIDTH_FACTOR: float = 1.2
 
     def draw_note(self, du: DrawUtil) -> None:
         """Editor drawer entry point as used by draw_all()."""
@@ -299,7 +300,7 @@ class NoteDrawerMixin:
         layout = self.current_score().layout
         stem_len = float(layout.note_stem_length_semitone or 3) * float(self.semitone_dist or 0.5)
         style_scale = float(getattr(layout, 'scale', 1.0) or 1.0)
-        stem_w = max(0.1, float(getattr(layout, 'note_stem_thickness_mm', 0.75) or 0.75) * style_scale)
+        stem_w = max(0.1, float(getattr(layout, 'note_stem_thickness_mm', 0.75) or 0.75) * style_scale * self._STEM_WIDTH_FACTOR)
         # Stem direction based on hand
         if getattr(n, 'hand', '<') in ('l', '<'):
             x2 = x - stem_len
@@ -370,7 +371,7 @@ class NoteDrawerMixin:
         # Connect notes in a chord (same start time, same hand)
         layout = self.current_score().layout
         style_scale = float(getattr(layout, 'scale', 1.0) or 1.0)
-        stem_w = max(0.1, float(getattr(layout, 'note_stem_thickness_mm', 0.75) or 0.75) * style_scale)
+        stem_w = max(0.1, float(getattr(layout, 'note_stem_thickness_mm', 0.75) or 0.75) * style_scale * self._STEM_WIDTH_FACTOR)
         hand = getattr(n, 'hand', '<')
         t = float(n.time)
         cache = cast("Editor", self)._draw_cache or {}

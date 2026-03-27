@@ -11,6 +11,9 @@ from ui.style import Style
 from settings_manager import get_preferences
 # Stripped renderer, tile cache, and spatial index for static viewport simplicity
 
+# Hardcoded editor-wide stroke multiplier. Adjust to tune all editor line widths at once.
+EDITOR_LINE_WIDTH_FACTOR = 1.25
+
 
 def _draw_editor_background(ctx: cairo.Context, w: int, h: int, color=(0.12, 0.12, 0.12)):
     # Neutral background; no demo drawings.
@@ -251,6 +254,7 @@ class CairoEditorWidget(QtWidgets.QWidget):
 
                 # Rebuild only guides layer and composite on top
                 du_guides = DrawUtil()
+                du_guides.set_line_width_factor(EDITOR_LINE_WIDTH_FACTOR)
                 du_guides.set_current_page_size_mm(page_w_mm, page_h_mm)
                 if self._editor is not None:
                     try:
@@ -273,6 +277,7 @@ class CairoEditorWidget(QtWidgets.QWidget):
                 c_img_detached = None
                 if content_alpha > 0.0:
                     du_content = DrawUtil()
+                    du_content.set_line_width_factor(EDITOR_LINE_WIDTH_FACTOR)
                     du_content.set_current_page_size_mm(page_w_mm, page_h_mm)
                     if self._editor is not None:
                         self._editor.draw_all(du_content)
@@ -301,6 +306,7 @@ class CairoEditorWidget(QtWidgets.QWidget):
 
                 # Now render guides and composite
                 du_guides = DrawUtil()
+                du_guides.set_line_width_factor(EDITOR_LINE_WIDTH_FACTOR)
                 du_guides.set_current_page_size_mm(page_w_mm, page_h_mm)
                 if self._editor is not None:
                     try:

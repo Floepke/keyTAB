@@ -11,6 +11,8 @@ if TYPE_CHECKING:
 
 
 class BeamDrawerMixin:
+    _STEM_WIDTH_FACTOR: float = 1.2
+
     def draw_beam(self, du: DrawUtil) -> None:
         self = cast("Editor", self)
         # Build per-hand beam grouping lists following base_grid or beam markers,
@@ -307,7 +309,7 @@ class BeamDrawerMixin:
         stem_len = float(layout.note_stem_length_semitone or 3) * float(self.semitone_dist or 0.5)
         style_scale = float(getattr(layout, 'scale', 1.0) or 1.0)
         beam_w = max(0.2, float(getattr(layout, 'beam_thickness_mm', 1.5) or 1.5) * style_scale)
-        stem_w = max(0.1, float(getattr(layout, 'note_stem_thickness_mm', 0.75) or 0.75) * style_scale)
+        stem_w = max(0.1, float(getattr(layout, 'note_stem_thickness_mm', 0.75) or 0.75) * style_scale * self._STEM_WIDTH_FACTOR)
 
         # Iterate windows in lockstep with groups for right hand
         right_groups = groups_all.get('r') or []
