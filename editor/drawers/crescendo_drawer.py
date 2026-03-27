@@ -217,12 +217,13 @@ class CrescendoDrawerMixin:
                 start_handle_y = y_start_draw if start_join_peers else y_start
                 end_handle_y = y_end_draw if end_join_peers else y_end
 
-                # Keep handles visible by pushing them outside dynamic symbol boxes.
+                # If this hairpin has symbols, force handles around those symbols
+                # regardless of connected joins.
                 handle_gap = max(0.2, text_gap * 0.5)
                 if start_text:
-                    start_handle_y -= (start_h * 0.5) + dynamic_bg_pad + handle_r + handle_gap
+                    start_handle_y = y_start - ((start_h * 0.5) + dynamic_bg_pad + handle_r + handle_gap)
                 if end_text:
-                    end_handle_y += (end_h * 0.5) + dynamic_bg_pad + handle_r + handle_gap
+                    end_handle_y = y_end + ((end_h * 0.5) + dynamic_bg_pad + handle_r + handle_gap)
 
                 # Start handle (at the tip / top)
                 self.register_hairpin_hit_rect(
