@@ -62,7 +62,7 @@ class DecrescendoDrawerMixin:
             # Left arm: top-left → bottom-point
             du.add_line(
                 x_mm - half_spread, y_start, x_mm, y_end,
-                color=self.notation_color,
+                color=self.accent_color,
                 width_mm=lw,
                 line_cap='round',
                 id=ev_id,
@@ -71,7 +71,7 @@ class DecrescendoDrawerMixin:
             # Right arm: top-right → bottom-point
             du.add_line(
                 x_mm + half_spread, y_start, x_mm, y_end,
-                color=self.notation_color,
+                color=self.accent_color,
                 width_mm=lw,
                 line_cap='round',
                 id=ev_id,
@@ -89,7 +89,7 @@ class DecrescendoDrawerMixin:
                     x_mm - handle_r, y_start - handle_r,
                     x_mm + handle_r, y_start + handle_r,
                     stroke_color=self.accent_color,
-                    stroke_width_mm=0.4,
+                    stroke_width_mm=0.5,
                     fill_color=self.accent_color,
                     id=ev_id,
                     tags=['decrescendo', 'decrescendo_handle'],
@@ -104,7 +104,7 @@ class DecrescendoDrawerMixin:
                     x_mm - handle_r, y_end - handle_r,
                     x_mm + handle_r, y_end + handle_r,
                     stroke_color=self.accent_color,
-                    stroke_width_mm=0.4,
+                    stroke_width_mm=0.5,
                     fill_color=self.accent_color,
                     id=ev_id,
                     tags=['decrescendo', 'decrescendo_handle'],
