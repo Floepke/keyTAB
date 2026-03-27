@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import argparse
 import ast
+import importlib.util
 import plistlib
 import shutil
 import subprocess
@@ -168,6 +169,16 @@ def ensure_command(name: str) -> str:
     return path
 
 
+def ensure_pyinstaller_available(python_cmd: str) -> None:
+    """Verify PyInstaller is importable in the interpreter used for the build."""
+    if importlib.util.find_spec("PyInstaller") is not None:
+        return
+    raise SystemExit(
+        "PyInstaller is not installed in the active Python environment. "
+        f"Install it with: {python_cmd} -m pip install pyinstaller"
+    )
+
+
 def prepare_icon(icon_path: Path, work_dir: Path) -> tuple[Path, bool]:
     icon_path = icon_path.resolve()
     if not icon_path.exists():
@@ -265,7 +276,8 @@ def run_pyinstaller(
     work_dir.mkdir(parents=True, exist_ok=True)
     icon_to_use, generated = prepare_icon(icon, work_dir)
 
-    python_cmd = ensure_command("python3")
+    python_cmd = sys.executable or ensure_command("python3")
+    ensure_pyinstaller_available(python_cmd)
     cmd = [
         python_cmd,
         "-m",
