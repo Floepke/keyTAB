@@ -221,12 +221,9 @@ def main(argv: list[str] | None = None):
     get_appdata_manager()
 
     # Ensure style storage exists in hidden app folder
-    try:
-        user_root = Path.home() / ".keyTAB"
-        user_root.mkdir(parents=True, exist_ok=True)
-        (user_root / "pstyle").mkdir(parents=True, exist_ok=True)
-    except Exception:
-        pass
+    user_root = Path.home() / ".keyTAB"
+    user_root.mkdir(parents=True, exist_ok=True)
+    (user_root / "pstyle").mkdir(parents=True, exist_ok=True)
 
     # Platform-specific DPI handling:
     # - On Linux, use Qt env vars to scale UI.
@@ -257,10 +254,7 @@ def main(argv: list[str] | None = None):
     QtGui.QGuiApplication.setOverrideCursor(QtGui.QCursor(QtCore.Qt.CursorShape.ArrowCursor))
     
     # Force the font via stylesheet as a fallback if Qt ignores the app font
-    try:
-        app.setStyleSheet(app.styleSheet() + "\n* { font-family: 'Fira Code'; }\n")
-    except Exception:
-        pass
+    app.setStyleSheet(app.styleSheet() + "\n* { font-family: 'Fira Code'; }\n")
 
     # Set application window icon from icons package
     # Scale window icon slightly smaller for the title bar
@@ -277,12 +271,9 @@ def main(argv: list[str] | None = None):
         sty.set_light_theme()
 
     # Install and apply embedded UI font (FiraCode-SemiBold) globally AFTER palette/style reset
-    try:
-        install_default_ui_font(app, name='FiraCode-SemiBold', point_size=int(10))
-        # Fallback stylesheet to force family if Qt ignores app font
-        app.setStyleSheet(app.styleSheet() + "\n* { font-family: 'Fira Code'; }\n")
-    except Exception:
-        pass
+    install_default_ui_font(app, name='FiraCode-SemiBold', point_size=int(10))
+    # Fallback stylesheet to force family if Qt ignores app font
+    app.setStyleSheet(app.styleSheet() + "\n* { font-family: 'Fira Code'; }\n")
 
     win = MainWindow()
 
@@ -291,22 +282,14 @@ def main(argv: list[str] | None = None):
             return
         win.open_documents_from_paths([path], confirm_dirty=True)
 
-    try:
-        app.fileRequested.connect(_handle_file_request)
-    except Exception:
-        pass
+    app.fileRequested.connect(_handle_file_request)
 
     if initial_documents:
         QtCore.QTimer.singleShot(0, lambda: win.open_documents_from_paths(initial_documents, confirm_dirty=False))
 
     prompt_install_if_needed()
-    try:
-        win.schedule_edwin_prompt(250)
-    except Exception:
-        try:
-            QtCore.QTimer.singleShot(250, win._maybe_prompt_edwin_install)
-        except Exception:
-            pass
+    win.schedule_edwin_prompt(250)
+    QtCore.QTimer.singleShot(250, win._maybe_prompt_edwin_install)
 
     # Ensure clean shutdown of background threads on app exit
     app.aboutToQuit.connect(win.prepare_close)
@@ -317,11 +300,8 @@ def main(argv: list[str] | None = None):
         start_max = bool(adm.get("window_maximized", True))
         if not start_max:
             geom_b64 = str(adm.get("window_geometry", ""))
-            try:
-                if geom_b64:
-                    win.restoreGeometry(QtCore.QByteArray.fromBase64(geom_b64.encode("ascii")))
-            except Exception:
-                pass
+            if geom_b64:
+                win.restoreGeometry(QtCore.QByteArray.fromBase64(geom_b64.encode("ascii")))
             win.show()
         else:
             win.showMaximized()

@@ -38,21 +38,15 @@ def _atomic_write_text(path: Path, content: str, encoding: str = "utf-8") -> Non
             os.fsync(f.fileno())
         os.replace(temp_path, str(path))
         temp_path = None
+        flags = getattr(os, "O_DIRECTORY", 0)
+        dfd = os.open(str(parent), flags)
         try:
-            flags = getattr(os, "O_DIRECTORY", 0)
-            dfd = os.open(str(parent), flags)
-            try:
-                os.fsync(dfd)
-            finally:
-                os.close(dfd)
-        except Exception:
-            pass
+            os.fsync(dfd)
+        finally:
+            os.close(dfd)
     finally:
         if temp_path is not None:
-            try:
-                os.remove(temp_path)
-            except Exception:
-                pass
+            os.remove(temp_path)
 
 
 @dataclass

@@ -83,7 +83,8 @@ def _ensure_fluidsynth_lib() -> None:
         except Exception:
             continue
     raise ImportError(
-        "FluidSynth native library not available. Install it with 'sudo apt-get install fluidsynth libfluidsynth3' (or equivalent) and ensure the library is present at /usr/lib*/libfluidsynth.so.3."
+        "FluidSynth native library not available. Install it with 'sudo apt-get install fluidsynth libfluidsynth3' (or equivalent) "
+        "and install the Python binding with 'python3 -m pip install pyfluidsynth'."
     )
 
 
@@ -98,9 +99,9 @@ if sys.platform.startswith("linux"):
     except Exception as exc:  # pragma: no cover - environment specific
         _FLUIDSYNTH_AVAILABLE = False
         _FLUIDSYNTH_IMPORT_ERROR = (
-            "FluidSynth native library not available. Install it with "
+            "FluidSynth not available. Install the native library with "
             "'sudo apt-get install fluidsynth libfluidsynth3' (or the equivalent for your distro) "
-            "and ensure pyfluidsynth is installed."
+            "and install the Python binding with 'python3 -m pip install pyfluidsynth'."
         )
         try:
             sys.stderr.write(f"[midi] {_FLUIDSYNTH_IMPORT_ERROR} ({exc})\n")
@@ -146,7 +147,7 @@ class _FluidsynthBackend(_Backend):
             raise ImportError(
                 "FluidSynth not available. Install it with 'sudo apt-get install fluidsynth libfluidsynth3' and ensure pyfluidsynth is installed."
             )
-        self._fs: Optional[fluidsynth.Synth] = None
+        self._fs: Optional[_fluidsynth.Synth] = None
         self._sfid: Optional[int] = None
         self._channel: int = 0
         self._gain: float = 0.35
@@ -190,59 +191,35 @@ class _FluidsynthBackend(_Backend):
                 pass
         self._sfid = self._fs.sfload(self._soundfont_path)
         self._fs.program_select(self._channel, self._sfid, 0, 0)
-        try:
-            self._fs.set_gain(self._gain)
-        except Exception:
-            pass
+        self._fs.setting('synth.gain', self._gain)
 
     def program_select(self) -> None:
         if self._fs is not None and self._sfid is not None:
-            try:
-                self._fs.program_select(self._channel, self._sfid, 0, 0)
-            except Exception:
-                pass
+            self._fs.program_select(self._channel, self._sfid, 0, 0)
 
     def set_gain(self, gain: float) -> None:
         self._gain = max(0.0, float(gain))
         if self._fs is not None:
-            try:
-                self._fs.set_gain(self._gain)
-            except Exception:
-                pass
+            self._fs.setting('synth.gain', self._gain)
 
     def note_on(self, midi_note: int, velocity: int) -> None:
         if self._fs is not None:
-            try:
-                self._fs.noteon(self._channel, midi_note, velocity)
-            except Exception:
-                pass
+            self._fs.noteon(self._channel, midi_note, velocity)
 
     def note_off(self, midi_note: int) -> None:
         if self._fs is not None:
-            try:
-                self._fs.noteoff(self._channel, midi_note)
-            except Exception:
-                pass
+            self._fs.noteoff(self._channel, midi_note)
 
     def all_notes_off(self) -> None:
         if self._fs is not None:
-            try:
-                self._fs.all_notes_off(self._channel)
-            except Exception:
-                pass
-        try:
-            if self._fs is not None:
-                self._fs.system_reset()
-        except Exception:
-            pass
+            self._fs.all_notes_off(self._channel)
+        if self._fs is not None:
+            self._fs.system_reset()
 
     def shutdown(self) -> None:
         self.all_notes_off()
         if self._fs is not None:
-            try:
-                self._fs.delete()
-            except Exception:
-                pass
+            self._fs.delete()
         self._fs = None
 
 
@@ -394,40 +371,26 @@ class _MidiOutBackend(_Backend):
         return str(self._port_name)
 
     def program_select(self) -> None:
-        try:
-            self._port.send(mido.Message("program_change", program=0))
-        except Exception:
-            pass
+        self._port.send(mido.Message("program_change", program=0))
 
     def set_gain(self, gain: float) -> None:
         # Not supported on OS synth; ignore.
         pass
 
     def note_on(self, midi_note: int, velocity: int) -> None:
-        try:
-            self._port.send(mido.Message("note_on", note=int(midi_note), velocity=int(velocity)))
-        except Exception:
-            pass
+        self._port.send(mido.Message("note_on", note=int(midi_note), velocity=int(velocity)))
 
     def note_off(self, midi_note: int) -> None:
-        try:
-            self._port.send(mido.Message("note_off", note=int(midi_note), velocity=0))
-        except Exception:
-            pass
+        self._port.send(mido.Message("note_off", note=int(midi_note), velocity=0))
 
     def all_notes_off(self) -> None:
-        try:
-            for n in range(128):
-                self._port.send(mido.Message("note_off", note=n, velocity=0))
-        except Exception:
-            pass
+        for n in range(128):
+            self._port.send(mido.Message("note_off", note=n, velocity=0))
+        self._port.send(mido.Message("control_change", control=123, value=0))
 
     def shutdown(self) -> None:
-        try:
-            self.all_notes_off()
-            self._port.close()
-        except Exception:
-            pass
+        self.all_notes_off()
+        self._port.close()
 
 
 class _MacDLSSynthBackend(_Backend):
@@ -547,20 +510,11 @@ class _MacDLSSynthBackend(_Backend):
         self._midi(0xB0 | self._channel, 123, 0)
 
     def shutdown(self) -> None:
-        try:
-            self.all_notes_off()
-        except Exception:
-            pass
-        try:
-            if bool(self._graph):
-                self._audio_toolbox.AUGraphStop(self._graph)
-        except Exception:
-            pass
-        try:
-            if bool(self._graph):
-                self._audio_toolbox.DisposeAUGraph(self._graph)
-        except Exception:
-            pass
+        self.all_notes_off()
+        if bool(self._graph):
+            self._audio_toolbox.AUGraphStop(self._graph)
+        if bool(self._graph):
+            self._audio_toolbox.DisposeAUGraph(self._graph)
         self._graph = ctypes.c_void_p()
         self._synth_unit = ctypes.c_void_p()
         self._output_unit = ctypes.c_void_p()

@@ -2,6 +2,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Callable, Iterable, List, Optional, Sequence, Tuple
 import os, math
+from functools import lru_cache
 import cairo
 from PySide6 import QtGui
 from utils.CONSTANT import EDITOR_LAYERING
@@ -108,6 +109,36 @@ class Text:
     id: int = 0
     tags: List[str] = field(default_factory=list)
     hit_rect_mm: Optional[Tuple[float, float, float, float]] = None  # (x,y,w,h)
+
+
+# ---------------------------------------------------------------------------
+# Module-level scratch Cairo surface/context reused for text-extent queries.
+# Creating a new ImageSurface per measurement leaks native memory; reusing a
+# single 1×1 surface avoids the leak entirely.
+# ---------------------------------------------------------------------------
+_SCRATCH_SURF: cairo.ImageSurface = cairo.ImageSurface(cairo.FORMAT_ARGB32, 1, 1)
+_SCRATCH_CTX: cairo.Context = cairo.Context(_SCRATCH_SURF)
+
+
+@lru_cache(maxsize=512)
+def _cached_text_extents_mm(text: str, family: str, size_pt: float,
+                              italic: bool, bold: bool) -> Tuple[float, float, float, float]:
+    """Return (x_bearing_mm, y_bearing_mm, width_mm, height_mm).
+
+    Results are LRU-cached so repeated identical queries (same text/font/size)
+    never touch Cairo at all.  The scratch surface is reused across all calls,
+    so no native surface memory is leaked.
+    """
+    slant = cairo.FONT_SLANT_ITALIC if italic else cairo.FONT_SLANT_NORMAL
+    weight = cairo.FONT_WEIGHT_BOLD if bold else cairo.FONT_WEIGHT_NORMAL
+    _SCRATCH_CTX.select_font_face(family, slant, weight)
+    _SCRATCH_CTX.set_font_size(size_pt)
+    te = _SCRATCH_CTX.text_extents(text)
+    x_bearing_mm = te.x_bearing / PT_PER_MM
+    y_bearing_mm = te.y_bearing / PT_PER_MM
+    width_mm = te.width / PT_PER_MM
+    height_mm = te.height / PT_PER_MM
+    return (x_bearing_mm, y_bearing_mm, width_mm, height_mm)
 
 
 class DrawUtil:
@@ -1030,18 +1061,7 @@ class DrawUtil:
                               family: str, size_pt: float,
                               italic: bool, bold: bool) -> Tuple[float, float, float, float]:
         """Return (x_bearing_mm, y_bearing_mm, width_mm, height_mm) for given text settings."""
-        surf = cairo.ImageSurface(cairo.FORMAT_ARGB32, 1, 1)
-        ctx = cairo.Context(surf)
-        slant = cairo.FONT_SLANT_ITALIC if italic else cairo.FONT_SLANT_NORMAL
-        weight = cairo.FONT_WEIGHT_BOLD if bold else cairo.FONT_WEIGHT_NORMAL
-        ctx.select_font_face(family, slant, weight)
-        ctx.set_font_size(size_pt)  # extents in points
-        te = ctx.text_extents(text)
-        x_bearing_mm = te.x_bearing / PT_PER_MM
-        y_bearing_mm = te.y_bearing / PT_PER_MM
-        width_mm = te.width / PT_PER_MM
-        height_mm = te.height / PT_PER_MM
-        return (x_bearing_mm, y_bearing_mm, width_mm, height_mm)
+        return _cached_text_extents_mm(text, family, size_pt, italic, bold)
 
 
 def make_image_surface(width_px: int, height_px: int):
