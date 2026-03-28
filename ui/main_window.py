@@ -556,7 +556,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def _create_menus(self) -> None:
         menubar = self.menuBar()
-        # Keep menu inside the app window on macOS.
+        # Keep menu inside the app window on macOS (also in fullscreen).
         if sys.platform == "darwin":
             menubar.setNativeMenuBar(False)
 
@@ -1181,11 +1181,8 @@ class MainWindow(QtWidgets.QMainWindow):
                 self.showFullScreen()
             except Exception:
                 pass
-        try:
-            if hasattr(self, '_full_screen_act') and self._full_screen_act is not None:
-                self._full_screen_act.setChecked(self.isFullScreen())
-        except Exception:
-            pass
+        if hasattr(self, '_full_screen_act') and self._full_screen_act is not None:
+            self._full_screen_act.setChecked(self.isFullScreen())
 
     def _flush_app_state_save(self) -> None:
         """Persist app state to session and optionally autosave project."""
@@ -1197,11 +1194,8 @@ class MainWindow(QtWidgets.QMainWindow):
                 self.file_manager.autosave_current()
         except Exception:
             pass
-        try:
-            if self.file_manager.path() is not None:
-                self.file_manager.save()
-        except Exception:
-            pass
+        if self.file_manager.path() is not None:
+            self.file_manager.save()
 
     def _playback_system_label(self) -> str:
         if sys.platform.startswith('linux'):
@@ -2941,11 +2935,7 @@ class MainWindow(QtWidgets.QMainWindow):
             else:
                 failures.append((family, detail))
 
-        still_missing = [
-            f
-            for f in fonts
-            if not has_system_font(str(f.get("check_name", f["family"])))
-        ]
+        still_missing = [f for f in fonts if not has_system_font(str(f.get("check_name", f["family"])))]
         adm.set("fonts_install_ok", len(still_missing) == 0)
         adm.save()
 

@@ -76,16 +76,16 @@ class Layout:
 
     # Hairpin (crescendo / decrescendo) appearance
     hairpin_visible: bool = True
-    hairpin_line_width_mm: float = 0.75
+    hairpin_line_width_mm: float = 1.5
     hairpin_spread_mm: float = 10.0  # width of the open end of the hairpin in mm
-    hairpin_text_size_pt: float = 12.0
-    hairpin_text_gap_mm: float = 1.2
+    hairpin_font_size_pt: float = 12.0
+    hairpin_text_gap_mm: float = 5.0
     dynamic_symbol_background_padding_mm: float = 2.5
 
     # Repeat markers
     repeat_start_visible: bool = True
     repeat_end_visible: bool = True
-    double_bar_visible: bool = True
+    double_barline_visible: bool = True
     
     # Measure grouping (prefill for line break tool; not applied automatically)
     measure_grouping: str = ""
@@ -194,7 +194,7 @@ LAYOUT_FLOAT_CONFIG: dict[str, dict[str, float]] = {
     'text_background_padding_mm': {'min': 0.0, 'max': 20.0, 'step': 0.05},
     'hairpin_line_width_mm': {'min': 0.05, 'max': 5.0, 'step': 0.05},
     'hairpin_spread_mm': {'min': 0.05, 'max': 20.0, 'step': 0.05},
-    'hairpin_text_size_pt': {'min': 4.0, 'max': 48.0, 'step': 0.5},
+    'hairpin_font_size_pt': {'min': 4.0, 'max': 48.0, 'step': 0.5},
     'hairpin_text_gap_mm': {'min': 0.0, 'max': 20.0, 'step': 0.05},
     'dynamic_symbol_background_padding_mm': {'min': 0.0, 'max': 20.0, 'step': 0.05},
     'slur_width_sides_mm': {'min': 0.05, 'max': 5.0, 'step': 0.05},

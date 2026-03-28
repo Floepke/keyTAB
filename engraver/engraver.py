@@ -1974,7 +1974,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
             if barline_visible and has_any_barlines and op_time.ge(total_ticks, float(line['time_start'])) and op_time.le(total_ticks, float(line['time_end'])):
                 _draw_barline_constructive(float(total_ticks), bar_width_mm * 2.0, tag='grid_line')
 
-            if barline_visible and bool(layout.get('double_bar_visible', True)) and norm_double_bars:
+            if barline_visible and bool(layout.get('double_barline_visible', True)) and norm_double_bars:
                 double_w_mm = max(0.1, bar_width_mm)
                 # Keep visible whitespace between lines after increasing line thickness.
                 inner_clear_gap_mm = max(0.35, semitone_mm * 0.5)
@@ -2956,7 +2956,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
             if bool(layout.get('hairpin_visible', True)) and (line_crescendos or line_decrescendos):
                 hairpin_w = float(layout.get('hairpin_line_width_mm', 0.5) or 0.5) * scale
                 hairpin_spread = float(layout.get('hairpin_spread_mm', 5.0) or 5.0) * scale
-                text_size_pt = float(layout.get('hairpin_text_size_pt', 12.0) or 12.0)
+                text_size_pt = float(layout.get('hairpin_font_size_pt', 12.0) or 12.0)
                 text_gap = float(layout.get('hairpin_text_gap_mm', 1.2) or 1.2) * scale
                 dynamic_bg_pad = float(
                     layout.get(

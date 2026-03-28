@@ -413,7 +413,7 @@ class GridDrawerMixin:
                     (["barline", "end_barline"] if is_last else ["barline"]),
                 )
 
-        if barline_visible and bool(getattr(layout, 'double_bar_visible', True)) and layout is not None:
+        if barline_visible and bool(getattr(layout, 'double_barline_visible', True)) and layout is not None:
             double_events = list(getattr(score.events, 'double_bar', []) or [])
             if double_events:
                 top_mm = float(getattr(self, '_view_y_mm_offset', 0.0) or 0.0)

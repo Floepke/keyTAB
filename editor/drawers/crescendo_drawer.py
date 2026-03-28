@@ -26,7 +26,7 @@ class CrescendoDrawerMixin:
         style_scale = float(getattr(layout, 'scale', 1.0) or 1.0) if layout is not None else 1.0
         lw = float(getattr(layout, 'hairpin_line_width_mm', 0.5) or 0.5) * style_scale
         spread = float(getattr(layout, 'hairpin_spread_mm', 5.0) or 5.0) * style_scale
-        text_size_pt = float(getattr(layout, 'hairpin_text_size_pt', 12.0) or 12.0)
+        text_size_pt = float(getattr(layout, 'hairpin_font_size_pt', 12.0) or 12.0)
         text_gap = float(getattr(layout, 'hairpin_text_gap_mm', 1.2) or 1.2) * style_scale
         dynamic_bg_pad = float(
             getattr(

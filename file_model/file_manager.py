@@ -69,20 +69,14 @@ class FileManager:
     def new(self) -> SCORE:
         """Create a new SCORE and clear the current path."""
         self._current = SCORE().new()
-        try:
-            adm = get_appdata_manager()
-            template = adm.get("score_template", {})
-            if isinstance(template, dict) and template:
-                self._apply_score_template(template)
-        except Exception:
-            pass
+        adm = get_appdata_manager()
+        template = adm.get("score_template", {})
+        if isinstance(template, dict) and template:
+            self._apply_score_template(template)
         self._path = None
         self._dirty = False
         # Snapshot a fresh session immediately so restore works even before edits.
-        try:
-            self.autosave_current()
-        except Exception:
-            pass
+        self.autosave_current()
         return self._current
 
     def _apply_score_template(self, template: dict) -> None:
@@ -115,6 +109,9 @@ class FileManager:
         try:
             layout_data = data.get('layout')
             if isinstance(layout_data, dict):
+                if 'hairpin_font_size_pt' not in layout_data and 'hairpin_text_size_pt' in layout_data:
+                    layout_data = dict(layout_data)
+                    layout_data['hairpin_font_size_pt'] = layout_data.get('hairpin_text_size_pt')
                 score.layout = Layout(**layout_data)
         except Exception:
             pass

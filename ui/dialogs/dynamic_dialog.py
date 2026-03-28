@@ -126,7 +126,7 @@ class DynamicDialog(QtWidgets.QDialog):
 
         lay.addWidget(self.grid, 1)
 
-        hint = QtWidgets.QLabel('LelandText symbols are shown in a clickable raster. Hover a cell to see its dynamic token.', self)
+        hint = QtWidgets.QLabel('LelandText symbols are shown in a clickable raster. Double click to choose a symbol or select symbol and hit Ok.', self)
         hint.setWordWrap(True)
         lay.addWidget(hint)
 

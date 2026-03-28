@@ -29,6 +29,7 @@ class CountLineDrawerMixin:
         handle_h = max(2.0, float(self.semitone_dist or 2.5))
         active_tool = str(getattr(getattr(self, "_tool", None), "TOOL_NAME", ""))
         show_handles = active_tool == "count_line"
+        handle_red = (.5, 0.0, 0.0, 1.0)
 
         for ev in events:
             try:
@@ -52,7 +53,7 @@ class CountLineDrawerMixin:
                 y_mm,
                 x2,
                 y_mm,
-                color=(0, 0, 0, 1),
+                color=self.accent_color,
                 width_mm=0.4,
                 dash_pattern=[0, 1.5],
                 id=int(getattr(ev, '_id', 0) or 0),
@@ -68,7 +69,7 @@ class CountLineDrawerMixin:
                     y_mm + handle_h * .7,
                     stroke_color=None,
                     stroke_width_mm=0.0,
-                    fill_color=self.accent_color,
+                    fill_color=handle_red,
                     id=int(getattr(ev, '_id', 0) or 0),
                     tags=["count_line", "count_line_handle", "count_line_handle_start"],
                 )
@@ -79,7 +80,7 @@ class CountLineDrawerMixin:
                     y_mm + handle_h * .7,
                     stroke_color=None,
                     stroke_width_mm=0.0,
-                    fill_color=self.accent_color,
+                    fill_color=handle_red,
                     id=int(getattr(ev, '_id', 0) or 0),
                     tags=["count_line", "count_line_handle", "count_line_handle_end"],
                 )

@@ -241,15 +241,12 @@ def main(argv: list[str] | None = None):
         pass
 
     # Platform-specific startup handling.
-    # On macOS, force menus to render inside the window instead of the global menu bar.
+    # On macOS, keep the in-window (non-native) menu bar in all window states.
     if sys.platform == "darwin":
         # Force Fusion style in-process to avoid accidental fallback to native style
         # from shell/launchd environment overrides.
         os.environ["QT_STYLE_OVERRIDE"] = "Fusion"
         os.environ.pop("QT_QPA_PLATFORMTHEME", None)
-        QtCore.QCoreApplication.setAttribute(
-            QtCore.Qt.ApplicationAttribute.AA_DontUseNativeMenuBar, True
-        )
     # Create QApplication with argv to ensure proper initialization paths on macOS
     app = KeyTabApplication([sys.argv[0], *qt_args])
 

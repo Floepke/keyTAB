@@ -538,7 +538,7 @@ class StyleDialog(QtWidgets.QDialog):
             # Hairpin
             'hairpin_line_width_mm': 'Hairpin',
             'hairpin_spread_mm': 'Hairpin',
-            'hairpin_text_size_pt': 'Hairpin',
+            'hairpin_font_size_pt': 'Hairpin',
             'hairpin_text_gap_mm': 'Hairpin',
             'dynamic_symbol_background_padding_mm': 'Hairpin',
             # Pedal
@@ -600,7 +600,7 @@ class StyleDialog(QtWidgets.QDialog):
             'countline_visible': 'Visibility',
             'repeat_start_visible': 'Visibility',
             'repeat_end_visible': 'Visibility',
-            'double_bar_visible': 'Visibility',
+            'double_barline_visible': 'Visibility',
         }
 
         type_hints = {}
@@ -995,7 +995,7 @@ class StyleDialog(QtWidgets.QDialog):
         try:
             payload = self._serialize_layout(self.get_values())
             with path.open("w", encoding="utf-8") as fh:
-                json.dump(payload, fh, indent=2, ensure_ascii=False)
+                json.dump(payload, fh, indent=2, ensure_ascii=True)
             self.msg_label.setText(f"Saved style to {path.name}.")
         except Exception:
             self.msg_label.setText("Failed to save style.")

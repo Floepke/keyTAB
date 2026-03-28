@@ -99,18 +99,16 @@ def _apply_legacy_conversion(data: dict) -> dict:
 		pass
 
 	# Layout key migration: dynamic symbol background padding rename.
-	try:
-		if isinstance(data, dict):
-			layout = data.get('layout', None)
-			if isinstance(layout, dict):
-				if 'dynamic_symbol_background_padding_mm' not in layout:
-					if 'dynamic_symbol_background_padding' in layout:
-						layout['dynamic_symbol_background_padding_mm'] = layout.get('dynamic_symbol_background_padding')
-					elif 'dynamic_background_padding' in layout:
-						layout['dynamic_symbol_background_padding_mm'] = layout.get('dynamic_background_padding')
-	except Exception:
-		pass
-
+	if isinstance(data, dict):
+		layout = data.get('layout', None)
+		if isinstance(layout, dict):
+			if 'hairpin_font_size_pt' not in layout and 'hairpin_text_size_pt' in layout:
+				layout['hairpin_font_size_pt'] = layout.get('hairpin_text_size_pt')
+			if 'dynamic_symbol_background_padding_mm' not in layout:
+				if 'dynamic_symbol_background_padding' in layout:
+					layout['dynamic_symbol_background_padding_mm'] = layout.get('dynamic_symbol_background_padding')
+				elif 'dynamic_background_padding' in layout:
+					layout['dynamic_symbol_background_padding_mm'] = layout.get('dynamic_background_padding')
 	return data
 
 
@@ -350,7 +348,8 @@ class SCORE:
 		if isinstance(payload, dict):
 			payload.pop('editor', None)
 		with open(path, 'w', encoding='utf-8') as f:
-			json.dump(payload, f, indent=None, ensure_ascii=False, separators=(',', ':'))
+			# Store non-ASCII symbols (e.g., dynamic glyphs) as \uXXXX escapes for stable/plain-text readability.
+			json.dump(payload, f, indent=4, ensure_ascii=True, separators=(',', ':'))
 
 	def load(self, path: str) -> "SCORE":
 		with open(path, 'r', encoding='utf-8') as f:
