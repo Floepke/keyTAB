@@ -208,6 +208,8 @@ class Editor(QtCore.QObject,
         self._arpeggio_hit_rects: list[dict] = []
         # Per-frame hairpin (crescendo/decrescendo) handle hit rectangles
         self._hairpin_hit_rects: list[dict] = []
+        # Per-frame dynamic symbol (text) hit rectangles
+        self._dynamic_symbol_hit_rects: list[dict] = []
 
         # Tiny mode: toggled by viewport width (stage 1: simplified drawing,
         # stage 2: skip drawing). tiny_mode_alpha is a continuous fade factor
@@ -255,6 +257,7 @@ class Editor(QtCore.QObject,
         self._velocity_hit_rects = []
         self._arpeggio_hit_rects = []
         self._hairpin_hit_rects = []
+        self._dynamic_symbol_hit_rects = []
         # In tiny stage 2, skip drawing to keep closing smooth
         if self.is_tiny_mode_ultra():
             self._draw_cache = None
@@ -458,6 +461,51 @@ class Editor(QtCore.QObject,
         """
         candidates = []
         for r in (self._hairpin_hit_rects or []):
+            if float(r['x1']) <= x_mm <= float(r['x2']) and float(r['y1']) <= y_mm <= float(r['y2']):
+                dx = x_mm - float(r['cx'])
+                dy = y_mm - float(r['cy'])
+                dist2 = dx * dx + dy * dy
+                candidates.append((dist2, r))
+        if not candidates:
+            return (None, None, None)
+        candidates.sort(key=lambda t: t[0])
+        r = candidates[0][1]
+        hp_id = int(r['_id'])
+        hp_type = str(r['type'])
+        handle = str(r['handle'])
+        score = self.current_score()
+        if score is None:
+            return (None, None, None)
+        event_list = getattr(score.events, hp_type, []) or []
+        for ev in event_list:
+            if int(getattr(ev, '_id', -1) or -1) == hp_id:
+                return (ev, hp_type, handle)
+        return (None, None, None)
+
+    # ---- Hit rectangles (dynamic symbols) ----
+    def register_dynamic_symbol_hit_rect(self, hairpin_id: int, hairpin_type: str, handle: str,
+                                          x_left_mm: float, y_top_mm: float, x_right_mm: float, y_bottom_mm: float) -> None:
+        cx = (float(x_left_mm) + float(x_right_mm)) * 0.5
+        cy = (float(y_top_mm) + float(y_bottom_mm)) * 0.5
+        self._dynamic_symbol_hit_rects.append({
+            '_id': int(hairpin_id),
+            'type': str(hairpin_type),
+            'handle': str(handle),
+            'x1': float(x_left_mm),
+            'y1': float(y_top_mm),
+            'x2': float(x_right_mm),
+            'y2': float(y_bottom_mm),
+            'cx': cx,
+            'cy': cy,
+        })
+
+    def hit_test_dynamic_symbol_mm(self, x_mm: float, y_mm: float):
+        """Return (hairpin_event, hairpin_type, handle_kind) for a dynamic symbol rectangle hit.
+
+        Returns (None, None, None) if no dynamic symbol is hit.
+        """
+        candidates = []
+        for r in (self._dynamic_symbol_hit_rects or []):
             if float(r['x1']) <= x_mm <= float(r['x2']) and float(r['y1']) <= y_mm <= float(r['y2']):
                 dx = x_mm - float(r['cx'])
                 dy = y_mm - float(r['cy'])

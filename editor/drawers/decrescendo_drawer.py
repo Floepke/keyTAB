@@ -9,7 +9,7 @@ if TYPE_CHECKING:
 class DecrescendoDrawerMixin:
     def draw_decrescendo(self, du: DrawUtil) -> None:
         self = cast("Editor", self)
-        if getattr(self, 'is_tiny_mode', None) and self.is_tiny_mode():
+        if getattr(self, 'is_tiny_mode_ultra', None) and self.is_tiny_mode_ultra():
             return
         score = getattr(self, 'current_score', lambda: None)()
         if score is None:
@@ -111,7 +111,7 @@ class DecrescendoDrawerMixin:
                 except Exception:
                     return max(1.0, (text_size_pt / 72.0) * 25.4 * 0.8)
 
-            def _draw_text_centered_at(xc_mm: float, yc_mm: float, txt: str, ev_tag_id: int, ev_tags: list[str]) -> None:
+            def _draw_text_centered_at(xc_mm: float, yc_mm: float, txt: str, ev_tag_id: int, ev_tags: list[str], handle: str = '') -> None:
                 if not txt:
                     return
                 try:
@@ -123,11 +123,15 @@ class DecrescendoDrawerMixin:
 
                 rx = bx + float(xb)
                 ry = by + float(yb)
+                sym_x1 = rx - dynamic_bg_pad
+                sym_y1 = ry - dynamic_bg_pad
+                sym_x2 = rx + float(w) + dynamic_bg_pad
+                sym_y2 = ry + float(h) + dynamic_bg_pad
                 du.add_rectangle(
-                    rx - dynamic_bg_pad,
-                    ry - dynamic_bg_pad,
-                    rx + float(w) + dynamic_bg_pad,
-                    ry + float(h) + dynamic_bg_pad,
+                    sym_x1,
+                    sym_y1,
+                    sym_x2,
+                    sym_y2,
                     corner_radius=max(0.0, dynamic_bg_pad),
                     stroke_color=None,
                     fill_color=paper_color,
@@ -148,6 +152,12 @@ class DecrescendoDrawerMixin:
                     id=ev_tag_id,
                     tags=['dynamic_symbol_text_top'],
                 )
+
+                if is_dynamic_tool and handle:
+                    self.register_dynamic_symbol_hit_rect(
+                        ev_tag_id, 'decrescendo', handle,
+                        sym_x1, sym_y1, sym_x2, sym_y2,
+                    )
 
             start_h = _text_h_mm(start_text)
             end_h = _text_h_mm(end_text)
@@ -200,6 +210,7 @@ class DecrescendoDrawerMixin:
                     start_text,
                     ev_id,
                     ['decrescendo_text'],
+                    handle='start',
                 )
             if end_text:
                 _draw_text_centered_at(
@@ -208,6 +219,7 @@ class DecrescendoDrawerMixin:
                     end_text,
                     ev_id,
                     ['decrescendo_text'],
+                    handle='end',
                 )
 
             if is_dynamic_tool:

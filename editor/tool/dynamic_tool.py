@@ -110,6 +110,10 @@ class DynamicTool(BaseTool):
         # Ignore the immediate post-dialog click/release sequence.
         self._suppress_next_left_interaction = True
         selected_glyph, ok = DynamicDialog.get_dynamic_glyph(parent=parent_w, current_value=current)
+        # Restore focus to the main window after the modal dialog (needed on macOS)
+        if parent_w is not None:
+            parent_w.activateWindow()
+            parent_w.raise_()
         if not ok:
             return
         setattr(hp, field, str(selected_glyph or ''))
@@ -270,6 +274,13 @@ class DynamicTool(BaseTool):
         super().on_left_click(x, y)
         if self._suppress_next_left_interaction:
             return
+        # Check for click on a dynamic symbol rectangle — open edit dialog.
+        if self._editor is not None:
+            x_mm, y_mm = self._cursor_mm(x, y)
+            hp, _hp_type, handle = self._editor.hit_test_dynamic_symbol_mm(x_mm, y_mm)
+            if hp is not None and handle in ('start', 'end'):
+                self._set_hairpin_text_via_dialog(hp, str(handle))
+                return
         # Snapshot is handled by the editor after this call; just clear state.
         self._created_on_press = False
         self._clear_active_interaction()

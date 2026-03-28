@@ -42,15 +42,15 @@ class Layout:
     note_head_visible: bool = True
     note_stem_visible: bool = True
     note_stop_visible: bool = True
-    note_stem_length_semitone: int = 5
-    note_stem_thickness_mm: float = 0.75 # Thickness of the stem as well the notehead outline width
-    note_stopsign_thickness_mm: float = 1.0
+    note_stem_length_semitone: int = 6
+    note_stem_thickness_mm: float = 1.25 # Thickness of the stem as well the notehead outline width
+    note_stopsign_thickness_mm: float = 1.25
     note_leftdot_visible: bool = False
-    note_continuation_dot_size_mm: float = 2.5
+    note_continuation_dot_size_mm: float = 2.15
     note_midinote_visible: bool = False
     note_midinote_left_color: str = '#ccc'
     note_midinote_right_color: str = '#ccc'
-    note_width_scaling: float = 1.0 # Scaling factor for black noteheads when it sits under the stem while a white note sits next to it (0.05 to 1.0)
+    note_width_scaling: float = 1.05 # Scaling factor for black noteheads when it sits under the stem while a white note sits next to it (0.05 to 1.0)
 
     # Beam appearance
     beam_visible: bool = True
