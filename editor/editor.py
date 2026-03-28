@@ -1351,19 +1351,20 @@ class Editor(QtCore.QObject,
             if (isinstance(self._tool, NoteTool)) and (self.time_cursor is not None) and (self.pitch_cursor is not None):
                 x_mm = float(self.pitch_to_x(int(self.pitch_cursor)))
                 w = float(self.semitone_dist or 0.5)
-                h = w * 2
-                if self.pitch_cursor in BLACK_KEYS:
-                    w *= .8
                 layout = self.current_score().layout
+                note_width_scale = float(getattr(layout, 'note_width_scaling', 0.75) or 0.75)
+                note_width_scale = max(0.05, note_width_scale)
+                head_half_w = w * note_width_scale
+                h = w * 2
                 l = float(layout.note_stem_length_semitone or 3) * float(self.semitone_dist or 0.5)
                 # Draw a translucent preview notehead at cursor
                 fill_color = self.accent_color if self.pitch_cursor in BLACK_KEYS else self.paper_color
                 
                 # draw the notehead and stem
                 du.add_oval(
-                    x_mm - w,
+                    x_mm - head_half_w,
                     y_mm,
-                    x_mm + w,
+                    x_mm + head_half_w,
                     y_mm + h,
                     fill_color=fill_color,
                     stroke_color=self.accent_color,
@@ -1401,6 +1402,8 @@ class Editor(QtCore.QObject,
             if (isinstance(self._tool, GraceNoteTool)) and (self.time_cursor is not None) and (self.pitch_cursor is not None):
                 x_mm = float(self.pitch_to_x(int(self.pitch_cursor)))
                 scale = float(getattr(self.current_score().layout, 'grace_note_scale', 0.75) or 0.75)
+                note_width_scale = float(getattr(self.current_score().layout, 'note_width_scaling', 0.75) or 0.75)
+                note_width_scale = max(0.05, note_width_scale)
                 outline_w = float(
                     getattr(self.current_score().layout, 'grace_note_outline_width_mm', getattr(self.current_score().layout, 'grace_note_outline_width', 0.3))
                     or 0.3
@@ -1408,8 +1411,8 @@ class Editor(QtCore.QObject,
                 w = float(self.semitone_dist or 0.5) * scale
                 top = y_mm
                 bottom = y_mm + (w * 2.0)
-                left = x_mm - w
-                right = x_mm + w
+                left = x_mm - (w * note_width_scale)
+                right = x_mm + (w * note_width_scale)
                 du.add_oval(
                     left,
                     top,

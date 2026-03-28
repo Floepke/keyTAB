@@ -48,6 +48,14 @@ class DynamicDialog(QtWidgets.QDialog):
         self.setModal(True)
         self.setWindowModality(QtCore.Qt.WindowModality.WindowModal)
 
+        screen = QtGui.QGuiApplication.primaryScreen()
+        if screen is not None:
+            avail = screen.availableGeometry()
+            self.resize(max(760, int(avail.width() * 0.72)), max(520, int(avail.height() * 0.78)))
+        else:
+            self.resize(980, 700)
+        self.setMinimumSize(760, 520)
+
         lay = QtWidgets.QVBoxLayout(self)
         lay.setContentsMargins(10, 10, 10, 10)
         lay.setSpacing(8)
@@ -56,52 +64,69 @@ class DynamicDialog(QtWidgets.QDialog):
         info.setWordWrap(True)
         lay.addWidget(info)
 
-        self.listbox = QtWidgets.QListWidget(self)
-        self.listbox.setSelectionMode(QtWidgets.QAbstractItemView.SelectionMode.SingleSelection)
+        self.grid = QtWidgets.QListWidget(self)
+        self.grid.setSelectionMode(QtWidgets.QAbstractItemView.SelectionMode.SingleSelection)
+        self.grid.setViewMode(QtWidgets.QListView.ViewMode.IconMode)
+        self.grid.setFlow(QtWidgets.QListView.Flow.LeftToRight)
+        self.grid.setWrapping(True)
+        self.grid.setResizeMode(QtWidgets.QListView.ResizeMode.Adjust)
+        self.grid.setMovement(QtWidgets.QListView.Movement.Static)
+        self.grid.setLayoutMode(QtWidgets.QListView.LayoutMode.Batched)
+        self.grid.setUniformItemSizes(True)
+        self.grid.setSpacing(8)
+        self.grid.setVerticalScrollMode(QtWidgets.QAbstractItemView.ScrollMode.ScrollPerPixel)
+        self.grid.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
 
         app_font = QtWidgets.QApplication.font()
         leland_family = register_font_from_bytes('LelandText') or 'LelandText'
-        combo_font = QtGui.QFont(app_font)
-        combo_font.setFamily(leland_family)
+        symbol_font = QtGui.QFont(app_font)
+        symbol_font.setFamily(leland_family)
         base_pt = float(app_font.pointSizeF() if app_font.pointSizeF() > 0 else max(8.0, float(app_font.pointSize())))
-        combo_font.setPointSizeF(max(12.0, base_pt * 2.0))
+        symbol_font.setPointSizeF(max(13.0, base_pt * 2.15))
 
-        row_h = max(42, int(QtGui.QFontMetrics(combo_font).height() * 3.0))
+        metrics = QtGui.QFontMetrics(symbol_font)
+        glyph_w = max([metrics.horizontalAdvance(glyph) for _token, glyph in DYNAMIC_GLYPH_CHOICES] or [0])
+        glyph_h = max([metrics.boundingRect(glyph).height() for _token, glyph in DYNAMIC_GLYPH_CHOICES] or [metrics.height()])
+        cell_w = max(66, int(glyph_w + 28))
+        cell_h = max(72, int(glyph_h + 28))
+        self.grid.setGridSize(QtCore.QSize(cell_w, cell_h))
 
-        self.listbox.setFont(combo_font)
+        self.grid.setFont(symbol_font)
 
-        no_symbol_item = QtWidgets.QListWidgetItem('(use no symbol)')
+        no_symbol_item = QtWidgets.QListWidgetItem('none')
         no_symbol_item.setData(QtCore.Qt.ItemDataRole.UserRole, '')
         no_symbol_item.setData(QtCore.Qt.ItemDataRole.UserRole + 1, '')
+        no_symbol_item.setToolTip('Use no dynamic symbol')
         no_symbol_item.setFont(app_font)
         no_symbol_item.setTextAlignment(int(QtCore.Qt.AlignmentFlag.AlignHCenter | QtCore.Qt.AlignmentFlag.AlignVCenter))
-        no_symbol_item.setSizeHint(QtCore.QSize(0, row_h))
-        self.listbox.addItem(no_symbol_item)
+        no_symbol_item.setSizeHint(QtCore.QSize(cell_w, cell_h))
+        self.grid.addItem(no_symbol_item)
 
         for token, glyph in DYNAMIC_GLYPH_CHOICES:
             item = QtWidgets.QListWidgetItem(glyph)
             item.setData(QtCore.Qt.ItemDataRole.UserRole, glyph)
             item.setData(QtCore.Qt.ItemDataRole.UserRole + 1, token)
-            item.setFont(combo_font)
+            item.setToolTip(token)
+            item.setFont(symbol_font)
             item.setTextAlignment(int(QtCore.Qt.AlignmentFlag.AlignHCenter | QtCore.Qt.AlignmentFlag.AlignVCenter))
-            item.setSizeHint(QtCore.QSize(0, row_h))
-            self.listbox.addItem(item)
+            item.setSizeHint(QtCore.QSize(cell_w, cell_h))
+            self.grid.addItem(item)
 
         current = str(current_value or '')
         if current:
-            for i in range(self.listbox.count()):
-                item = self.listbox.item(i)
+            for i in range(self.grid.count()):
+                item = self.grid.item(i)
                 if item is not None and str(item.data(QtCore.Qt.ItemDataRole.UserRole) or '') == current:
-                    self.listbox.setCurrentRow(i)
+                    self.grid.setCurrentRow(i)
                     break
         else:
-            self.listbox.setCurrentRow(0)
-        if self.listbox.currentRow() < 0 and self.listbox.count() > 0:
-            self.listbox.setCurrentRow(0)
+            self.grid.setCurrentRow(0)
+        if self.grid.currentRow() < 0 and self.grid.count() > 0:
+            self.grid.setCurrentRow(0)
 
-        lay.addWidget(self.listbox)
+        lay.addWidget(self.grid, 1)
 
-        hint = QtWidgets.QLabel('We use font LelandText for all dynamic symbols. LelandText is the music font from Musescore 3.', self)
+        hint = QtWidgets.QLabel('LelandText symbols are shown in a clickable raster. Hover a cell to see its dynamic token.', self)
         hint.setWordWrap(True)
         lay.addWidget(hint)
 
@@ -110,12 +135,13 @@ class DynamicDialog(QtWidgets.QDialog):
         btns.rejected.connect(self.reject)
         lay.addWidget(btns)
 
-        self.listbox.itemDoubleClicked.connect(lambda _item: self.accept())
+        self.grid.itemDoubleClicked.connect(lambda _item: self.accept())
+        self.grid.itemActivated.connect(lambda _item: self.accept())
 
-        QtCore.QTimer.singleShot(0, self.listbox.setFocus)
+        QtCore.QTimer.singleShot(0, self.grid.setFocus)
 
     def selected_glyph(self) -> str:
-        item = self.listbox.currentItem()
+        item = self.grid.currentItem()
         if item is None:
             return ''
         return str(item.data(QtCore.Qt.ItemDataRole.UserRole) or '')

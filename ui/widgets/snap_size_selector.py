@@ -222,18 +222,12 @@ class SnapSizeSelector(QtWidgets.QWidget):
             total_w = max(text_w, 54 + 8 + fm.horizontalAdvance("÷ 64") + 8 + 54) + layout_margins
             # Fix height, allow width to expand with the dock
             self.setFixedHeight(total_h)
-            # If hosted in a dock, clamp dock size too (include title bar height)
+            # If hosted in a dock, do not clamp dock min/max size.
             p = self.parent()
             if isinstance(p, QtWidgets.QDockWidget):
-                try:
-                    style = p.style()
-                    title_h = style.pixelMetric(QtWidgets.QStyle.PM_TitleBarHeight, None, p)
-                except Exception:
-                    title_h = 24
-                dock_h = total_h + int(title_h)
-                # Only clamp height; keep width flexible to match other docks
-                p.setMinimumHeight(dock_h)
-                p.setMaximumHeight(dock_h)
+                # Explicitly clear any previously persisted constraints.
+                p.setMinimumHeight(0)
+                p.setMaximumHeight(16777215)
         except Exception:
             pass
 

@@ -215,7 +215,11 @@ def main(argv: list[str] | None = None):
 
     # Load settings and apply UI scale before creating QApplication
     preferences = get_preferences()
-    ui_scale = float(preferences.get("ui_scale", 1.0))
+    try:
+        ui_scale = float(preferences.get("ui_scale", 1.0))
+    except Exception:
+        ui_scale = 1.0
+    ui_scale = max(0.5, min(3.0, ui_scale))
     
     # Initialize appdata to ensure ~/.keyTAB/appdata.py exists
     get_appdata_manager()
@@ -225,14 +229,20 @@ def main(argv: list[str] | None = None):
     user_root.mkdir(parents=True, exist_ok=True)
     (user_root / "pstyle").mkdir(parents=True, exist_ok=True)
 
-    # Platform-specific DPI handling:
-    # - On Linux, use Qt env vars to scale UI.
-    # - On macOS, explicitly clear Qt scaling and plugin env to avoid Cocoa issues.
-    if sys.platform.startswith("linux"):
-        os.environ.setdefault("QT_ENABLE_HIGHDPI_SCALING", "1")
-        os.environ["QT_SCALE_FACTOR"] = str(ui_scale)
+    # Apply user-selected Qt widget scaling globally.
+    # Must be set before QApplication is constructed.
+    os.environ.setdefault("QT_ENABLE_HIGHDPI_SCALING", "1")
+    os.environ["QT_SCALE_FACTOR"] = str(ui_scale)
+    try:
+        QtGui.QGuiApplication.setHighDpiScaleFactorRoundingPolicy(
+            QtCore.Qt.HighDpiScaleFactorRoundingPolicy.PassThrough
+        )
+    except Exception:
+        pass
+
+    # Platform-specific startup handling.
     # On macOS, force menus to render inside the window instead of the global menu bar.
-    elif sys.platform == "darwin":
+    if sys.platform == "darwin":
         # Force Fusion style in-process to avoid accidental fallback to native style
         # from shell/launchd environment overrides.
         os.environ["QT_STYLE_OVERRIDE"] = "Fusion"
@@ -288,8 +298,7 @@ def main(argv: list[str] | None = None):
         QtCore.QTimer.singleShot(0, lambda: win.open_documents_from_paths(initial_documents, confirm_dirty=False))
 
     prompt_install_if_needed()
-    win.schedule_edwin_prompt(250)
-    QtCore.QTimer.singleShot(250, win._maybe_prompt_edwin_install)
+    win.schedule_fonts_install_prompt(250)
 
     # Ensure clean shutdown of background threads on app exit
     app.aboutToQuit.connect(win.prepare_close)

@@ -42,6 +42,11 @@ class MainWindow(QtWidgets.QMainWindow):
             self._left_panel_width_pref_px = int(max(1, adm_width.get("left_panel_width_px", 220)))
         except Exception:
             self._left_panel_width_pref_px = 220
+        self._left_panel_width_last_saved_px = int(self._left_panel_width_pref_px)
+        self._left_panel_width_save_timer = QtCore.QTimer(self)
+        self._left_panel_width_save_timer.setSingleShot(True)
+        self._left_panel_width_save_timer.setInterval(250)
+        self._left_panel_width_save_timer.timeout.connect(self._persist_left_panel_width)
         self._editor_scroll_step_logical_px: int = 1
 
         # File management
@@ -320,8 +325,8 @@ class MainWindow(QtWidgets.QMainWindow):
         # Fit state tracking
         self.is_fit = False
         self.is_startup = True
-        # Defer Edwin font prompt until explicitly scheduled by the app (after AppImage install prompt)
-        self._edwin_prompt_armed = False
+        # Defer the font install prompt until explicitly scheduled by the app (after AppImage install prompt)
+        self._fonts_prompt_armed = False
 
         # Restore splitter sizes from last session if available; else fall back to fit
         adm = get_appdata_manager()
@@ -1015,6 +1020,14 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def eventFilter(self, watched: QtCore.QObject, event: QtCore.QEvent) -> bool:
         et = event.type()
+
+        # Persist left dock width when user drags the dock separator.
+        try:
+            if et == QtCore.QEvent.Type.Resize:
+                if watched is getattr(self, 'snap_dock', None) or watched is getattr(self, 'tool_dock', None):
+                    self._schedule_left_panel_width_save()
+        except Exception:
+            pass
 
         # Ensure scrollbar hover tooltip text is cleared immediately once the
         # cursor is no longer over the custom editor scrollbar.
@@ -2760,6 +2773,39 @@ class MainWindow(QtWidgets.QMainWindow):
             self.tool_dock.adjust_to_fit()
         self._freeze_left_panel_width_once()
 
+    def _left_panel_width_px(self) -> int:
+        lw = 0
+        try:
+            if hasattr(self, 'snap_dock'):
+                lw = max(lw, int(self.snap_dock.width()))
+        except Exception:
+            pass
+        try:
+            if hasattr(self, 'tool_dock'):
+                lw = max(lw, int(self.tool_dock.width()))
+        except Exception:
+            pass
+        return int(max(0, lw))
+
+    def _schedule_left_panel_width_save(self) -> None:
+        try:
+            if hasattr(self, '_left_panel_width_save_timer') and self._left_panel_width_save_timer is not None:
+                self._left_panel_width_save_timer.start()
+        except Exception:
+            pass
+
+    def _persist_left_panel_width(self) -> None:
+        lw = int(self._left_panel_width_px())
+        if lw <= 0:
+            return
+        if lw == int(getattr(self, '_left_panel_width_last_saved_px', 0) or 0):
+            return
+        adm = get_appdata_manager()
+        adm.set("left_panel_width_px", int(lw))
+        adm.save()
+        self._left_panel_width_last_saved_px = int(lw)
+        self._left_panel_width_pref_px = int(lw)
+
     def _freeze_left_panel_width_once(self) -> None:
         if self._left_panel_width_frozen:
             return
@@ -2774,16 +2820,18 @@ class MainWindow(QtWidgets.QMainWindow):
             tool_width = int(self.tool_dock.sizeHint().width())
 
         pref_width = int(getattr(self, '_left_panel_width_pref_px', 220) or 220)
-        target_width = max(120, pref_width, snap_width, tool_width)
-        self.snap_dock.setMinimumWidth(target_width)
-        self.tool_dock.setMinimumWidth(target_width)
+        if pref_width > 0:
+            target_width = max(80, pref_width)
+        else:
+            target_width = max(80, snap_width, tool_width)
         # Apply an initial width while still allowing user resizing afterward
         self.resizeDocks([self.snap_dock, self.tool_dock], [target_width, target_width], QtCore.Qt.Orientation.Horizontal)
+        self._schedule_left_panel_width_save()
         self._left_panel_width_frozen = True
 
     def resizeEvent(self, ev: QtGui.QResizeEvent) -> None:
         super().resizeEvent(ev)
-        ...
+        self._schedule_left_panel_width_save()
 
     def _on_snap_changed(self, base: int, divide: int) -> None:
         # Update editor snap size units and request a redraw
@@ -2806,115 +2854,119 @@ class MainWindow(QtWidgets.QMainWindow):
         app_state.snap_divide = int(divide)
 
     def _on_tool_selected(self, name: str) -> None:
-        # Persist selected tool to app state
-        try:
-            app_state = self._current_app_state()
-            app_state.selected_tool = str(name)
-            if str(name) != 'note':
-                # Leave velocity mode state untouched; it is restored when returning to note tool
-                pass
-        except Exception:
+        # Persist selected tool to app state; the editor will read from app state on each redraw to determine which tool is active.
+        app_state = self._current_app_state()
+        app_state.selected_tool = str(name)
+        if str(name) != 'note':
+            # Leave velocity mode state untouched; it is restored when returning to note tool
             pass
 
-    def schedule_edwin_prompt(self, delay_ms: int = 150) -> None:
-        """Schedule the Edwin font install prompt once, after any other startup dialogs."""
-        if self._edwin_prompt_armed:
+    def schedule_fonts_install_prompt(self, delay_ms: int = 150) -> None:
+        """Schedule one startup prompt to install all required fonts."""
+        if self._fonts_prompt_armed:
             return
-        self._edwin_prompt_armed = True
-        QtCore.QTimer.singleShot(max(0, int(delay_ms)), self._maybe_prompt_edwin_install)
+        self._fonts_prompt_armed = True
+        QtCore.QTimer.singleShot(max(0, int(delay_ms)), self._maybe_prompt_fonts_install)
 
-    def _maybe_prompt_edwin_install(self) -> None:
+    def _maybe_prompt_fonts_install(self) -> None:
+        adm = get_appdata_manager()
+        if bool(adm.get("fonts_install_ok", False)):
+            return
+
         fonts = [
             {
-                "name": "Edwin",
-                "installed_key": "edwin_font_installed",
-                "dismissed_key": "edwin_install_prompt_dismissed",
-                "desc": "Edwin font for headers and engraving (recommended)",
+                "key": "Edwin",
+                "family": "Edwin",
+                "check_name": "Edwin",
+                "desc": "Edwin font for headers and engraving.",
             },
             {
-                "name": "Latin Modern Roman Caps",
-                "installed_key": "lmromancaps_font_installed",
-                "dismissed_key": "lmromancaps_install_prompt_dismissed",
-                "desc": "Latin Modern Roman Caps for engraving text and titles (recommended)",
+                "key": "FiraCode-SemiBold",
+                "family": "Fira Code",
+                "check_name": "FiraCode-SemiBold",
+                "desc": "Fira Code SemiBold for UI consistency.",
             },
             {
-                "name": "Latin Modern Roman",
-                "installed_key": "lmroman_font_installed",
-                "dismissed_key": "lmroman_install_prompt_dismissed",
-                "desc": "Latin Modern Roman for engraving text and titles (recommended)",
+                "key": "lmroman10-regular",
+                "family": "Latin Modern Roman",
+                "check_name": "Latin Modern Roman",
+                "desc": "Latin Modern Roman for engraving text and titles.",
+            },
+            {
+                "key": "lmromancaps10-regular",
+                "family": "Latin Modern Roman Caps",
+                "check_name": "Latin Modern Roman Caps",
+                "desc": "Latin Modern Roman Caps for engraving text and titles.",
+            },
+            {
+                "key": "LelandText",
+                "family": "LelandText",
+                "check_name": "LelandText",
+                "desc": "LelandText for dynamic/hairpin symbols (crescendo and decrescendo).",
             },
         ]
-        try:
-            adm = get_appdata_manager()
-        except Exception:
-            return
-        try:
-            from fonts import has_system_font, install_embedded_font_to_system
-        except Exception:
-            return
-        try:
-            # Build list of fonts that are not yet installed
-            missing: list[dict] = []
-            all_dismissed = True
-            for f in fonts:
-                name = f["name"]
-                installed_key = f["installed_key"]
-                dismissed_key = f["dismissed_key"]
-                is_dismissed = bool(adm.get(dismissed_key, False))
-                all_dismissed = all_dismissed and is_dismissed
-                if has_system_font(name):
-                    adm.set(installed_key, True)
-                    continue
+        from fonts import has_system_font, install_embedded_font_to_system
+        missing: list[dict] = []
+        for f in fonts:
+            check_name = str(f.get("check_name", f["family"]))
+            if not has_system_font(check_name):
                 missing.append(f)
-            if not missing:
-                adm.save()
-                return
-            if all_dismissed:
-                return
-            msg = QtWidgets.QMessageBox(self)
-            msg.setIcon(QtWidgets.QMessageBox.Icon.Information)
-            msg.setWindowTitle("Install recommended fonts")
-            lines = ["keyTAB can install embedded fonts so the preview matches prints/PDFs (recommended):"]
-            for f in missing:
-                lines.append(f"- {f['name']}: {f['desc']}")
-            lines.append("Install these to your user font folder now?")
-            msg.setText("\n".join(lines))
-            msg.setStandardButtons(QtWidgets.QMessageBox.StandardButton.Yes | QtWidgets.QMessageBox.StandardButton.No)
-            msg.setDefaultButton(QtWidgets.QMessageBox.StandardButton.Yes)
-            result = msg.exec()
-            if result != QtWidgets.QMessageBox.StandardButton.Yes:
-                for f in fonts:
-                    adm.set(f["dismissed_key"], True)
-                adm.save()
-                return
-            successes = []
-            failures = []
-            for f in missing:
-                name = f["name"]
-                installed_key = f["installed_key"]
-                success, detail = install_embedded_font_to_system(name)
-                if success:
-                    adm.set(installed_key, True)
-                    successes.append(name)
-                else:
-                    failures.append((name, detail))
+        if not missing:
+            adm.set("fonts_install_ok", True)
             adm.save()
-            if successes:
-                QtWidgets.QMessageBox.information(
-                    self,
-                    "Fonts installed",
-                    "The following fonts were installed. keyTAB will restart to apply them:\n" + "\n".join(successes),
-                )
-                QtCore.QTimer.singleShot(100, self._request_app_restart)
-            if failures:
-                details = "\n".join([f"{n}: {d}" for n, d in failures])
-                QtWidgets.QMessageBox.warning(
-                    self,
-                    "Font installation failed",
-                    f"keyTAB could not install some fonts automatically:\n{details}",
-                )
-        except Exception:
-            pass
+            return
+        adm.set("fonts_install_ok", False)
+        msg = QtWidgets.QMessageBox(self)
+        msg.setIcon(QtWidgets.QMessageBox.Icon.Information)
+        msg.setWindowTitle("Install required fonts")
+        lines = ["keyTAB can install embedded fonts to your user font folder so editing and engraving match:"]
+        for f in missing:
+            lines.append(f"- {f['family']}: {f['desc']}")
+        lines.append("Install all missing fonts now?")
+        msg.setText("\n".join(lines))
+        msg.setStandardButtons(QtWidgets.QMessageBox.StandardButton.Yes | QtWidgets.QMessageBox.StandardButton.No)
+        msg.setDefaultButton(QtWidgets.QMessageBox.StandardButton.Yes)
+        result = msg.exec()
+        if result != QtWidgets.QMessageBox.StandardButton.Yes:
+            adm.save()
+            return
+        successes = []
+        failures = []
+        for f in missing:
+            key = str(f["key"])
+            family = str(f["family"])
+            success, detail = install_embedded_font_to_system(key)
+            if success:
+                successes.append(family)
+            else:
+                failures.append((family, detail))
+
+        still_missing = [
+            f
+            for f in fonts
+            if not has_system_font(str(f.get("check_name", f["family"])))
+        ]
+        adm.set("fonts_install_ok", len(still_missing) == 0)
+        adm.save()
+
+        if successes:
+            QtWidgets.QMessageBox.information(
+                self,
+                "Fonts installed",
+                "The following fonts were installed. keyTAB will restart to apply them:\n" + "\n".join(successes),
+            )
+            QtCore.QTimer.singleShot(100, self._request_app_restart)
+        if failures or still_missing:
+            details = "\n".join([f"{n}: {d}" for n, d in failures])
+            if still_missing:
+                if details:
+                    details += "\n"
+                details += "Still missing: " + ", ".join(str(f["family"]) for f in still_missing)
+            QtWidgets.QMessageBox.warning(
+                self,
+                "Font installation failed",
+                f"keyTAB could not install some fonts automatically:\n{details}",
+            )
 
     def _request_app_restart(self) -> None:
         try:
@@ -2975,6 +3027,7 @@ class MainWindow(QtWidgets.QMainWindow):
             lw = max(lw, int(self.tool_dock.width()))
         if lw > 0:
             adm.set("left_panel_width_px", int(lw))
+            self._left_panel_width_last_saved_px = int(lw)
         # Persist whether the session is currently saved to a project file
         fm = getattr(self, 'file_manager', None)
         if fm is not None:

@@ -214,26 +214,24 @@ class CrescendoDrawerMixin:
             if is_dynamic_tool:
                 start_handle_x = x_mm
                 end_handle_x = x_mm
-                start_handle_y = y_start_draw if start_join_peers else y_start
-                end_handle_y = y_end_draw if end_join_peers else y_end
-
-                # If this hairpin has symbols, force handles around those symbols
-                # regardless of connected joins.
-                handle_gap = max(0.2, text_gap * 0.5)
-                if start_text:
-                    start_handle_y = y_start - ((start_h * 0.5) + dynamic_bg_pad + handle_r + handle_gap)
-                if end_text:
-                    end_handle_y = y_end + ((end_h * 0.5) + dynamic_bg_pad + handle_r + handle_gap)
+                # Handles are edge-anchored to the actual drawn hairpin endpoints.
+                # This keeps handle position aligned even when text offsets move y_start_draw/y_end_draw.
+                start_anchor_y = y_start_draw
+                end_anchor_y = y_end_draw
+                start_top = start_anchor_y
+                start_bottom = start_anchor_y + (2.0 * handle_r)
+                end_top = end_anchor_y - (2.0 * handle_r)
+                end_bottom = end_anchor_y
 
                 # Start handle (at the tip / top)
                 self.register_hairpin_hit_rect(
                     ev_id, 'crescendo', 'start',
-                    start_handle_x - handle_r, start_handle_y - handle_r,
-                    start_handle_x + handle_r, start_handle_y + handle_r,
+                    start_handle_x - handle_r, start_top,
+                    start_handle_x + handle_r, start_bottom,
                 )
                 du.add_rectangle(
-                    start_handle_x - handle_r, start_handle_y - handle_r,
-                    start_handle_x + handle_r, start_handle_y + handle_r,
+                    start_handle_x - handle_r, start_top,
+                    start_handle_x + handle_r, start_bottom,
                     stroke_color=(.5, 0.0, 0.0, 1.0),
                     stroke_width_mm=0.5,
                     fill_color=(.5, 0.0, 0.0, 1.0),
@@ -243,12 +241,12 @@ class CrescendoDrawerMixin:
                 # End handle (at the open end / bottom)
                 self.register_hairpin_hit_rect(
                     ev_id, 'crescendo', 'end',
-                    end_handle_x - handle_r, end_handle_y - handle_r,
-                    end_handle_x + handle_r, end_handle_y + handle_r,
+                    end_handle_x - handle_r, end_top,
+                    end_handle_x + handle_r, end_bottom,
                 )
                 du.add_rectangle(
-                    end_handle_x - handle_r, end_handle_y - handle_r,
-                    end_handle_x + handle_r, end_handle_y + handle_r,
+                    end_handle_x - handle_r, end_top,
+                    end_handle_x + handle_r, end_bottom,
                     stroke_color=(.5, 0.0, 0.0, 1.0),
                     stroke_width_mm=0.5,
                     fill_color=(.5, 0.0, 0.0, 1.0),

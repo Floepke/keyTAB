@@ -70,8 +70,6 @@ EDITOR_LAYERING = [
     'text_bg',
     'text',
     'text_handle',
-    'crescendo_handle',
-    'decrescendo_handle',
     'crescendo',
     'decrescendo',
     'dynamic_text_bg',
@@ -79,6 +77,8 @@ EDITOR_LAYERING = [
     'decrescendo_text',
     'dynamic_symbol_bg_top',
     'dynamic_symbol_text_top',
+    'crescendo_handle',
+    'decrescendo_handle',
 ]
 
 ENGRAVER_LAYERING = [

@@ -272,13 +272,9 @@ def get_appdata_manager() -> AppDataManager:
         # Window state (session-managed)
         adm.register("window_maximized", True, "Start maximized; updated on exit")
         adm.register("window_geometry", "", "Base64-encoded Qt window geometry for normal state")
+        adm.register("left_panel_width_px", 220, "Last width of the left docked panel area in pixels")
         adm.register("score_template", {}, "Default score template for new scores (dict of score fields except events)")
-        adm.register("edwin_font_installed", False, "True when Edwin font was installed to the user font directory")
-        adm.register("edwin_install_prompt_dismissed", False, "User declined the Edwin font installation prompt")
-        adm.register("lmromancaps_font_installed", False, "True when Latin Modern Roman Caps font was installed to the user font directory")
-        adm.register("lmromancaps_install_prompt_dismissed", False, "User declined the Latin Modern Roman Caps font installation prompt")
-        adm.register("lmroman_font_installed", False, "True when Latin Modern Roman font was installed to the user font directory")
-        adm.register("lmroman_install_prompt_dismissed", False, "User declined the Latin Modern Roman font installation prompt")
+        adm.register("fonts_install_ok", False, "True when all required embedded fonts are installed to the user font directory")
         adm.register("user_soundfont_path", "", "Absolute path to last selected user soundfont (.sf2/.sf3)")
         # Removed window_state persistence to avoid saving/restoring dock/toolbar layout
         adm.load()
@@ -288,6 +284,15 @@ def get_appdata_manager() -> AppDataManager:
         if removed is not None:
             adm.save()
         for legacy_key in ("user_styles", "selected_style_name", "user_styles_version"):
+            adm._values.pop(legacy_key, None)
+        for legacy_key in (
+            "edwin_font_installed",
+            "edwin_install_prompt_dismissed",
+            "lmromancaps_font_installed",
+            "lmromancaps_install_prompt_dismissed",
+            "lmroman_font_installed",
+            "lmroman_install_prompt_dismissed",
+        ):
             adm._values.pop(legacy_key, None)
         _appdata_manager = adm
     return _appdata_manager

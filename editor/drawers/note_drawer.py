@@ -137,6 +137,9 @@ class NoteDrawerMixin:
         self = cast("Editor", self)
         fill = self._midinote_color(n, draw_mode)
         w = float(self.semitone_dist or 0.5)
+        layout = self.current_score().layout
+        head_scale = float(getattr(layout, 'note_width_scaling', 0.75) or 0.75)
+        head_half_w = w * max(0.05, head_scale)
         du.add_polygon(
             [
                 (x, y1),
@@ -151,8 +154,8 @@ class NoteDrawerMixin:
             tags=["midi_note"],
         )
         # Register a clickable rectangle covering the main midinote body
-        x_left = x - w
-        x_right = x + w
+        x_left = x - max(w, head_half_w)
+        x_right = x + max(w, head_half_w)
         # Include full notehead bounds so border clicks are reliably detected.
         # For short durations, the body can be smaller than the head, so use a union.
         y_head_top = y1
@@ -183,7 +186,7 @@ class NoteDrawerMixin:
                 break
         if not on_barline:
             return
-        layout = cast("Editor", self).current_score().layout
+        layout = self.current_score().layout
         if not bool(getattr(layout, 'barline_visible', True)):
             return
         w = float(self.semitone_dist or 0.5)
@@ -225,23 +228,20 @@ class NoteDrawerMixin:
     def _draw_notehead(self, du: DrawUtil, n, x: float, y1: float, draw_mode: str) -> None:
         self = cast("Editor", self)
         w = float(self.semitone_dist or 0.5)
-        layout = cast("Editor", self).current_score().layout
+        layout = self.current_score().layout
         outline_w = 0.5
-        black_head_scale = float(getattr(layout, 'note_width_scaling', 0.75) or 0.75)
-        black_head_scale = max(0.05, min(1.0, black_head_scale))
+        head_scale = float(getattr(layout, 'note_width_scaling', 0.75) or 0.75)
+        head_scale = max(0.05, head_scale)
+        head_half_w = w * head_scale
         black_above = n.pitch in BLACK_KEYS and self._black_note_above_stem(n, layout)
-        base_scale = 0.8
-        head_scale = base_scale
-        if n.pitch in BLACK_KEYS and (not black_above) and self._adjacent_white_same_hand(n, layout):
-            head_scale = base_scale * black_head_scale
         # Adjust vertical for black-note rule
         if black_above:
             y1 = y1 - (w * 2.0)
         if n.pitch in BLACK_KEYS:
             du.add_oval(
-                x - (w * head_scale),
+                x - head_half_w,
                 y1,
-                x + (w * head_scale),
+                x + head_half_w,
                 y1 + w * 2.0,
                 stroke_color=self.notation_color,
                 stroke_width_mm=0.3,
@@ -253,9 +253,9 @@ class NoteDrawerMixin:
             paper_r, paper_g, paper_b = Style.get_named_rgb('paper', (255, 255, 255))
             bg_fill = (paper_r / 255.0, paper_g / 255.0, paper_b / 255.0, 1.0)
             du.add_oval(
-                x - w,
+                x - head_half_w,
                 y1,
-                x + w,
+                x + head_half_w,
                 y1 + w * 2.0,
                 stroke_color=self.notation_color,
                 stroke_width_mm=outline_w,
@@ -268,7 +268,7 @@ class NoteDrawerMixin:
         self = cast("Editor", self)
         if getattr(self, 'is_tiny_mode', None) and self.is_tiny_mode():
             return
-        layout = cast("Editor", self).current_score().layout
+        layout = self.current_score().layout
         if not bool(getattr(layout, 'note_stop_visible', True)):
             return
         # Show stop triangle if followed by a rest in same hand

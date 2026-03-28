@@ -47,6 +47,8 @@ class GraceNoteDrawerMixin:
         semitone_dist = float(getattr(self, 'semitone_dist', 0.5) or 0.5)
         notation_color = getattr(self, 'notation_color', (0, 0, 0, 1))
         scale = float(getattr(layout, 'grace_note_scale', 0.75) or 0.75)
+        note_width_scale = float(getattr(layout, 'note_width_scaling', 0.75) or 0.75)
+        note_width_scale = max(0.05, note_width_scale)
         outline_w = float(
             getattr(layout, 'grace_note_outline_width_mm', getattr(layout, 'grace_note_outline_width', 0.3))
             or 0.3
@@ -61,10 +63,11 @@ class GraceNoteDrawerMixin:
             y_top = float(time_to_mm(t))
 
             base_w = semitone_dist * scale
+            head_half_w = base_w * note_width_scale
             top = y_top
             bottom = y_top + (base_w * 2.0)
-            left = x - base_w
-            right = x + base_w
+            left = x - head_half_w
+            right = x + head_half_w
 
             y_center = (top + bottom) * 0.5
 
