@@ -49,7 +49,8 @@ class CrescendoDrawerMixin:
         bleed_mm = max(2.0, float(getattr(score.app_state, 'zoom_mm_per_quarter', 25.0) or 25.0) * 0.5)
 
         is_dynamic_tool = str(getattr(getattr(self, '_tool', None), 'TOOL_NAME', '')) == 'dynamic'
-        handle_r = max(1.0, (self.semitone_dist or 2.5) * 0.35)
+        # Match count-line handle geometry: side = 1.4 * max(2.0, semitone_dist)
+        handle_r = max(2.0, float(self.semitone_dist or 2.5)) * 0.7
 
         page_w, _ = du.current_page_size_mm()
 
@@ -155,9 +156,10 @@ class CrescendoDrawerMixin:
                 )
 
                 if is_dynamic_tool and handle:
-                    self.register_dynamic_symbol_hit_rect(
-                        ev_tag_id, 'crescendo', handle,
+                    self.register_hit_rect(
+                        'dynamic_symbol', ev_tag_id,
                         sym_x1, sym_y1, sym_x2, sym_y2,
+                        htype='crescendo', handle=handle,
                     )
 
             start_h = _text_h_mm(start_text)
@@ -236,31 +238,33 @@ class CrescendoDrawerMixin:
                 end_bottom = end_anchor_y
 
                 # Start handle (at the tip / top)
-                self.register_hairpin_hit_rect(
-                    ev_id, 'crescendo', 'start',
+                self.register_hit_rect(
+                    'hairpin', ev_id,
                     start_handle_x - handle_r, start_top,
                     start_handle_x + handle_r, start_bottom,
+                    htype='crescendo', handle='start',
                 )
                 du.add_rectangle(
                     start_handle_x - handle_r, start_top,
                     start_handle_x + handle_r, start_bottom,
-                    stroke_color=(.5, 0.0, 0.0, 1.0),
-                    stroke_width_mm=0.5,
+                    stroke_color=None,
+                    stroke_width_mm=0.0,
                     fill_color=(.5, 0.0, 0.0, 1.0),
                     id=ev_id,
                     tags=['crescendo', 'crescendo_handle'],
                 )
                 # End handle (at the open end / bottom)
-                self.register_hairpin_hit_rect(
-                    ev_id, 'crescendo', 'end',
+                self.register_hit_rect(
+                    'hairpin', ev_id,
                     end_handle_x - handle_r, end_top,
                     end_handle_x + handle_r, end_bottom,
+                    htype='crescendo', handle='end',
                 )
                 du.add_rectangle(
                     end_handle_x - handle_r, end_top,
                     end_handle_x + handle_r, end_bottom,
-                    stroke_color=(.5, 0.0, 0.0, 1.0),
-                    stroke_width_mm=0.5,
+                    stroke_color=None,
+                    stroke_width_mm=0.0,
                     fill_color=(.5, 0.0, 0.0, 1.0),
                     id=ev_id,
                     tags=['crescendo', 'crescendo_handle'],

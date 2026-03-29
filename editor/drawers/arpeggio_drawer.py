@@ -134,12 +134,10 @@ class ArpeggioDrawerMixin:
                 tags=["arpeggio_handle"],
             )
             try:
-                self.register_arpeggio_hit_rect(
-                    arp_id,
-                    handle_x - r * 1.2,
-                    handle_y - r * 1.2,
-                    handle_x + r * 1.2,
-                    handle_y + r * 1.2,
+                self.register_hit_rect(
+                    'arpeggio', arp_id,
+                    handle_x - r * 1.2, handle_y - r * 1.2,
+                    handle_x + r * 1.2, handle_y + r * 1.2,
                 )
             except Exception:
                 pass

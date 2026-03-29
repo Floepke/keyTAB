@@ -302,17 +302,9 @@ class NoteTool(BaseTool):
 
     def _hit_note_and_rect(self, score: SCORE, x_px: float, y_px: float):
         x_mm, y_mm = self._cursor_mm(x_px, y_px)
-        matches = []
-        for r in (getattr(self._editor, '_note_hit_rects', []) or []):
-            if float(r['x1']) <= x_mm <= float(r['x2']) and float(r['y1']) <= y_mm <= float(r['y2']):
-                dx = x_mm - float(r['cx'])
-                dy = y_mm - float(r['cy'])
-                dist2 = dx * dx + dy * dy
-                matches.append((dist2, r))
-        if not matches:
+        hit_rect = self._editor.hit_test_hit_rect(x_mm, y_mm, 'note')
+        if hit_rect is None:
             return None, None, y_mm
-        matches.sort(key=lambda t: t[0])
-        hit_rect = matches[0][1]
         hit_id = int(hit_rect.get('_id', -1) or -1)
         for n in getattr(score.events, 'note', []) or []:
             if int(getattr(n, '_id', -1) or -1) == hit_id:
@@ -321,17 +313,9 @@ class NoteTool(BaseTool):
 
     def _hit_velocity_handle(self, score: SCORE, x_px: float, y_px: float):
         x_mm, y_mm = self._cursor_mm(x_px, y_px)
-        matches = []
-        for r in (getattr(self._editor, '_velocity_hit_rects', []) or []):
-            if float(r['x1']) <= x_mm <= float(r['x2']) and float(r['y1']) <= y_mm <= float(r['y2']):
-                dx = x_mm - float(r['cx'])
-                dy = y_mm - float(r['cy'])
-                dist2 = dx * dx + dy * dy
-                matches.append((dist2, r))
-        if not matches:
+        hit_rect = self._editor.hit_test_hit_rect(x_mm, y_mm, 'velocity')
+        if hit_rect is None:
             return None, None, y_mm
-        matches.sort(key=lambda t: t[0])
-        hit_rect = matches[0][1]
         hit_id = int(hit_rect.get('_id', -1) or -1)
         for n in getattr(score.events, 'note', []) or []:
             if int(getattr(n, '_id', -1) or -1) == hit_id:

@@ -113,7 +113,7 @@ class TempoDrawerMixin:
                 dash_pattern=None,
             )
             try:
-                self.register_tempo_hit_rect(int(getattr(tp, '_id', 0) or 0), x_left, min(y0, y1), x_left + rect_w, max(y0, y1))
+                self.register_hit_rect('tempo', int(getattr(tp, '_id', 0) or 0), x_left, min(y0, y1), x_left + rect_w, max(y0, y1))
             except Exception:
                 pass
             # add guide start line (black)

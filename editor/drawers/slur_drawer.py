@@ -138,20 +138,20 @@ class SlurDrawerMixin:
                     )
 
             if is_slur_tool:
-                handle_w = 2.0
-                handle_h = 2.0
+                # Match count-line handle geometry: side = 1.4 * max(2.0, semitone_dist)
+                handle_size = max(2.0, float(self.semitone_dist or 2.5)) * 1.4
+                handle_half = handle_size * 0.5
                 handles = [(x1, y1), (x2, y2), (x3, y3), (x4, y4)]
                 for idx, (hx, hy) in enumerate(handles, start=1):
                     is_anchor = idx in (1, 4)
-                    stroke_col = (.5, 0.0, 0.0, 1.0) if is_anchor else self.accent_color
                     fill_col = (.5, 0.0, 0.0, 1.0) if is_anchor else self.accent_color
                     du.add_rectangle(
-                        hx - handle_w * 0.5,
-                        hy - handle_h * 0.5,
-                        hx + handle_w * 0.5,
-                        hy + handle_h * 0.5,
-                        stroke_color=stroke_col,
-                        stroke_width_mm=0.5,
+                        hx - handle_half,
+                        hy - handle_half,
+                        hx + handle_half,
+                        hy + handle_half,
+                        stroke_color=None,
+                        stroke_width_mm=0.0,
                         fill_color=fill_col,
                         id=int(getattr(sl, '_id', 0) or 0),
                         tags=["slur-handle"],

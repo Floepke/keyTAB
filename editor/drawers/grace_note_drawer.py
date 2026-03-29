@@ -120,10 +120,8 @@ class GraceNoteDrawerMixin:
 
             # Hit rectangle uses unscaled notehead size for predictable picking
             hit_w = semitone_dist
-            self.register_note_hit_rect(
-                int(getattr(g, '_id', 0) or 0),
-                float(x - hit_w),
-                float(y_center - hit_w),
-                float(x + hit_w),
-                float(y_center + hit_w),
+            self.register_hit_rect(
+                'note', int(getattr(g, '_id', 0) or 0),
+                float(x - hit_w), float(y_center - hit_w),
+                float(x + hit_w), float(y_center + hit_w),
             )

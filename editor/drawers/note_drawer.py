@@ -111,7 +111,7 @@ class NoteDrawerMixin:
             try:
                 w = float(self.semitone_dist or 0.5)
                 rect_id = int(getattr(n, '_id', 0) or 0)
-                self.register_note_hit_rect(rect_id, float(x - w), float(y1), float(x + w), float(y1 + (w * 2.0)))
+                self.register_hit_rect('note', rect_id, float(x - w), float(y1), float(x + w), float(y1 + (w * 2.0)))
             except Exception:
                 pass
             return
@@ -171,7 +171,7 @@ class NoteDrawerMixin:
         if y_top > y_bottom:
             y_top, y_bottom = y_bottom, y_top
         rect_id = int(getattr(n, '_id', 0) or 0)
-        self.register_note_hit_rect(rect_id, float(x_left), float(y_top), float(x_right), float(y_bottom))
+        self.register_hit_rect('note', rect_id, float(x_left), float(y_top), float(x_right), float(y_bottom))
 
     def _draw_hand_split_indicator(self, du: DrawUtil, n, x: float, y1: float) -> None:
         self = cast("Editor", self)
@@ -353,8 +353,25 @@ class NoteDrawerMixin:
 
         # Draw dots using notehead center for consistent positioning
         dot_d = w * 0.8
+        dot_pitch = int(getattr(n, 'pitch', 0) or 0)
         for t in sorted(set(dot_times)):
             y_center = float(self.time_to_mm(t)) + w
+
+            # If another note starts at this exact time on adjacent pitch,
+            # push continuation dot forward two semitone distances to avoid overlap.
+            has_adjacent_start = False
+            for m in notes_view:
+                if int(getattr(m, '_id', -1) or -1) == int(getattr(n, '_id', -2) or -2):
+                    continue
+                if not self._time_op.eq(float(getattr(m, 'time', 0.0) or 0.0), float(t)):
+                    continue
+                mp = int(getattr(m, 'pitch', 0) or 0)
+                if abs(mp - dot_pitch) == 1:
+                    has_adjacent_start = True
+                    break
+            if has_adjacent_start:
+                y_center += float(self.semitone_dist or 0.5) * 2.0
+
             du.add_oval(
                 x - dot_d / 2.0,
                 y_center - dot_d / 2.0,

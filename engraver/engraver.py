@@ -1724,12 +1724,12 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
 
                     # Beam connection lines (note stem tip to beam line) are part of beam drawing.
                     # Record their x-ranges at each note start so barline cuts include them.
-                    for m in grp:
-                        mt = float(m.get('time', t_first) or t_first)
+                    for n in grp:
+                        mt = float(n.get('time', t_first) or t_first)
                         if not (op_time.ge(mt, float(t0)) and op_time.lt(mt, float(t1))):
                             continue
                         y_note = _time_to_y(float(mt))
-                        x_note = _key_to_x(int(m.get('pitch', 0) or 0))
+                        x_note = _key_to_x(int(n.get('pitch', 0) or 0))
                         if hand_norm == 'r':
                             x_tip = x_note + float(stem_len_mm_for_barlines)
                         else:
@@ -2534,15 +2534,15 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                             id=0,
                             tags=['beam'],
                         )
-                        for m in grp:
-                            mt = float(m.get('time', t_first) or t_first)
+                        for n in grp:
+                            mt = float(n.get('time', t_first) or t_first)
                             if not (op_time.ge(mt, float(t0)) and op_time.lt(mt, float(t1))):
                                 continue
                             y_note = _time_to_y(float(mt))
                             if hand_norm == 'r':
-                                x_tip = _key_to_x(int(m.get('pitch', 0) or 0)) + float(layout_stem_len)
+                                x_tip = _key_to_x(int(n.get('pitch', 0) or 0)) + float(layout_stem_len)
                             else:
-                                x_tip = _key_to_x(int(m.get('pitch', 0) or 0)) - float(layout_stem_len)
+                                x_tip = _key_to_x(int(n.get('pitch', 0) or 0)) - float(layout_stem_len)
                             if abs(yb2 - yb1) > 1e-6:
                                 t_ratio = (y_note - yb1) / (yb2 - yb1)
                                 x_on_beam = x1 + t_ratio * (x2 - x1)
@@ -2610,8 +2610,8 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                         continue
                     if not op_time.eq(float(m.get('time', 0.0) or 0.0), t0):
                         continue
-                    mp = int(m.get('pitch', 0) or 0)
-                    if mp not in BLACK_KEYS and abs(mp - p0) == 1:
+                    other_pitch = int(m.get('pitch', 0) or 0)
+                    if other_pitch not in BLACK_KEYS and abs(other_pitch - p0) == 1:
                         return True
                 return False
 
@@ -2864,13 +2864,13 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                 # Problem solved: continuation dots indicate overlapped starts/ends
                 # and line crossings for the same hand.
                 dot_times: list[float] = []
-                for m in line_notes:
-                    if int(m.get('idx', -1) or -1) == int(item.get('idx', -2) or -2):
+                for n in line_notes:
+                    if int(n.get('idx', -1) or -1) == int(item.get('idx', -2) or -2):
                         continue
-                    if str(m.get('hand', 'l') or 'l') != hand_key:
+                    if str(n.get('hand', 'l') or 'l') != hand_key:
                         continue
-                    s = float(m.get('time', 0.0) or 0.0)
-                    e = float(m.get('end', 0.0) or 0.0)
+                    s = float(n.get('time', 0.0) or 0.0)
+                    e = float(n.get('end', 0.0) or 0.0)
                     if op_time.gt(s, n_t) and op_time.lt(s, n_end):
                         dot_times.append(s)
                     if op_time.gt(e, n_t) and op_time.lt(e, n_end):
@@ -2889,8 +2889,27 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                         dot_d *= scale
                     else:
                         dot_d = w * 0.8
+                    dot_pitch = int(item.get('pitch', 0) or 0)
                     for t in sorted(set(dot_times)):
                         y_center = _time_to_y(float(t)) + w
+
+                        # Keep continuation dots legible: if another note starts at
+                        # this exact time on adjacent pitch, move the dot forward.
+                        has_adjacent_start = False
+                        for n in line_notes:
+                            if int(n.get('idx', -1) or -1) == int(item.get('idx', -2) or -2):
+                                continue
+                            if _is_line_continuation(n):
+                                continue
+                            if not op_time.eq(float(n.get('time', 0.0) or 0.0), float(t)):
+                                continue
+                            other_pitch = int(n.get('pitch', 0) or 0)
+                            if abs(other_pitch - dot_pitch) == 1:
+                                has_adjacent_start = True
+                                break
+                        if has_adjacent_start:
+                            y_center += float(semitone_mm) * 2.0
+
                         du.add_oval(
                             x - dot_d / 2.0,
                             y_center - dot_d / 2.0,

@@ -196,25 +196,13 @@ class Editor(QtCore.QObject,
         # Cache for base-grid-derived timeline helpers used by _build_render_cache
         self._grid_time_cache_key: tuple | None = None
         self._grid_time_cache_values: tuple[list[float], list[float]] | None = None
-        # Per-frame note hit rectangles in absolute mm coordinates
-        self._note_hit_rects: list[dict] = []
-        # Per-frame text hit rectangles in absolute mm coordinates
-        self._text_hit_rects: list[dict] = []
-        # Per-frame tempo hit rectangles in absolute mm coordinates
-        self._tempo_hit_rects: list[dict] = []
-        # Per-frame velocity handle hit rectangles
-        self._velocity_hit_rects: list[dict] = []
-        # Per-frame arpeggio handle hit rectangles
-        self._arpeggio_hit_rects: list[dict] = []
-        # Per-frame hairpin (crescendo/decrescendo) handle hit rectangles
-        self._hairpin_hit_rects: list[dict] = []
-        # Per-frame dynamic symbol (text) hit rectangles
-        self._dynamic_symbol_hit_rects: list[dict] = []
-
         # Tiny mode: toggled by viewport width (stage 1: simplified drawing,
         # stage 2: skip drawing). tiny_mode_alpha is a continuous fade factor
         # (1.0 = fully opaque, 0.0 = fully transparent) used by the view to
-        # fade the drawing out as we approach stage 2.
+        # Per-frame hit rectangles (all types) in absolute mm coordinates; reset each frame
+        self._hit_rects: list[dict] = []
+
+        # Tiny mode: toggled by viewport width (stage 1: simplified drawing,
         self.tiny_mode_stage: int = 0
         self.tiny_mode_alpha: float = 1.0
 
@@ -251,13 +239,7 @@ class Editor(QtCore.QObject,
         We simply call all drawer methods; DrawUtil sorts items by tag layering.
         """
         # Reset hit rectangles for this frame; drawers will register rectangles
-        self._note_hit_rects = []
-        self._text_hit_rects = []
-        self._tempo_hit_rects = []
-        self._velocity_hit_rects = []
-        self._arpeggio_hit_rects = []
-        self._hairpin_hit_rects = []
-        self._dynamic_symbol_hit_rects = []
+        self._hit_rects = []
         # In tiny stage 2, skip drawing to keep closing smooth
         if self.is_tiny_mode_ultra():
             self._draw_cache = None
@@ -351,274 +333,131 @@ class Editor(QtCore.QObject,
         label = getattr(self, '_pending_snapshot_label', 'transpose_notes')
         self._snapshot_if_changed(coalesce=True, label=str(label or 'transpose_notes'))
 
-    # ---- Hit rectangles (notes) ----
-    def register_note_hit_rect(self, note_id: int, x_left_mm: float, y_top_mm: float, x_right_mm: float, y_bottom_mm: float) -> None:
-        """Register a clickable rectangle for a note in absolute mm coordinates.
+    # ---- Hit rectangles ----
+    def register_hit_rect(self, type: str, _id: int, x1: float, y1: float, x2: float, y2: float, **extra) -> None:
+        """Register a clickable rectangle for hit detection.
 
-        Rectangles may overlap; hit test will select the one closest to the rectangle center.
+        type  — namespace string: 'note', 'text', 'tempo', 'velocity', 'arpeggio',
+                'hairpin', or 'dynamic_symbol'.
+        _id   — event id stored in the record.
+        x1/y1/x2/y2 — bounding box in absolute mm coordinates.
+        **extra — arbitrary extra fields stored alongside (e.g. kind, hand, htype, handle).
         """
-        cx = (float(x_left_mm) + float(x_right_mm)) * 0.5
-        cy = (float(y_top_mm) + float(y_bottom_mm)) * 0.5
-        self._note_hit_rects.append({
-            '_id': int(note_id),
-            'x1': float(x_left_mm),
-            'y1': float(y_top_mm),
-            'x2': float(x_right_mm),
-            'y2': float(y_bottom_mm),
+        cx = (float(x1) + float(x2)) * 0.5
+        cy = (float(y1) + float(y2)) * 0.5
+        record: dict = {
+            'type': str(type),
+            '_id': int(_id),
+            'x1': float(x1),
+            'y1': float(y1),
+            'x2': float(x2),
+            'y2': float(y2),
             'cx': cx,
             'cy': cy,
-        })
+        }
+        record.update(extra)
+        self._hit_rects.append(record)
 
-    # ---- Hit rectangles (text) ----
-    def register_text_hit_rect(self, text_id: int, x_left_mm: float, y_top_mm: float, x_right_mm: float, y_bottom_mm: float, kind: str = 'body') -> None:
-        """Register a clickable rectangle for a text element (body or handle).
+    def hit_test_hit_rect(self, x_mm: float, y_mm: float, type: str) -> dict | None:
+        """Return the best-matching hit rect dict of the given type at (x_mm, y_mm).
 
-        kind: 'body' or 'handle' to allow prioritizing handle hits.
+        For 'text': handle rects beat body rects; ties resolved by smallest area.
+        For all other types: closest center wins.
+        Returns None if no rect of that type contains the point.
         """
-        cx = (float(x_left_mm) + float(x_right_mm)) * 0.5
-        cy = (float(y_top_mm) + float(y_bottom_mm)) * 0.5
-        self._text_hit_rects.append({
-            '_id': int(text_id),
-            'x1': float(x_left_mm),
-            'y1': float(y_top_mm),
-            'x2': float(x_right_mm),
-            'y2': float(y_bottom_mm),
-            'cx': cx,
-            'cy': cy,
-            'kind': str(kind or 'body'),
-        })
+        x_mm = float(x_mm)
+        y_mm = float(y_mm)
+        if type == 'text':
+            candidates = []
+            for r in self._hit_rects:
+                if r.get('type') != 'text':
+                    continue
+                if float(r['x1']) <= x_mm <= float(r['x2']) and float(r['y1']) <= y_mm <= float(r['y2']):
+                    area = max(0.0, (float(r['x2']) - float(r['x1'])) * (float(r['y2']) - float(r['y1'])))
+                    priority = 0 if r.get('kind') == 'handle' else 1
+                    candidates.append((priority, area, r))
+            if not candidates:
+                return None
+            candidates.sort(key=lambda t: (t[0], t[1]))
+            return candidates[0][2]
+        else:
+            matches = []
+            for r in self._hit_rects:
+                if r.get('type') != type:
+                    continue
+                if float(r['x1']) <= x_mm <= float(r['x2']) and float(r['y1']) <= y_mm <= float(r['y2']):
+                    dx = x_mm - float(r['cx'])
+                    dy = y_mm - float(r['cy'])
+                    matches.append((dx * dx + dy * dy, r))
+            if not matches:
+                return None
+            matches.sort(key=lambda t: t[0])
+            return matches[0][1]
 
-    # ---- Hit rectangles (velocity handles) ----
-    def register_velocity_hit_rect(self, note_id: int, x_left_mm: float, y_top_mm: float, x_right_mm: float, y_bottom_mm: float, hand: str) -> None:
-        cx = (float(x_left_mm) + float(x_right_mm)) * 0.5
-        cy = (float(y_top_mm) + float(y_bottom_mm)) * 0.5
-        self._velocity_hit_rects.append({
-            '_id': int(note_id),
-            'hand': str(hand or 'l'),
-            'x1': float(x_left_mm),
-            'y1': float(y_top_mm),
-            'x2': float(x_right_mm),
-            'y2': float(y_bottom_mm),
-            'cx': cx,
-            'cy': cy,
-        })
-
-    # ---- Hit rectangles (arpeggio handles) ----
-    def register_arpeggio_hit_rect(self, arp_id: int, x_left_mm: float, y_top_mm: float, x_right_mm: float, y_bottom_mm: float) -> None:
-        cx = (float(x_left_mm) + float(x_right_mm)) * 0.5
-        cy = (float(y_top_mm) + float(y_bottom_mm)) * 0.5
-        self._arpeggio_hit_rects.append({
-            '_id': int(arp_id),
-            'x1': float(x_left_mm),
-            'y1': float(y_top_mm),
-            'x2': float(x_right_mm),
-            'y2': float(y_bottom_mm),
-            'cx': cx,
-            'cy': cy,
-        })
-
-    def hit_test_arpeggio_handle(self, x_px: float, y_px: float) -> int | None:
+    def _px_to_mm(self, x_px: float, y_px: float) -> tuple[float, float]:
+        """Convert logical (Qt) pixel coordinates to absolute mm."""
         w_px_per_mm = float(getattr(self, '_widget_px_per_mm', 1.0) or 1.0)
         if w_px_per_mm <= 0:
-            return None
+            return 0.0, 0.0
         x_mm = float(x_px) / w_px_per_mm
-        y_mm_local = float(y_px) / w_px_per_mm
-        y_mm = y_mm_local + float(getattr(self, '_view_y_mm_offset', 0.0) or 0.0)
-        matches = []
-        for r in (self._arpeggio_hit_rects or []):
-            if float(r['x1']) <= x_mm <= float(r['x2']) and float(r['y1']) <= y_mm <= float(r['y2']):
-                dx = x_mm - float(r['cx'])
-                dy = y_mm - float(r['cy'])
-                dist2 = dx * dx + dy * dy
-                matches.append((dist2, int(r['_id'])))
-        if not matches:
-            return None
-        matches.sort(key=lambda t: t[0])
-        return matches[0][1]
+        y_mm = float(y_px) / w_px_per_mm + float(getattr(self, '_view_y_mm_offset', 0.0) or 0.0)
+        return x_mm, y_mm
 
-    # ---- Hit rectangles (hairpin crescendo/decrescendo) ----
-    def register_hairpin_hit_rect(self, hairpin_id: int, hairpin_type: str, handle: str,
-                                   x_left_mm: float, y_top_mm: float, x_right_mm: float, y_bottom_mm: float) -> None:
-        cx = (float(x_left_mm) + float(x_right_mm)) * 0.5
-        cy = (float(y_top_mm) + float(y_bottom_mm)) * 0.5
-        self._hairpin_hit_rects.append({
-            '_id': int(hairpin_id),
-            'type': str(hairpin_type),
-            'handle': str(handle),
-            'x1': float(x_left_mm),
-            'y1': float(y_top_mm),
-            'x2': float(x_right_mm),
-            'y2': float(y_bottom_mm),
-            'cx': cx,
-            'cy': cy,
-        })
-
-    def hit_test_hairpin_mm(self, x_mm: float, y_mm: float):
-        """Return (hairpin_event, hairpin_type, handle_kind) for absolute mm coordinates.
-
-        Returns (None, None, None) if no handle is hit.
-        handle_kind is 'start' or 'end'.
-        """
-        candidates = []
-        for r in (self._hairpin_hit_rects or []):
-            if float(r['x1']) <= x_mm <= float(r['x2']) and float(r['y1']) <= y_mm <= float(r['y2']):
-                dx = x_mm - float(r['cx'])
-                dy = y_mm - float(r['cy'])
-                dist2 = dx * dx + dy * dy
-                candidates.append((dist2, r))
-        if not candidates:
-            return (None, None, None)
-        candidates.sort(key=lambda t: t[0])
-        r = candidates[0][1]
-        hp_id = int(r['_id'])
-        hp_type = str(r['type'])
-        handle = str(r['handle'])
-        score = self.current_score()
-        if score is None:
-            return (None, None, None)
-        event_list = getattr(score.events, hp_type, []) or []
-        for ev in event_list:
-            if int(getattr(ev, '_id', -1) or -1) == hp_id:
-                return (ev, hp_type, handle)
-        return (None, None, None)
-
-    # ---- Hit rectangles (dynamic symbols) ----
-    def register_dynamic_symbol_hit_rect(self, hairpin_id: int, hairpin_type: str, handle: str,
-                                          x_left_mm: float, y_top_mm: float, x_right_mm: float, y_bottom_mm: float) -> None:
-        cx = (float(x_left_mm) + float(x_right_mm)) * 0.5
-        cy = (float(y_top_mm) + float(y_bottom_mm)) * 0.5
-        self._dynamic_symbol_hit_rects.append({
-            '_id': int(hairpin_id),
-            'type': str(hairpin_type),
-            'handle': str(handle),
-            'x1': float(x_left_mm),
-            'y1': float(y_top_mm),
-            'x2': float(x_right_mm),
-            'y2': float(y_bottom_mm),
-            'cx': cx,
-            'cy': cy,
-        })
-
-    def hit_test_dynamic_symbol_mm(self, x_mm: float, y_mm: float):
-        """Return (hairpin_event, hairpin_type, handle_kind) for a dynamic symbol rectangle hit.
-
-        Returns (None, None, None) if no dynamic symbol is hit.
-        """
-        candidates = []
-        for r in (self._dynamic_symbol_hit_rects or []):
-            if float(r['x1']) <= x_mm <= float(r['x2']) and float(r['y1']) <= y_mm <= float(r['y2']):
-                dx = x_mm - float(r['cx'])
-                dy = y_mm - float(r['cy'])
-                dist2 = dx * dx + dy * dy
-                candidates.append((dist2, r))
-        if not candidates:
-            return (None, None, None)
-        candidates.sort(key=lambda t: t[0])
-        r = candidates[0][1]
-        hp_id = int(r['_id'])
-        hp_type = str(r['type'])
-        handle = str(r['handle'])
-        score = self.current_score()
-        if score is None:
-            return (None, None, None)
-        event_list = getattr(score.events, hp_type, []) or []
-        for ev in event_list:
-            if int(getattr(ev, '_id', -1) or -1) == hp_id:
-                return (ev, hp_type, handle)
-        return (None, None, None)
-
-    # ---- Hit rectangles (tempo) ----
-    def register_tempo_hit_rect(self, tempo_id: int, x_left_mm: float, y_top_mm: float, x_right_mm: float, y_bottom_mm: float) -> None:
-        """Register a clickable rectangle for a tempo marker in absolute mm coordinates."""
-        cx = (float(x_left_mm) + float(x_right_mm)) * 0.5
-        cy = (float(y_top_mm) + float(y_bottom_mm)) * 0.5
-        self._tempo_hit_rects.append({
-            '_id': int(tempo_id),
-            'x1': float(x_left_mm),
-            'y1': float(y_top_mm),
-            'x2': float(x_right_mm),
-            'y2': float(y_bottom_mm),
-            'cx': cx,
-            'cy': cy,
-        })
-
-    def _hit_test_text_internal(self, x_mm: float, y_mm: float):
-        candidates = []
-        for r in (self._text_hit_rects or []):
-            if float(r['x1']) <= x_mm <= float(r['x2']) and float(r['y1']) <= y_mm <= float(r['y2']):
-                area = max(0.0, (float(r['x2']) - float(r['x1'])) * (float(r['y2']) - float(r['y1'])))
-                kind = str(r.get('kind', 'body'))
-                priority = 0 if kind == 'handle' else 1
-                candidates.append((priority, area, int(r['_id']), kind, r))
-        if not candidates:
-            return (None, None, None)
-        candidates.sort(key=lambda t: (t[0], t[1]))
-        _p, _a, tid, kind, rect = candidates[0]
-        return (tid, kind == 'handle', rect)
-
-    def hit_test_text(self, x_px: float, y_px: float):
-        """Return (text_id, is_handle, rect) containing the point.
-
-        Expects logical px coordinates; converts to absolute mm before testing.
-        Returns (None, None, None) if no hit.
-        """
-        w_px_per_mm = float(getattr(self, '_widget_px_per_mm', 1.0) or 1.0)
-        if w_px_per_mm <= 0:
-            return (None, None, None)
-        x_mm = float(x_px) / w_px_per_mm
-        y_mm_local = float(y_px) / w_px_per_mm
-        y_mm = y_mm_local + float(getattr(self, '_view_y_mm_offset', 0.0) or 0.0)
-        return self._hit_test_text_internal(x_mm, y_mm)
-
-    def hit_test_text_mm(self, x_mm: float, y_mm: float):
-        """Return (text_id, is_handle, rect) for absolute mm coordinates."""
-        return self._hit_test_text_internal(float(x_mm), float(y_mm))
+    # ---- Hit rect backward-compatible wrappers ----
+    def hit_test_note_id(self, x_px: float, y_px: float) -> int | None:
+        x_mm, y_mm = self._px_to_mm(x_px, y_px)
+        r = self.hit_test_hit_rect(x_mm, y_mm, 'note')
+        return int(r['_id']) if r is not None else None
 
     def hit_test_tempo(self, x_px: float, y_px: float) -> int | None:
-        """Return the tempo id whose registered rectangle contains the mouse point."""
-        w_px_per_mm = float(getattr(self, '_widget_px_per_mm', 1.0) or 1.0)
-        if w_px_per_mm <= 0:
-            return None
-        x_mm = float(x_px) / w_px_per_mm
-        y_mm_local = float(y_px) / w_px_per_mm
-        y_mm = y_mm_local + float(getattr(self, '_view_y_mm_offset', 0.0) or 0.0)
-        matches = []
-        for r in (self._tempo_hit_rects or []):
-            if float(r['x1']) <= x_mm <= float(r['x2']) and float(r['y1']) <= y_mm <= float(r['y2']):
-                dx = x_mm - float(r['cx'])
-                dy = y_mm - float(r['cy'])
-                dist2 = dx * dx + dy * dy
-                matches.append((dist2, int(r['_id'])))
-        if not matches:
-            return None
-        matches.sort(key=lambda t: t[0])
-        return matches[0][1]
+        x_mm, y_mm = self._px_to_mm(x_px, y_px)
+        r = self.hit_test_hit_rect(x_mm, y_mm, 'tempo')
+        return int(r['_id']) if r is not None else None
 
-    def hit_test_note_id(self, x_px: float, y_px: float) -> int | None:
-        """Return the note id whose registered rectangle contains the mouse point.
+    def hit_test_arpeggio_handle(self, x_px: float, y_px: float) -> int | None:
+        x_mm, y_mm = self._px_to_mm(x_px, y_px)
+        r = self.hit_test_hit_rect(x_mm, y_mm, 'arpeggio')
+        return int(r['_id']) if r is not None else None
 
-        - Coordinates x_px, y_px are logical (Qt) pixels.
-        - Converts to absolute mm using editor metrics and viewport offset.
-        - If multiple rectangles contain the point, returns the one with center closest to the point.
-        - Returns None if no rectangle contains the point.
-        """
-        w_px_per_mm = float(getattr(self, '_widget_px_per_mm', 1.0) or 1.0)
-        if w_px_per_mm <= 0:
-            return None
-        x_mm = float(x_px) / w_px_per_mm
-        y_mm_local = float(y_px) / w_px_per_mm
-        y_mm = y_mm_local + float(getattr(self, '_view_y_mm_offset', 0.0) or 0.0)
-        matches = []
-        for r in (self._note_hit_rects or []):
-            if float(r['x1']) <= x_mm <= float(r['x2']) and float(r['y1']) <= y_mm <= float(r['y2']):
-                dx = x_mm - float(r['cx'])
-                dy = y_mm - float(r['cy'])
-                dist2 = dx * dx + dy * dy
-                matches.append((dist2, int(r['_id'])))
-        if not matches:
-            return None
-        matches.sort(key=lambda t: t[0])
-        return matches[0][1]
+    def hit_test_text(self, x_px: float, y_px: float):
+        x_mm, y_mm = self._px_to_mm(x_px, y_px)
+        return self.hit_test_text_mm(x_mm, y_mm)
+
+    def hit_test_text_mm(self, x_mm: float, y_mm: float):
+        r = self.hit_test_hit_rect(float(x_mm), float(y_mm), 'text')
+        if r is None:
+            return (None, None, None)
+        return (int(r['_id']), r.get('kind') == 'handle', r)
+
+    def hit_test_hairpin_mm(self, x_mm: float, y_mm: float):
+        r = self.hit_test_hit_rect(float(x_mm), float(y_mm), 'hairpin')
+        if r is None:
+            return (None, None, None)
+        hp_id = int(r['_id'])
+        hp_type = str(r.get('htype', ''))
+        handle = str(r.get('handle', ''))
+        score = self.current_score()
+        if score is None:
+            return (None, None, None)
+        for ev in (getattr(score.events, hp_type, []) or []):
+            if int(getattr(ev, '_id', -1) or -1) == hp_id:
+                return (ev, hp_type, handle)
+        return (None, None, None)
+
+    def hit_test_dynamic_symbol_mm(self, x_mm: float, y_mm: float):
+        r = self.hit_test_hit_rect(float(x_mm), float(y_mm), 'dynamic_symbol')
+        if r is None:
+            return (None, None, None)
+        hp_id = int(r['_id'])
+        hp_type = str(r.get('htype', ''))
+        handle = str(r.get('handle', ''))
+        score = self.current_score()
+        if score is None:
+            return (None, None, None)
+        for ev in (getattr(score.events, hp_type, []) or []):
+            if int(getattr(ev, '_id', -1) or -1) == hp_id:
+                return (ev, hp_type, handle)
+        return (None, None, None)
 
     def _calculate_layout(self, view_width_mm: float) -> None:
         """Compute editor-specific layout based on the current view width.
@@ -635,6 +474,7 @@ class Editor(QtCore.QObject,
         self._rebuild_x_positions()
 
     # ---- Note lookup ----
+
     def get_note_by_id(self, note_id: int):
         """Return the note event for id, preferring current viewport cache.
 
@@ -1475,7 +1315,7 @@ class Editor(QtCore.QObject,
 
         # --- Velocity sliders (note tool only) ---
         if isinstance(self._tool, NoteTool) and getattr(self._tool, 'velocity_mode', False):
-            self._velocity_hit_rects = []
+            self._hit_rects = [r for r in self._hit_rects if r.get('type') != 'velocity']
             score = self.current_score()
             if score is not None:
                 top_mm = float(self._view_y_mm_offset or 0.0)
@@ -1520,19 +1360,19 @@ class Editor(QtCore.QObject,
                         y_mm - handle_r,
                         x_outer + handle_r,
                         y_mm + handle_r,
-                        stroke_color=self.accent_color,
+                        stroke_color=None,
                         fill_color=self.accent_color,
-                        stroke_width_mm=0.6,
+                        stroke_width_mm=0.0,
                         id=nid,
                         tags=['velocity_slider_handle'],
                     )
-                    self.register_velocity_hit_rect(
-                        nid,
+                    self.register_hit_rect(
+                        'velocity', nid,
                         x_outer - handle_r * 1.4,
                         y_mm - handle_r * 1.4,
                         x_outer + handle_r * 1.4,
                         y_mm + handle_r * 1.4,
-                        hand,
+                        hand=hand,
                     )
                     tool = self._tool
                     if isinstance(tool, NoteTool) and getattr(tool, '_velocity_dragging', False):

@@ -160,12 +160,13 @@ class TextDrawerMixin:
                 id=int(getattr(ev, '_id', 0) or 0),
                 tags=["text"],
             )
-            self.register_text_hit_rect(int(getattr(ev, '_id', 0) or 0), min_x, min_y, max_x, max_y, kind='body')
+            self.register_hit_rect('text', int(getattr(ev, '_id', 0) or 0), min_x, min_y, max_x, max_y, kind='body')
 
             if show_handles:
                 # Place handle just beyond the rotated right edge
                 handle_gap = max(1.5, (self.semitone_dist or 2.5) * 0.3)
-                handle_size = max(2.0, (self.semitone_dist or 2.5) * 0.6)
+                # Match count-line handle geometry: side = 1.4 * max(2.0, semitone_dist)
+                handle_size = max(2.0, float(self.semitone_dist or 2.5)) * 1.4
                 rad = w_mm * 0.5 + handle_gap
                 ang = math.radians(angle)
                 hx = x_mm + rad * math.cos(ang)
@@ -179,10 +180,10 @@ class TextDrawerMixin:
                     hy1,
                     hx2,
                     hy2,
-                    stroke_color=self.accent_color,
-                    stroke_width_mm=0.4,
-                    fill_color=self.accent_color,
+                    stroke_color=None,
+                    stroke_width_mm=0.0,
+                    fill_color=(0.5, 0.0, 0.0, 1.0),
                     id=int(getattr(ev, '_id', 0) or 0),
                     tags=["text", "text_handle"],
                 )
-                self.register_text_hit_rect(int(getattr(ev, '_id', 0) or 0), hx1, hy1, hx2, hy2, kind='handle')
+                self.register_hit_rect('text', int(getattr(ev, '_id', 0) or 0), hx1, hy1, hx2, hy2, kind='handle')
