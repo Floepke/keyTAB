@@ -26,12 +26,9 @@ class ToolbarHandle(QtWidgets.QSplitterHandle):
         self.fit_btn = QtWidgets.QToolButton(self)
         self.fit_btn.setFocusPolicy(QtCore.Qt.FocusPolicy.NoFocus)
         # Fit button: no icon, no text, half-height
-        try:
-            self.fit_btn.setText("")
-            # Ensure no icon is displayed
-            self.fit_btn.setIcon(QtGui.QIcon())
-        except Exception:
-            pass
+        self.fit_btn.setText("")
+        # Ensure no icon is displayed
+        self.fit_btn.setIcon(QtGui.QIcon())
         # Keep width; reduce height to half
         self.fit_btn.setFixedWidth(self._button_size)
         self.fit_btn.setFixedHeight(max(1, self._button_size // 2))
@@ -53,10 +50,7 @@ class ToolbarHandle(QtWidgets.QSplitterHandle):
         self.next_btn.setFixedSize(self._button_size, self._button_size)
         self.next_btn.setToolTip("Go to the next print page.")
         layout.addWidget(self.next_btn)
-        try:
-            self.next_btn.clicked.connect(parent.nextRequested.emit)
-        except Exception:
-            pass
+        self.next_btn.clicked.connect(parent.nextRequested.emit)
         
         '''this button goes to the previous page in the print view.'''
         self.prev_btn = QtWidgets.QToolButton(self)
@@ -68,24 +62,7 @@ class ToolbarHandle(QtWidgets.QSplitterHandle):
         self.prev_btn.setFixedSize(self._button_size, self._button_size)
         self.prev_btn.setToolTip("Go to the previous print page.")
         layout.addWidget(self.prev_btn)
-        try:
-            self.prev_btn.clicked.connect(parent.previousRequested.emit)
-        except Exception:
-            pass
-
-        # Visual separator between default toolbar and contextual toolbar
-        sep = QtWidgets.QFrame(self)
-        # Use a 1px separator that adapts to the current palette
-        sep.setFrameShape(QtWidgets.QFrame.Shape.NoFrame)
-        sep.setFixedHeight(1)
-        pal = self.palette()
-        btn = pal.color(QtGui.QPalette.Button)
-        # Slightly darken the button color to get a subtle separator line
-        line_r = max(0, min(255, int(btn.red() * 0.75)))
-        line_g = max(0, min(255, int(btn.green() * 0.75)))
-        line_b = max(0, min(255, int(btn.blue() * 0.75)))
-        sep.setStyleSheet(f"background-color: rgb({line_r}, {line_g}, {line_b});")
-        layout.addWidget(sep)
+        self.prev_btn.clicked.connect(parent.previousRequested.emit)
 
         '''this button plays the music.'''
         self.play_btn = QtWidgets.QToolButton(self)
@@ -100,10 +77,7 @@ class ToolbarHandle(QtWidgets.QSplitterHandle):
             "<space> toggles playback from the current mouse cursor position."
         )
         layout.addWidget(self.play_btn)
-        try:
-            self.play_btn.clicked.connect(parent.playRequested.emit)
-        except Exception:
-            pass
+        self.play_btn.clicked.connect(parent.playRequested.emit)
 
         '''this button stops the music.'''
         self.stop_btn = QtWidgets.QToolButton(self)
@@ -118,97 +92,66 @@ class ToolbarHandle(QtWidgets.QSplitterHandle):
             "<space> toggles playback from the current mouse cursor position."
         )
         layout.addWidget(self.stop_btn)
-        try:
-            self.stop_btn.clicked.connect(parent.stopRequested.emit)
-        except Exception:
-            pass
+        self.stop_btn.clicked.connect(parent.stopRequested.emit)
 
-        # Visual separator between playback controls and dialog shortcuts
-        sep = QtWidgets.QFrame(self)
-        sep.setFrameShape(QtWidgets.QFrame.Shape.NoFrame)
-        sep.setFixedHeight(1)
-        pal = self.palette()
-        btn = pal.color(QtGui.QPalette.Button)
-        line_r = max(0, min(255, int(btn.red() * 0.75)))
-        line_g = max(0, min(255, int(btn.green() * 0.75)))
-        line_b = max(0, min(255, int(btn.blue() * 0.75)))
-        sep.setStyleSheet(f"background-color: rgb({line_r}, {line_g}, {line_b});")
-        layout.addWidget(sep)
-
+        '''this button opens the style dialog.'''
         self.style_btn = QtWidgets.QToolButton(self)
         self.style_btn.setFocusPolicy(QtCore.Qt.FocusPolicy.NoFocus)
         self.style_btn.setText('S')
-        try:
-            f = self.style_btn.font()
-            sz = f.pointSizeF()
-            if sz <= 0:
-                sz = float(f.pointSize())
-            if sz <= 0:
-                sz = 10.0
-            f.setPointSizeF(sz * 2.0)
-            self.style_btn.setFont(f)
-        except Exception:
-            pass
+        f = self.style_btn.font()
+        sz = f.pointSizeF()
+        if sz <= 0:
+            sz = float(f.pointSize())
+        if sz <= 0:
+            sz = 10.0
+        f.setPointSizeF(sz * 2.0)
+        self.style_btn.setFont(f)
         self.style_btn.setToolTip('Appearance. Customize the visual style of the score.')
         self.style_btn.setIconSize(QtCore.QSize(self._button_size - 6, self._button_size - 6))
         self.style_btn.setFixedSize(self._button_size, self._button_size)
         layout.addWidget(self.style_btn)
-        try:
-            self.style_btn.clicked.connect(parent.styleRequested.emit)
-        except Exception:
-            pass
+        self.style_btn.clicked.connect(parent.styleRequested.emit)
 
+        '''this button opens the info dialog.'''
         self.info_btn = QtWidgets.QToolButton(self)
         self.info_btn.setFocusPolicy(QtCore.Qt.FocusPolicy.NoFocus)
         self.info_btn.setText('I')
-        try:
-            f = self.info_btn.font()
-            sz = f.pointSizeF()
-            if sz <= 0:
-                sz = float(f.pointSize())
-            if sz <= 0:
-                sz = 10.0
-            f.setPointSizeF(sz * 2.0)
-            self.info_btn.setFont(f)
-        except Exception:
-            pass
+        f = self.info_btn.font()
+        sz = f.pointSizeF()
+        if sz <= 0:
+            sz = float(f.pointSize())
+        if sz <= 0:
+            sz = 10.0
+        f.setPointSizeF(sz * 2.0)
+        self.info_btn.setFont(f)
         self.info_btn.setToolTip('Title info. Edit title, composer, and copyright. View analysis information.')
         self.info_btn.setIconSize(QtCore.QSize(self._button_size - 6, self._button_size - 6))
         self.info_btn.setFixedSize(self._button_size, self._button_size)
         layout.addWidget(self.info_btn)
-        try:
-            self.info_btn.clicked.connect(parent.infoRequested.emit)
-        except Exception:
-            pass
+        self.info_btn.clicked.connect(parent.infoRequested.emit)
 
-        # Quick dialogs: Title info, Appearance, Line Breaks
+        '''this button opens the line break dialog.'''
         self.line_break_btn = QtWidgets.QToolButton(self)
         self.line_break_btn.setFocusPolicy(QtCore.Qt.FocusPolicy.NoFocus)
         self.line_break_btn.setText('L')
-        try:
-            f = self.line_break_btn.font()
-            sz = f.pointSizeF()
-            if sz <= 0:
-                sz = float(f.pointSize())
-            if sz <= 0:
-                sz = 10.0
-            f.setPointSizeF(sz * 2.0)
-            self.line_break_btn.setFont(f)
-        except Exception:
-            pass
+        f = self.line_break_btn.font()
+        sz = f.pointSizeF()
+        if sz <= 0:
+            sz = float(f.pointSize())
+        if sz <= 0:
+            sz = 10.0
+        f.setPointSizeF(sz * 2.0)
+        self.line_break_btn.setFont(f)
         self.line_break_btn.setToolTip('Line breaks. Organize the document into systems and pages.')
         self.line_break_btn.setIconSize(QtCore.QSize(self._button_size - 6, self._button_size - 6))
         self.line_break_btn.setFixedSize(self._button_size, self._button_size)
         layout.addWidget(self.line_break_btn)
-        try:
-            self.line_break_btn.clicked.connect(parent.lineBreakRequested.emit)
-        except Exception:
-            pass
+        self.line_break_btn.clicked.connect(parent.lineBreakRequested.emit)
 
         # Visual separator between dialog shortcuts and contextual toolbar
         sep = QtWidgets.QFrame(self)
         sep.setFrameShape(QtWidgets.QFrame.Shape.NoFrame)
-        sep.setFixedHeight(1)
+        sep.setFixedHeight(4)
         pal = self.palette()
         btn = pal.color(QtGui.QPalette.Button)
         line_r = max(0, min(255, int(btn.red() * 0.75)))
@@ -235,10 +178,7 @@ class ToolbarHandle(QtWidgets.QSplitterHandle):
 
     def mouseDoubleClickEvent(self, ev: QtGui.QMouseEvent) -> None:
         # Forward double-click on the handle to request a fit action
-        try:
-            self.parent().fitRequested.emit(True)
-        except Exception:
-            pass
+        self.parent().fitRequested.emit(True)
         super().mouseDoubleClickEvent(ev)
 
     def set_buttons(self, defs: list[dict]):
@@ -321,18 +261,12 @@ class ToolbarSplitter(QtWidgets.QSplitter):
     def createHandle(self):
         h = ToolbarHandle(self.orientation(), self)
         # Keep a reference for ToolManager to update contextual buttons
-        try:
-            self._handle = h
-        except Exception:
-            pass
+        self._handle = h
         return h
 
     def set_context_buttons(self, defs: list[dict]):
-        try:
-            if hasattr(self, '_handle') and self._handle is not None:
-                self._handle.set_buttons(defs)
-        except Exception:
-            pass
+        if hasattr(self, '_handle') and self._handle is not None:
+            self._handle.set_buttons(defs)
 
     def mouseDoubleClickEvent(self, ev: QtGui.QMouseEvent) -> None:
         # Only trigger fit when double-clicking the splitter handle
