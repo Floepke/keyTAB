@@ -1318,6 +1318,8 @@ class Editor(QtCore.QObject,
             self._hit_rects = [r for r in self._hit_rects if r.get('type') != 'velocity']
             score = self.current_score()
             if score is not None:
+                velocity_color = (0.5, 0, 0, 1)
+                selected_note_ids = self.get_selected_note_ids_cached(score)
                 top_mm = float(self._view_y_mm_offset or 0.0)
                 bottom_mm = top_mm + float(self._viewport_h_mm or 0.0)
                 bleed_mm = max(4.0, float(self.semitone_dist or 2.5) * 2.0)
@@ -1337,6 +1339,7 @@ class Editor(QtCore.QObject,
                         continue
                     if y_mm < (top_mm - bleed_mm) or y_mm > (bottom_mm + bleed_mm):
                         continue
+                    slider_color = self.accent_color if nid in selected_note_ids else velocity_color
                     ratio = max(0.0, min(1.0, float(vel) / 127.0))
                     dist_from_inner = max_len * (1.0 - ratio)
                     if hand == 'l':
@@ -1352,7 +1355,7 @@ class Editor(QtCore.QObject,
                         y_mm,
                         x2,
                         y_mm,
-                        color=self.accent_color,
+                        color=slider_color,
                         width_mm=1.0,
                         dash_pattern=None,
                         id=0,
@@ -1364,7 +1367,7 @@ class Editor(QtCore.QObject,
                         x_outer + handle_r,
                         y_mm + handle_r,
                         stroke_color=None,
-                        fill_color=self.accent_color,
+                        fill_color=slider_color,
                         stroke_width_mm=0.0,
                         id=nid,
                         tags=['velocity_slider_handle'],
@@ -1391,7 +1394,7 @@ class Editor(QtCore.QObject,
                                     str(int(val)),
                                     size_pt=14,
                                     family='Edwin',
-                                    color=self.accent_color,
+                                    color=slider_color,
                                     anchor='s',
                                     id=0,
                                     tags=['velocity_slider_value'],
@@ -1670,6 +1673,55 @@ class Editor(QtCore.QObject,
     @selection_window_end.setter
     def selection_window_end(self, v: float) -> None:
         self._sel_end_units = float(v)
+
+    def get_selected_note_ids_cached(self, score: SCORE | None = None) -> set[int]:
+        """Return selected note IDs using draw-cache data when possible.
+
+        The cache key is the current selection time/pitch signature.
+        """
+        if not bool(getattr(self, '_selection_active', False)):
+            return set()
+        if score is None:
+            score = self.current_score()
+        if score is None:
+            return set()
+
+        a = float(min(self._sel_start_units, self._sel_end_units))
+        b = float(max(self._sel_start_units, self._sel_end_units)) - 0.1
+        min_p = max(1, min(88, int(getattr(self, '_sel_min_pitch', 1))))
+        max_p = max(1, min(88, int(getattr(self, '_sel_max_pitch', 88))))
+
+        cache = getattr(self, '_draw_cache', None) or {}
+        sel_sig = (round(a, 6), round(b, 6), int(min_p), int(max_p))
+        cached_sig = cache.get('selected_note_ids_sig') if isinstance(cache, dict) else None
+        cached_ids = cache.get('selected_note_ids') if isinstance(cache, dict) else None
+        if cached_sig == sel_sig and isinstance(cached_ids, set):
+            return cached_ids
+
+        t_begin = float(cache.get('time_begin', float('inf'))) if isinstance(cache, dict) else float('inf')
+        t_end = float(cache.get('time_end', float('-inf'))) if isinstance(cache, dict) else float('-inf')
+        if a >= t_begin and b <= t_end and isinstance(cache, dict):
+            candidates = list(cache.get('notes_view') or [])
+        else:
+            candidates = list(getattr(score.events, 'note', []) or [])
+
+        ids: set[int] = set()
+        for sn in candidates:
+            try:
+                st = float(getattr(sn, 'time', 0.0) or 0.0)
+                sp = int(getattr(sn, 'pitch', 0) or 0)
+                sid = int(getattr(sn, '_id', 0) or 0)
+            except Exception:
+                continue
+            if sid <= 0:
+                continue
+            if a <= st <= b and min_p <= sp <= max_p:
+                ids.add(sid)
+
+        if isinstance(cache, dict):
+            cache['selected_note_ids_sig'] = sel_sig
+            cache['selected_note_ids'] = ids
+        return ids
 
     def detect_events_from_time_window(self, start_units: float, end_units: float) -> dict:
         """Scan the SCORE and return a dict of events whose start time falls within [start_units, end_units].

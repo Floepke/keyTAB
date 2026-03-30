@@ -29,6 +29,7 @@ class NoteTool(BaseTool):
         self._velocity_mode: bool = False
         self._velocity_dragging: bool = False
         self._velocity_target: Note | None = None
+        self._velocity_targets: list[Note] = []
         self._velocity_display_value: int | None = None
         self._velocity_display_x_mm: float | None = None
         self._velocity_display_y_mm: float | None = None
@@ -322,6 +323,42 @@ class NoteTool(BaseTool):
                 return n, hit_rect, y_mm
         return None, hit_rect, y_mm
 
+    def _resolve_velocity_targets(self, score: SCORE, primary: Note | None) -> list[Note]:
+        if primary is None:
+            return []
+        primary_id = int(getattr(primary, '_id', 0) or 0)
+        selected_ids: set[int] = set()
+        if hasattr(self._editor, 'get_selected_note_ids_cached'):
+            try:
+                selected_ids = set(self._editor.get_selected_note_ids_cached(score) or set())
+            except Exception:
+                selected_ids = set()
+        if primary_id > 0 and primary_id in selected_ids:
+            out = [n for n in (getattr(score.events, 'note', []) or []) if int(getattr(n, '_id', 0) or 0) in selected_ids]
+            if out:
+                return out
+        return [primary]
+
+    def _apply_velocity_value(self, value: int) -> None:
+        if self._editor is None or self._velocity_target is None:
+            return
+        new_vel = int(max(0, min(127, int(value))))
+        targets = list(self._velocity_targets or [])
+        if not targets:
+            targets = [self._velocity_target]
+        for n in targets:
+            try:
+                n.velocity = new_vel
+            except Exception:
+                continue
+        t = float(getattr(self._velocity_target, 'time', 0.0) or 0.0)
+        self._velocity_display_y_mm = float(self._editor.time_to_mm(t))
+        self._velocity_display_value = new_vel
+        if hasattr(self._editor, 'widget') and getattr(self._editor, 'widget', None) is not None:
+            w = getattr(self._editor, 'widget')
+            if hasattr(w, 'request_overlay_refresh'):
+                w.request_overlay_refresh()
+
     def _apply_velocity_from_cursor(self, x_px: float) -> None:
         if self._editor is None or self._velocity_target is None:
             return
@@ -336,15 +373,8 @@ class NoteTool(BaseTool):
             dist = max(0.0, float(x_mm) - float(margin + stave_width))
         ratio = max(0.0, min(1.0, dist / max_len))
         new_vel = int(round((1.0 - ratio) * 127.0))
-        self._velocity_target.velocity = new_vel
-        t = float(getattr(self._velocity_target, 'time', 0.0) or 0.0)
-        self._velocity_display_y_mm = float(self._editor.time_to_mm(t))
         self._velocity_display_x_mm = x_mm
-        self._velocity_display_value = new_vel
-        if hasattr(self._editor, 'widget') and getattr(self._editor, 'widget', None) is not None:
-            w = getattr(self._editor, 'widget')
-            if hasattr(w, 'request_overlay_refresh'):
-                w.request_overlay_refresh()
+        self._apply_velocity_value(new_vel)
 
     def _persist_velocity_mode(self) -> None:
         try:
@@ -370,6 +400,7 @@ class NoteTool(BaseTool):
             pass
         self._velocity_dragging = False
         self._velocity_target = None
+        self._velocity_targets = []
         self._velocity_display_value = None
         self._velocity_display_x_mm = None
         self._velocity_display_y_mm = None
@@ -427,6 +458,7 @@ class NoteTool(BaseTool):
         super().on_left_press(x, y)
         self._velocity_dragging = False
         self._velocity_target = None
+        self._velocity_targets = []
         self._velocity_display_value = None
         self._velocity_display_x_mm = None
         self._velocity_display_y_mm = None
@@ -438,6 +470,7 @@ class NoteTool(BaseTool):
             v_note, _v_rect, _y_mm = self._hit_velocity_handle(score, x, y)
             if v_note is not None:
                 self._velocity_target = v_note
+                self._velocity_targets = self._resolve_velocity_targets(score, v_note)
                 self._velocity_dragging = True
                 self._editing_existing = True
                 self.edit_note = v_note
@@ -521,6 +554,7 @@ class NoteTool(BaseTool):
         self._arpeggio_drag_anchor_time = 0.0
         self._velocity_dragging = False
         self._velocity_target = None
+        self._velocity_targets = []
         self._velocity_display_value = None
         self._velocity_display_x_mm = None
         self._velocity_display_y_mm = None
@@ -636,6 +670,7 @@ class NoteTool(BaseTool):
         self._arpeggio_drag_anchor_time = 0.0
         self._velocity_dragging = False
         self._velocity_target = None
+        self._velocity_targets = []
         self._velocity_display_value = None
         self._velocity_display_x_mm = None
         self._velocity_display_y_mm = None
@@ -758,6 +793,7 @@ class NoteTool(BaseTool):
             self._velocity_mode = not self._velocity_mode
             self._velocity_dragging = False
             self._velocity_target = None
+            self._velocity_targets = []
             self._velocity_display_value = None
             self._velocity_display_x_mm = None
             self._velocity_display_y_mm = None
