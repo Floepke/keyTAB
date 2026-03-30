@@ -2771,6 +2771,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                                 )
 
                 continues_from_prev_line = _is_line_continuation(item)
+                continues_to_next_line = op_time.lt(n_t, float(line_end)) and op_time.gt(n_end, float(line_end))
 
                 # Problem solved: avoid duplicated heads on continuations.
                 if not continues_from_prev_line and bool(layout.get('note_head_visible', True)):
@@ -2977,7 +2978,11 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                         )
 
                 # Problem solved: stop sign marks a rest gap after a note.
-                if bool(layout.get('note_stop_visible', True)) and _has_followed_rest(item):
+                if (
+                    bool(layout.get('note_stop_visible', True))
+                    and not continues_to_next_line
+                    and _has_followed_rest(item)
+                ):
                     w_stop = w * 1.8
                     points = [
                         (x - w_stop / 2.0, y_end - w_stop),

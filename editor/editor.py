@@ -1,6 +1,6 @@
 from __future__ import annotations
 from typing import Literal, Optional, Tuple, Dict, Type, TYPE_CHECKING
-import math, bisect, copy
+import math, bisect, copy, heapq
 from PySide6 import QtCore
 
 from editor.tool.base_tool import BaseTool
@@ -192,6 +192,10 @@ class Editor(QtCore.QObject,
         # Cache for base-grid-derived timeline helpers used by _build_render_cache
         self._grid_time_cache_key: tuple | None = None
         self._grid_time_cache_values: tuple[list[float], list[float]] | None = None
+        # Cache for note-time derived arrays used by _build_render_cache
+        # to avoid full re-sorts every frame when notes are unchanged.
+        self._note_time_cache_key: tuple | None = None
+        self._note_time_cache_values: tuple[list, list[float], list[float], list[tuple[float, int]], list[float]] | None = None
         # Tiny mode: toggled by viewport width (stage 1: simplified drawing,
         # stage 2: skip drawing). tiny_mode_alpha is a continuous fade factor
         # (1.0 = fully opaque, 0.0 = fully transparent) used by the view to
@@ -846,6 +850,29 @@ class Editor(QtCore.QObject,
         return
 
     # ---- Shared render cache ----
+    def _compute_note_time_cache_key(self, notes: list) -> tuple[int, int]:
+        """Cheap content hash for note timing/pitch fields used by sorting/culling."""
+        h = 1469598103934665603  # FNV-1a 64-bit offset basis
+        fnv_prime = 1099511628211
+        mask = (1 << 64) - 1
+        for n in notes:
+            try:
+                t_i = int(round(float(getattr(n, 'time', 0.0) or 0.0) * 1000.0))
+                d_i = int(round(float(getattr(n, 'duration', 0.0) or 0.0) * 1000.0))
+                p_i = int(getattr(n, 'pitch', 0) or 0)
+                nid = int(getattr(n, '_id', 0) or 0)
+            except Exception:
+                t_i, d_i, p_i, nid = (0, 0, 0, 0)
+            h ^= (t_i & mask)
+            h = (h * fnv_prime) & mask
+            h ^= (d_i & mask)
+            h = (h * fnv_prime) & mask
+            h ^= (p_i & mask)
+            h = (h * fnv_prime) & mask
+            h ^= (nid & mask)
+            h = (h * fnv_prime) & mask
+        return (len(notes), int(h))
+
     def _build_render_cache(self) -> None:
         """Build per-frame cached, time-sorted viewport data for drawers.
 
@@ -882,11 +909,20 @@ class Editor(QtCore.QObject,
         # Comparator with threshold of 7 ticks
         op = Operator(7)
 
-        # Notes sorted by (time, pitch)
+        # Notes sorted/indexed by timing. Reuse persistent cache when note data is unchanged.
         notes = list(getattr(score.events, 'note', []) or [])
-        notes_sorted = sorted(notes, key=lambda n: (float(n.time), int(n.pitch)))
-        starts = [float(n.time) for n in notes_sorted]
-        ends = [float(n.time + n.duration) for n in notes_sorted]
+        note_cache_key = self._compute_note_time_cache_key(notes)
+        if self._note_time_cache_key == note_cache_key and self._note_time_cache_values is not None:
+            notes_sorted, starts, ends, end_pairs, end_values = self._note_time_cache_values
+        else:
+            notes_sorted = sorted(notes, key=lambda n: (float(n.time), int(n.pitch)))
+            starts = [float(n.time) for n in notes_sorted]
+            ends = [float(n.time + n.duration) for n in notes_sorted]
+            # End-sorted pairs are reused across frames for end-window queries.
+            end_pairs = sorted(((ends[i], i) for i in range(len(ends))), key=lambda p: p[0])
+            end_values = [p[0] for p in end_pairs]
+            self._note_time_cache_key = note_cache_key
+            self._note_time_cache_values = (notes_sorted, starts, ends, end_pairs, end_values)
 
         # Collect arpeggio member note IDs for quick skip in note drawer
         arpeggio_note_ids: set[int] = set()
@@ -907,12 +943,10 @@ class Editor(QtCore.QObject,
         lo_start = bisect.bisect_left(starts, time_begin)
         hi_start = bisect.bisect_right(starts, time_end)
 
-        # Build ends sorted by value with original indices for correct bisecting
-        end_pairs = sorted(((ends[i], i) for i in range(len(ends))), key=lambda p: p[0])
-        end_values = [p[0] for p in end_pairs]
+        # Query notes whose end falls inside the viewport from cached end-order arrays.
         lo_end_val = bisect.bisect_left(end_values, time_begin)
         hi_end_val = bisect.bisect_right(end_values, time_end)
-        by_end_indices = [end_pairs[j][1] for j in range(lo_end_val, hi_end_val)]
+        by_end_indices = sorted(end_pairs[j][1] for j in range(lo_end_val, hi_end_val))
 
         viewport_len = float(max(0.0, time_end - time_begin))
         slack = float(op.threshold)
@@ -922,10 +956,16 @@ class Editor(QtCore.QObject,
         span_cut = bisect.bisect_right(starts, time_begin)
         span_indices = [i for i in range(max(0, span_cut)) if ends[i] >= time_end]
 
-        candidate_idx_set = (
-            set(range(back_lo, hi_start)) | set(by_end_indices) | set(span_indices)
-        )
-        candidate_indices = sorted(candidate_idx_set)
+        # Merge sorted candidate streams (start-window, end-window, spanning)
+        # and deduplicate in one pass to reduce transient set allocations.
+        start_range = range(max(0, back_lo), max(0, hi_start))
+        candidate_indices: list[int] = []
+        prev_idx: int | None = None
+        for idx in heapq.merge(start_range, by_end_indices, span_indices):
+            if prev_idx is not None and idx == prev_idx:
+                continue
+            candidate_indices.append(int(idx))
+            prev_idx = int(idx)
 
         # Filtered view: will be further intersection-tested by drawers
         notes_view = [notes_sorted[i] for i in candidate_indices] if candidate_indices else []

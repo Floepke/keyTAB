@@ -348,6 +348,17 @@ class SCORE:
 		payload = self.get_dict()
 		if isinstance(payload, dict):
 			payload.pop('editor', None)
+			events = payload.get('events', None)
+			if isinstance(events, dict):
+				notes = events.get('note', None)
+				if isinstance(notes, list):
+					events['note'] = sorted(
+						notes,
+						key=lambda n: (
+							float((n or {}).get('time', 0.0) or 0.0),
+							int((n or {}).get('pitch', 0) or 0),
+						),
+					)
 		with open(path, 'w', encoding='utf-8') as f:
 			# Store non-ASCII symbols (e.g., dynamic glyphs) as \uXXXX escapes for stable/plain-text readability.
 			json.dump(payload, f, indent=4, ensure_ascii=True, separators=(',', ':'))
