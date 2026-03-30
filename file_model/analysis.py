@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime
 from typing import Any
 
 
@@ -12,7 +11,6 @@ class Analysis:
     pages: int = 0
     measures: int = 0
     lines: int = 0
-    updated_at: str = ""
 
     @staticmethod
     def _list_from_events(events: Any, name: str) -> list:
@@ -63,16 +61,10 @@ class Analysis:
         derived_pages = pages_count if pages_count is not None else 0
         measures = cls._measure_count(base_grid)
 
-        try:
-            timestamp = datetime.now().isoformat(timespec="seconds")
-        except Exception:
-            timestamp = ""
-
         return cls(
             notes=notes,
             grace_notes=grace_notes,
             lines=derived_lines,
             measures=measures,
             pages=derived_pages,
-            updated_at=timestamp,
         )
