@@ -175,6 +175,31 @@ class DynamicTool(BaseTool):
         else:
             return score.new_decrescendo(time=float(t_snap), duration=float(dur), x_rpitch=int(rpitch))
 
+    def _hairpin_endpoint_time(self, hp, handle: str) -> float:
+        start = float(getattr(hp, 'time', 0.0) or 0.0)
+        if handle == 'start':
+            return start
+        return start + float(getattr(hp, 'duration', self._snap_units()) or self._snap_units())
+
+    def _find_connected_symbol_for_handle(self, hp, handle: str):
+        score = self._score()
+        if score is None:
+            return None
+        endpoint_time = self._hairpin_endpoint_time(hp, handle)
+        endpoint_rpitch = int(getattr(hp, 'x_rpitch', 0) or 0)
+        for symbol in (getattr(score.events, 'dynamic_symbol', []) or []):
+            symbol_time = float(getattr(symbol, 'time', 0.0) or 0.0)
+            symbol_rpitch = int(getattr(symbol, 'x_rpitch', 0) or 0)
+            if abs(symbol_time - endpoint_time) < 0.1 and symbol_rpitch == endpoint_rpitch:
+                return symbol
+        return None
+
+    def _move_connected_symbol_with_handle(self, hp, handle: str, symbol) -> None:
+        if symbol is None:
+            return
+        symbol.time = float(max(0.0, self._hairpin_endpoint_time(hp, handle)))
+        symbol.x_rpitch = int(getattr(hp, 'x_rpitch', 0) or 0)
+
     def _apply_handle_drag(self, hp, handle: str, t_snap: float, rpitch: int) -> None:
         snap_units = self._snap_units()
         if handle == 'start':
@@ -249,6 +274,7 @@ class DynamicTool(BaseTool):
             return
         if self._active_hairpin is None or self._active_handle is None:
             return
+        connected_symbol = self._find_connected_symbol_for_handle(self._active_hairpin, self._active_handle)
         t_snap = self._snap_time(y)
         try:
             x_mm, _ = self._cursor_mm(x, y)
@@ -256,6 +282,7 @@ class DynamicTool(BaseTool):
         except Exception:
             rpitch = int(getattr(self._active_hairpin, 'x_rpitch', 0) or 0)
         self._apply_handle_drag(self._active_hairpin, self._active_handle, t_snap, rpitch)
+        self._move_connected_symbol_with_handle(self._active_hairpin, self._active_handle, connected_symbol)
         self._redraw()
 
     def on_left_drag_end(self, x: float, y: float) -> None:
