@@ -20,7 +20,7 @@
         "pages":1,
         "measures":20,
         "lines":4,
-        "updated_at":"2026-03-30T08:18:12"
+        "updated_at":"2026-03-30T08:59:58"
     },
     "base_grid":[
         {
@@ -50,7 +50,7 @@
         "note_head_visible":true,
         "note_stem_visible":true,
         "note_stop_visible":true,
-        "note_stem_length_semitone":5,
+        "note_stem_length_semitone":6,
         "note_stem_thickness_mm":1.0,
         "note_stopsign_thickness_mm":1.0,
         "note_leftdot_visible":true,
@@ -185,7 +185,7 @@
         "stave_clef_line_thickness_mm":0.5,
         "stave_ledger_line_length_mm":10.0,
         "stave_clef_line_dash_pattern_mm":[
-            4.0
+            3.0
         ]
     },
     "app_state":{
@@ -194,8 +194,8 @@
         "editor_scroll_pos":6,
         "snap_base":16,
         "snap_divide":1,
-        "selected_tool":"note",
-        "style_dialog_tab_index":4,
+        "selected_tool":"text",
+        "style_dialog_tab_index":1,
         "note_velocity_mode":false
     },
     "events":{
@@ -4002,18 +4002,12 @@
                 "time":8192.0
             },
             {
-                "time":15360.0
-            },
-            {
                 "time":0.0
             }
         ],
         "end_repeat":[
             {
                 "time":8192.0
-            },
-            {
-                "time":15360.0
             }
         ],
         "double_bar":[
@@ -4029,7 +4023,7 @@
             {
                 "time":0.0,
                 "margin_mm":[
-                    8.0,
+                    9.5,
                     5.0
                 ],
                 "stave_range":"auto",
@@ -4057,7 +4051,7 @@
                 "time":15360.0,
                 "margin_mm":[
                     5.0,
-                    5.0
+                    6.0
                 ],
                 "stave_range":"auto",
                 "page_break":false

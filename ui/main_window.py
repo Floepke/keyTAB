@@ -1082,8 +1082,6 @@ class MainWindow(QtWidgets.QMainWindow):
         try:
             sc = self.file_manager.current() if hasattr(self, 'file_manager') else None
         except Exception:
-            sc = None
-        if sc is None:
             return AppState()
         try:
             if not hasattr(sc, 'app_state') or sc.app_state is None:
@@ -1095,70 +1093,50 @@ class MainWindow(QtWidgets.QMainWindow):
     def _resolve_app_state_defaults(self) -> AppState:
         """Return app state; if not present in file, seed from appdata defaults."""
         app_state = self._current_app_state()
-        try:
-            sc = self.file_manager.current()
-            if bool(getattr(sc, '_app_state_from_file', False)):
-                return app_state
-        except Exception:
-            pass
-        try:
-            adm = get_appdata_manager()
-            app_state.zoom_mm_per_quarter = float(adm.get("zoom_mm_per_quarter", app_state.zoom_mm_per_quarter) or app_state.zoom_mm_per_quarter)
-            app_state.print_view_page_index = int(adm.get("print_view_page_index", app_state.print_view_page_index) or app_state.print_view_page_index)
-            app_state.editor_scroll_pos = int(adm.get("editor_scroll_pos", app_state.editor_scroll_pos) or app_state.editor_scroll_pos)
-            app_state.snap_base = int(adm.get("snap_base", app_state.snap_base) or app_state.snap_base)
-            app_state.snap_divide = int(adm.get("snap_divide", app_state.snap_divide) or app_state.snap_divide)
-            app_state.selected_tool = str(adm.get("selected_tool", app_state.selected_tool) or app_state.selected_tool)
-            app_state.note_velocity_mode = bool(adm.get("note_velocity_mode", getattr(app_state, 'note_velocity_mode', False)))
-        except Exception:
-            pass
+        sc = self.file_manager.current()
+        if bool(getattr(sc, '_app_state_from_file', False)):
+            return app_state
+        adm = get_appdata_manager()
+        app_state.zoom_mm_per_quarter = float(adm.get("zoom_mm_per_quarter", app_state.zoom_mm_per_quarter) or app_state.zoom_mm_per_quarter)
+        app_state.print_view_page_index = int(adm.get("print_view_page_index", app_state.print_view_page_index) or app_state.print_view_page_index)
+        app_state.editor_scroll_pos = int(adm.get("editor_scroll_pos", app_state.editor_scroll_pos) or app_state.editor_scroll_pos)
+        app_state.snap_base = int(adm.get("snap_base", app_state.snap_base) or app_state.snap_base)
+        app_state.snap_divide = int(adm.get("snap_divide", app_state.snap_divide) or app_state.snap_divide)
+        app_state.selected_tool = str(adm.get("selected_tool", app_state.selected_tool) or app_state.selected_tool)
+        app_state.note_velocity_mode = bool(adm.get("note_velocity_mode", getattr(app_state, 'note_velocity_mode', False)))
         return app_state
 
     def _restore_app_state_from_score(self) -> None:
         self._is_restoring_app_state = True
+        app_state = self._resolve_app_state_defaults()
+        # Tool selection
         try:
-            app_state = self._resolve_app_state_defaults()
-            # Tool selection
-            try:
-                self.tool_dock.selector.set_selected_tool(str(app_state.selected_tool or "note"), emit=True)
-            except Exception:
-                try:
-                    self.editor_controller.set_tool_by_name('note')
-                except Exception:
-                    pass
-            # Snap size
-            try:
-                sb = int(app_state.snap_base or 8)
-                sd = int(app_state.snap_divide or 1)
-                self.snap_dock.selector.set_snap(sb, sd, emit=True)
-            except Exception:
-                pass
-            # Scroll restore (used when metrics arrive)
-            self._pending_scroll_restore = int(app_state.editor_scroll_pos or 0)
-            # Print page restore
-            self._page_counter = max(0, int(getattr(app_state, 'print_view_page_index', 0) or 0))
-            self._set_page_index(self._page_counter)
-        finally:
-            self._is_restoring_app_state = False
+            self.tool_dock.selector.set_selected_tool(str(app_state.selected_tool or "note"), emit=True)
+        except Exception:
+            self.editor_controller.set_tool_by_name('note')
+        # Snap size
+        sb = int(app_state.snap_base or 8)
+        sd = int(app_state.snap_divide or 1)
+        self.snap_dock.selector.set_snap(sb, sd, emit=True)
+        # Scroll restore (used when metrics arrive)
+        self._pending_scroll_restore = int(app_state.editor_scroll_pos or 0)
+        # Print page restore
+        self._page_counter = max(0, int(getattr(app_state, 'print_view_page_index', 0) or 0))
+        self._set_page_index(self._page_counter)
+        self._is_restoring_app_state = False
 
     def _schedule_app_state_save(self) -> None:
         if self._is_restoring_app_state:
             return
-        try:
-            if hasattr(self, '_app_state_save_timer') and self._app_state_save_timer is not None:
-                self._app_state_save_timer.start(500)
-        except Exception:
-            pass
+        if hasattr(self, '_app_state_save_timer') and self._app_state_save_timer is not None:
+            self._app_state_save_timer.start(500)
 
     def _read_autosave_preferences(self) -> tuple[bool, int]:
         enabled = True
         interval_minutes = 1
-        try:
-            pm = get_preferences_manager()
-            enabled = bool(pm.get("auto_save", True))
-            interval_minutes = int(pm.get("auto_save_interval", 1))
-        except Exception:
-            pass
+        pm = get_preferences_manager()
+        enabled = bool(pm.get("auto_save", True))
+        interval_minutes = int(pm.get("auto_save_interval", 1))
         if interval_minutes < 1:
             interval_minutes = 1
         return enabled, interval_minutes
@@ -1166,30 +1144,18 @@ class MainWindow(QtWidgets.QMainWindow):
     def _apply_autosave_preferences(self) -> None:
         enabled, interval_minutes = self._read_autosave_preferences()
         interval_ms = int(interval_minutes) * 60_000
-        try:
-            self._autosave_timer.setInterval(interval_ms)
-        except Exception:
-            pass
-        try:
-            if enabled:
-                self._autosave_timer.start()
-            else:
-                self._autosave_timer.stop()
-        except Exception:
-            pass
+        self._autosave_timer.setInterval(interval_ms)
+        if enabled:
+            self._autosave_timer.start()
+        else:
+            self._autosave_timer.stop()
 
     def _toggle_full_screen(self) -> None:
         """Toggle native/fullscreen mode across platforms using F11."""
-        try:
-            if self.isFullScreen() or (self.windowState() & QtCore.Qt.WindowState.WindowFullScreen):
-                self.showNormal()
-            else:
-                self.showFullScreen()
-        except Exception:
-            try:
-                self.showFullScreen()
-            except Exception:
-                pass
+        if self.isFullScreen() or (self.windowState() & QtCore.Qt.WindowState.WindowFullScreen):
+            self.showNormal()
+        else:
+            self.showFullScreen()
         if hasattr(self, '_full_screen_act') and self._full_screen_act is not None:
             self._full_screen_act.setChecked(self.isFullScreen())
 
@@ -1198,11 +1164,8 @@ class MainWindow(QtWidgets.QMainWindow):
         auto_save_enabled, _ = self._read_autosave_preferences()
         if not auto_save_enabled:
             return
-        try:
-            if hasattr(self.file_manager, 'autosave_current'):
-                self.file_manager.autosave_current()
-        except Exception:
-            pass
+        if hasattr(self.file_manager, 'autosave_current'):
+            self.file_manager.autosave_current()
         if self.file_manager.path() is not None:
             self.file_manager.save()
 
@@ -1259,14 +1222,8 @@ class MainWindow(QtWidgets.QMainWindow):
             "sudo apt-get install fluidsynth libfluidsynth3\n\n"
             "You can still use External MIDI playback from the Playback menu."
         )
-        try:
-            QtWidgets.QMessageBox.warning(self, "FluidSynth not installed", msg)
-        except Exception:
-            pass
-        try:
-            self._status("FluidSynth missing: install fluidsynth/libfluidsynth3 or use External MIDI", 7000)
-        except Exception:
-            pass
+        QtWidgets.QMessageBox.warning(self, "FluidSynth not installed", msg)
+        self._status("FluidSynth missing: install fluidsynth/libfluidsynth3 or use External MIDI", 10000)
 
     def _rebuild_midi_port_menu(self) -> None:
         menu = getattr(self, '_midi_port_menu', None)
@@ -1363,21 +1320,12 @@ class MainWindow(QtWidgets.QMainWindow):
         dlg.setFileMode(QtWidgets.QFileDialog.FileMode.ExistingFile)
         dlg.setNameFilter("SoundFont (*.sf2 *.sf3)")
         dlg.setViewMode(QtWidgets.QFileDialog.ViewMode.Detail)
-        try:
-            here = Path(__file__).resolve().parent.parent / "assets" / "soundfonts"
-            if here.is_dir():
-                dlg.setDirectory(str(here))
-        except Exception:
-            pass
         if dlg.exec() == QtWidgets.QDialog.DialogCode.Accepted:
             sel = dlg.selectedFiles()[0]
             if sel:
                 self._set_soundfont_path_to_appdata(sel)
-                try:
-                    if hasattr(self, 'player') and self.player is not None:
-                        self.player.set_soundfont(sel)
-                except Exception:
-                    pass
+                if hasattr(self, 'player') and self.player is not None:
+                    self.player.set_soundfont(sel)
                 self._status("Custom FluidSynth soundfont selected", 2500)
                 return sel
         return existing if existing else None
@@ -1404,11 +1352,8 @@ class MainWindow(QtWidgets.QMainWindow):
                         midi_out_port=None,
                     )
                     self._player_config = ('system', self._get_midi_out_port_from_appdata())
-                    try:
-                        if hasattr(self.player, 'set_persist_settings'):
-                            self.player.set_persist_settings(False)
-                    except Exception:
-                        pass
+                    if hasattr(self.player, 'set_persist_settings'):
+                        self.player.set_persist_settings(False)
                     return
             raise
 
@@ -1417,30 +1362,24 @@ class MainWindow(QtWidgets.QMainWindow):
         self._status("Select external MIDI output from Playback > MIDI port", 2500)
 
     def _update_clock(self) -> None:
-        try:
-            now = datetime.now()
-            timestr = now.strftime("%H:%M:%S")
-            if hasattr(self, "_clock_label") and self._clock_label is not None:
-                self._clock_label.setText(timestr)
-                # Re-position in case width changed
-                self._position_clock()
-        except Exception:
-            pass
+        now = datetime.now()
+        timestr = now.strftime("%H:%M:%S")
+        if hasattr(self, "_clock_label") and self._clock_label is not None:
+            self._clock_label.setText(timestr)
+            # Re-position in case width changed
+            self._position_clock()
 
     def _position_clock(self) -> None:
-        try:
-            menubar = self.menuBar()
-            if not hasattr(self, "_clock_label") or self._clock_label is None:
-                return
-            rect = menubar.rect()
-            sh = self._clock_label.sizeHint()
-            # Height equals menubar height to align vertically; width to hint
-            self._clock_label.resize(sh.width(), rect.height())
-            x = max(0, rect.width() - self._clock_label.width() - 8)
-            self._clock_label.move(x, 0)
-            self._clock_label.show()
-        except Exception:
-            pass
+        menubar = self.menuBar()
+        if not hasattr(self, "_clock_label") or self._clock_label is None:
+            return
+        rect = menubar.rect()
+        sh = self._clock_label.sizeHint()
+        # Height equals menubar height to align vertically; width to hint
+        self._clock_label.resize(sh.width(), rect.height())
+        x = max(0, rect.width() - self._clock_label.width() - 8)
+        self._clock_label.move(x, 0)
+        self._clock_label.show()
 
     def _export_pdf(self) -> None:
         dlg = QtWidgets.QFileDialog(self)

@@ -30,11 +30,10 @@ class EditorScrollBar(QtWidgets.QScrollBar):
         self._jump_target_provider: Optional[Callable[[int], int]] = None
         self._measure_tooltip_font_point_size: Optional[float] = 32.0
         self._measure_tooltip_font_family: str = "Edwin"
-        self._measure_popup = QtWidgets.QLabel(None)
+        self._measure_popup = QtWidgets.QLabel(self.window() if isinstance(self.window(), QtWidgets.QWidget) else self)
         self._measure_popup.setWindowFlags(
             QtCore.Qt.WindowType.ToolTip
             | QtCore.Qt.WindowType.FramelessWindowHint
-            | QtCore.Qt.WindowType.BypassWindowManagerHint
         )
         self._measure_popup.setAttribute(QtCore.Qt.WidgetAttribute.WA_ShowWithoutActivating, True)
         self._measure_popup.setAttribute(QtCore.Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
@@ -44,12 +43,11 @@ class EditorScrollBar(QtWidgets.QScrollBar):
         self.setStyle(self._jump_style)
 
     def _hide_measure_popup(self) -> None:
-        try:
-            self._measure_popup.hide()
-        except Exception:
-            pass
+        self._measure_popup.hide()
 
     def _show_measure_popup(self, text: str, global_pos: QtCore.QPoint) -> None:
+        self._ensure_measure_popup_parent()
+
         tooltip_font = QtGui.QFont(QtWidgets.QToolTip.font())
         tooltip_font.setFamily(self._measure_tooltip_font_family)
         custom_pt = self._measure_tooltip_font_point_size
@@ -57,15 +55,10 @@ class EditorScrollBar(QtWidgets.QScrollBar):
             tooltip_font.setPointSizeF(custom_pt)
         self._measure_popup.setFont(tooltip_font)
 
-        try:
-            bg_rgb = Style.get_named_rgb('bg', (240, 240, 240))
-            fg_rgb = Style.get_named_rgb('text', (0, 0, 0))
-            bg = QtGui.QColor(int(bg_rgb[0]), int(bg_rgb[1]), int(bg_rgb[2]))
-            fg = QtGui.QColor(int(fg_rgb[0]), int(fg_rgb[1]), int(fg_rgb[2]))
-        except Exception:
-            palette = QtWidgets.QToolTip.palette()
-            bg = palette.color(QtGui.QPalette.ColorRole.ToolTipBase)
-            fg = palette.color(QtGui.QPalette.ColorRole.ToolTipText)
+        bg_rgb = Style.get_named_rgb('bg', (240, 240, 240))
+        fg_rgb = Style.get_named_rgb('text', (0, 0, 0))
+        bg = QtGui.QColor(int(bg_rgb[0]), int(bg_rgb[1]), int(bg_rgb[2]))
+        fg = QtGui.QColor(int(fg_rgb[0]), int(fg_rgb[1]), int(fg_rgb[2]))
         border = fg
         self._measure_popup.setStyleSheet(
             f"QLabel {{ background: {bg.name()}; color: {fg.name()}; "
@@ -81,6 +74,21 @@ class EditorScrollBar(QtWidgets.QScrollBar):
         tip_y = int(global_pos.y() - (tip_h // 2))
         self._measure_popup.move(tip_x, tip_y)
         self._measure_popup.show()
+
+    def _ensure_measure_popup_parent(self) -> None:
+        host = self.window() if isinstance(self.window(), QtWidgets.QWidget) else None
+        if host is not None and self._measure_popup.parentWidget() is not host:
+            self._measure_popup.setParent(host)
+            self._measure_popup.setWindowFlags(
+                QtCore.Qt.WindowType.ToolTip
+                | QtCore.Qt.WindowType.FramelessWindowHint
+            )
+            self._measure_popup.setAttribute(QtCore.Qt.WidgetAttribute.WA_ShowWithoutActivating, True)
+            self._measure_popup.setAttribute(QtCore.Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
+        popup_handle = self._measure_popup.windowHandle()
+        host_handle = host.windowHandle() if host is not None else None
+        if popup_handle is not None and host_handle is not None:
+            popup_handle.setTransientParent(host_handle)
 
     def set_tooltip_provider(self, provider: Optional[Callable[[int], str]]) -> None:
         self._tooltip_provider = provider
@@ -191,3 +199,27 @@ class EditorScrollBar(QtWidgets.QScrollBar):
     def hideEvent(self, ev: QtGui.QHideEvent) -> None:
         self._hide_measure_popup()
         super().hideEvent(ev)
+
+    def refresh_hover_tooltip(self) -> None:
+        """Re-evaluate hover tooltip for the current cursor position."""
+        try:
+            if not self.isVisible():
+                self._hide_measure_popup()
+                return
+            global_pos = QtGui.QCursor.pos()
+            local_pos = self.mapFromGlobal(global_pos)
+            if self.rect().contains(local_pos):
+                self._update_tooltip(QtCore.QPointF(local_pos), global_pos)
+            else:
+                self._hide_measure_popup()
+        except Exception:
+            self._hide_measure_popup()
+
+    def event(self, ev: QtCore.QEvent) -> bool:
+        # Keep predictive measure tooltip responsive even when Qt only emits
+        # tooltip events (for example after modal dialogs or when cursor rests).
+        if ev.type() == QtCore.QEvent.Type.ToolTip and isinstance(ev, QtGui.QHelpEvent):
+            self._update_tooltip(QtCore.QPointF(ev.pos()), ev.globalPos())
+            ev.accept()
+            return True
+        return super().event(ev)

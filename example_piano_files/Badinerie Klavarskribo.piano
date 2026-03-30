@@ -17,10 +17,10 @@
     "analysis":{
         "notes":419,
         "grace_notes":0,
-        "pages":1,
+        "pages":2,
         "measures":20,
-        "lines":4,
-        "updated_at":"2026-03-30T08:18:17"
+        "lines":5,
+        "updated_at":"2026-03-30T08:56:32"
     },
     "base_grid":[
         {
@@ -46,14 +46,14 @@
         "header_height_mm":17.5,
         "footer_height_mm":10.0,
         "scale":0.38,
-        "black_note_rule":"above_stem_if_collision",
+        "black_note_rule":"above_stem",
         "note_head_visible":true,
         "note_stem_visible":true,
         "note_stop_visible":true,
-        "note_stem_length_semitone":5,
+        "note_stem_length_semitone":6,
         "note_stem_thickness_mm":1.0,
         "note_stopsign_thickness_mm":1.0,
-        "note_leftdot_visible":true,
+        "note_leftdot_visible":false,
         "note_continuation_dot_size_mm":2.5,
         "note_midinote_visible":false,
         "note_midinote_left_color":"#cccccc",
@@ -80,7 +80,7 @@
         "repeat_start_visible":true,
         "repeat_end_visible":true,
         "double_barline_visible":true,
-        "measure_grouping":"",
+        "measure_grouping":"4",
         "countline_visible":true,
         "countline_dash_pattern":[
             0.0,
@@ -185,17 +185,17 @@
         "stave_clef_line_thickness_mm":0.5,
         "stave_ledger_line_length_mm":10.0,
         "stave_clef_line_dash_pattern_mm":[
-            4.0
+            3.0
         ]
     },
     "app_state":{
         "zoom_mm_per_quarter":28.531167061100078,
         "print_view_page_index":0,
-        "editor_scroll_pos":6,
+        "editor_scroll_pos":0,
         "snap_base":16,
         "snap_divide":1,
-        "selected_tool":"note",
-        "style_dialog_tab_index":4,
+        "selected_tool":"barline",
+        "style_dialog_tab_index":1,
         "note_velocity_mode":false
     },
     "events":{
@@ -4002,18 +4002,12 @@
                 "time":8192.0
             },
             {
-                "time":15360.0
-            },
-            {
                 "time":0.0
             }
         ],
         "end_repeat":[
             {
                 "time":8192.0
-            },
-            {
-                "time":15360.0
             }
         ],
         "double_bar":[
@@ -4036,7 +4030,7 @@
                 "page_break":false
             },
             {
-                "time":5120.0,
+                "time":4096.0,
                 "margin_mm":[
                     5.0,
                     5.0
@@ -4045,7 +4039,7 @@
                 "page_break":false
             },
             {
-                "time":10240.0,
+                "time":8192.0,
                 "margin_mm":[
                     5.0,
                     5.0
@@ -4054,7 +4048,16 @@
                 "page_break":false
             },
             {
-                "time":15360.0,
+                "time":12288.0,
+                "margin_mm":[
+                    5.0,
+                    5.0
+                ],
+                "stave_range":"auto",
+                "page_break":true
+            },
+            {
+                "time":16384.0,
                 "margin_mm":[
                     5.0,
                     5.0

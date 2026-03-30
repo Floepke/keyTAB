@@ -169,7 +169,7 @@ class Layout:
     stave_three_line_thickness_mm: float = 1.1
     stave_clef_line_thickness_mm: float = 0.5
     stave_ledger_line_length_mm: float = 10.0
-    stave_clef_line_dash_pattern_mm: list[float] = field(default_factory=lambda: [5.0, 3.0])  # Dash pattern for clef lines (e.g., [dash_length, gap_length])
+    stave_clef_line_dash_pattern_mm: list[float] = field(default_factory=lambda: [3.0])  # Dash pattern for clef lines (e.g., [dash_length, gap_length])
 
 
 LAYOUT_FLOAT_CONFIG: dict[str, dict[str, float]] = {
