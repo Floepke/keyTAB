@@ -250,6 +250,19 @@ def main(argv: list[str] | None = None):
     # Create QApplication with argv to ensure proper initialization paths on macOS
     app = KeyTabApplication([sys.argv[0], *qt_args])
 
+    # Suppress unhelpful Qt platform warning about grabMouse on non-popup windows.
+    # grabMouse() is used to track mouse releases outside the widget; this warning
+    # is harmless on Wayland/xcb where it isn't fully supported.
+    _original_handler = QtCore.qInstallMessageHandler(None)
+    def _qt_message_handler(msg_type, context, message):
+        if "This plugin supports grabbing the mouse only for popup windows" in message:
+            return
+        if _original_handler is not None:
+            _original_handler(msg_type, context, message)
+        else:
+            print(message, file=sys.stderr)
+    QtCore.qInstallMessageHandler(_qt_message_handler)
+
     # Belt-and-suspenders: explicitly pick Fusion when available on macOS.
     if sys.platform == "darwin":
         styles = {str(s).lower(): str(s) for s in QtWidgets.QStyleFactory.keys()}
