@@ -7,6 +7,101 @@ if TYPE_CHECKING:
 
 
 class DecrescendoDrawerMixin:
+    def _get_dynamic_symbol_at_position(self, t: float, x_rpitch: int) -> dict | None:
+        """
+        Check if there's a dynamic symbol at the given time and x_rpitch.
+        Returns dict with 'glyph', 'width_mm', 'height_mm' if found, None otherwise.
+        """
+        self = cast("Editor", self)
+        score = self.current_score()
+        if score is None:
+            return None
+        
+        layout = getattr(score, 'layout', None)
+        dynamic_symbols = list(getattr(score.events, 'dynamic_symbol', []) or [])
+        
+        for sym in dynamic_symbols:
+            sym_time = float(getattr(sym, 'time', 0.0) or 0.0)
+            sym_rpitch = int(getattr(sym, 'x_rpitch', 0) or 0)
+            
+            # Check if symbol is at same time and x position
+            if abs(sym_time - t) < 0.1 and sym_rpitch == x_rpitch:
+                glyph = str(getattr(sym, 'symbol', '') or '')
+                if not glyph:
+                    return None
+                
+                # Calculate glyph dimensions using font metrics
+                try:
+                    from fonts import register_font_from_bytes
+                    import PySide6.QtGui as QtGui
+                    
+                    leland_family = register_font_from_bytes('LelandText') or 'LelandText'
+                    symbol_font = QtGui.QFont(leland_family)
+                    font_size_pt = float(getattr(layout, 'dynamic_symbol_font_size_pt', 12.0) or 12.0)
+                    symbol_font.setPointSizeF(font_size_pt)
+                    
+                    metrics = QtGui.QFontMetrics(symbol_font)
+                    glyph_w_px = metrics.horizontalAdvance(glyph)
+                    glyph_h_px = metrics.boundingRect(glyph).height()
+                    
+                    # Convert to mm (approximate: 1pt ≈ 0.35mm at screen DPI levels)
+                    scale = float(getattr(layout, 'scale', 1.0) or 1.0)
+                    px_per_mm = float(getattr(self, '_widget_px_per_mm', 1.0) or 1.0)
+                    glyph_w_mm = (glyph_w_px / px_per_mm) * scale if px_per_mm else 3.5
+                    glyph_h_mm = (glyph_h_px / px_per_mm) * scale if px_per_mm else 2.5
+                    
+                    padding = float(getattr(layout, 'dynamic_symbol_background_padding_mm', 2.5) or 2.5)
+                    
+                    return {
+                        'glyph': glyph,
+                        'width_mm': glyph_w_mm + (2 * padding),
+                        'height_mm': glyph_h_mm + (2 * padding),
+                    }
+                except Exception:
+                    # Fallback if font calculation fails
+                    return {
+                        'glyph': glyph,
+                        'width_mm': 4.0,
+                        'height_mm': 3.0,
+                    }
+        
+        return None
+    
+    def _adjust_hairpin_for_symbols(
+        self, 
+        t_start: float, 
+        t_end: float, 
+        x_rpitch: int,
+        y_start_draw: float,
+        y_end_draw: float,
+    ) -> tuple[float, float]:
+        """
+        Adjust hairpin start/end draw positions to avoid overlapping with dynamic symbols.
+        Returns (adjusted_y_start_draw, adjusted_y_end_draw).
+        """
+        self = cast("Editor", self)
+        score = self.current_score()
+        layout = getattr(score, 'layout', None) if score else None
+        
+        # Use hairpin_text_gap_mm from layout for spacing
+        gap_mm = float(getattr(layout, 'hairpin_text_gap_mm', 5.0) or 5.0) if layout else 5.0
+        
+        # Check if there's a symbol at the start position
+        symbol_at_start = self._get_dynamic_symbol_at_position(t_start, x_rpitch)
+        if symbol_at_start is not None:
+            # Move the visible start inward so the open end does not sit under the symbol.
+            symbol_half_height = symbol_at_start['height_mm'] * 0.5
+            y_start_draw += symbol_half_height + gap_mm
+        
+        # Check if there's a symbol at the end position
+        symbol_at_end = self._get_dynamic_symbol_at_position(t_end, x_rpitch)
+        if symbol_at_end is not None:
+            # Move the tip inward so the decrescendo gets shorter instead of extending through the symbol.
+            symbol_half_height = symbol_at_end['height_mm'] * 0.5
+            y_end_draw -= symbol_half_height + gap_mm
+        
+        return y_start_draw, y_end_draw
+    
     def draw_decrescendo(self, du: DrawUtil) -> None:
         self = cast("Editor", self)
         if getattr(self, 'is_tiny_mode_ultra', None) and self.is_tiny_mode_ultra():
@@ -26,22 +121,6 @@ class DecrescendoDrawerMixin:
         style_scale = float(getattr(layout, 'scale', 1.0) or 1.0) if layout is not None else 1.0
         lw = float(getattr(layout, 'hairpin_line_width_mm', 0.5) or 0.5) * style_scale
         spread = float(getattr(layout, 'hairpin_spread_mm', 5.0) or 5.0) * style_scale
-        text_size_pt = float(getattr(layout, 'hairpin_font_size_pt', 12.0) or 12.0)
-        text_gap = float(getattr(layout, 'hairpin_text_gap_mm', 1.2) or 1.2) * style_scale
-        dynamic_bg_pad = float(
-            getattr(
-                layout,
-                'dynamic_symbol_background_padding_mm',
-                getattr(
-                    layout,
-                    'dynamic_symbol_background_padding',
-                    getattr(layout, 'dynamic_background_padding', getattr(layout, 'text_background_padding_mm', 0.5)),
-                ),
-            ) or 0.0
-        ) * style_scale
-        paper_color = getattr(self, 'paper_color', (1.0, 1.0, 1.0, 1.0))
-        text_color = self.notation_color
-        text_family = 'LelandText'
 
         top_mm = float(getattr(self, '_view_y_mm_offset', 0.0) or 0.0)
         vp_h_mm = float(getattr(self, '_viewport_h_mm', 0.0) or 0.0)
@@ -75,115 +154,18 @@ class DecrescendoDrawerMixin:
             x_mm = clamp_x(float(self.relative_c4pitch_to_x(x_rpitch)))
             half_spread = spread * 0.5
 
-            # Text-aware spacing for professional spanner engraving.
-            start_text = str(getattr(ev, 'start_text', '') or '')
-            end_text = str(getattr(ev, 'end_text', '') or '')
-
-            all_hairpins = list(getattr(score.events, 'crescendo', []) or []) + list(getattr(score.events, 'decrescendo', []) or [])
-            eps = 1e-6
-            end_join_peers = [
-                hp for hp in all_hairpins
-                if hp is not ev
-                and int(getattr(hp, 'x_rpitch', 0) or 0) == x_rpitch
-                and abs(float(getattr(hp, 'time', 0.0) or 0.0) - t_end) <= eps
-            ]
-            start_join_peers = [
-                hp for hp in all_hairpins
-                if hp is not ev
-                and int(getattr(hp, 'x_rpitch', 0) or 0) == x_rpitch
-                and abs((float(getattr(hp, 'time', 0.0) or 0.0) + float(getattr(hp, 'duration', 0.0) or 0.0)) - t_start) <= eps
-            ]
-
-            def _text_w_mm(txt: str) -> float:
-                if not txt:
-                    return 0.0
-                try:
-                    _xb, _yb, w, _h = du._get_text_extents_mm(txt, text_family, text_size_pt, False, False)
-                    return float(max(0.0, w))
-                except Exception:
-                    return max(1.0, (text_size_pt / 72.0) * 25.4)
-
-            def _text_h_mm(txt: str) -> float:
-                if not txt:
-                    return 0.0
-                try:
-                    _xb, _yb, _w, h = du._get_text_extents_mm(txt, text_family, text_size_pt, False, False)
-                    return float(max(0.0, h))
-                except Exception:
-                    return max(1.0, (text_size_pt / 72.0) * 25.4 * 0.8)
-
-            def _draw_text_centered_at(xc_mm: float, yc_mm: float, txt: str, ev_tag_id: int, ev_tags: list[str], handle: str = '') -> None:
-                if not txt:
-                    return
-                try:
-                    xb, yb, w, h = du._get_text_extents_mm(txt, text_family, text_size_pt, False, False)
-                except Exception:
-                    xb, yb, w, h = 0.0, 0.0, _text_w_mm(txt), _text_h_mm(txt)
-                bx = float(xc_mm) - (float(xb) + (float(w) * 0.5))
-                by = float(yc_mm) - (float(yb) + (float(h) * 0.5))
-
-                rx = bx + float(xb)
-                ry = by + float(yb)
-                sym_x1 = rx - dynamic_bg_pad
-                sym_y1 = ry - dynamic_bg_pad
-                sym_x2 = rx + float(w) + dynamic_bg_pad
-                sym_y2 = ry + float(h) + dynamic_bg_pad
-                du.add_rectangle(
-                    sym_x1,
-                    sym_y1,
-                    sym_x2,
-                    sym_y2,
-                    corner_radius=max(0.0, dynamic_bg_pad),
-                    stroke_color=None,
-                    fill_color=paper_color,
-                    id=ev_tag_id,
-                    tags=['dynamic_symbol_bg_top'],
-                )
-
-                du.add_text(
-                    bx,
-                    by,
-                    txt,
-                    family=text_family,
-                    size_pt=text_size_pt,
-                    italic=False,
-                    bold=False,
-                    color=text_color,
-                    anchor=None,
-                    id=ev_tag_id,
-                    tags=['dynamic_symbol_text_top'],
-                )
-
-                if is_dynamic_tool and handle:
-                    self.register_hit_rect(
-                        'dynamic_symbol', ev_tag_id,
-                        sym_x1, sym_y1, sym_x2, sym_y2,
-                        htype='decrescendo', handle=handle,
-                    )
-
-            start_h = _text_h_mm(start_text)
-            end_h = _text_h_mm(end_text)
-            start_w = _text_w_mm(start_text)
-            end_w = _text_w_mm(end_text)
-            peer_start_h = max([_text_h_mm(str(getattr(hp, 'start_text', '') or '')) for hp in end_join_peers] or [0.0])
-            peer_end_h = max([_text_h_mm(str(getattr(hp, 'end_text', '') or '')) for hp in start_join_peers] or [0.0])
-            peer_start_w = max([_text_w_mm(str(getattr(hp, 'start_text', '') or '')) for hp in end_join_peers] or [0.0])
-            peer_end_w = max([_text_w_mm(str(getattr(hp, 'end_text', '') or '')) for hp in start_join_peers] or [0.0])
-
-            start_pad = ((start_h * 0.5) + text_gap) if start_text else 0.0
-            end_pad = ((end_h * 0.5) + text_gap) if end_text else 0.0
-            if start_join_peers and (start_h > 0.0 or peer_end_h > 0.0):
-                start_pad = max(start_pad, text_gap + (max(start_h, peer_end_h) * 0.5))
-            if end_join_peers and (end_h > 0.0 or peer_start_h > 0.0):
-                end_pad = max(end_pad, text_gap + (max(end_h, peer_start_h) * 0.5))
-
-            y_start_draw = y_start + start_pad
-            y_end_draw = y_end - end_pad
+            y_start_draw = y_start
+            y_end_draw = y_end
             min_span = max(0.8, float(self.semitone_dist or 0.5) * 0.6)
             if (y_end_draw - y_start_draw) < min_span:
                 mid = (y_start + y_end) * 0.5
                 y_start_draw = mid - (min_span * 0.5)
                 y_end_draw = mid + (min_span * 0.5)
+
+            # Adjust hairpin position to avoid overlapping with dynamic symbols
+            y_start_draw, y_end_draw = self._adjust_hairpin_for_symbols(
+                t_start, t_end, x_rpitch, y_start_draw, y_end_draw
+            )
 
             # Decrescendo: open at top (start), closes toward bottom (end/tip)
             # Left arm: top-left → bottom-point
@@ -204,25 +186,6 @@ class DecrescendoDrawerMixin:
                 id=ev_id,
                 tags=['decrescendo'],
             )
-
-            if start_text:
-                _draw_text_centered_at(
-                    x_mm,
-                    y_start,
-                    start_text,
-                    ev_id,
-                    ['decrescendo_text'],
-                    handle='start',
-                )
-            if end_text:
-                _draw_text_centered_at(
-                    x_mm,
-                    y_end,
-                    end_text,
-                    ev_id,
-                    ['decrescendo_text'],
-                    handle='end',
-                )
 
             if is_dynamic_tool:
                 start_handle_x = x_mm

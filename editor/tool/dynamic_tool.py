@@ -1,26 +1,29 @@
 from __future__ import annotations
 from typing import Optional, Tuple
-from PySide6 import QtWidgets
+from PySide6 import QtWidgets, QtGui
 
 from editor.tool.base_tool import BaseTool
 from file_model.SCORE import SCORE
-from ui.dialogs.dynamic_dialog import DynamicDialog
+from ui.dialogs.dynamic_menu import DynamicSymbolMenu
 from utils.CONSTANT import QUARTER_NOTE_UNIT
 
 
 class DynamicTool(BaseTool):
     """
-    Tool for placing and editing crescendo (<) and decrescendo (>) hairpins.
-    The active hairpin type is selected via toolbar buttons. Left click on empty
-    space creates a new hairpin at the snapped time position with a snap-size
-    initial duration. Drag handles to adjust the start time, end time, and
-    horizontal position (x_rpitch). Right click on a handle removes the hairpin.
+    Tool for placing and editing crescendo/decrescendo hairpins and standalone
+    dynamic symbols.
+
+    Modes:
+    - crescendo: place/edit crescendo hairpins
+    - decrescendo: place/edit decrescendo hairpins
+    - dynamic: insert/edit/move/delete standalone dynamic symbols
     """
 
     TOOL_NAME = 'dynamic'
 
     _MODE_CRESCENDO = 'crescendo'
     _MODE_DECRESCENDO = 'decrescendo'
+    _MODE_DYNAMIC_SYMBOL = 'dynamic'
 
     def __init__(self) -> None:
         super().__init__()
@@ -28,13 +31,17 @@ class DynamicTool(BaseTool):
         self._active_hairpin = None          # current event object being dragged
         self._active_type: Optional[str] = None   # 'crescendo' or 'decrescendo'
         self._active_handle: Optional[str] = None # 'start' or 'end'
+        self._active_symbol = None
         self._created_on_press: bool = False
+        self._dragged_symbol: bool = False
         self._suppress_next_left_interaction: bool = False
+        self._dialog_open: bool = False  # Gate to prevent multiple dialogs opening
 
     def _clear_active_interaction(self) -> None:
         self._active_hairpin = None
         self._active_handle = None
         self._active_type = None
+        self._active_symbol = None
 
     def toolbar_spec(self) -> list[dict]:
         return [
@@ -52,10 +59,17 @@ class DynamicTool(BaseTool):
                 'tooltip': 'Decrescendo hairpin',
                 'active': self._mode == self._MODE_DECRESCENDO,
             },
+            {
+                'name': self._MODE_DYNAMIC_SYMBOL,
+                'icon': 'dynamics',
+                'text': 'dyn',
+                'tooltip': 'Standalone dynamic symbol',
+                'active': self._mode == self._MODE_DYNAMIC_SYMBOL,
+            },
         ]
 
     def on_toolbar_button(self, name: str) -> None:
-        if name in (self._MODE_CRESCENDO, self._MODE_DECRESCENDO):
+        if name in (self._MODE_CRESCENDO, self._MODE_DECRESCENDO, self._MODE_DYNAMIC_SYMBOL):
             self._mode = str(name)
 
     # ---- Helpers ----
@@ -102,96 +116,51 @@ class DynamicTool(BaseTool):
         if hasattr(self._editor, 'force_redraw_from_model'):
             self._editor.force_redraw_from_model()
 
-    def _set_hairpin_text_via_dialog(self, hp, handle: str) -> None:
+    def _select_dynamic_symbol(self, current: str = '') -> tuple[str, bool]:
+        # Prevent multiple dialogs from opening simultaneously
+        if self._dialog_open:
+            return '', False
+        
         parent_w = QtWidgets.QApplication.activeWindow()
-        field = 'start_text' if str(handle) == 'start' else 'end_text'
-        current = str(getattr(hp, field, '') or '')
-        self._clear_active_interaction()
-        # Ignore the immediate post-dialog click/release sequence.
+        self._dialog_open = True
         self._suppress_next_left_interaction = True
-        selected_glyph, ok = DynamicDialog.get_dynamic_glyph(parent=parent_w, current_value=current)
-        # Restore focus to the main window after the modal dialog (needed on macOS)
-        if parent_w is not None:
-            parent_w.activateWindow()
-            parent_w.raise_()
-        if not ok:
+        try:
+            selected_glyph, ok = DynamicSymbolMenu.get_dynamic_glyph(
+                parent=parent_w, 
+                current_value=current,
+                pos=QtGui.QCursor.pos()
+            )
+        finally:
+            self._dialog_open = False
+            if parent_w is not None:
+                parent_w.activateWindow()
+                parent_w.raise_()
+        return str(selected_glyph or ''), bool(ok)
+
+    def _create_dynamic_symbol(self, x: float, y: float, symbol: str):
+        score = self._score()
+        if score is None:
+            return None
+        t_snap = self._snap_time(y)
+        x_mm, _ = self._cursor_mm(x, y)
+        rpitch = self._x_mm_to_rpitch(x_mm)
+        return score.new_dynamic_symbol(time=float(t_snap), x_rpitch=int(rpitch), symbol=str(symbol or ''))
+
+    def _delete_dynamic_symbol(self, ev) -> None:
+        score = self._score()
+        if score is None:
             return
-        setattr(hp, field, str(selected_glyph or ''))
-        self._mirror_symbol_to_connected_side(hp, str(handle))
-        if self._editor is not None and hasattr(self._editor, '_snapshot_if_changed'):
-            self._editor._snapshot_if_changed(coalesce=False, label='hairpin_set_text')
-        self._redraw()
+        ev_id = int(getattr(ev, '_id', -1) or -1)
+        score.events.dynamic_symbol = [
+            d for d in (score.events.dynamic_symbol or [])
+            if int(getattr(d, '_id', -2) or -2) != ev_id
+        ]
 
     def _all_hairpins(self) -> list[object]:
         score = self._score()
         if score is None:
             return []
         return list(getattr(score.events, 'crescendo', []) or []) + list(getattr(score.events, 'decrescendo', []) or [])
-
-    def _mirror_symbol_to_connected_side(self, hp, handle: str) -> None:
-        all_hairpins = self._all_hairpins()
-        if not all_hairpins:
-            return
-        x_rpitch = int(getattr(hp, 'x_rpitch', 0) or 0)
-        start_t = float(getattr(hp, 'time', 0.0) or 0.0)
-        dur = float(getattr(hp, 'duration', 0.0) or 0.0)
-        end_t = start_t + dur
-        eps = 1e-6
-
-        if handle == 'start':
-            winner = str(getattr(hp, 'start_text', '') or '')
-            for peer in all_hairpins:
-                if peer is hp:
-                    continue
-                if int(getattr(peer, 'x_rpitch', 0) or 0) != x_rpitch:
-                    continue
-                peer_end_t = float(getattr(peer, 'time', 0.0) or 0.0) + float(getattr(peer, 'duration', 0.0) or 0.0)
-                if abs(peer_end_t - start_t) <= eps:
-                    setattr(peer, 'end_text', winner)
-        else:
-            winner = str(getattr(hp, 'end_text', '') or '')
-            for peer in all_hairpins:
-                if peer is hp:
-                    continue
-                if int(getattr(peer, 'x_rpitch', 0) or 0) != x_rpitch:
-                    continue
-                peer_start_t = float(getattr(peer, 'time', 0.0) or 0.0)
-                if abs(peer_start_t - end_t) <= eps:
-                    setattr(peer, 'start_text', winner)
-
-    def _sync_symbols_on_new_connections(self, hp) -> None:
-        """When drag creates a connection, copy top-side symbol to bottom-side symbol."""
-        all_hairpins = self._all_hairpins()
-        if not all_hairpins:
-            return
-
-        x_rpitch = int(getattr(hp, 'x_rpitch', 0) or 0)
-        start_t = float(getattr(hp, 'time', 0.0) or 0.0)
-        dur = float(getattr(hp, 'duration', 0.0) or 0.0)
-        end_t = start_t + dur
-        eps = 1e-6
-
-        # Join at current start: peer end (top) -> hp start (bottom)
-        for peer in all_hairpins:
-            if peer is hp:
-                continue
-            if int(getattr(peer, 'x_rpitch', 0) or 0) != x_rpitch:
-                continue
-            peer_end_t = float(getattr(peer, 'time', 0.0) or 0.0) + float(getattr(peer, 'duration', 0.0) or 0.0)
-            if abs(peer_end_t - start_t) <= eps:
-                top_symbol = str(getattr(peer, 'end_text', '') or '')
-                setattr(hp, 'start_text', top_symbol)
-
-        # Join at current end: hp end (top) -> peer start (bottom)
-        top_symbol = str(getattr(hp, 'end_text', '') or '')
-        for peer in all_hairpins:
-            if peer is hp:
-                continue
-            if int(getattr(peer, 'x_rpitch', 0) or 0) != x_rpitch:
-                continue
-            peer_start_t = float(getattr(peer, 'time', 0.0) or 0.0)
-            if abs(peer_start_t - end_t) <= eps:
-                setattr(peer, 'start_text', top_symbol)
 
     def _create_hairpin(self, x: float, y: float):
         score = self._score()
@@ -226,7 +195,7 @@ class DynamicTool(BaseTool):
 
     def on_left_press(self, x: float, y: float) -> None:
         super().on_left_press(x, y)
-        if self._suppress_next_left_interaction:
+        if self._suppress_next_left_interaction or self._dialog_open:
             self._clear_active_interaction()
             return
         if self._editor is None:
@@ -234,6 +203,17 @@ class DynamicTool(BaseTool):
         # Ensure draw cache is up to date for hit testing
         self._editor.draw_frame()
         x_mm, y_mm = self._cursor_mm(x, y)
+        self._dragged_symbol = False
+
+        if self._mode == self._MODE_DYNAMIC_SYMBOL:
+            sym, _sym_type, _ = self._editor.hit_test_dynamic_symbol_mm(x_mm, y_mm)
+            self._active_symbol = sym
+            self._active_hairpin = None
+            self._active_type = None
+            self._active_handle = None
+            self._created_on_press = False
+            return
+
         hp, hp_type, handle = self._editor.hit_test_hairpin_mm(x_mm, y_mm)
         self._active_hairpin = hp
         self._active_type = hp_type
@@ -251,7 +231,21 @@ class DynamicTool(BaseTool):
 
     def on_left_drag(self, x: float, y: float, dx: float, dy: float) -> None:
         super().on_left_drag(x, y, dx, dy)
-        if self._suppress_next_left_interaction:
+        if self._suppress_next_left_interaction or self._dialog_open:
+            return
+        if self._mode == self._MODE_DYNAMIC_SYMBOL:
+            if self._active_symbol is None:
+                return
+            t_snap = self._snap_time(y)
+            try:
+                x_mm, _ = self._cursor_mm(x, y)
+                rpitch = self._x_mm_to_rpitch(x_mm)
+            except Exception:
+                rpitch = int(getattr(self._active_symbol, 'x_rpitch', 0) or 0)
+            self._active_symbol.time = float(max(0.0, t_snap))
+            self._active_symbol.x_rpitch = int(rpitch)
+            self._dragged_symbol = True
+            self._redraw()
             return
         if self._active_hairpin is None or self._active_handle is None:
             return
@@ -266,37 +260,42 @@ class DynamicTool(BaseTool):
 
     def on_left_drag_end(self, x: float, y: float) -> None:
         super().on_left_drag_end(x, y)
-        if self._active_hairpin is not None:
-            self._sync_symbols_on_new_connections(self._active_hairpin)
         self._clear_active_interaction()
 
     def on_left_click(self, x: float, y: float) -> None:
         super().on_left_click(x, y)
-        if self._suppress_next_left_interaction:
+        if self._suppress_next_left_interaction or self._dialog_open:
             return
-        # Check for click on a dynamic symbol rectangle — open edit dialog.
-        if self._editor is not None:
-            x_mm, y_mm = self._cursor_mm(x, y)
-            hp, _hp_type, handle = self._editor.hit_test_dynamic_symbol_mm(x_mm, y_mm)
-            if hp is not None and handle in ('start', 'end'):
-                self._set_hairpin_text_via_dialog(hp, str(handle))
+        if self._mode == self._MODE_DYNAMIC_SYMBOL:
+            if self._editor is None:
                 return
-        # Snapshot is handled by the editor after this call; just clear state.
+            x_mm, y_mm = self._cursor_mm(x, y)
+            symbol_ev, _sym_type, _ = self._editor.hit_test_dynamic_symbol_mm(x_mm, y_mm)
+            if symbol_ev is not None and not self._dragged_symbol:
+                glyph, ok = self._select_dynamic_symbol(str(getattr(symbol_ev, 'symbol', '') or ''))
+                if ok:
+                    symbol_ev.symbol = str(glyph or '')
+                    self._redraw()
+                return
+
+            if symbol_ev is None:
+                glyph, ok = self._select_dynamic_symbol('')
+                if not ok:
+                    return
+                created = self._create_dynamic_symbol(x, y, glyph)
+                if created is not None:
+                    self._redraw()
+            return
+
+        # Hairpin modes
         self._created_on_press = False
         self._clear_active_interaction()
 
     def on_left_double_click(self, x: float, y: float) -> None:
         super().on_left_double_click(x, y)
-        if self._suppress_next_left_interaction:
-            return
-        if self._editor is None:
-            return
-        self._editor.draw_frame()
-        x_mm, y_mm = self._cursor_mm(x, y)
-        hp, _hp_type, handle = self._editor.hit_test_hairpin_mm(x_mm, y_mm)
-        if hp is None or handle not in ('start', 'end'):
-            return
-        self._set_hairpin_text_via_dialog(hp, str(handle))
+        # Dynamic symbol dialog is opened from left-click only.
+        # Ignoring canvas double-click avoids duplicate dialogs.
+        return
 
     def on_left_unpress(self, x: float, y: float) -> None:
         super().on_left_unpress(x, y)
@@ -310,6 +309,15 @@ class DynamicTool(BaseTool):
             return
         self._editor.draw_frame()
         x_mm, y_mm = self._cursor_mm(x, y)
+
+        if self._mode == self._MODE_DYNAMIC_SYMBOL:
+            sym, _sym_type, _ = self._editor.hit_test_dynamic_symbol_mm(x_mm, y_mm)
+            if sym is None:
+                return
+            self._delete_dynamic_symbol(sym)
+            self._redraw()
+            return
+
         hp, hp_type, _handle = self._editor.hit_test_hairpin_mm(x_mm, y_mm)
         if hp is None:
             return
@@ -327,7 +335,6 @@ class DynamicTool(BaseTool):
                 e for e in (score.events.decrescendo or [])
                 if int(getattr(e, '_id', -2) or -2) != hp_id
             ]
-        self._editor._snapshot_if_changed(coalesce=False, label='hairpin_delete')
         self._redraw()
 
     def on_mouse_move(self, x: float, y: float) -> None:

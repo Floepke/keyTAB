@@ -452,15 +452,13 @@ class Editor(QtCore.QObject,
         r = self.hit_test_hit_rect(float(x_mm), float(y_mm), 'dynamic_symbol')
         if r is None:
             return (None, None, None)
-        hp_id = int(r['_id'])
-        hp_type = str(r.get('htype', ''))
-        handle = str(r.get('handle', ''))
+        symbol_id = int(r['_id'])
         score = self.current_score()
         if score is None:
             return (None, None, None)
-        for ev in (getattr(score.events, hp_type, []) or []):
-            if int(getattr(ev, '_id', -1) or -1) == hp_id:
-                return (ev, hp_type, handle)
+        for ev in (getattr(score.events, 'dynamic_symbol', []) or []):
+            if int(getattr(ev, '_id', -1) or -1) == symbol_id:
+                return (ev, 'dynamic_symbol', '')
         return (None, None, None)
 
     def _calculate_layout(self, view_width_mm: float) -> None:

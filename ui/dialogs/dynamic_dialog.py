@@ -7,6 +7,51 @@ from PySide6 import QtCore, QtGui, QtWidgets
 from fonts import register_font_from_bytes
 
 
+class NoAutoActivateListWidget(QtWidgets.QListWidget):
+    """Custom list widget that prevents single-click auto-activation."""
+    
+    # Custom signal to ensure we control when double-click acceptance happens
+    itemDoubleClicked = QtCore.Signal(QtWidgets.QListWidgetItem)
+    
+    def __init__(self, parent: Optional[QtWidgets.QWidget] = None) -> None:
+        super().__init__(parent)
+    
+    def mousePressEvent(self, event: QtGui.QMouseEvent) -> None:
+        # Don't call super for single-click to prevent default behavior
+        if event.button() == QtCore.Qt.MouseButton.LeftButton:
+            item = self.itemAt(event.position().toPoint())
+            if item is not None:
+                self.setCurrentItem(item)
+            event.accept()
+            return
+        super().mousePressEvent(event)
+    
+    def mouseReleaseEvent(self, event: QtGui.QMouseEvent) -> None:
+        # Don't process single-click release
+        if event.button() == QtCore.Qt.MouseButton.LeftButton:
+            event.accept()
+            return
+        super().mouseReleaseEvent(event)
+    
+    def mouseDoubleClickEvent(self, event: QtGui.QMouseEvent) -> None:
+        # On double-click, select item and emit signal
+        if event.button() == QtCore.Qt.MouseButton.LeftButton:
+            item = self.itemAt(event.position().toPoint())
+            if item is not None:
+                self.setCurrentItem(item)
+                self.itemDoubleClicked.emit(item)
+            event.accept()
+            return
+        super().mouseDoubleClickEvent(event)
+    
+    def keyPressEvent(self, event: QtGui.QKeyEvent) -> None:
+        # Block Enter key to prevent auto-accepting
+        if event.key() in (QtCore.Qt.Key.Key_Return, QtCore.Qt.Key.Key_Enter):
+            event.ignore()
+            return
+        super().keyPressEvent(event)
+
+
 DYNAMIC_GLYPH_CHOICES: list[tuple[str, str]] = [
     ('pppppp', '\ue527'),
     ('ppppp', '\ue528'),
@@ -44,7 +89,7 @@ DYNAMIC_GLYPH_CHOICES: list[tuple[str, str]] = [
 class DynamicDialog(QtWidgets.QDialog):
     def __init__(self, parent: Optional[QtWidgets.QWidget] = None, current_value: str = '') -> None:
         super().__init__(parent)
-        self.setWindowTitle('Hairpin Dynamic Selection')
+        self.setWindowTitle('Dynamic Symbol Selection')
         self.setModal(True)
         self.setWindowModality(QtCore.Qt.WindowModality.WindowModal)
 
@@ -64,7 +109,7 @@ class DynamicDialog(QtWidgets.QDialog):
         info.setWordWrap(True)
         lay.addWidget(info)
 
-        self.grid = QtWidgets.QListWidget(self)
+        self.grid = NoAutoActivateListWidget(self)
         self.grid.setSelectionMode(QtWidgets.QAbstractItemView.SelectionMode.SingleSelection)
         self.grid.setViewMode(QtWidgets.QListView.ViewMode.IconMode)
         self.grid.setFlow(QtWidgets.QListView.Flow.LeftToRight)
@@ -76,6 +121,7 @@ class DynamicDialog(QtWidgets.QDialog):
         self.grid.setSpacing(8)
         self.grid.setVerticalScrollMode(QtWidgets.QAbstractItemView.ScrollMode.ScrollPerPixel)
         self.grid.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.grid.setFocusPolicy(QtCore.Qt.FocusPolicy.StrongFocus)  # Ensure grid can receive focus
 
         app_font = QtWidgets.QApplication.font()
         leland_family = register_font_from_bytes('LelandText') or 'LelandText'
@@ -136,9 +182,17 @@ class DynamicDialog(QtWidgets.QDialog):
         lay.addWidget(btns)
 
         self.grid.itemDoubleClicked.connect(lambda _item: self.accept())
-        self.grid.itemActivated.connect(lambda _item: self.accept())
 
-        QtCore.QTimer.singleShot(0, self.grid.setFocus)
+    def showEvent(self, event: QtGui.QShowEvent) -> None:
+        """Set focus to grid when dialog becomes visible."""
+        super().showEvent(event)
+        self.activateWindow()
+        self.raise_()
+        self.grid.setFocus()
+
+    def hideEvent(self, event: QtGui.QHideEvent) -> None:
+        """Clean up when dialog hides."""
+        super().hideEvent(event)
 
     def selected_glyph(self) -> str:
         item = self.grid.currentItem()
@@ -153,6 +207,8 @@ class DynamicDialog(QtWidgets.QDialog):
         current_value: str = '',
     ) -> tuple[str, bool]:
         dlg = cls(parent=parent, current_value=current_value)
-        if dlg.exec() == int(QtWidgets.QDialog.DialogCode.Accepted):
+        dlg.show()  # Show dialog first
+        dlg.exec()  # Then run modal loop
+        if dlg.result() == int(QtWidgets.QDialog.DialogCode.Accepted):
             return dlg.selected_glyph(), True
         return '', False

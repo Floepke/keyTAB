@@ -39,6 +39,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
     texts = list(events.get('text', []) or [])
     crescendos = list(events.get('crescendo', []) or [])
     decrescendos = list(events.get('decrescendo', []) or [])
+    dynamic_symbols = list(events.get('dynamic_symbol', []) or [])
     start_repeats = list(events.get('start_repeat', []) or [])
     end_repeats = list(events.get('end_repeat', []) or [])
     double_bars = list(events.get('double_bar', []) or [])
@@ -181,8 +182,6 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
             'duration': dur,
             'end': t0 + dur,
             'x_rpitch': float(ev.get('x_rpitch', 0) or 0),
-            'start_text': str(ev.get('start_text', '') or ''),
-            'end_text': str(ev.get('end_text', '') or ''),
             'id': int(ev.get('_id', 0) or 0),
             'idx': int(idx),
         })
@@ -200,13 +199,25 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
             'duration': dur,
             'end': t0 + dur,
             'x_rpitch': float(ev.get('x_rpitch', 0) or 0),
-            'start_text': str(ev.get('start_text', '') or ''),
-            'end_text': str(ev.get('end_text', '') or ''),
             'id': int(ev.get('_id', 0) or 0),
             'idx': int(idx),
         })
     if norm_decrescendos:
         norm_decrescendos = sorted(norm_decrescendos, key=lambda m: float(m.get('time', 0.0) or 0.0))
+
+    norm_dynamic_symbols: list[dict] = []
+    for idx, ev in enumerate(dynamic_symbols):
+        if not isinstance(ev, dict):
+            continue
+        norm_dynamic_symbols.append({
+            'time': float(ev.get('time', 0.0) or 0.0),
+            'x_rpitch': float(ev.get('x_rpitch', 0) or 0),
+            'symbol': str(ev.get('symbol', '') or ''),
+            'id': int(ev.get('_id', 0) or 0),
+            'idx': int(idx),
+        })
+    if norm_dynamic_symbols:
+        norm_dynamic_symbols = sorted(norm_dynamic_symbols, key=lambda m: float(m.get('time', 0.0) or 0.0))
 
     norm_start_repeats: list[dict] = []
     for idx, ev in enumerate(start_repeats):
@@ -2132,6 +2143,16 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                         continue
                     line_texts.append(tx)
 
+            line_dynamic_symbols: list[dict] = []
+            if norm_dynamic_symbols:
+                line_start = float(line.get('time_start', 0.0) or 0.0)
+                line_end = float(line.get('time_end', 0.0) or 0.0)
+                for ds in norm_dynamic_symbols:
+                    t_time = float(ds.get('time', 0.0) or 0.0)
+                    if op_time.lt(t_time, float(line_start)) or op_time.ge(t_time, float(line_end)):
+                        continue
+                    line_dynamic_symbols.append(ds)
+
             line_crescendos: list[dict] = []
             if norm_crescendos:
                 line_start = float(line.get('time_start', 0.0) or 0.0)
@@ -2926,137 +2947,109 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
             if bool(layout.get('hairpin_visible', True)) and (line_crescendos or line_decrescendos):
                 hairpin_w = float(layout.get('hairpin_line_width_mm', 0.5) or 0.5) * scale
                 hairpin_spread = float(layout.get('hairpin_spread_mm', 5.0) or 5.0) * scale
-                text_size_pt = float(layout.get('hairpin_font_size_pt', 12.0) or 12.0)
-                text_gap = float(layout.get('hairpin_text_gap_mm', 1.2) or 1.2) * scale
-                dynamic_bg_pad = float(
-                    layout.get(
-                        'dynamic_symbol_background_padding_mm',
-                        layout.get('dynamic_symbol_background_padding', layout.get('dynamic_background_padding', layout.get('text_background_padding_mm', 0.5))),
-                    ) or 0.0
-                ) * scale
-                text_family = 'LelandText'
-                text_color = notation_color
-                eps = 1e-6
-                all_hairpins = list(norm_crescendos) + list(norm_decrescendos)
+                hairpin_gap = float(layout.get('hairpin_text_gap_mm', 5.0) or 5.0)
+                dynamic_symbol_font_size_pt = float(layout.get('dynamic_symbol_font_size_pt', 12.0) or 12.0)
+                dynamic_bg_pad = float(layout.get('dynamic_symbol_background_padding_mm', 0.5) or 0.5) * scale
 
-                def _text_w_mm(txt: str) -> float:
-                    if not txt:
-                        return 0.0
-                    try:
-                        _xb, _yb, w, _h = du._get_text_extents_mm(txt, text_family, text_size_pt, False, False)
-                        return float(max(0.0, w))
-                    except Exception:
-                        return max(1.0, (text_size_pt / 72.0) * 25.4)
+                def _get_dynamic_symbol_at_position(t: float, x_rpitch: int) -> dict | None:
+                    """Get dynamic symbol dimensions at given time and x_rpitch."""
+                    for ds in line_dynamic_symbols:
+                        ds_time = float(ds.get('time', 0.0) or 0.0)
+                        ds_rpitch = int(ds.get('x_rpitch', 0) or 0)
+                        
+                        # Check if symbol is at same time and x position
+                        if abs(ds_time - t) < 0.1 and ds_rpitch == x_rpitch:
+                            glyph = str(ds.get('symbol', '') or '')
+                            if not glyph:
+                                return None
+                            
+                            # Calculate glyph dimensions
+                            try:
+                                xb, yb, w, h = du._get_text_extents_mm(glyph, 'LelandText', dynamic_symbol_font_size_pt, False, False)
+                            except Exception:
+                                # Fallback dimensions
+                                w = max(1.0, (dynamic_symbol_font_size_pt / 72.0) * 25.4)
+                                h = max(1.0, (dynamic_symbol_font_size_pt / 72.0) * 25.4 * 0.8)
+                            
+                            return {
+                                'glyph': glyph,
+                                'width_mm': w + (2 * dynamic_bg_pad),
+                                'height_mm': h + (2 * dynamic_bg_pad),
+                            }
+                    
+                    return None
 
-                def _text_h_mm(txt: str) -> float:
-                    if not txt:
-                        return 0.0
-                    try:
-                        _xb, _yb, _w, h = du._get_text_extents_mm(txt, text_family, text_size_pt, False, False)
-                        return float(max(0.0, h))
-                    except Exception:
-                        return max(1.0, (text_size_pt / 72.0) * 25.4 * 0.8)
+                def _adjust_hairpin_for_symbols(
+                    t_start: float,
+                    t_end: float,
+                    x_rpitch: int,
+                    y0: float,
+                    y1: float,
+                    is_crescendo: bool,
+                    *,
+                    adjust_start: bool,
+                    adjust_end: bool,
+                ) -> tuple[float, float]:
+                    """Adjust hairpin y positions to avoid overlapping with dynamic symbols."""
+                    start_offset = 0.0
+                    end_offset = 0.0
 
-                def _draw_text_centered_at(xc_mm: float, yc_mm: float, txt: str, ev_id: int, ev_tags: list[str]) -> None:
-                    if not txt:
-                        return
-                    try:
-                        xb, yb, w, h = du._get_text_extents_mm(txt, text_family, text_size_pt, False, False)
-                    except Exception:
-                        xb, yb, w, h = 0.0, 0.0, _text_w_mm(txt), _text_h_mm(txt)
-                    bx = float(xc_mm) - (float(xb) + (float(w) * 0.5))
-                    by = float(yc_mm) - (float(yb) + (float(h) * 0.5))
+                    if adjust_start:
+                        symbol_at_start = _get_dynamic_symbol_at_position(t_start, x_rpitch)
+                        if symbol_at_start is not None:
+                            start_offset = (symbol_at_start['height_mm'] * 0.5) + hairpin_gap
 
-                    # Paper knockout behind dynamic symbols for readability.
-                    rx = bx + float(xb)
-                    ry = by + float(yb)
-                    du.add_rectangle(
-                        rx - dynamic_bg_pad,
-                        ry - dynamic_bg_pad,
-                        rx + float(w) + dynamic_bg_pad,
-                        ry + float(h) + dynamic_bg_pad,
-                        stroke_color=None,
-                        fill_color=paper_color,
-                        id=ev_id,
-                        tags=ev_tags + ['dynamic_text_bg'],
-                    )
+                    if adjust_end:
+                        symbol_at_end = _get_dynamic_symbol_at_position(t_end, x_rpitch)
+                        if symbol_at_end is not None:
+                            end_offset = (symbol_at_end['height_mm'] * 0.5) + hairpin_gap
 
-                    du.add_text(
-                        bx,
-                        by,
-                        txt,
-                        family=text_family,
-                        size_pt=text_size_pt,
-                        italic=False,
-                        bold=False,
-                        color=text_color,
-                        anchor=None,
-                        id=ev_id,
-                        tags=ev_tags,
-                    )
+                    # Both wedge types need the visible span shortened inward along time.
+                    visible_span = max(0.0, y1 - y0)
+                    min_visible_span = max(hairpin_w * 2.0, 0.5 * scale)
+                    max_inset = max(0.0, visible_span - min_visible_span)
+                    requested_inset = start_offset + end_offset
+                    if requested_inset > max_inset and requested_inset > 0.0:
+                        inset_scale = max_inset / requested_inset
+                        start_offset *= inset_scale
+                        end_offset *= inset_scale
+                    y0 += start_offset
+                    y1 -= end_offset
 
-                def _join_peers(hp: dict) -> tuple[list[dict], list[dict]]:
-                    x_rpitch = int(float(hp.get('x_rpitch', 0.0) or 0.0))
-                    t_start = float(hp.get('time', 0.0) or 0.0)
-                    t_end = float(hp.get('end', t_start) or t_start)
-                    end_join_peers = [
-                        peer for peer in all_hairpins
-                        if peer is not hp
-                        and int(float(peer.get('x_rpitch', 0.0) or 0.0)) == x_rpitch
-                        and abs(float(peer.get('time', 0.0) or 0.0) - t_end) <= eps
-                    ]
-                    start_join_peers = [
-                        peer for peer in all_hairpins
-                        if peer is not hp
-                        and int(float(peer.get('x_rpitch', 0.0) or 0.0)) == x_rpitch
-                        and abs(float(peer.get('end', float(peer.get('time', 0.0) or 0.0)) or 0.0) - t_start) <= eps
-                    ]
-                    return end_join_peers, start_join_peers
+                    return y0, y1
 
                 def _draw_hairpin(hp: dict, is_crescendo: bool) -> None:
                     t_start = float(hp.get('time', 0.0) or 0.0)
                     t_end = float(hp.get('end', t_start) or t_start)
-                    dur = max(1e-6, float(hp.get('duration', t_end - t_start) or (t_end - t_start)))
                     if t_end <= t_start:
                         return
 
-                    x_mm = rpitch_to_x(float(hp.get('x_rpitch', 0.0) or 0.0))
-                    y_start = _time_to_y(t_start)
-                    y_end = _time_to_y(t_end)
-                    y_span = max(1e-6, y_end - y_start)
-                    half_spread = hairpin_spread * 0.5
-
-                    start_text = str(hp.get('start_text', '') or '')
-                    end_text = str(hp.get('end_text', '') or '')
-                    end_join_peers, start_join_peers = _join_peers(hp)
-
-                    start_h = _text_h_mm(start_text)
-                    end_h = _text_h_mm(end_text)
-                    peer_start_h = max([_text_h_mm(str(peer.get('start_text', '') or '')) for peer in end_join_peers] or [0.0])
-                    peer_end_h = max([_text_h_mm(str(peer.get('end_text', '') or '')) for peer in start_join_peers] or [0.0])
-
-                    start_pad = ((start_h * 0.5) + text_gap) if start_text else 0.0
-                    end_pad = ((end_h * 0.5) + text_gap) if end_text else 0.0
-                    if start_join_peers and (start_h > 0.0 or peer_end_h > 0.0):
-                        start_pad = max(start_pad, text_gap + (max(start_h, peer_end_h) * 0.5))
-                    if end_join_peers and (end_h > 0.0 or peer_start_h > 0.0):
-                        end_pad = max(end_pad, text_gap + (max(end_h, peer_start_h) * 0.5))
-
-                    t_draw_start = t_start + (dur * (start_pad / y_span))
-                    t_draw_end = t_end - (dur * (end_pad / y_span))
-                    if t_draw_end <= t_draw_start:
-                        return
-
-                    seg_start = max(t_draw_start, float(line_start))
-                    seg_end = min(t_draw_end, float(line_end))
+                    seg_start = max(t_start, float(line_start))
+                    seg_end = min(t_end, float(line_end))
                     if seg_end <= seg_start:
                         return
 
-                    draw_dur = max(1e-6, t_draw_end - t_draw_start)
-                    prog0 = max(0.0, min(1.0, (seg_start - t_draw_start) / draw_dur))
-                    prog1 = max(0.0, min(1.0, (seg_end - t_draw_start) / draw_dur))
+                    dur = max(1e-6, t_end - t_start)
+                    prog0 = max(0.0, min(1.0, (seg_start - t_start) / dur))
+                    prog1 = max(0.0, min(1.0, (seg_end - t_start) / dur))
+
+                    x_mm = rpitch_to_x(float(hp.get('x_rpitch', 0.0) or 0.0))
                     y0 = _time_to_y(seg_start)
                     y1 = _time_to_y(seg_end)
+
+                    # Adjust hairpin position to avoid overlapping with dynamic symbols
+                    y0, y1 = _adjust_hairpin_for_symbols(
+                        t_start,
+                        t_end,
+                        int(hp.get('x_rpitch', 0) or 0),
+                        y0,
+                        y1,
+                        is_crescendo,
+                        adjust_start=abs(seg_start - t_start) <= 1e-6,
+                        adjust_end=abs(seg_end - t_end) <= 1e-6,
+                    )
+
+                    half_spread = hairpin_spread * 0.5
 
                     if is_crescendo:
                         half0 = half_spread * prog0
@@ -3091,16 +3084,64 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                         tags=tags,
                     )
 
-                    if start_text and (float(line_start) - eps) <= t_start < (float(line_end) + eps):
-                        _draw_text_centered_at(x_mm, y_start, start_text, hp_id, tags + [f"{tags[0]}_text"])
-                    if end_text and (float(line_start) - eps) <= t_end < (float(line_end) + eps):
-                        _draw_text_centered_at(x_mm, y_end, end_text, hp_id, tags + [f"{tags[0]}_text"])
-
                 for hp in line_crescendos:
                     _draw_hairpin(hp, True)
 
                 for hp in line_decrescendos:
                     _draw_hairpin(hp, False)
+
+            if line_dynamic_symbols:
+                text_size_pt = float(layout.get('dynamic_symbol_font_size_pt', 12.0) or 12.0)
+                dynamic_bg_pad = float(
+                    layout.get(
+                        'dynamic_symbol_background_padding_mm',
+                        layout.get('dynamic_symbol_background_padding', layout.get('dynamic_background_padding', layout.get('text_background_padding_mm', 0.5))),
+                    ) or 0.0
+                ) * scale
+                text_family = 'LelandText'
+                text_color = notation_color
+
+                for ds in line_dynamic_symbols:
+                    symbol = str(ds.get('symbol', '') or '')
+                    if not symbol:
+                        continue
+                    t_time = float(ds.get('time', 0.0) or 0.0)
+                    x_mm = rpitch_to_x(float(ds.get('x_rpitch', 0.0) or 0.0))
+                    y_mm = _time_to_y(t_time)
+
+                    try:
+                        xb, yb, w, h = du._get_text_extents_mm(symbol, text_family, text_size_pt, False, False)
+                    except Exception:
+                        xb, yb, w, h = 0.0, 0.0, max(1.0, (text_size_pt / 72.0) * 25.4), max(1.0, (text_size_pt / 72.0) * 25.4 * 0.8)
+
+                    bx = float(x_mm) - (float(xb) + (float(w) * 0.5))
+                    by = float(y_mm) - (float(yb) + (float(h) * 0.5))
+                    rx = bx + float(xb)
+                    ry = by + float(yb)
+
+                    du.add_rectangle(
+                        rx - dynamic_bg_pad,
+                        ry - dynamic_bg_pad,
+                        rx + float(w) + dynamic_bg_pad,
+                        ry + float(h) + dynamic_bg_pad,
+                        stroke_color=None,
+                        fill_color=paper_color,
+                        id=int(ds.get('id', 0) or 0),
+                        tags=['dynamic_symbol_bg_top'],
+                    )
+                    du.add_text(
+                        bx,
+                        by,
+                        symbol,
+                        family=text_family,
+                        size_pt=text_size_pt,
+                        italic=False,
+                        bold=False,
+                        color=text_color,
+                        anchor=None,
+                        id=int(ds.get('id', 0) or 0),
+                        tags=['dynamic_symbol_text_top'],
+                    )
 
             if bool(layout.get('text_visible', True)) and line_texts:
                 default_font = layout.get('font_text', {}) or {}

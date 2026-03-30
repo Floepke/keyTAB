@@ -24,6 +24,7 @@ from file_model.events.grid_band import GridBand
 from file_model.events.arpeggio import Arpeggio
 from file_model.events.crescendo import Crescendo
 from file_model.events.decrescendo import Decrescendo
+from file_model.events.dynamic import DynamicSymbol
 from file_model.layout import Layout, LayoutFont
 from file_model.info import Info
 from file_model.analysis import Analysis
@@ -74,6 +75,7 @@ class Events:
 	arpeggio: List[Arpeggio] = field(default_factory=list)
 	crescendo: List[Crescendo] = field(default_factory=list)
 	decrescendo: List[Decrescendo] = field(default_factory=list)
+	dynamic_symbol: List[DynamicSymbol] = field(default_factory=list)
 
 
 def _defaults_for(dc_type):
@@ -312,17 +314,24 @@ class SCORE:
 		return obj
 
 	def new_crescendo(self, **kwargs) -> Crescendo:
-		base = {'time': 0.0, 'duration': 256.0, 'x_rpitch': 0, 'start_text': '', 'end_text': ''}
+		base = {'time': 0.0, 'duration': 256.0, 'x_rpitch': 0}
 		base.update(kwargs)
 		obj = Crescendo(**base, _id=self._gen_id())
 		self.events.crescendo.append(obj)
 		return obj
 
 	def new_decrescendo(self, **kwargs) -> Decrescendo:
-		base = {'time': 0.0, 'duration': 256.0, 'x_rpitch': 0, 'start_text': '', 'end_text': ''}
+		base = {'time': 0.0, 'duration': 256.0, 'x_rpitch': 0}
 		base.update(kwargs)
 		obj = Decrescendo(**base, _id=self._gen_id())
 		self.events.decrescendo.append(obj)
+		return obj
+
+	def new_dynamic_symbol(self, **kwargs) -> DynamicSymbol:
+		base = {'time': 0.0, 'x_rpitch': 0, 'symbol': ''}
+		base.update(kwargs)
+		obj = DynamicSymbol(**base, _id=self._gen_id())
+		self.events.dynamic_symbol.append(obj)
 		return obj
 
 	# ---- Dict conversion ----
