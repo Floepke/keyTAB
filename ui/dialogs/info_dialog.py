@@ -29,9 +29,23 @@ class InfoDialog(QtWidgets.QDialog):
         self._lyricist_edit = QtWidgets.QLineEdit(self)
         self._comment_edit = QtWidgets.QPlainTextEdit(self)
         self._comment_edit.setMinimumHeight(90)
+
+        self._copyright_btn = QtWidgets.QPushButton("©", self)
+        self._copyright_btn.setFixedWidth(28)
+        self._copyright_btn.setFixedHeight(self._copyright_edit.sizeHint().height())
+        self._copyright_btn.setFocusPolicy(QtCore.Qt.FocusPolicy.NoFocus)
+        self._copyright_btn.setToolTip("Insert © symbol at cursor")
+        self._copyright_btn.clicked.connect(self._insert_copyright_symbol)
+        copyright_row = QtWidgets.QWidget(self)
+        copyright_hl = QtWidgets.QHBoxLayout(copyright_row)
+        copyright_hl.setContentsMargins(0, 0, 0, 0)
+        copyright_hl.setSpacing(4)
+        copyright_hl.addWidget(self._copyright_edit)
+        copyright_hl.addWidget(self._copyright_btn)
+
         info_form.addRow("Title:", self._title_edit)
         info_form.addRow("Composer:", self._composer_edit)
-        info_form.addRow("Copyright:", self._copyright_edit)
+        info_form.addRow("Copyright:", copyright_row)
         info_form.addRow("Arranger:", self._arranger_edit)
         info_form.addRow("Lyricist:", self._lyricist_edit)
         info_form.addRow("Comment:", self._comment_edit)
@@ -128,3 +142,7 @@ class InfoDialog(QtWidgets.QDialog):
         info.arranger = str(self._arranger_edit.text())
         info.lyricist = str(self._lyricist_edit.text())
         info.comment = str(self._comment_edit.toPlainText())
+
+    def _insert_copyright_symbol(self) -> None:
+        self._copyright_edit.insert("©")
+        self._copyright_edit.setFocus()
