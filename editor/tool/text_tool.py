@@ -5,7 +5,7 @@ from typing import Optional, Tuple
 
 from PySide6 import QtWidgets, QtCore
 
-from ui.dialogs.style_dialog import FontPicker, FloatSliderEdit
+from ui.dialogs.text_dialog import TextDialog
 
 from editor.tool.base_tool import BaseTool
 from file_model.SCORE import SCORE
@@ -334,78 +334,11 @@ class TextTool(BaseTool):
             return
         score = self._score()
         default_font = getattr(score.layout, 'font_text', None) if score is not None else None
-        cur_font_raw = getattr(ev, 'font', None)
-        cur_font = self._coerce_font(cur_font_raw, default_font)
-        # If using default, show default in picker; if custom, use event font
-        if not bool(getattr(ev, 'use_custom_font', False)):
-            cur_font = deepcopy(self._coerce_font(default_font, default_font))
-
-        dlg = QtWidgets.QDialog(QtWidgets.QApplication.activeWindow())
-        dlg.setWindowTitle("Edit Text")
-        layout = QtWidgets.QFormLayout(dlg)
-
-        txt_edit = QtWidgets.QLineEdit(dlg)
-        txt_edit.setText(str(getattr(ev, 'text', '')))
-        layout.addRow("Text", txt_edit)
-
-        x_off_edit = FloatSliderEdit(float(getattr(ev, 'x_offset_mm', 0.0) or 0.0), -25.0, 25.0, 0.1, dlg)
-        y_off_edit = FloatSliderEdit(float(getattr(ev, 'y_offset_mm', 0.0) or 0.0), -25.0, 25.0, 0.1, dlg)
-        width_corr_edit = FloatSliderEdit(float(getattr(ev, 'text_background_width_offset_mm', 0.0) or 0.0), -20.0, 20.0, 0.05, dlg)
-        width_corr_row = QtWidgets.QWidget(dlg)
-        width_corr_row_layout = QtWidgets.QHBoxLayout(width_corr_row)
-        width_corr_row_layout.setContentsMargins(0, 0, 0, 0)
-        width_corr_row_layout.addWidget(width_corr_edit)
-        rot_edit = FloatSliderEdit(float(getattr(ev, 'rotation', 0.0) or 0.0), 0.0, 360.0, 0.1, dlg)
-        layout.addRow("X offset (mm)", x_off_edit)
-        layout.addRow("Y offset (mm)", y_off_edit)
-        layout.addRow("Background width offset (mm)", width_corr_row)
-        layout.addRow("Rotation (degrees)", rot_edit)
-
-        use_custom_chk = QtWidgets.QCheckBox("Use custom font", dlg)
-        use_custom_chk.setChecked(bool(getattr(ev, 'use_custom_font', False)))
-        layout.addRow(use_custom_chk)
-
-        font_picker = FontPicker(cur_font, parent=dlg)
-        layout.addRow(font_picker)
-
-        def toggle_custom(state: bool):
-            font_picker.setVisible(state)
-            if not state:
-                font_picker.set_value(default_font or LayoutFont())
-
-        use_custom_chk.toggled.connect(toggle_custom)
-        toggle_custom(use_custom_chk.isChecked())
-
-        btns = QtWidgets.QDialogButtonBox(QtWidgets.QDialogButtonBox.Ok | QtWidgets.QDialogButtonBox.Cancel, parent=dlg)
-        layout.addRow(btns)
-        btns.accepted.connect(dlg.accept)
-        btns.rejected.connect(dlg.reject)
-
-        original_state = {
-            'text': getattr(ev, 'text', ''),
-            'use_custom_font': bool(getattr(ev, 'use_custom_font', False)),
-            'font': deepcopy(getattr(ev, 'font', None)),
-            'text_background_width_offset_mm': float(getattr(ev, 'text_background_width_offset_mm', 0.0) or 0.0),
-            'x_offset_mm': float(getattr(ev, 'x_offset_mm', 0.0) or 0.0),
-            'y_offset_mm': float(getattr(ev, 'y_offset_mm', 0.0) or 0.0),
-            'rotation': float(getattr(ev, 'rotation', 0.0) or 0.0),
-        }
+        dlg = TextDialog(ev, default_font, parent=QtWidgets.QApplication.activeWindow())
+        original_state = TextDialog.snapshot_from_event(ev)
 
         def _apply_live(commit_snapshot: bool = False) -> None:
-            if bool(use_custom_chk.isChecked()):
-                ev.use_custom_font = True
-                ev.font = deepcopy(font_picker.value())
-            else:
-                ev.use_custom_font = False
-                ev.font = deepcopy(default_font or LayoutFont())
-            ev.text_background_width_offset_mm = float(width_corr_edit.value())
-            ev.text = txt_edit.text()
-            ev.x_offset_mm = float(x_off_edit.value())
-            ev.y_offset_mm = float(y_off_edit.value())
-            try:
-                ev.rotation = float(rot_edit.value())
-            except Exception:
-                pass
+            dlg.apply_to_event(ev)
             if commit_snapshot:
                 try:
                     self._editor._snapshot_if_changed(coalesce=False, label='text_edit')
@@ -418,24 +351,12 @@ class TextTool(BaseTool):
 
         def _revert_state() -> None:
             try:
-                ev.text = original_state['text']
-                ev.use_custom_font = original_state['use_custom_font']
-                ev.font = deepcopy(original_state['font'])
-                ev.text_background_width_offset_mm = float(original_state['text_background_width_offset_mm'])
-                ev.x_offset_mm = float(original_state['x_offset_mm'])
-                ev.y_offset_mm = float(original_state['y_offset_mm'])
-                ev.rotation = float(original_state['rotation'])
+                TextDialog.restore_event(ev, original_state)
             except Exception:
                 pass
             self._schedule_preview()
 
-        txt_edit.textChanged.connect(lambda _t: _apply_live(False))
-        x_off_edit.valueChanged.connect(lambda _v: _apply_live(False))
-        y_off_edit.valueChanged.connect(lambda _v: _apply_live(False))
-        rot_edit.valueChanged.connect(lambda _v: _apply_live(False))
-        use_custom_chk.toggled.connect(lambda _v: _apply_live(False))
-        font_picker.valueChanged.connect(lambda: _apply_live(False))
-        width_corr_edit.valueChanged.connect(lambda _v: _apply_live(False))
+        dlg.valueChanged.connect(lambda: _apply_live(False))
 
         dlg.accepted.connect(_apply)
         dlg.raise_()
