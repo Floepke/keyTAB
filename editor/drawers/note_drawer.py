@@ -153,23 +153,13 @@ class NoteDrawerMixin:
             id=n._id,
             tags=["midi_note"],
         )
-        # Register a clickable rectangle covering the main midinote body
+        # Register a clickable rectangle covering the full note (notehead top to note end).
+        # Sub-zone detection (notehead vs body) is handled in note_tool by comparing
+        # cursor Y against note_start_mm + 2*semitone_dist.
         x_left = x - max(w, head_half_w)
         x_right = x + max(w, head_half_w)
-        # Include full notehead bounds so border clicks are reliably detected.
-        # For short durations, the body can be smaller than the head, so use a union.
-        y_head_top = y1
-        y_head_bottom = y1 + (w * 2.0)
-        y_body_bottom = y2 - w
-        hit_pad = max(0.05, w * 0.08)
-        y_top = min(y_head_top, y_body_bottom) - hit_pad
-        y_bottom = max(y_head_bottom, y_body_bottom) + hit_pad
-        x_left -= hit_pad
-        x_right += hit_pad
-        if x_left > x_right:
-            x_left, x_right = x_right, x_left
-        if y_top > y_bottom:
-            y_top, y_bottom = y_bottom, y_top
+        y_top = y1           # top of notehead
+        y_bottom = y2        # actual end of note polygon
         rect_id = int(getattr(n, '_id', 0) or 0)
         self.register_hit_rect('note', rect_id, float(x_left), float(y_top), float(x_right), float(y_bottom))
 

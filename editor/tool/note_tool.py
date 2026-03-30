@@ -518,8 +518,9 @@ class NoteTool(BaseTool):
                 self._press_start_time = float(t_press_snap)
             self._duration_edit_armed = False
             if hit_rect is not None:
+                note_start_mm = float(self._editor.time_to_mm(float(getattr(found, 'time', 0.0) or 0.0)))
                 notehead_len_mm = float(getattr(self._editor, 'semitone_dist', 0.0) or 0.0) * 2.0
-                notehead_end_mm = float(hit_rect.get('y1', 0.0) or 0.0) + notehead_len_mm
+                notehead_end_mm = note_start_mm + notehead_len_mm
                 self._move_pitch_time_mode = bool(notehead_len_mm > 0.0 and y_mm_abs <= notehead_end_mm)
         else:
             # Create a new note at the snapped press time with minimum duration = snap size

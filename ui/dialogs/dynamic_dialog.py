@@ -44,7 +44,7 @@ DYNAMIC_GLYPH_CHOICES: list[tuple[str, str]] = [
 class DynamicDialog(QtWidgets.QDialog):
     def __init__(self, parent: Optional[QtWidgets.QWidget] = None, current_value: str = '') -> None:
         super().__init__(parent)
-        self.setWindowTitle('Hairpin Dynamic Direction')
+        self.setWindowTitle('Hairpin Dynamic Selection')
         self.setModal(True)
         self.setWindowModality(QtCore.Qt.WindowModality.WindowModal)
 
