@@ -9,7 +9,7 @@ from datetime import datetime
 
 from PySide6.QtWidgets import QFileDialog, QMessageBox, QWidget
 
-from file_model.SCORE import SCORE, MetaData
+from file_model.SCORE import SCORE, MetaData, _merge_with_defaults
 from file_model.info import Info
 from file_model.analysis import Analysis
 from file_model.base_grid import BaseGrid
@@ -106,51 +106,30 @@ class FileManager:
                 comment=comment,
             )
 
-        try:
-            layout_data = data.get('layout')
-            if isinstance(layout_data, dict):
-                if 'hairpin_font_size_pt' not in layout_data and 'hairpin_text_size_pt' in layout_data:
-                    layout_data = dict(layout_data)
-                    layout_data['hairpin_font_size_pt'] = layout_data.get('hairpin_text_size_pt')
-                score.layout = Layout(**layout_data)
-        except Exception:
-            pass
-        try:
-            score.info = _build_info(data.get('info', {}) if isinstance(data.get('info', {}), dict) else {})
-        except Exception:
-            pass
-        try:
-            editor_data = data.get('editor')
-            if isinstance(editor_data, dict) and 'zoom_mm_per_quarter' in editor_data:
-                try:
-                    score.app_state.zoom_mm_per_quarter = float(editor_data.get('zoom_mm_per_quarter'))
-                except Exception:
-                    pass
-        except Exception:
-            pass
-        try:
-            app_state_data = data.get('app_state')
-            if isinstance(app_state_data, dict):
-                try:
-                    allowed = {f.name for f in fields(AppState)}
-                    filtered = {k: v for k, v in app_state_data.items() if k in allowed}
-                    score.app_state = AppState(**filtered)
-                except Exception:
-                    score.app_state = AppState()
-        except Exception:
-            pass
-        try:
-            meta_data = data.get('meta_data')
-            if isinstance(meta_data, dict):
-                score.meta_data = MetaData(**meta_data)
-        except Exception:
-            pass
-        try:
-            base_grid = data.get('base_grid')
-            if isinstance(base_grid, list):
-                score.base_grid = [BaseGrid(**bg) if isinstance(bg, dict) else BaseGrid() for bg in base_grid]
-        except Exception:
-            pass
+        layout_data = data.get('layout')
+        if isinstance(layout_data, dict):
+            if 'hairpin_font_size_pt' not in layout_data and 'hairpin_text_size_pt' in layout_data:
+                layout_data = dict(layout_data)
+                layout_data['hairpin_font_size_pt'] = layout_data.get('hairpin_text_size_pt')
+            score.layout = Layout(**_merge_with_defaults(Layout, layout_data, 'layout'))
+        score.info = _build_info(data.get('info', {}) if isinstance(data.get('info', {}), dict) else {})
+        editor_data = data.get('editor')
+        if isinstance(editor_data, dict) and 'zoom_mm_per_quarter' in editor_data:
+            score.app_state.zoom_mm_per_quarter = float(editor_data.get('zoom_mm_per_quarter'))
+        app_state_data = data.get('app_state')
+        if isinstance(app_state_data, dict):
+            try:
+                allowed = {f.name for f in fields(AppState)}
+                filtered = {k: v for k, v in app_state_data.items() if k in allowed}
+                score.app_state = AppState(**filtered)
+            except Exception:
+                score.app_state = AppState()
+        meta_data = data.get('meta_data')
+        if isinstance(meta_data, dict):
+            score.meta_data = MetaData(**meta_data)
+        base_grid = data.get('base_grid')
+        if isinstance(base_grid, list):
+            score.base_grid = [BaseGrid(**bg) if isinstance(bg, dict) else BaseGrid() for bg in base_grid]
 
     def replace_current(self, new_score: SCORE) -> None:
         """Replace the current SCORE instance (used by undo/redo)."""

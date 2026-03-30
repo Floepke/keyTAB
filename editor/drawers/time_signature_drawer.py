@@ -45,8 +45,8 @@ class TimeSignatureDrawerMixin:
         klav_family = str(getattr(self, '_ts_cached_klav_family', None) or _resolve_font_family(klav_font))
         classic_size = 25.0
         klav_size = 15.0
-        guide_width_mm = float(getattr(layout, 'time_signature_indicator_guide_thickness_mm', 0.5) or 0.5)
-        divider_width_mm = float(getattr(layout, 'time_signature_indicator_divide_guide_thickness_mm', 1.0) or 1.0)
+        guide_width_mm = float(getattr(layout, 'time_signature_indicator_guide_thickness_mm', 0.5) or 0.5) * float(getattr(layout, 'scale', 1.0) or 1.0)
+        divider_width_mm = float(getattr(layout, 'time_signature_indicator_divide_guide_thickness_mm', 1.0) or 1.0) * float(getattr(layout, 'scale', 1.0) or 1.0)
 
         # Shared layout metrics
         margin = float(self.margin or 0.0)

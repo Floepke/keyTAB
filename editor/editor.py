@@ -36,8 +36,7 @@ from editor.drawers.beam_drawer import BeamDrawerMixin
 from editor.drawers.pedal_drawer import PedalDrawerMixin
 from editor.drawers.text_drawer import TextDrawerMixin
 from editor.drawers.slur_drawer import SlurDrawerMixin
-from editor.drawers.start_repeat_drawer import StartRepeatDrawerMixin
-from editor.drawers.end_repeat_drawer import EndRepeatDrawerMixin
+from editor.drawers.repeat_drawer import RepeatDrawerMixin
 from editor.drawers.double_bar_drawer import DoubleBarDrawerMixin
 from editor.drawers.count_line_drawer import CountLineDrawerMixin
 from editor.drawers.line_break_drawer import LineBreakDrawerMixin
@@ -71,8 +70,7 @@ class Editor(QtCore.QObject,
              DynamicDrawerMixin,
              CrescendoDrawerMixin,
              DecrescendoDrawerMixin,
-             StartRepeatDrawerMixin,
-             EndRepeatDrawerMixin,
+             RepeatDrawerMixin,
              DoubleBarDrawerMixin,
              CountLineDrawerMixin,
              LineBreakDrawerMixin,

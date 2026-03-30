@@ -17,7 +17,7 @@ class BarlineTool(BaseTool):
 
     def __init__(self) -> None:
         super().__init__()
-        self._mode: str = self._MODE_DOUBLE
+        self._mode: str = self._MODE_START
 
     def toolbar_spec(self) -> list[dict]:
         return [

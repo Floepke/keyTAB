@@ -1103,7 +1103,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                 origin = float(key_positions.get(bound_left, 0.0))
                 note_offset = float(key_positions.get(min_pitch, origin)) - origin
                 offset_left = note_offset - stem_len_mm
-                ts_lane_gap_mm = semitone_mm * .5  # Minimum gap between indicator lane and notes
+                ts_lane_gap_mm = semitone_mm  # Minimum gap between indicator lane and notes/beam stems
                 ts_lane_right_offset = min(0.0, float(offset_left - ts_lane_gap_mm))
         # Keep user-defined margins: do not expand margin_left for the indicator lane.
         line['margin_left'] = base_margin_left
@@ -1484,12 +1484,13 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                 beat_len_ticks = measure_len_ticks / max(1.0, float(numerator))
 
                 op = Operator(float(SHORTEST_DURATION))
-                # Column positions: left (group count), middle (beat count), right (guides)
-                base_x = ts_x_mid
-                col_gap = 5.0 * scale
-                x_mid = base_x
-                x_right = base_x + (10.0 * scale)
-                x_left = base_x - col_gap
+                # Column positions driven by the equally-spaced lane thirds.
+                # Right column: guide lines (also aligns with the classical indicator).
+                # Middle column: beat numbers.
+                # Left column: group numbers.
+                x_right = ts_x_right
+                x_mid = ts_x_mid
+                x_left = ts_x_left
 
                 grid_bar_off, grid_off = resolve_grid_layer_offsets(
                     [float(v) for v in (grid_positions or []) if isinstance(v, (int, float))],
@@ -1590,7 +1591,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                 for gi, s in zip(group_values, group_starts):
                     y = y_mm + (s - 1) * beat_len_mm
                     du.add_text(
-                        x_left - (2.0 * scale),
+                        x_left,
                         y,
                         str(gi),
                         size_pt=klav_size_pt,
@@ -2228,7 +2229,6 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
             text_h_mm = size_pt * mm_per_pt
             measure_pad = 1.5
             measure_symbol_anchor: dict[float, tuple[float, float, float]] = {}
-            measure_number_y_nudge = max(0.4, 0.9 * scale)
             measure_symbol_default_right_x = float(grid_right + measure_pad * 2.0)
 
             def _note_x_range(it: dict, include_stem: bool) -> tuple[float, float]:
@@ -2281,7 +2281,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                 text_w_mm = max(1.0, text_h_mm * 0.6 * len(num_txt))
                 t0 = m_start
                 t1 = min(float(line['time_end']), m_start + (text_h_mm * tick_per_mm))
-                y_text = _time_to_y(t0) + 1.0 + measure_number_y_nudge
+                y_text = _time_to_y(t0) + 1.0
 
                 # Default outside-right; only move further right on collision
                 base_right = grid_right + measure_pad
@@ -2335,44 +2335,34 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                 )
                 measure_symbol_default_right_x = float(x_pos + text_w_mm)
 
-            symbol_width = max(3.0, semitone_mm * 2.8)
+            symbol_width = max(3.0, semitone_mm * 4.0)
             symbol_gap = max(0.6, semitone_mm * 0.35)
             symbol_thin_w = max(0.15, bar_width_mm * 0.9)
-            symbol_thick_w = max(0.2, semitone_mm * 0.24)
+            symbol_thick_w = max(0.1, bar_width_mm)
             symbol_dot_d = max(1.0, semitone_mm * 0.6)
-            symbol_dot_y = max(0.8, semitone_mm * 0.55)
+            # Minimum clear gap between the outer edge of the horizontal line
+            # and the nearest edge of a dot. Increase to space dots further out.
+            dot_line_gap = semitone_mm
+            # dot center must be at least line_half + gap + dot_radius away from y_rep
+            symbol_dot_y = max(
+                max(0.8, semitone_mm * 0.55),
+                symbol_thick_w / 2.0 + dot_line_gap + symbol_dot_d / 2.0,
+            )
 
-            def _symbol_right_x(rep_t: float) -> float:
+            def _symbol_left_x(rep_t: float) -> float:
                 key = round(float(rep_t), 6)
                 anchored = measure_symbol_anchor.get(key)
                 if anchored is not None:
                     x_num, w_num, _y_num = anchored
-                    return float(x_num + w_num)
-                return float(measure_symbol_default_right_x)
-
-            def _symbol_y(rep_t: float, kind: str) -> float:
-                if kind not in ('start', 'end'):
-                    return _time_to_y(rep_t)
-                key = round(float(rep_t), 6)
-                anchored = measure_symbol_anchor.get(key)
-                if anchored is None:
-                    y_base = _time_to_y(rep_t)
-                    # Keep original placement behavior, but ensure end-repeat symbols
-                    # at system bottoms use the same vertical offset as other end repeats.
-                    if kind == 'end':
-                        sep = max(0.2, 0.2 * scale)
-                        return float(y_base)
-                    return y_base
-                _x_num, _w_num, y_num = anchored
-                sep = max(0.2, 0.2 * scale)
-                return float(y_num - (symbol_dot_y + (symbol_dot_d * 0.5) + sep))
+                    return float(x_num + w_num + symbol_gap)
+                return float(measure_symbol_default_right_x + symbol_gap)
 
             def _draw_repeat_symbol(rep_t: float, ev_id: int, kind: str) -> None:
                 if op_time.lt(rep_t, float(line['time_start'])) or op_time.gt(rep_t, float(line['time_end'])):
                     return
-                y_rep = _symbol_y(rep_t, kind)
-                x_right = _symbol_right_x(rep_t)
-                x_left = x_right - symbol_width
+                y_rep = float(_time_to_y(rep_t))
+                x_left = _symbol_left_x(rep_t)
+                x_right = x_left + symbol_width
                 dot_x1 = x_left + (symbol_width * 0.25)
                 dot_x2 = x_left + (symbol_width * 0.75)
                 if kind == 'start':

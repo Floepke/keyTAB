@@ -6,17 +6,24 @@ if TYPE_CHECKING:
     from editor.editor import Editor
 
 
-class StartRepeatDrawerMixin:
-    def draw_start_repeat(self, du: DrawUtil) -> None:
+class RepeatDrawerMixin:
+    def _draw_repeat(self, du: DrawUtil, kind: str) -> None:
+        """Draw start or end repeat symbols.
+
+        kind: 'start' — dots below the horizontal line
+              'end'   — dots above the horizontal line
+        """
         self = cast("Editor", self)
         score = self.current_score()
         if score is None:
             return
         layout = getattr(score, 'layout', None)
-        if layout is None or not bool(getattr(layout, 'repeat_start_visible', True)):
+        visibility_key = 'repeat_start_visible' if kind == 'start' else 'repeat_end_visible'
+        if layout is None or not bool(getattr(layout, visibility_key, True)):
             return
 
-        events = list(getattr(score.events, 'start_repeat', []) or [])
+        event_attr = 'start_repeat' if kind == 'start' else 'end_repeat'
+        events = list(getattr(score.events, event_attr, []) or [])
         if not events:
             return
 
@@ -30,11 +37,18 @@ class StartRepeatDrawerMixin:
         ext_len = max(4.0, semitone_dx * 2.4)
         x_left = x_stave_right
         x_right = x_left + ext_len
-        thick_w = max(0.2, semitone_dx * 0.24)
+        style_scale = float(getattr(layout, 'scale', 1.0) or 1.0)
+        bar_width_mm = float(getattr(layout, 'grid_barline_thickness_mm', 0.25) or 0.25) * style_scale
+        thick_w = max(0.1, bar_width_mm)
         dot_d = max(1.0, semitone_dx * 0.6)
+        # Dot center is semitone_dist away from the outer edge of the line.
+        dot_y = thick_w / 2.0 + semitone_dx + dot_d / 2.0
         dot_x1 = x_left + (ext_len / 3.0)
         dot_x2 = x_left + ((2.0 * ext_len) / 3.0)
-        dot_y = max(0.8, semitone_dx * 0.55)
+
+        line_tag = 'start_repeat' if kind == 'start' else 'end_repeat'
+        dot_tag = 'start_repeat_dot' if kind == 'start' else 'end_repeat_dot'
+        dot_sign = 1.0 if kind == 'start' else -1.0
 
         for ev in events:
             try:
@@ -46,8 +60,6 @@ class StartRepeatDrawerMixin:
             if y < (top_mm - bleed_mm) or y > (bottom_mm + bleed_mm):
                 continue
 
-            # Vertical timeline orientation: start-repeat is a thicker barline extension
-            # on the right side, with two side-by-side dots below it.
             du.add_line(
                 x_left,
                 y,
@@ -56,16 +68,23 @@ class StartRepeatDrawerMixin:
                 color=self.notation_color,
                 width_mm=thick_w,
                 id=ev_id,
-                tags=['barline_symbol', 'start_repeat'],
+                tags=['barline_symbol', line_tag],
             )
+            dot_cy = y + dot_sign * dot_y
             for dot_x in (dot_x1, dot_x2):
                 du.add_oval(
                     dot_x - (dot_d / 2.0),
-                    y + dot_y - (dot_d / 2.0),
+                    dot_cy - (dot_d / 2.0),
                     dot_x + (dot_d / 2.0),
-                    y + dot_y + (dot_d / 2.0),
+                    dot_cy + (dot_d / 2.0),
                     stroke_color=None,
                     fill_color=self.notation_color,
                     id=ev_id,
-                    tags=['barline_symbol_dot', 'start_repeat_dot'],
+                    tags=['barline_symbol_dot', dot_tag],
                 )
+
+    def draw_start_repeat(self, du: DrawUtil) -> None:
+        self._draw_repeat(du, 'start')
+
+    def draw_end_repeat(self, du: DrawUtil) -> None:
+        self._draw_repeat(du, 'end')
