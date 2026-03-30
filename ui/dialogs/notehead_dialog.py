@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import replace
-from typing import Optional
+from typing import Any, Optional
 
 import cairo
 from PySide6 import QtCore, QtGui, QtWidgets
@@ -50,12 +50,15 @@ class NoteheadDialog(QtWidgets.QDialog):
     def __init__(
         self,
         *,
-        note: Note,
+        note: Any,
         layout,
         semitone_space_mm: float,
         notation_color: tuple[float, float, float, float],
         paper_color: tuple[float, float, float, float],
         default_black_above: bool,
+        choices: Optional[list[tuple[str, str]]] = None,
+        show_stem: bool = True,
+        outline_width_mm_override: float | None = None,
         parent: Optional[QtWidgets.QWidget] = None,
     ) -> None:
         super().__init__(parent)
@@ -70,6 +73,9 @@ class NoteheadDialog(QtWidgets.QDialog):
         self._notation_color = notation_color
         self._paper_color = paper_color
         self._default_black_above = bool(default_black_above)
+        self._choices = list(choices or _NOTEHEAD_CHOICES)
+        self._show_stem = bool(show_stem)
+        self._outline_width_mm_override = None if outline_width_mm_override is None else float(outline_width_mm_override)
 
         lay = QtWidgets.QVBoxLayout(self)
         lay.setContentsMargins(10, 10, 10, 10)
@@ -101,14 +107,14 @@ class NoteheadDialog(QtWidgets.QDialog):
 
     def _populate_choices(self) -> None:
         self.combo.clear()
-        for literal, label in _NOTEHEAD_CHOICES:
+        for literal, label in self._choices:
             self.combo.addItem(label)
             idx = self.combo.count() - 1
             self.combo.setItemData(idx, literal, QtCore.Qt.ItemDataRole.UserRole)
             pix = self._render_preview(literal, size=QtCore.QSize(88, 52), px_per_mm=4.0)
             self.combo.setItemData(idx, QtGui.QIcon(pix), QtCore.Qt.ItemDataRole.DecorationRole)
 
-    def _make_preview_note(self, literal: str) -> Note:
+    def _make_preview_note(self, literal: str):
         return replace(self._note, notehead=literal)
 
     def _render_preview(self, literal: str, *, size: QtCore.QSize, px_per_mm: float) -> QtGui.QPixmap:
@@ -132,7 +138,8 @@ class NoteheadDialog(QtWidgets.QDialog):
             corner_radius=1.25,
             tags=["preview_background"],
         )
-        self._draw_preview_stem(du, note, x_mm=x_mm, y_mm=y_mm)
+        if self._show_stem:
+            self._draw_preview_stem(du, note, x_mm=x_mm, y_mm=y_mm)
         notehead = Notehead.from_note(
             x_mm=x_mm,
             y_mm=y_mm,
@@ -142,6 +149,7 @@ class NoteheadDialog(QtWidgets.QDialog):
             notation_color=self._notation_color,
             paper_color=self._paper_color,
             default_black_above=self._default_black_above,
+            outline_width_mm_override=self._outline_width_mm_override,
         )
         tag = "notehead_black" if bool(getattr(notehead, "filled", False)) else "notehead_white"
         notehead.draw_notehead(du, item_id=0, tags=[tag])
@@ -181,12 +189,15 @@ class NoteheadDialog(QtWidgets.QDialog):
     def get_notehead(
         cls,
         *,
-        note: Note,
+        note: Any,
         layout,
         semitone_space_mm: float,
         notation_color: tuple[float, float, float, float],
         paper_color: tuple[float, float, float, float],
         default_black_above: bool,
+        choices: Optional[list[tuple[str, str]]] = None,
+        show_stem: bool = True,
+        outline_width_mm_override: float | None = None,
         parent: Optional[QtWidgets.QWidget] = None,
     ) -> tuple[str, bool]:
         dlg = cls(
@@ -196,6 +207,9 @@ class NoteheadDialog(QtWidgets.QDialog):
             notation_color=notation_color,
             paper_color=paper_color,
             default_black_above=default_black_above,
+            choices=choices,
+            show_stem=show_stem,
+            outline_width_mm_override=outline_width_mm_override,
             parent=parent,
         )
         if dlg.exec() == int(QtWidgets.QDialog.DialogCode.Accepted):

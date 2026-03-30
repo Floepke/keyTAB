@@ -127,6 +127,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
             'pitch': p,
             'id': int(g.get('_id', 0) or 0),
             'idx': int(idx),
+            'raw': g,
         })
     norm_grace = sorted(norm_grace, key=lambda m: float(m.get('time', 0.0) or 0.0))
 
@@ -2650,55 +2651,20 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                     p = int(item.get('pitch', 0) or 0)
                     x = _key_to_x(p)
                     y_top = _time_to_y(g_t)
-                    w = semitone_mm * g_scale
-                    if p in BLACK_KEYS:
-                        # Black keys: single filled head.
-                        du.add_oval(
-                            x - w,
-                            y_top,
-                            x + w,
-                            y_top + (w * 2.0),
-                            stroke_color=None,
-                            stroke_width_mm=0.0,
-                            fill_color=notation_color,
-                            id=int(item.get('id', 0) or 0),
-                            tags=['grace_note_black'],
-                        )
-                    else:
-                        # White keys: outer dark fill, inner white fill inset by half the outline width.
-                        du.add_oval(
-                            x - w,
-                            y_top,
-                            x + w,
-                            y_top + (w * 2.0),
-                            stroke_color=None,
-                            stroke_width_mm=0.0,
-                            fill_color=notation_color,
-                            id=int(item.get('id', 0) or 0),
-                            tags=['grace_note_black_outline'],
-                        )
-                        inset = max(0.0, g_outline * 0.5)
-                        il = x - w + inset
-                        ir = x + w - inset
-                        it = y_top + inset
-                        ib = y_top + (w * 2.0) - inset
-                        if ir <= il:
-                            midx = ( (x - w) + (x + w) ) * 0.5
-                            il = ir = midx
-                        if ib <= it:
-                            midy = (y_top + y_top + (w * 2.0)) * 0.5
-                            it = ib = midy
-                        du.add_oval(
-                            il,
-                            it,
-                            ir,
-                            ib,
-                            stroke_color=None,
-                            stroke_width_mm=0.0,
-                            fill_color=paper_color,
-                            id=int(item.get('id', 0) or 0),
-                            tags=['grace_note_white_fill'],
-                        )
+                    g_raw = item.get('raw', {}) or {}
+                    notehead = Notehead.from_note(
+                        x_mm=float(x),
+                        y_mm=float(y_top),
+                        note=g_raw,
+                        layout=layout,
+                        semitone_space_mm=float(semitone_mm * g_scale),
+                        notation_color=notation_color,
+                        paper_color=paper_color,
+                        default_black_above=False,
+                        outline_width_mm_override=float(g_outline),
+                    )
+                    tag = 'grace_note_black' if bool(getattr(notehead, 'filled', False)) else 'grace_note_white'
+                    notehead.draw_notehead(du, item_id=int(item.get('id', 0) or 0), tags=[tag])
 
             # Problem solved: render notes after grid, using precomputed positions.
             for item in line_notes:
@@ -2750,28 +2716,6 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                         id=int(item.get('id', 0) or 0),
                         tags=['midi_note'],
                     )
-
-                    side_key = 'left' if float(x) < float(grid_band_split_x) else 'right'
-                    dark_intervals = grid_band_dark_intervals.get(side_key, [])
-                    if dark_intervals:
-                        for t0, t1 in dark_intervals:
-                            seg_start = max(float(n_t), float(t0), float(line_start))
-                            seg_end = min(float(n_end), float(t1), float(line_end))
-                            if seg_end <= seg_start:
-                                continue
-                            y0 = _time_to_y(seg_start)
-                            y1_seg = _time_to_y(seg_end)
-                            if y1_seg < y0:
-                                y0, y1_seg = y1_seg, y0
-                            seg_poly = _clip_poly_y(midi_poly, y0, y1_seg)
-                            if len(seg_poly) >= 3:
-                                du.add_polygon(
-                                    seg_poly,
-                                    stroke_color=None,
-                                    fill_color=paper_color,
-                                    id=int(item.get('id', 0) or 0),
-                                    tags=['midi_note'],
-                                )
 
                 continues_from_prev_line = _is_line_continuation(item)
                 continues_to_next_line = op_time.lt(n_t, float(line_end)) and op_time.gt(n_end, float(line_end))

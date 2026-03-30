@@ -41,4 +41,10 @@ class SymbolUtil:
 
     @property
     def notehead_outline_width_mm(self) -> float:
+        try:
+            override = getattr(self, 'outline_width_mm_override', None)
+            if override is not None:
+                return max(0.05, float(override))
+        except Exception:
+            pass
         return self.note_stem_thickness_mm

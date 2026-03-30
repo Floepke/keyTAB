@@ -214,13 +214,66 @@ class ColorPickerEdit(QtWidgets.QWidget):
         def sizeHint(self, option: QtWidgets.QStyleOptionViewItem, index: QtCore.QModelIndex) -> QtCore.QSize:
             return QtCore.QSize(max(120, option.rect.width()), 26)
 
+    class _ClosedSwatchCombo(QtWidgets.QComboBox):
+        def __init__(self, parent=None) -> None:
+            super().__init__(parent)
+            self._current_color_code: str = '#000000'
+
+        def set_current_color(self, code: str) -> None:
+            txt = str(code or '').strip()
+            if txt and not txt.startswith('#'):
+                txt = f"#{txt}"
+            self._current_color_code = txt if txt else '#000000'
+            self.update()
+
+        def paintEvent(self, event: QtGui.QPaintEvent) -> None:
+            painter = QtWidgets.QStylePainter(self)
+            opt = QtWidgets.QStyleOptionComboBox()
+            self.initStyleOption(opt)
+
+            # Draw normal frame and arrow button first.
+            painter.drawComplexControl(QtWidgets.QStyle.ComplexControl.CC_ComboBox, opt)
+
+            # Fill the visible combo field (excluding arrow button) with selected color.
+            edit_rect = self.style().subControlRect(
+                QtWidgets.QStyle.ComplexControl.CC_ComboBox,
+                opt,
+                QtWidgets.QStyle.SubControl.SC_ComboBoxEditField,
+                self,
+            )
+            fill = QtGui.QColor(self._current_color_code)
+            if not fill.isValid():
+                fill = QtGui.QColor('#000000')
+            painter.fillRect(edit_rect.adjusted(1, 1, -1, -1), fill)
+            painter.setPen(QtGui.QPen(QtGui.QColor('#666666'), 1.0))
+            painter.drawRect(edit_rect.adjusted(1, 1, -1, -1))
+
+    @staticmethod
+    def _make_swatch_icon(code: str, size: int = 18) -> QtGui.QIcon:
+        pix = QtGui.QPixmap(size, size)
+        pix.fill(QtCore.Qt.GlobalColor.transparent)
+        p = QtGui.QPainter(pix)
+        try:
+            rect = pix.rect().adjusted(1, 1, -1, -1)
+            color = QtGui.QColor(str(code or '').strip())
+            if not color.isValid():
+                color = QtGui.QColor('#000000')
+            p.setRenderHint(QtGui.QPainter.RenderHint.Antialiasing, True)
+            p.setPen(QtGui.QPen(QtGui.QColor('#666666'), 1.0))
+            p.setBrush(QtGui.QBrush(color))
+            p.drawRect(rect)
+        finally:
+            p.end()
+        return QtGui.QIcon(pix)
+
     def __init__(self, value: str, parent=None) -> None:
         super().__init__(parent)
-        self._combo = QtWidgets.QComboBox(self)
+        self._combo = self._ClosedSwatchCombo(self)
         self._combo.setEditable(False)
         self._populate_presets()
         self._combo.setInsertPolicy(QtWidgets.QComboBox.InsertPolicy.NoInsert)
         self._combo.setItemDelegate(self._SwatchDelegate(self._combo))
+        self._combo.setIconSize(QtCore.QSize(16, 16))
         view = self._combo.view()
         if view is not None:
             view.setStyleSheet("QListView::item { min-height: 24px; padding: 2px 4px; }")
@@ -247,18 +300,31 @@ class ColorPickerEdit(QtWidgets.QWidget):
 
     def _populate_presets(self) -> None:
         self._combo.clear()
+        # Dynamic first row reflects the current selected value when it is not in presets.
+        self._combo.addItem('')
+        self._combo.setItemData(0, '#000000', QtCore.Qt.ItemDataRole.UserRole)
+        self._combo.setItemIcon(0, self._make_swatch_icon('#000000'))
         for idx, code in enumerate(self.PRESET_COLORS):
             self._combo.addItem('')
-            self._combo.setItemData(idx, code, QtCore.Qt.ItemDataRole.UserRole)
+            row = idx + 1
+            self._combo.setItemData(row, code, QtCore.Qt.ItemDataRole.UserRole)
+            self._combo.setItemIcon(row, self._make_swatch_icon(code))
+
+    def _set_current_swatch(self, txt: str) -> None:
+        self._combo.setItemData(0, txt, QtCore.Qt.ItemDataRole.UserRole)
+        self._combo.setItemIcon(0, self._make_swatch_icon(txt))
+        if isinstance(self._combo, self._ClosedSwatchCombo):
+            self._combo.set_current_color(txt)
 
     def set_value(self, value: str) -> None:
         txt = str(value or '').strip()
         if txt and not txt.startswith('#'):
             txt = f"#{txt}"
+        self._set_current_swatch(txt if txt else '#000000')
         self._hex_edit.setText(txt)
         idx = self._combo.findData(txt, QtCore.Qt.ItemDataRole.UserRole)
         self._combo.blockSignals(True)
-        self._combo.setCurrentIndex(idx if idx >= 0 else 0)
+        self._combo.setCurrentIndex(idx if idx >= 1 else 0)
         self._combo.blockSignals(False)
 
     def value(self) -> str:

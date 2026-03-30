@@ -60,7 +60,8 @@ def draw_circle_left_dot(
     du: DrawUtil,
     symbol: "Notehead",
 ) -> None:
-    if str(getattr(symbol, "hand", "l") or "l") != "l":
+    hand = str(getattr(symbol, "hand", "") or "")
+    if hand != "l":
         return
     if not bool(symbol._layout_value("note_leftdot_visible", False)):
         return

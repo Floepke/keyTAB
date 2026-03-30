@@ -144,6 +144,7 @@ class Notehead(SymbolUtil):
     form: NoteheadForm
     direction: NoteheadDirection
     filled: bool = False
+    outline_width_mm_override: float | None = None
 
     @property
     def pitch(self) -> int:
@@ -151,7 +152,7 @@ class Notehead(SymbolUtil):
 
     @property
     def hand(self) -> str:
-        return str(_read_note_field(self.note, "hand", "l") or "l")
+        return str(_read_note_field(self.note, "hand", "") or "")
 
     def draw_notehead(self, du: DrawUtil, item_id: int = 0, tags: list[str] | None = None, use_custom_color: bool = False) -> None:
         draw_tags = list(tags or [])
@@ -207,6 +208,7 @@ class Notehead(SymbolUtil):
         notation_color: tuple[float, float, float, float],
         paper_color: tuple[float, float, float, float],
         default_black_above: bool,
+        outline_width_mm_override: float | None = None,
     ) -> "Notehead":
         spec = resolve_notehead_spec(note, default_black_above=bool(default_black_above))
         return cls(
@@ -220,4 +222,5 @@ class Notehead(SymbolUtil):
             form=spec.form,
             direction=spec.direction,
             filled=spec.filled,
+            outline_width_mm_override=(None if outline_width_mm_override is None else float(outline_width_mm_override)),
         )

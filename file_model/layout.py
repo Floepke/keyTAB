@@ -58,7 +58,7 @@ class Layout:
 
     # Grace note appearance
     grace_note_visible: bool = True
-    grace_note_outline_width_mm: float = 1.5
+    grace_note_outline_width_mm: float = 1.0
     grace_note_scale: float = 0.75
 
     # Pedal appearance

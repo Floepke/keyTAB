@@ -197,7 +197,7 @@ class SCORE:
 		return obj
 
 	def new_grace_note(self, **kwargs) -> GraceNote:
-		base = {'pitch': 41, 'time': 50.0}
+		base = {'pitch': 41, 'time': 50.0, 'notehead': 'auto'}
 		base.update(kwargs)
 		obj = GraceNote(**base, _id=self._gen_id())
 		self.events.grace_note.append(obj)
@@ -595,7 +595,13 @@ class SCORE:
 				setattr(n, 'color', 'auto')
 			dur = float(getattr(n, 'duration', 0.0) or 0.0)
 			if dur < float(GRACENOTE_THRESHOLD):
-				converted_grace.append(GraceNote(pitch=int(getattr(n, 'pitch', 40) or 40), time=float(getattr(n, 'time', 0.0) or 0.0)))
+				converted_grace.append(
+					GraceNote(
+						pitch=int(getattr(n, 'pitch', 40) or 40),
+						time=float(getattr(n, 'time', 0.0) or 0.0),
+						notehead=str(getattr(n, 'notehead', 'auto') or 'auto'),
+					)
+				)
 			else:
 				remaining_notes.append(n)
 
@@ -664,7 +670,7 @@ class SCORE:
 
 		self.events.note = deduped_notes
 		for g in converted_grace:
-			self.new_grace_note(pitch=int(g.pitch), time=float(g.time))
+			self.new_grace_note(pitch=int(g.pitch), time=float(g.time), notehead=str(getattr(g, 'notehead', 'auto') or 'auto'))
 
 		self._last_load_checks_report = {
 			'deduped_removed': int(deduped_removed),

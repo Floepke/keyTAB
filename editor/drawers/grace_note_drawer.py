@@ -1,7 +1,9 @@
 from __future__ import annotations
 from typing import TYPE_CHECKING, cast
 from ui.widgets.draw_util import DrawUtil
-from utils.CONSTANT import BLACK_KEYS, QUARTER_NOTE_UNIT
+from utils.CONSTANT import QUARTER_NOTE_UNIT
+from symbol_design.noteheads import Notehead
+from ui.style import Style
 
 if TYPE_CHECKING:
     from editor.editor import Editor
@@ -46,13 +48,12 @@ class GraceNoteDrawerMixin:
         op = Operator(7)
         semitone_dist = float(getattr(self, 'semitone_dist', 0.5) or 0.5)
         notation_color = getattr(self, 'notation_color', (0, 0, 0, 1))
-        scale = float(getattr(layout, 'grace_note_scale', 0.75) or 0.75)
-        note_width_scale = float(getattr(layout, 'note_width_scaling', 0.75) or 0.75)
-        note_width_scale = max(0.05, note_width_scale)
-        outline_w = float(
-            getattr(layout, 'grace_note_outline_width_mm', getattr(layout, 'grace_note_outline_width', 0.3))
-            or 0.3
-        )
+        grace_scale = float(getattr(layout, 'grace_note_scale', 0.75) or 0.75)
+        semitone_scaled = semitone_dist * max(0.05, grace_scale)
+        style_scale = float(getattr(layout, 'scale', 1.0) or 1.0)
+        outline_w = float(getattr(layout, 'grace_note_outline_width_mm', getattr(layout, 'grace_note_outline_width', 0.3)) or 0.3) * style_scale
+        paper_r, paper_g, paper_b = Style.get_named_rgb('paper', (255, 255, 255))
+        paper_color = (paper_r / 255.0, paper_g / 255.0, paper_b / 255.0, 1.0)
 
         for g in notes:
             t = float(getattr(g, 'time', 0.0) or 0.0)
@@ -61,65 +62,23 @@ class GraceNoteDrawerMixin:
             pitch = int(getattr(g, 'pitch', 40) or 40)
             x = float(self.pitch_to_x(pitch))
             y_top = float(time_to_mm(t))
-
-            base_w = semitone_dist * scale
-            head_half_w = base_w * note_width_scale
-            top = y_top
-            bottom = y_top + (base_w * 2.0)
-            left = x - head_half_w
-            right = x + head_half_w
-
-            y_center = (top + bottom) * 0.5
-
-            if pitch in BLACK_KEYS:
-                du.add_oval(
-                    left,
-                    top,
-                    right,
-                    bottom,
-                    stroke_color=notation_color,
-                    stroke_width_mm=0.0,
-                    fill_color=notation_color,
-                    id=getattr(g, '_id', 0),
-                    tags=["grace_note_black"],
-                )
-            else:
-                # Draw outline inward: paint outer with notation color, then inner white.
-                du.add_oval(
-                    left,
-                    top,
-                    right,
-                    bottom,
-                    stroke_color=None,
-                    fill_color=notation_color,
-                    id=getattr(g, '_id', 0),
-                    tags=["grace_note_white_outline"],
-                )
-                # Halve the inset so the visible outline matches the configured width.
-                inset = outline_w * 0.25
-                inner_left = left + inset
-                inner_right = right - inset
-                inner_top = top + inset
-                inner_bottom = bottom - inset
-                if inner_right <= inner_left:
-                    mid_x = (left + right) * 0.5
-                    inner_left = inner_right = mid_x
-                if inner_bottom <= inner_top:
-                    mid_y = (top + bottom) * 0.5
-                    inner_top = inner_bottom = mid_y
-                du.add_oval(
-                    inner_left,
-                    inner_top,
-                    inner_right,
-                    inner_bottom,
-                    stroke_color=None,
-                    fill_color=(1.0, 1.0, 1.0, 1.0),
-                    id=getattr(g, '_id', 0),
-                    tags=["grace_note_white_fill"],
-                )
+            notehead = Notehead.from_note(
+                x_mm=float(x),
+                y_mm=float(y_top),
+                note=g,
+                layout=layout,
+                semitone_space_mm=float(semitone_scaled),
+                notation_color=notation_color,
+                paper_color=paper_color,
+                default_black_above=False,
+                outline_width_mm_override=float(outline_w),
+            )
+            tag = "grace_note_black" if bool(getattr(notehead, 'filled', False)) else "grace_note_white"
+            notehead.draw_notehead(du, item_id=int(getattr(g, '_id', 0) or 0), tags=[tag], use_custom_color=False)
 
             # Hit rectangle uses unscaled notehead size for predictable picking
             hit_w = semitone_dist
+            y_center = float(y_top + semitone_scaled)
             self.register_hit_rect(
                 'note', int(getattr(g, '_id', 0) or 0),
                 float(x - hit_w), float(y_center - hit_w),
