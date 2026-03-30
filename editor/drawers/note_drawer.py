@@ -110,8 +110,12 @@ class NoteDrawerMixin:
             self._draw_left_dot(du, n, x, y1, draw_mode)
             try:
                 w = float(self.semitone_dist or 0.5)
+                layout = self.current_score().layout
+                y_top = float(y1)
+                if int(getattr(n, 'pitch', 0) or 0) in BLACK_KEYS and self._black_note_above_stem(n, layout):
+                    y_top = float(y1) - (w * 2.0)
                 rect_id = int(getattr(n, '_id', 0) or 0)
-                self.register_hit_rect('note', rect_id, float(x - w), float(y1), float(x + w), float(y1 + (w * 2.0)))
+                self.register_hit_rect('note', rect_id, float(x - w), float(y_top), float(x + w), float(y1 + (w * 2.0)))
             except Exception:
                 pass
             return
@@ -159,6 +163,8 @@ class NoteDrawerMixin:
         x_left = x - max(w, head_half_w)
         x_right = x + max(w, head_half_w)
         y_top = y1           # top of notehead
+        if int(getattr(n, 'pitch', 0) or 0) in BLACK_KEYS and self._black_note_above_stem(n, layout):
+            y_top = float(y1) - (w * 2.0)
         y_bottom = y2        # actual end of note polygon
         rect_id = int(getattr(n, '_id', 0) or 0)
         self.register_hit_rect('note', rect_id, float(x_left), float(y_top), float(x_right), float(y_bottom))

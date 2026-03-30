@@ -20,7 +20,7 @@
         "pages":2,
         "measures":20,
         "lines":5,
-        "updated_at":"2026-03-30T10:57:03"
+        "updated_at":"2026-03-30T11:18:15"
     },
     "base_grid":[
         {
@@ -191,10 +191,10 @@
     "app_state":{
         "zoom_mm_per_quarter":27.172540058190545,
         "print_view_page_index":0,
-        "editor_scroll_pos":10153,
+        "editor_scroll_pos":9393,
         "snap_base":16,
         "snap_divide":1,
-        "selected_tool":"barline",
+        "selected_tool":"note",
         "style_dialog_tab_index":0,
         "note_velocity_mode":false
     },
@@ -1561,8 +1561,8 @@
             },
             {
                 "pitch":38,
-                "time":15616,
-                "duration":64,
+                "time":15616.0,
+                "duration":64.0,
                 "velocity":64,
                 "hand":"l",
                 "notehead":"auto",
@@ -2983,8 +2983,8 @@
             },
             {
                 "pitch":46,
-                "time":256,
-                "duration":64,
+                "time":256.0,
+                "duration":64.0,
                 "velocity":64,
                 "hand":"r",
                 "notehead":"auto",

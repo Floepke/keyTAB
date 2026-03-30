@@ -103,12 +103,9 @@ class MainWindow(QtWidgets.QMainWindow):
         adm2 = None
         was_saved = False
         saved_path = ""
-        try:
-            adm2 = get_appdata_manager()
-            was_saved = bool(adm2.get("last_session_saved", False))
-            saved_path = str(adm2.get("last_session_path", "") or "")
-        except Exception:
-            pass
+        adm2 = get_appdata_manager()
+        was_saved = bool(adm2.get("last_session_saved", False))
+        saved_path = str(adm2.get("last_session_path", "") or "")
         session_path = Path(UTILS_SAVE_DIR) / "session.piano"
         opened = False
         status_msg = ""
@@ -156,12 +153,9 @@ class MainWindow(QtWidgets.QMainWindow):
                     status_msg = f"Opened last saved project: {saved_path}"
 
         if not opened and was_saved:
-            try:
-                if adm2 is None:
-                    adm2 = get_appdata_manager()
-                last_path = str(adm2.get("last_opened_file", "") or "")
-            except Exception:
-                last_path = ""
+            if adm2 is None:
+                adm2 = get_appdata_manager()
+            last_path = str(adm2.get("last_opened_file", "") or "")
             if last_path and str(last_path) != str(saved_path):
                 sc = _try_open_path_with_retries(last_path, retries=16, delay_sec=0.25)
                 if sc is not None:

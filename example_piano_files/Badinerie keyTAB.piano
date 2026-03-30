@@ -20,7 +20,7 @@
         "pages":1,
         "measures":20,
         "lines":4,
-        "updated_at":"2026-03-30T08:59:58"
+        "updated_at":"2026-03-30T11:03:16"
     },
     "base_grid":[
         {
@@ -191,7 +191,7 @@
     "app_state":{
         "zoom_mm_per_quarter":28.531167061100078,
         "print_view_page_index":0,
-        "editor_scroll_pos":6,
+        "editor_scroll_pos":354,
         "snap_base":16,
         "snap_divide":1,
         "selected_tool":"text",
