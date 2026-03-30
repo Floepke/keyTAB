@@ -350,6 +350,7 @@ class NoteDrawerMixin:
         # Draw dots using notehead center for consistent positioning
         dot_d = w * 0.8
         dot_pitch = int(getattr(n, 'pitch', 0) or 0)
+        layout = self.current_score().layout
         for t in sorted(set(dot_times)):
             y_center = float(self.time_to_mm(t)) + w
 
@@ -363,6 +364,10 @@ class NoteDrawerMixin:
                     continue
                 mp = int(getattr(m, 'pitch', 0) or 0)
                 if abs(mp - dot_pitch) == 1:
+                    # Black adjacent notes drawn above stem do not collide with the
+                    # default continuation-dot position.
+                    if mp in BLACK_KEYS and self._black_note_above_stem(m, layout):
+                        continue
                     has_adjacent_start = True
                     break
             if has_adjacent_start:

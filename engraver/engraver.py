@@ -2927,6 +2927,14 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                                 continue
                             other_pitch = int(n.get('pitch', 0) or 0)
                             if abs(other_pitch - dot_pitch) == 1:
+                                # Black adjacent notes rendered above stem do not collide
+                                # with the default continuation-dot position.
+                                other_black_above = (
+                                    other_pitch in BLACK_KEYS
+                                    and _black_note_above_stem(n, black_rule, line_notes, op_time)
+                                )
+                                if other_black_above:
+                                    continue
                                 has_adjacent_start = True
                                 break
                         if has_adjacent_start:
