@@ -34,17 +34,18 @@ class RepeatDrawerMixin:
         bleed_mm = max(4.0, semitone_dx * 3.0)
 
         x_stave_right = float(self.margin or 0.0) + float(self.stave_width or 0.0)
-        ext_len = max(4.0, semitone_dx * 2.4)
+        ext_len = semitone_dx * 3.0
         x_left = x_stave_right
         x_right = x_left + ext_len
         style_scale = float(getattr(layout, 'scale', 1.0) or 1.0)
         bar_width_mm = float(getattr(layout, 'grid_barline_thickness_mm', 0.25) or 0.25) * style_scale
         thick_w = max(0.1, bar_width_mm)
-        dot_d = max(1.0, semitone_dx * 0.6)
+        dot_d = semitone_dx
         # Dot center is semitone_dist away from the outer edge of the line.
         dot_y = thick_w / 2.0 + semitone_dx + dot_d / 2.0
-        dot_x1 = x_left + (ext_len / 3.0)
-        dot_x2 = x_left + ((2.0 * ext_len) / 3.0)
+        # Align dot outer edges with line outer edges.
+        dot_x1 = x_left + (dot_d / 2.0)
+        dot_x2 = x_right - (dot_d / 2.0)
 
         line_tag = 'start_repeat' if kind == 'start' else 'end_repeat'
         dot_tag = 'start_repeat_dot' if kind == 'start' else 'end_repeat_dot'

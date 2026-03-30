@@ -160,6 +160,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
             'text': str(t.get('text', '') or ''),
             'font': t.get('font', None),
             'use_custom_font': bool(t.get('use_custom_font', False)),
+            'text_background_width_offset_mm': float(t.get('text_background_width_offset_mm', 0.0) or 0.0),
             'id': int(t.get('_id', 0) or 0),
             'idx': int(idx),
         })
@@ -1143,6 +1144,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
 
     analysis_snapshot = Analysis.compute(score, lines_count=len(lines), pages_count=len(pages))
     setattr(du, 'analysis', analysis_snapshot)
+    first_system_start = float(lines[0].get('time_start', 0.0) or 0.0) if lines else 0.0
     target_page_index = 0
     if not pdf_export and pages:
         try:
@@ -1352,24 +1354,29 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
             shared_band_intervals: list[tuple[float, float]] = []
             grid_band_dark_intervals: dict[str, list[tuple[float, float]]] = {'left': shared_band_intervals, 'right': shared_band_intervals}
 
-            def _text_bbox(text_val: str, family: str, size_pt: float, italic: bool, bold: bool, angle_deg: float, padding_mm: float, corner_radius_mm: float) -> tuple[float, float, float, list[tuple[float, float]], list[tuple[float, float]]]:
-                xb, yb, w_mm, h_mm = du._get_text_extents_mm(text_val, family, size_pt, italic, bold)
+            def _text_bbox(text_val: str, family: str, size_pt: float, italic: bool, bold: bool, angle_deg: float, padding_mm: float, corner_radius_mm: float, width_offset_mm: float) -> tuple[float, float, float, list[tuple[float, float]], list[tuple[float, float]]]:
+                xb, yb, ink_w_mm, ink_h_mm = du._get_text_extents_mm(text_val, family, size_pt, italic, bold)
                 pad = max(0.0, float(padding_mm))
-                w_mm += pad * 2.0
-                h_mm += pad * 2.0
-                hw = w_mm * 0.5
+                base_w_mm = max(0.0, float(ink_w_mm) + (pad * 2.0))
+                h_mm = max(0.0, float(ink_h_mm) + (pad * 2.0))
+                base_hw = base_w_mm * 0.5
                 hh = h_mm * 0.5
-                r = min(max(0.0, float(corner_radius_mm)), hw, hh)
+                x0 = -base_hw
+                x1 = base_hw + float(width_offset_mm)
+                if x1 < x0:
+                    x1 = x0
+                w_mm = max(0.0, x1 - x0)
+                r = min(max(0.0, float(corner_radius_mm)), w_mm * 0.5, hh)
 
-                def _rounded_rect_points(hw_val: float, hh_val: float, radius: float) -> list[tuple[float, float]]:
+                def _rounded_rect_points(x0_val: float, x1_val: float, hh_val: float, radius: float) -> list[tuple[float, float]]:
                     if radius <= 1e-6:
-                        return [(-hw_val, -hh_val), (hw_val, -hh_val), (hw_val, hh_val), (-hw_val, hh_val)]
+                        return [(x0_val, -hh_val), (x1_val, -hh_val), (x1_val, hh_val), (x0_val, hh_val)]
                     pts: list[tuple[float, float]] = []
                     corner_defs = [
-                        (-hw_val + radius, -hh_val + radius, 180.0, 270.0),
-                        (hw_val - radius, -hh_val + radius, 270.0, 360.0),
-                        (hw_val - radius, hh_val - radius, 0.0, 90.0),
-                        (-hw_val + radius, hh_val - radius, 90.0, 180.0),
+                        (x0_val + radius, -hh_val + radius, 180.0, 270.0),
+                        (x1_val - radius, -hh_val + radius, 270.0, 360.0),
+                        (x1_val - radius, hh_val - radius, 0.0, 90.0),
+                        (x0_val + radius, hh_val - radius, 90.0, 180.0),
                     ]
                     step = 15.0
                     for cx, cy, start_deg, end_deg in corner_defs:
@@ -1380,8 +1387,9 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                             deg += step
                     return pts
 
-                base_poly = _rounded_rect_points(hw, hh, r)
-                corners = [(-hw, -hh), (hw, -hh), (hw, hh), (-hw, hh)]
+                base_poly = _rounded_rect_points(-base_hw, base_hw, hh, min(max(0.0, float(corner_radius_mm)), base_hw, hh))
+                draw_poly = _rounded_rect_points(x0, x1, hh, r)
+                corners = [(x0, -hh), (x1, -hh), (x1, hh), (x0, hh)]
                 ang = math.radians(angle_deg)
                 sin_a = math.sin(ang)
                 cos_a = math.cos(ang)
@@ -1397,9 +1405,12 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                 for (dx, dy) in base_poly:
                     rx = dx * cos_a - dy * sin_a
                     ry = dx * sin_a + dy * cos_a
-                    rot_poly.append((rx, ry))
                     if ry < min_y:
                         min_y = ry
+                for (dx, dy) in draw_poly:
+                    rx = dx * cos_a - dy * sin_a
+                    ry = dx * sin_a + dy * cos_a
+                    rot_poly.append((rx, ry))
                 offset_down = max(0.0, -min_y)
                 return w_mm, h_mm, offset_down, rot_corners, rot_poly
 
@@ -2230,6 +2241,8 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
             measure_pad = 1.5
             measure_symbol_anchor: dict[float, tuple[float, float, float]] = {}
             measure_symbol_default_right_x = float(grid_right + measure_pad * 2.0)
+            measure_guide_width_mm = max(0.12, 0.15 * scale)
+            measure_guide_dash_pattern = [0.8 * scale, 0.8 * scale]
 
             def _note_x_range(it: dict, include_stem: bool) -> tuple[float, float]:
                 p = int(it.get('pitch', 0) or 0)
@@ -2310,10 +2323,10 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                     x_pos + text_w_mm,
                     guide_y,
                     color=notation_color,
-                    width_mm=max(0.12, 0.15 * scale),
+                    width_mm=measure_guide_width_mm,
                     id=0,
                     tags=['measure_number_guide'],
-                    dash_pattern=[0.8 * scale, 0.8 * scale],
+                    dash_pattern=measure_guide_dash_pattern,
                 )
                 du.add_text(
                     x_pos,
@@ -2365,6 +2378,20 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                 x_right = x_left + symbol_width
                 dot_x1 = x_left + (symbol_width * 0.25)
                 dot_x2 = x_left + (symbol_width * 0.75)
+                line_end_ticks = float(line.get('time_end', 0.0) or 0.0)
+                is_prev_system_duplicate = op_time.eq(rep_t, line_end_ticks) and op_time.gt(rep_t, first_system_start)
+                if is_prev_system_duplicate:
+                    du.add_line(
+                        grid_right,
+                        y_rep,
+                        x_right,
+                        y_rep,
+                        color=notation_color,
+                        width_mm=measure_guide_width_mm,
+                        id=0,
+                        tags=['measure_number_guide'],
+                        dash_pattern=measure_guide_dash_pattern,
+                    )
                 if kind == 'start':
                     du.add_line(
                         x_left,
@@ -3166,10 +3193,11 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                     display_txt = txt_raw if txt_raw.strip() else "(no text set)"
                     family, size_pt_raw, italic, bold = _resolve_font(tx)
                     size_pt = float(size_pt_raw) * ENGRAVER_FRACTIONAL_TEXT_SCALING_CORRECTION * (scale / 0.3333333333333333)
+                    width_off_mm = float(tx.get('text_background_width_offset_mm', 0.0) or 0.0)
                     y_mm = _time_to_y(t_time) + y_off
                     x_mm = rpitch_to_x(x_rp) + x_off
                     try:
-                        w_mm, h_mm, offset_down, rot_corners, rot_poly = _text_bbox(display_txt, family, size_pt, italic, bold, angle, pad_mm, pad_mm)
+                        w_mm, h_mm, offset_down, rot_corners, rot_poly = _text_bbox(display_txt, family, size_pt, italic, bold, angle, pad_mm, pad_mm, width_off_mm)
                     except Exception:
                         continue
                     cy = y_mm + offset_down

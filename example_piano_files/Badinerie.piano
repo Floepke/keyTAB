@@ -20,7 +20,7 @@
         "pages":1,
         "measures":20,
         "lines":4,
-        "updated_at":"2026-03-30T04:53:00"
+        "updated_at":"2026-03-30T06:55:09"
     },
     "base_grid":[
         {
@@ -67,7 +67,7 @@
         "pedal_lane_enabled":false,
         "pedal_lane_width_mm":2.5,
         "text_visible":true,
-        "text_background_padding_mm":1.5,
+        "text_background_padding_mm":2.0,
         "slur_visible":true,
         "slur_width_sides_mm":0.5,
         "slur_width_middle_mm":2.0,
@@ -91,20 +91,25 @@
         "barline_visible":true,
         "grid_line_visible":true,
         "grid_band_visible":true,
-        "grid_band_track":[],
+        "grid_band_track":[
+            {
+                "time":0.0,
+                "duration":256.0
+            }
+        ],
         "grid_barline_thickness_mm":1.25,
         "grid_gridline_thickness_mm":0.5,
         "grid_gridline_dash_pattern_mm":[
             5.0
         ],
-        "grid_band_color":"#ccc",
+        "grid_band_color":"#ddd",
         "grid_band_start_phase":"dark",
         "time_signature_indicator_type":"both",
         "time_signature_indicator_lane_width_mm":15.0,
         "time_signature_indicator_guide_thickness_mm":1.0,
         "time_signature_indicator_divide_guide_thickness_mm":1.0,
         "time_signature_indicator_classic_font":{
-            "family":"Latin Modern Roman",
+            "family":"Edwin",
             "size_pt":50.0,
             "bold":true,
             "italic":false,
@@ -112,7 +117,7 @@
             "y_offset":0.0
         },
         "time_signature_indicator_klavarskribo_font":{
-            "family":"Latin Modern Roman",
+            "family":"Edwin",
             "size_pt":35.0,
             "bold":true,
             "italic":false,
@@ -120,7 +125,7 @@
             "y_offset":0.0
         },
         "measure_numbering_font":{
-            "family":"Latin Modern Roman",
+            "family":"Edwin",
             "size_pt":35.0,
             "bold":true,
             "italic":false,
@@ -128,7 +133,7 @@
             "y_offset":0.0
         },
         "font_text":{
-            "family":"Latin Modern Roman",
+            "family":"Edwin",
             "size_pt":14.0,
             "bold":true,
             "italic":false,
@@ -136,7 +141,7 @@
             "y_offset":0.0
         },
         "font_title":{
-            "family":"Latin Modern Roman",
+            "family":"Edwin",
             "size_pt":25.0,
             "bold":true,
             "italic":false,
@@ -144,7 +149,7 @@
             "y_offset":0.0
         },
         "font_composer":{
-            "family":"Latin Modern Roman",
+            "family":"Edwin",
             "size_pt":15.0,
             "bold":false,
             "italic":false,
@@ -152,7 +157,7 @@
             "y_offset":0.0
         },
         "font_copyright":{
-            "family":"Latin Modern Roman",
+            "family":"Edwin",
             "size_pt":12.0,
             "bold":true,
             "italic":false,
@@ -160,7 +165,7 @@
             "y_offset":0.0
         },
         "font_arranger":{
-            "family":"Latin Modern Roman",
+            "family":"Edwin",
             "size_pt":12.0,
             "bold":false,
             "italic":false,
@@ -168,7 +173,7 @@
             "y_offset":0.0
         },
         "font_lyricist":{
-            "family":"Latin Modern Roman",
+            "family":"Edwin",
             "size_pt":12.0,
             "bold":false,
             "italic":false,
@@ -186,11 +191,11 @@
     "app_state":{
         "zoom_mm_per_quarter":28.531167061100078,
         "print_view_page_index":0,
-        "editor_scroll_pos":6,
+        "editor_scroll_pos":0,
         "snap_base":16,
         "snap_divide":1,
-        "selected_tool":"note",
-        "style_dialog_tab_index":3,
+        "selected_tool":"text",
+        "style_dialog_tab_index":4,
         "note_velocity_mode":false
     },
     "events":{
@@ -3978,14 +3983,15 @@
                 "x_offset_mm":0.0,
                 "y_offset_mm":0.0,
                 "font":{
-                    "family":"Latin Modern Roman",
+                    "family":"Edwin",
                     "size_pt":14.0,
                     "bold":true,
                     "italic":false,
                     "x_offset":0.0,
                     "y_offset":0.0
                 },
-                "use_custom_font":false
+                "use_custom_font":false,
+                "text_background_width_offset_mm":0.0
             }
         ],
         "slur":[],
@@ -3993,18 +3999,21 @@
         "grid_band":[],
         "start_repeat":[
             {
-                "time":0.0
-            },
-            {
                 "time":8192.0
             },
             {
                 "time":15360.0
+            },
+            {
+                "time":0.0
             }
         ],
         "end_repeat":[
             {
                 "time":8192.0
+            },
+            {
+                "time":15360.0
             }
         ],
         "double_bar":[

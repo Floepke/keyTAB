@@ -110,31 +110,37 @@ class TextTool(BaseTool):
             italic = bool(getattr(font, 'italic', False))
             bold = bool(getattr(font, 'bold', False))
             pad_mm = float(getattr(layout, 'text_background_padding_mm', 0.0) or 0.0)
+            width_off_mm = float(getattr(ev, 'text_background_width_offset_mm', 0.0) or 0.0)
             x_off = float(getattr(ev, 'x_offset_mm', 0.0) or 0.0)
             y_off = float(getattr(ev, 'y_offset_mm', 0.0) or 0.0)
             angle = float(getattr(ev, 'rotation', 0.0) or 0.0)
             x_mm = float(self.relative_x_to_x_mm(int(getattr(ev, 'x_rpitch', 0) or 0))) + x_off
             y_mm = float(self._editor.time_to_mm(float(getattr(ev, 'time', 0.0) or 0.0))) + y_off
             du = self.draw_util()
-            _xb, _yb, w_mm, h_mm = du._get_text_extents_mm(display_txt, family, size_pt, italic, bold)
-            w_mm += pad_mm * 2.0
-            h_mm += pad_mm * 2.0
-            hw = w_mm * 0.5
+            _xb, _yb, ink_w_mm, ink_h_mm = du._get_text_extents_mm(display_txt, family, size_pt, italic, bold)
+            base_w_mm = max(0.0, float(ink_w_mm) + (pad_mm * 2.0))
+            h_mm = max(0.0, float(ink_h_mm) + (pad_mm * 2.0))
+            base_hw = base_w_mm * 0.5
+            x0 = -base_hw
+            x1 = base_hw + width_off_mm
+            if x1 < x0:
+                x1 = x0
+            w_mm = max(0.0, x1 - x0)
             hh = h_mm * 0.5
-            r = min(max(0.0, pad_mm), hw, hh)
+            r = min(max(0.0, pad_mm), w_mm * 0.5, hh)
             ang = math.radians(angle)
             sin_a = math.sin(ang)
             cos_a = math.cos(ang)
 
-            def _rounded_rect_points(hw_val: float, hh_val: float, radius: float) -> list[tuple[float, float]]:
+            def _rounded_rect_points(x0_val: float, x1_val: float, hh_val: float, radius: float) -> list[tuple[float, float]]:
                 if radius <= 1e-6:
-                    return [(-hw_val, -hh_val), (hw_val, -hh_val), (hw_val, hh_val), (-hw_val, hh_val)]
+                    return [(x0_val, -hh_val), (x1_val, -hh_val), (x1_val, hh_val), (x0_val, hh_val)]
                 pts: list[tuple[float, float]] = []
                 corner_defs = [
-                    (-hw_val + radius, -hh_val + radius, 180.0, 270.0),
-                    (hw_val - radius, -hh_val + radius, 270.0, 360.0),
-                    (hw_val - radius, hh_val - radius, 0.0, 90.0),
-                    (-hw_val + radius, hh_val - radius, 90.0, 180.0),
+                    (x0_val + radius, -hh_val + radius, 180.0, 270.0),
+                    (x1_val - radius, -hh_val + radius, 270.0, 360.0),
+                    (x1_val - radius, hh_val - radius, 0.0, 90.0),
+                    (x0_val + radius, hh_val - radius, 90.0, 180.0),
                 ]
                 step = 15.0
                 for cx, cy, start_deg, end_deg in corner_defs:
@@ -145,15 +151,19 @@ class TextTool(BaseTool):
                         deg += step
                 return pts
 
-            base_poly = _rounded_rect_points(hw, hh, r)
+            base_poly = _rounded_rect_points(-base_hw, base_hw, hh, min(max(0.0, pad_mm), base_hw, hh))
+            draw_poly = _rounded_rect_points(x0, x1, hh, r)
             rot: list[tuple[float, float]] = []
             min_y = float('inf')
             for dx, dy in base_poly:
                 rx = dx * cos_a - dy * sin_a
                 ry = dx * sin_a + dy * cos_a
-                rot.append((rx, ry))
                 if ry < min_y:
                     min_y = ry
+            for dx, dy in draw_poly:
+                rx = dx * cos_a - dy * sin_a
+                ry = dx * sin_a + dy * cos_a
+                rot.append((rx, ry))
             offset_down = max(0.0, -min_y)
             cy = y_mm + offset_down
             poly = [(x_mm + dx, cy + dy) for (dx, dy) in rot]
@@ -163,7 +173,7 @@ class TextTool(BaseTool):
             max_y_abs = max(p[1] for p in poly)
             bbox = (min_x, max_x, min_y_abs, max_y_abs)
             gap = max(1.5, (self._editor.semitone_dist or 2.5) * 0.3)
-            rad = hw + gap
+            rad = (w_mm * 0.5) + gap
             hx = x_mm + rad * cos_a
             hy = cy + rad * sin_a
             handle_size = max(2.0, (self._editor.semitone_dist or 2.5) * 0.6)
@@ -340,9 +350,15 @@ class TextTool(BaseTool):
 
         x_off_edit = FloatSliderEdit(float(getattr(ev, 'x_offset_mm', 0.0) or 0.0), -25.0, 25.0, 0.1, dlg)
         y_off_edit = FloatSliderEdit(float(getattr(ev, 'y_offset_mm', 0.0) or 0.0), -25.0, 25.0, 0.1, dlg)
+        width_corr_edit = FloatSliderEdit(float(getattr(ev, 'text_background_width_offset_mm', 0.0) or 0.0), -20.0, 20.0, 0.05, dlg)
+        width_corr_row = QtWidgets.QWidget(dlg)
+        width_corr_row_layout = QtWidgets.QHBoxLayout(width_corr_row)
+        width_corr_row_layout.setContentsMargins(0, 0, 0, 0)
+        width_corr_row_layout.addWidget(width_corr_edit)
         rot_edit = FloatSliderEdit(float(getattr(ev, 'rotation', 0.0) or 0.0), 0.0, 360.0, 0.1, dlg)
         layout.addRow("X offset (mm)", x_off_edit)
         layout.addRow("Y offset (mm)", y_off_edit)
+        layout.addRow("Background width offset (mm)", width_corr_row)
         layout.addRow("Rotation (degrees)", rot_edit)
 
         use_custom_chk = QtWidgets.QCheckBox("Use custom font", dlg)
@@ -351,7 +367,6 @@ class TextTool(BaseTool):
 
         font_picker = FontPicker(cur_font, parent=dlg)
         layout.addRow(font_picker)
-        font_picker.setVisible(use_custom_chk.isChecked())
 
         def toggle_custom(state: bool):
             font_picker.setVisible(state)
@@ -359,6 +374,7 @@ class TextTool(BaseTool):
                 font_picker.set_value(default_font or LayoutFont())
 
         use_custom_chk.toggled.connect(toggle_custom)
+        toggle_custom(use_custom_chk.isChecked())
 
         btns = QtWidgets.QDialogButtonBox(QtWidgets.QDialogButtonBox.Ok | QtWidgets.QDialogButtonBox.Cancel, parent=dlg)
         layout.addRow(btns)
@@ -369,6 +385,7 @@ class TextTool(BaseTool):
             'text': getattr(ev, 'text', ''),
             'use_custom_font': bool(getattr(ev, 'use_custom_font', False)),
             'font': deepcopy(getattr(ev, 'font', None)),
+            'text_background_width_offset_mm': float(getattr(ev, 'text_background_width_offset_mm', 0.0) or 0.0),
             'x_offset_mm': float(getattr(ev, 'x_offset_mm', 0.0) or 0.0),
             'y_offset_mm': float(getattr(ev, 'y_offset_mm', 0.0) or 0.0),
             'rotation': float(getattr(ev, 'rotation', 0.0) or 0.0),
@@ -381,6 +398,7 @@ class TextTool(BaseTool):
             else:
                 ev.use_custom_font = False
                 ev.font = deepcopy(default_font or LayoutFont())
+            ev.text_background_width_offset_mm = float(width_corr_edit.value())
             ev.text = txt_edit.text()
             ev.x_offset_mm = float(x_off_edit.value())
             ev.y_offset_mm = float(y_off_edit.value())
@@ -403,6 +421,7 @@ class TextTool(BaseTool):
                 ev.text = original_state['text']
                 ev.use_custom_font = original_state['use_custom_font']
                 ev.font = deepcopy(original_state['font'])
+                ev.text_background_width_offset_mm = float(original_state['text_background_width_offset_mm'])
                 ev.x_offset_mm = float(original_state['x_offset_mm'])
                 ev.y_offset_mm = float(original_state['y_offset_mm'])
                 ev.rotation = float(original_state['rotation'])
@@ -416,6 +435,7 @@ class TextTool(BaseTool):
         rot_edit.valueChanged.connect(lambda _v: _apply_live(False))
         use_custom_chk.toggled.connect(lambda _v: _apply_live(False))
         font_picker.valueChanged.connect(lambda: _apply_live(False))
+        width_corr_edit.valueChanged.connect(lambda _v: _apply_live(False))
 
         dlg.accepted.connect(_apply)
         dlg.raise_()

@@ -9,7 +9,7 @@ if TYPE_CHECKING:
 
 
 class TextDrawerMixin:
-    def _text_bbox(self, du: DrawUtil, text: str, family: str, size_pt: float, italic: bool, bold: bool, angle_deg: float, padding_mm: float) -> Tuple[float, float, float, list[tuple[float, float]], list[tuple[float, float]]]:
+    def _text_bbox(self, du: DrawUtil, text: str, family: str, size_pt: float, italic: bool, bold: bool, angle_deg: float, padding_mm: float, width_offset_mm: float) -> Tuple[float, float, float, list[tuple[float, float]], list[tuple[float, float]]]:
         """Return (width_mm, height_mm, offset_down_mm, rotated_corners, rounded_polygon).
 
         - width/height are axis-aligned (unrotated) text extents with padding applied.
@@ -17,23 +17,31 @@ class TextDrawerMixin:
         - rotated_corners are the four axis-aligned corners after rotation (for handles).
         - rounded_polygon is a rotated list of points approximating rounded corners.
         """
-        _, _, w_mm, h_mm = du._get_text_extents_mm(text, family, size_pt, italic, bold)
+        _, _, ink_w_mm, ink_h_mm = du._get_text_extents_mm(text, family, size_pt, italic, bold)
         pad = max(0.0, float(padding_mm))
-        w_mm += pad * 2.0
-        h_mm += pad * 2.0
-        hw = w_mm * 0.5
+        base_w_mm = max(0.0, float(ink_w_mm) + (pad * 2.0))
+        h_mm = max(0.0, float(ink_h_mm) + (pad * 2.0))
+        base_hw = base_w_mm * 0.5
         hh = h_mm * 0.5
-        r = min(pad, hw, hh)
 
-        def _rounded_rect_points(hw_val: float, hh_val: float, radius: float) -> list[tuple[float, float]]:
+        # Keep text anchor math based on the original background, then apply
+        # width offset only to the final rectangle's right side.
+        final_x0 = -base_hw
+        final_x1 = base_hw + float(width_offset_mm)
+        if final_x1 < final_x0:
+            final_x1 = final_x0
+        w_mm = max(0.0, final_x1 - final_x0)
+        r = min(pad, w_mm * 0.5, h_mm * 0.5)
+
+        def _rounded_rect_points(x0: float, x1: float, hh_val: float, radius: float) -> list[tuple[float, float]]:
             if radius <= 1e-6:
-                return [(-hw_val, -hh_val), (hw_val, -hh_val), (hw_val, hh_val), (-hw_val, hh_val)]
+                return [(x0, -hh_val), (x1, -hh_val), (x1, hh_val), (x0, hh_val)]
             pts: list[tuple[float, float]] = []
             corner_defs = [
-                (-hw_val + radius, -hh_val + radius, 180.0, 270.0),  # top-left
-                (hw_val - radius, -hh_val + radius, 270.0, 360.0),   # top-right
-                (hw_val - radius, hh_val - radius, 0.0, 90.0),       # bottom-right
-                (-hw_val + radius, hh_val - radius, 90.0, 180.0),    # bottom-left
+                (x0 + radius, -hh_val + radius, 180.0, 270.0),  # top-left
+                (x1 - radius, -hh_val + radius, 270.0, 360.0),   # top-right
+                (x1 - radius, hh_val - radius, 0.0, 90.0),       # bottom-right
+                (x0 + radius, hh_val - radius, 90.0, 180.0),    # bottom-left
             ]
             step = 15.0
             for cx, cy, start_deg, end_deg in corner_defs:
@@ -44,8 +52,10 @@ class TextDrawerMixin:
                     deg += step
             return pts
 
-        base_poly = _rounded_rect_points(hw, hh, r)
-        corners = [(-hw, -hh), (hw, -hh), (hw, hh), (-hw, hh)]
+        # Base rectangle (without width offset) defines text position anchoring.
+        base_poly = _rounded_rect_points(-base_hw, base_hw, hh, min(pad, base_hw, hh))
+        corners = [(final_x0, -hh), (final_x1, -hh), (final_x1, hh), (final_x0, hh)]
+        draw_poly = _rounded_rect_points(final_x0, final_x1, hh, r)
         ang = math.radians(angle_deg)
         sin_a = math.sin(ang)
         cos_a = math.cos(ang)
@@ -61,16 +71,17 @@ class TextDrawerMixin:
         for (dx, dy) in base_poly:
             rx = dx * cos_a - dy * sin_a
             ry = dx * sin_a + dy * cos_a
-            rot_poly.append((rx, ry))
             if ry < min_y:
                 min_y = ry
+        for (dx, dy) in draw_poly:
+            rx = dx * cos_a - dy * sin_a
+            ry = dx * sin_a + dy * cos_a
+            rot_poly.append((rx, ry))
         offset_down = max(0.0, -min_y)
         return w_mm, h_mm, offset_down, rot_corners, rot_poly
 
     def draw_text(self, du: DrawUtil) -> None:
         self = cast("Editor", self)
-        if getattr(self, 'is_tiny_mode', None) and self.is_tiny_mode():
-            return
         score = getattr(self, 'current_score', lambda: None)()
         if score is None:
             return
@@ -117,6 +128,7 @@ class TextDrawerMixin:
             italic = bool(getattr(font, 'italic', False))
             bold = bool(getattr(font, 'bold', False))
             pad_mm = float(getattr(score.layout, 'text_background_padding_mm', 0.0) or 0.0)
+            width_offset_mm = float(getattr(ev, 'text_background_width_offset_mm', 0.0) or 0.0)
             x_off = float(getattr(ev, 'x_offset_mm', 0.0) or 0.0)
             y_off = float(getattr(ev, 'y_offset_mm', 0.0) or 0.0)
 
@@ -126,7 +138,7 @@ class TextDrawerMixin:
 
             x_mm = float(self.relative_c4pitch_to_x(rp)) + x_off
 
-            w_mm, _, offset_down, _, rot_poly = self._text_bbox(du, display_txt, family, size_pt, italic, bold, angle, pad_mm)
+            w_mm, _, offset_down, _, rot_poly = self._text_bbox(du, display_txt, family, size_pt, italic, bold, angle, pad_mm, width_offset_mm)
 
             cy = y_mm + offset_down
             # Build rotated polygon in absolute coords

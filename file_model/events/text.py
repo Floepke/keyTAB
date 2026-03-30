@@ -25,4 +25,5 @@ class Text:
         italic=True,
     ))
     use_custom_font: bool = False
+    text_background_width_offset_mm: float = 0.0
     _id: int = 0

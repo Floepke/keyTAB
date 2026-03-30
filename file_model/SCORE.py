@@ -223,6 +223,7 @@ class SCORE:
 			'y_offset_mm': 0.0,
 			'font': default_font,
 			'use_custom_font': False,
+			'text_background_width_offset_mm': 0.0,
 		}
 		base.update(kwargs)
 		obj = Text(**base, _id=self._gen_id())
