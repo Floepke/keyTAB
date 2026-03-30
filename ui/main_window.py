@@ -1,6 +1,7 @@
 from PySide6 import QtCore, QtGui, QtWidgets
 from typing import Optional
 import sys, os, time
+import traceback
 from pathlib import Path
 from utils.file_associations import is_supported_document
 from datetime import datetime
@@ -15,6 +16,7 @@ from ui.widgets.snap_size_selector import SnapSizeDock
 from ui.widgets.draw_util import DrawUtil
 from ui.widgets.draw_view import DrawUtilView
 from ui.about_dialog import AboutDialog
+from ui.error_dialog import show_error_dialog
 from ui.style import Style
 from settings_manager import open_preferences, get_preferences_manager
 from appdata_manager import get_appdata_manager
@@ -62,6 +64,7 @@ class MainWindow(QtWidgets.QMainWindow):
             self._center_playhead_enabled = True
         self._playhead_anchor_measure: int | None = None
         self._playhead_last_visible_measure: int | None = None
+        self._last_engraver_error_signature: str | None = None
         
         # Install error-backup hook early so any unhandled exception triggers a backup
         self.file_manager.install_error_backup_hook()
@@ -97,6 +100,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
         # When engraving completes, refresh analysis then re-render the print view
         self.engraver.engraved.connect(self._on_engraver_finished)
+        self.engraver.failed.connect(self._on_engraver_failed)
         
         # Startup restore: prefer opening the last saved project; else restore unsaved session; else new
         self._session_restore_mode: bool = False
@@ -1219,6 +1223,15 @@ class MainWindow(QtWidgets.QMainWindow):
         QtWidgets.QMessageBox.warning(self, "FluidSynth not installed", msg)
         self._status("FluidSynth missing: install fluidsynth/libfluidsynth3 or use External MIDI", 10000)
 
+    def _show_error_dialog(self, title: str, text: str, details: str = "", informative_text: str = "") -> None:
+        show_error_dialog(self, title, text, details=details, informative_text=informative_text)
+
+    def _format_exception_details(self, exc: Exception) -> str:
+        try:
+            return ''.join(traceback.format_exception(type(exc), exc, exc.__traceback__))
+        except Exception:
+            return str(exc or '')
+
     def _rebuild_midi_port_menu(self) -> None:
         menu = getattr(self, '_midi_port_menu', None)
         if menu is None:
@@ -1427,7 +1440,11 @@ class MainWindow(QtWidgets.QMainWindow):
                 progress.setValue(100)
                 progress.close()
             except Exception as e:
-                QtWidgets.QMessageBox.critical(self, "Export PDF failed, please contact the developer and send this error: ", str(e))
+                self._show_error_dialog(
+                    "Export PDF failed",
+                    str(e),
+                    details=self._format_exception_details(e),
+                )
 
     def _export_image_pdf(self) -> None:
         dpi_options = [300, 600, 1200]
@@ -1512,7 +1529,11 @@ class MainWindow(QtWidgets.QMainWindow):
                 progress.setValue(100)
                 progress.close()
             except Exception as e:
-                QtWidgets.QMessageBox.critical(self, "Export Image PDF failed", str(e))
+                self._show_error_dialog(
+                    "Export Image PDF failed",
+                    str(e),
+                    details=self._format_exception_details(e),
+                )
 
     def _prime_export_progress(self, progress: QtWidgets.QProgressDialog, target_percent: int = 46, duration_ms: int = 400) -> None:
         """Animate the progress bar to a target percentage over a fixed duration."""
@@ -1862,12 +1883,12 @@ class MainWindow(QtWidgets.QMainWindow):
                 self.script_engine = ScriptEngine(self.file_manager, self.editor_controller, parent=self)
                 engine = self.script_engine
             except Exception as exc:
-                QtWidgets.QMessageBox.critical(self, "Run Script", f"Failed to initialize scripting: {exc}")
+                self._show_error_dialog("Run Script", f"Failed to initialize scripting: {exc}", details=self._format_exception_details(exc))
                 return
         try:
             engine.choose_and_run()
         except Exception as exc:
-            QtWidgets.QMessageBox.critical(self, "Run Script", f"Script failed: {exc}")
+            self._show_error_dialog("Run Script", f"Script failed: {exc}", details=self._format_exception_details(exc))
 
     def _scripts_dir(self) -> Path:
         return Path(__file__).resolve().parent.parent / "scripts"
@@ -1879,12 +1900,12 @@ class MainWindow(QtWidgets.QMainWindow):
                 self.script_engine = ScriptEngine(self.file_manager, self.editor_controller, parent=self)
                 engine = self.script_engine
             except Exception as exc:
-                QtWidgets.QMessageBox.critical(self, "Run Script", f"Failed to initialize scripting: {exc}")
+                self._show_error_dialog("Run Script", f"Failed to initialize scripting: {exc}", details=self._format_exception_details(exc))
                 return
         try:
             engine.run_script(Path(script_path))
         except Exception as exc:
-            QtWidgets.QMessageBox.critical(self, "Run Script", f"Script failed: {exc}")
+            self._show_error_dialog("Run Script", f"Script failed: {exc}", details=self._format_exception_details(exc))
 
     def _rebuild_tools_menu(self) -> None:
         menu = getattr(self, "_tools_menu", None)
@@ -2312,6 +2333,7 @@ class MainWindow(QtWidgets.QMainWindow):
             return {}
 
     def _on_engraver_finished(self) -> None:
+        self._last_engraver_error_signature = None
         # Keep print view page selection aligned with restored/app-state page index.
         try:
             page_count = int(self.du.page_count())
@@ -2338,6 +2360,23 @@ class MainWindow(QtWidgets.QMainWindow):
             pass
         try:
             self.print_view.request_render()
+        except Exception:
+            pass
+
+    @QtCore.Slot(str, str)
+    def _on_engraver_failed(self, error_text: str, error_details: str) -> None:
+        signature = f"{error_text}\n{error_details}".strip()
+        if signature and signature == self._last_engraver_error_signature:
+            return
+        self._last_engraver_error_signature = signature or None
+        self._show_error_dialog(
+            "Engraving failed",
+            str(error_text or "The engraver failed."),
+            details=str(error_details or ""),
+            informative_text="Use 'Copy Error Log' and keep the copied traceback for debugging.",
+        )
+        try:
+            self._status("Engraving failed. See error dialog for details.", 10000)
         except Exception:
             pass
 

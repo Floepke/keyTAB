@@ -2,6 +2,7 @@ from PySide6 import QtCore
 from datetime import datetime
 import bisect, math
 import multiprocessing as mp
+import traceback
 from ui.widgets.draw_util import DrawUtil
 from utils.CONSTANT import BE_KEYS, QUARTER_NOTE_UNIT, PIANO_KEY_AMOUNT, SHORTEST_DURATION, hex_to_rgba, BLACK_KEYS, ENGRAVER_FRACTIONAL_TEXT_SCALING_CORRECTION, SLUR_SEGMENT_COUNT
 from utils.tiny_tool import key_class_filter
@@ -3365,7 +3366,12 @@ def _engrave_worker(score: dict, request_id: int, pageno: int, out_conn) -> None
     try:
         local_du = DrawUtil()
         do_engrave(score, local_du, pageno=pageno)
-        out_conn.send((int(request_id), local_du))
+        out_conn.send(('ok', int(request_id), local_du))
+    except Exception as exc:
+        try:
+            out_conn.send(('error', int(request_id), str(exc), traceback.format_exc()))
+        except Exception:
+            pass
     finally:
         try:
             out_conn.close()
@@ -3382,6 +3388,7 @@ class Engraver(QtCore.QObject):
     """
 
     engraved = QtCore.Signal()
+    failed = QtCore.Signal(str, str)
 
     def __init__(self, draw_util: DrawUtil, parent=None):
         super().__init__(parent)
@@ -3517,13 +3524,19 @@ class Engraver(QtCore.QObject):
                 has_result = False
             if has_result:
                 try:
-                    req_id, result_du = self._result_recv.recv()
+                    payload = self._result_recv.recv()
                 except (EOFError, OSError):
                     pass
                 else:
                     got_result = True
                     self._close_result_pipe()
-                    self._on_finished(req_id, result_du)
+                    kind = str(payload[0]) if isinstance(payload, tuple) and payload else 'ok'
+                    if kind == 'ok':
+                        _kind, req_id, result_du = payload
+                        self._on_finished(req_id, result_du)
+                    else:
+                        _kind, req_id, error_text, error_details = payload
+                        self._on_failed(req_id, str(error_text), str(error_details))
 
         if self._proc is not None and not self._proc.is_alive():
             self._proc.join(timeout=0.1)
@@ -3531,6 +3544,11 @@ class Engraver(QtCore.QObject):
             self._close_result_pipe()
             if self._running and not got_result:
                 self._running = False
+                if self._pending_score is None:
+                    self.failed.emit(
+                        'Engraving failed',
+                        'The engraver worker exited without returning a result.',
+                    )
                 if self._pending_score is not None:
                     self._maybe_start_pending()
             if not self._running:
@@ -3574,3 +3592,11 @@ class Engraver(QtCore.QObject):
             except Exception:
                 pass
             self.engraved.emit()
+
+    @QtCore.Slot(int, str, str)
+    def _on_failed(self, request_id: int, error_text: str, error_details: str) -> None:
+        self._running = False
+        if self._pending_score is not None:
+            self._maybe_start_pending()
+        if int(request_id) == int(self._latest_request_id):
+            self.failed.emit(str(error_text or 'Engraving failed'), str(error_details or ''))

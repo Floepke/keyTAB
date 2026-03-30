@@ -8,6 +8,7 @@ import sys
 from datetime import datetime
 
 from PySide6.QtWidgets import QFileDialog, QMessageBox, QWidget
+from ui.error_dialog import show_error_dialog
 
 from file_model.SCORE import SCORE, MetaData, _merge_with_defaults
 from file_model.info import Info
@@ -385,11 +386,7 @@ class FileManager:
         if self._parent is None:
             # If no parent (non-GUI context), silently ignore GUI messagebox
             return
-        msg = QMessageBox(self._parent)
-        msg.setIcon(QMessageBox.Critical)
-        msg.setWindowTitle(title)
-        msg.setText(text)
-        msg.exec()
+        show_error_dialog(self._parent, title, text)
 
     def _show_info(self, title: str, text: str) -> None:
         if self._parent is None:
