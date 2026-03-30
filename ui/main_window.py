@@ -2896,7 +2896,7 @@ class MainWindow(QtWidgets.QMainWindow):
                 "key": "LelandText",
                 "family": "LelandText",
                 "check_name": "LelandText",
-                "desc": "LelandText for dynamic/hairpin symbols (crescendo and decrescendo).",
+                "desc": "LelandText for dynamic symbols (f/mp/p etc...).",
             },
         ]
         from fonts import has_system_font, install_embedded_font_to_system

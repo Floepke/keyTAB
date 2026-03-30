@@ -4,6 +4,7 @@ import sys
 import threading
 import time
 import ctypes
+import ctypes.util
 from pathlib import Path
 from typing import List, Optional, Tuple
 
@@ -64,7 +65,24 @@ def list_midi_output_ports() -> List[str]:
 
 
 def _ensure_fluidsynth_lib() -> None:
+    env_lib = str(os.environ.get("PYFLUIDSYNTH_LIB", "") or "").strip()
+    if env_lib:
+        try:
+            ctypes.CDLL(env_lib)
+            return
+        except Exception:
+            pass
+
+    appdir = str(os.environ.get("APPDIR", "") or "").strip()
+    app_candidates: list[Path] = []
+    if appdir:
+        app_candidates.extend([
+            Path(appdir) / "usr" / "lib" / "libfluidsynth.so",
+            Path(appdir) / "usr" / "lib" / "libfluidsynth.so.3",
+        ])
+
     candidates = [
+        *app_candidates,
         Path("/usr/lib/x86_64-linux-gnu/libfluidsynth.so.3"),
         Path("/usr/lib/libfluidsynth.so.3"),
         Path("/lib/x86_64-linux-gnu/libfluidsynth.so.3"),
@@ -82,6 +100,26 @@ def _ensure_fluidsynth_lib() -> None:
             return
         except Exception:
             continue
+
+    found = ctypes.util.find_library("fluidsynth")
+    if found:
+        try:
+            # find_library returns soname only; try loading it directly first
+            lib = ctypes.CDLL(str(found))
+            os.environ.setdefault("PYFLUIDSYNTH_LIB", str(found))
+            return
+        except Exception:
+            # If direct load fails, search common paths for the actual file
+            for search_dir in ["/usr/lib/x86_64-linux-gnu", "/lib/x86_64-linux-gnu", "/usr/lib", "/lib", "/usr/local/lib"]:
+                full_path = Path(search_dir) / found
+                if full_path.exists():
+                    try:
+                        ctypes.CDLL(str(full_path))
+                        os.environ.setdefault("PYFLUIDSYNTH_LIB", str(full_path))
+                        return
+                    except Exception:
+                        pass
+
     raise ImportError(
         "FluidSynth native library not available. Install it with 'sudo apt-get install fluidsynth libfluidsynth3' (or equivalent) "
         "and install the Python binding with 'python3 -m pip install pyfluidsynth'."

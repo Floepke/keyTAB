@@ -22,6 +22,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import importlib.util
 import os
 import platform
 import shlex
@@ -146,6 +147,26 @@ def ensure_pip_requirements(project_root: Path) -> None:
     result = subprocess.run(cmd)
     if result.returncode != 0:
         raise SystemExit("Failed to install requirements.txt with pip3")
+
+
+def resolve_fluidsynth_module_file() -> Path | None:
+    """Return the installed fluidsynth.py module path, if available."""
+    try:
+        spec = importlib.util.find_spec("fluidsynth")
+    except Exception:
+        return None
+    if spec is None:
+        return None
+    origin = getattr(spec, "origin", None)
+    if not origin:
+        return None
+    try:
+        p = Path(str(origin)).resolve()
+    except Exception:
+        return None
+    if p.exists() and p.is_file():
+        return p
+    return None
 
 
 def _is_debian_pkg_installed(pkg: str) -> bool:
@@ -279,6 +300,14 @@ def write_apprun(appdir: Path, name: str) -> Path:
         f"export ALSA_CONFIG_PATH=\"$HERE/usr/share/alsa/alsa.conf\"\n"
         f"export ALSA_CONFIG_DIR=\"$HERE/usr/share/alsa\"\n"
         f"export ALSA_PLUGIN_DIR=\"$HERE/usr/lib/alsa-lib\"\n"
+        # Hint pyfluidsynth to the bundled FluidSynth shared library first.
+        # Try both versioned and plain soname variants.
+        "for lib in \"$HERE/usr/lib/libfluidsynth.so\"*; do\n"
+        "  if [ -f \"$lib\" ]; then\n"
+        "    export PYFLUIDSYNTH_LIB=\"$lib\"\n"
+        "    break\n"
+        "  fi\n"
+        "done\n"
         # Ensure bundled Python modules (including rtmidi) are discoverable
         f"export PYTHONPATH=\"$HERE/usr/lib/{name}/_internal:$PYTHONPATH\"\n"
         # Force mido to use bundled RtMidi backend
@@ -458,6 +487,7 @@ def main() -> int:
 
     ensure_system_packages(["patchelf", "desktop-file-utils", "file", "libfuse2"])
     ensure_system_package_alternatives(["libtiff5", "libtiff6"])
+    ensure_system_package_alternatives(["libfluidsynth3", "libfluidsynth2", "libfluidsynth1"])
     ensure_pip_requirements(project_root)
     ensure_pip_dependency("PyInstaller")
 
@@ -478,14 +508,24 @@ def main() -> int:
         f"--specpath={str(spec_dir)}",
         str(entry_script),
     ]
-    # Ensure MIDI backend (python-rtmidi) is bundled even if imported dynamically
+    # Ensure MIDI backends are bundled even if imported dynamically.
+    # pyfluidsynth is imported as module name "fluidsynth".
     cmd.extend([
         "--hidden-import=rtmidi",
         "--hidden-import=rtmidi._rtmidi",
         "--collect-all=rtmidi",
         "--hidden-import=mido.backends.rtmidi",
         "--collect-all=mido",
+        "--hidden-import=fluidsynth",
+        "--collect-all=fluidsynth",
     ])
+    fluidsynth_module = resolve_fluidsynth_module_file()
+    if fluidsynth_module is not None:
+        # Ensure the binding file is present at runtime even when module graph
+        # analysis misses it due dynamic/conditional import patterns.
+        cmd.append(f"--add-data={str(fluidsynth_module)}:_internal")
+    else:
+        print("Warning: fluidsynth module file not found; pyfluidsynth may be missing from bundle.")
     if args.extra_args.strip():
         cmd.extend(shlex.split(args.extra_args))
 
@@ -519,10 +559,10 @@ def main() -> int:
     copy_bundled_assets(project_root, lib_app_dir, appdir, exe_name)
     copy_qt_licenses(appdir, exe_name)
 
-    # Bundle a small set of audio deps often missing on minimal systems; skip FluidSynth (ask user to install).
+    # Bundle a small set of audio deps often missing on minimal systems, including FluidSynth.
     copy_shared_libs(
         appdir,
-        ["libpulse", "libsndfile", "libglib-2.0"],
+        ["libpulse", "libsndfile", "libglib-2.0", "libfluidsynth"],
         extra_targets=[],
     )
 
