@@ -118,7 +118,6 @@ class ArpeggioDrawerMixin:
                 # Midi body spans the arpeggio duration
                 self._draw_midinote(du, note_obj, x_note, y0, y1, draw_mode="note")
                 self._draw_notehead(du, note_obj, x_note, y_head_top, draw_mode="note")
-                self._draw_left_dot(du, note_obj, x_note, y_head_top, draw_mode="note")
 
             # Accent handle at the terminal end of the diagonal (used for resizing)
             handle_x, handle_y = end_pt

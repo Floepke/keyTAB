@@ -62,6 +62,7 @@ class BaseTool:
     def on_left_unpress(self, x: float, y: float) -> None: pass
     def on_left_click(self, x: float, y: float) -> None: pass
     def on_left_double_click(self, x: float, y: float) -> None: pass
+    def on_left_double_unpress(self, x: float, y: float) -> None: pass
 
     def on_left_drag_start(self, x: float, y: float) -> None: pass
     def on_left_drag(self, x: float, y: float, dx: float, dy: float) -> None: pass
@@ -71,6 +72,7 @@ class BaseTool:
     def on_right_unpress(self, x: float, y: float) -> None: pass
     def on_right_click(self, x: float, y: float) -> None: pass
     def on_right_double_click(self, x: float, y: float) -> None: pass
+    def on_right_double_unpress(self, x: float, y: float) -> None: pass
 
     def on_right_drag_start(self, x: float, y: float) -> None: pass
     def on_right_drag(self, x: float, y: float, dx: float, dy: float) -> None: pass

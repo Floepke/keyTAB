@@ -2,6 +2,7 @@ from __future__ import annotations
 import math
 from typing import TYPE_CHECKING, cast, Tuple
 from ui.widgets.draw_util import DrawUtil
+from ui.style import Style
 from file_model.layout import LayoutFont
 
 if TYPE_CHECKING:
@@ -187,6 +188,9 @@ class TextDrawerMixin:
                 hx2 = hx + handle_size * 0.5
                 hy1 = hy - handle_size * 0.5
                 hy2 = hy + handle_size * 0.5
+                # Get custom handle color and convert from RGB (0-255) to normalized RGBA (0-1)
+                color_rgb = Style.get_named_rgb('accent_color2', (128, 0, 0))
+                handle_color = (float(color_rgb[0]) / 255.0, float(color_rgb[1]) / 255.0, float(color_rgb[2]) / 255.0, 1.0)
                 du.add_rectangle(
                     hx1,
                     hy1,
@@ -194,7 +198,7 @@ class TextDrawerMixin:
                     hy2,
                     stroke_color=None,
                     stroke_width_mm=0.0,
-                    fill_color=(0.5, 0.0, 0.0, 1.0),
+                    fill_color=handle_color,
                     id=int(getattr(ev, '_id', 0) or 0),
                     tags=["text", "text_handle"],
                 )

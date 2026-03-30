@@ -8,6 +8,7 @@ from utils.tiny_tool import key_class_filter
 from utils.operator import Operator
 from typing import Tuple
 from ui.style import Style
+from symbol_design.noteheads import Notehead, resolve_notehead_spec
 
 if TYPE_CHECKING:
     from editor.editor import Editor
@@ -107,12 +108,12 @@ class NoteDrawerMixin:
             self._draw_notehead(du, n, x, y1, draw_mode)
             self._draw_midinote(du, n, x, y1, y2, draw_mode)
             self._draw_stem(du, n, x, y1, draw_mode)
-            self._draw_left_dot(du, n, x, y1, draw_mode)
             try:
                 w = float(self.semitone_dist or 0.5)
                 layout = self.current_score().layout
+                spec = resolve_notehead_spec(n, default_black_above=self._black_note_above_stem(n, layout))
                 y_top = float(y1)
-                if int(getattr(n, 'pitch', 0) or 0) in BLACK_KEYS and self._black_note_above_stem(n, layout):
+                if bool(getattr(spec, 'is_up', False)):
                     y_top = float(y1) - (w * 2.0)
                 rect_id = int(getattr(n, '_id', 0) or 0)
                 self.register_hit_rect('note', rect_id, float(x - w), float(y_top), float(x + w), float(y1 + (w * 2.0)))
@@ -127,7 +128,6 @@ class NoteDrawerMixin:
         self._draw_stem(du, n, x, y1, draw_mode)
         self._draw_note_continuation_dot(du, n, x, y1, y2, draw_mode)
         self._draw_connect_stem(du, n, x, y1, draw_mode)
-        self._draw_left_dot(du, n, x, y1, draw_mode)
 
     def _midinote_color(self, n, draw_mode: str) -> tuple[float, float, float, float]:
         if draw_mode in ('cursor', 'edit', 'selected'):
@@ -163,7 +163,8 @@ class NoteDrawerMixin:
         x_left = x - max(w, head_half_w)
         x_right = x + max(w, head_half_w)
         y_top = y1           # top of notehead
-        if int(getattr(n, 'pitch', 0) or 0) in BLACK_KEYS and self._black_note_above_stem(n, layout):
+        spec = resolve_notehead_spec(n, default_black_above=self._black_note_above_stem(n, layout))
+        if bool(getattr(spec, 'is_up', False)):
             y_top = float(y1) - (w * 2.0)
         y_bottom = y2        # actual end of note polygon
         rect_id = int(getattr(n, '_id', 0) or 0)
@@ -223,42 +224,21 @@ class NoteDrawerMixin:
 
     def _draw_notehead(self, du: DrawUtil, n, x: float, y1: float, draw_mode: str) -> None:
         self = cast("Editor", self)
-        w = float(self.semitone_dist or 0.5)
         layout = self.current_score().layout
-        outline_w = 0.5
-        head_scale = float(getattr(layout, 'note_width_scaling', 0.75) or 0.75)
-        head_scale = max(0.05, head_scale)
-        head_half_w = w * head_scale
-        black_above = n.pitch in BLACK_KEYS and self._black_note_above_stem(n, layout)
-        # Adjust vertical for black-note rule
-        if black_above:
-            y1 = y1 - (w * 2.0)
-        if n.pitch in BLACK_KEYS:
-            du.add_oval(
-                x - head_half_w,
-                y1,
-                x + head_half_w,
-                y1 + w * 2.0,
-                stroke_color=self.notation_color,
-                stroke_width_mm=0.3,
-                fill_color=self.notation_color,
-                id=n._id,
-                tags=["notehead_black"],
-            )
-        else:
-            paper_r, paper_g, paper_b = Style.get_named_rgb('paper', (255, 255, 255))
-            bg_fill = (paper_r / 255.0, paper_g / 255.0, paper_b / 255.0, 1.0)
-            du.add_oval(
-                x - head_half_w,
-                y1,
-                x + head_half_w,
-                y1 + w * 2.0,
-                stroke_color=self.notation_color,
-                stroke_width_mm=outline_w,
-                fill_color=bg_fill,
-                id=n._id,
-                tags=["notehead_white"],
-            )
+        paper_r, paper_g, paper_b = Style.get_named_rgb('paper', (255, 255, 255))
+        bg_fill = (paper_r / 255.0, paper_g / 255.0, paper_b / 255.0, 1.0)
+        notehead = Notehead.from_note(
+            x_mm=float(x),
+            y_mm=float(y1),
+            note=n,
+            layout=layout,
+            semitone_space_mm=float(self.semitone_dist or 0.5),
+            notation_color=self.notation_color,
+            paper_color=bg_fill,
+            default_black_above=self._black_note_above_stem(n, layout),
+        )
+        tag = "notehead_black" if bool(getattr(notehead, 'filled', False)) else "notehead_white"
+        notehead.draw_notehead(du, item_id=int(getattr(n, '_id', 0) or 0), tags=[tag], use_custom_color=True)
 
     def _draw_notestop(self, du: DrawUtil, n, x: float, y2: float, draw_mode: str) -> None:
         self = cast("Editor", self)
@@ -410,31 +390,6 @@ class NoteDrawerMixin:
             width_mm=stem_w,
             id=0,
             tags=["chord_connect"],
-        )
-
-    def _draw_left_dot(self, du: DrawUtil, n, x: float, y1: float, draw_mode: str) -> None:
-        self = cast("Editor", self)
-        # Simple left-hand indicator dot in notehead (optional)
-        if getattr(n, 'hand', 'l') != 'l':
-            return
-        layout = self.current_score().layout
-        if not bool(getattr(layout, 'note_leftdot_visible', False)):
-            return
-        if n.pitch in BLACK_KEYS and self._black_note_above_stem(n, layout):
-            y1 = y1 - (float(self.semitone_dist or 0.5) * 2.0)
-        w = float(self.semitone_dist or 0.5) * 2.0
-        dot_d = w * 0.35
-        cy = y1 + (w / 2.0)
-        fill = (1.0, 1.0, 1.0, 1.0) if (n.pitch in BLACK_KEYS) else self.notation_color
-        du.add_oval(
-            x - dot_d / 3.0,
-            cy - dot_d / 3.0,
-            x + dot_d / 3.0,
-            cy + dot_d / 3.0,
-            stroke_color=None,
-            fill_color=fill,
-            id=0,
-            tags=["left_dot"],
         )
 
     def _editor_background_rgba(self) -> Tuple[float, float, float, float]:

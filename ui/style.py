@@ -94,6 +94,7 @@ class Style:
         'text': (0, 0, 0),
         'alternate_background_color': (245, 245, 245),
         'accent': (0, 120, 215),
+        'accent_color2': (128, 0, 0),  # Custom notehead indicator color (0.5, 0, 0, 1 normalized)
         'paper': (255, 255, 255),
         'notation': (0, 16, 0),
         'midi_left': (153, 179, 204),
@@ -141,6 +142,7 @@ class Style:
         _set_named('midi_left', 'left_midi_color')
         _set_named('midi_right', 'right_midi_color')
         cls._NAMED['draw_util'] = (255, 255, 255)
+        cls._NAMED['accent_color2'] = (128, 0, 0)  # Fixed custom notehead color
         cls._NAMED['editor'] = cls._NAMED['paper']
         cls._THEME_SYNCED = True
 
@@ -232,6 +234,7 @@ class Style:
             Style._NAMED['midi_left'] = (midi_left.red(), midi_left.green(), midi_left.blue())
             Style._NAMED['midi_right'] = (midi_right.red(), midi_right.green(), midi_right.blue())
             Style._NAMED['draw_util'] = (255, 255, 255)
+            Style._NAMED['accent_color2'] = (128, 0, 0)  # Fixed custom notehead color
             Style._NAMED['editor'] = Style._NAMED['paper']
             Style._THEME_SYNCED = True
         except Exception:

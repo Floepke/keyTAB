@@ -76,7 +76,7 @@ class Layout:
 
     # Hairpin (crescendo / decrescendo) appearance
     hairpin_visible: bool = True
-    hairpin_line_width_mm: float = 1.5
+    hairpin_line_width_mm: float = 1.0
     hairpin_spread_mm: float = 10.0  # width of the open end of the hairpin in mm
     hairpin_font_size_pt: float = 12.0
     hairpin_text_gap_mm: float = 5.0

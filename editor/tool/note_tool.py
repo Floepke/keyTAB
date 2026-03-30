@@ -4,9 +4,12 @@ from editor.tool.base_tool import BaseTool
 from file_model.SCORE import SCORE
 from utils.operator import Operator
 from ui.widgets.draw_util import DrawUtil
-from utils.CONSTANT import QUARTER_NOTE_UNIT, SHORTEST_DURATION
+from utils.CONSTANT import BLACK_KEYS, QUARTER_NOTE_UNIT, SHORTEST_DURATION
 from file_model.events.note import Note
 from file_model.events.arpeggio import Arpeggio
+from symbol_design.noteheads import resolve_notehead_spec
+from ui.dialogs.notehead_dialog import NoteheadDialog
+from PySide6 import QtGui, QtWidgets
 
 
 class NoteTool(BaseTool):
@@ -33,6 +36,10 @@ class NoteTool(BaseTool):
         self._velocity_display_value: int | None = None
         self._velocity_display_x_mm: float | None = None
         self._velocity_display_y_mm: float | None = None
+        self._ignore_next_left_release: bool = False
+        self._suppress_note_edit_until_release: bool = False
+        self._notehead_dialog_active: bool = False
+        self._pending_notehead_dialog_note_id: int | None = None
         # Arpeggio edit session
         self._arpeggio_dragging: bool = False
         self._arpeggio_target: Arpeggio | None = None
@@ -257,13 +264,13 @@ class NoteTool(BaseTool):
                 'name': 'hand_left',
                 'icon': 'note_left',
                 'active': hand == 'l',
-                'tooltip': 'Click to write left hand notes (shortcut: , )',
+                'tooltip': 'Click to write left hand notes (shortcut: , ). Double-click a notehead to set or reset a custom notehead.',
             },
             {
                 'name': 'hand_right',
                 'icon': 'note_right',
                 'active': hand == 'r',
-                'tooltip': 'Click to write right hand notes (shortcut: . )',
+                'tooltip': 'Click to write right hand notes (shortcut: . ). Double-click a notehead to set or reset a custom notehead.',
             },
             {
                 'name': 'selection_left',
@@ -456,6 +463,8 @@ class NoteTool(BaseTool):
     def on_left_press(self, x: float, y: float) -> None:
         '''Detect existing note under cursor or create a new one, then enter edit mode'''
         super().on_left_press(x, y)
+        if self._notehead_dialog_active or self._suppress_note_edit_until_release:
+            return
         self._velocity_dragging = False
         self._velocity_target = None
         self._velocity_targets = []
@@ -547,6 +556,14 @@ class NoteTool(BaseTool):
 
     def on_left_unpress(self, x: float, y: float) -> None:
         super().on_left_unpress(x, y)
+        if self._suppress_note_edit_until_release:
+            self._suppress_note_edit_until_release = False
+            self._notehead_dialog_active = False
+            self._ignore_next_left_release = False
+            return
+        if self._ignore_next_left_release:
+            self._ignore_next_left_release = False
+            return
         # Keep last edit and clear the session handle
         if self._arpeggio_dragging and hasattr(self._editor, '_snapshot_if_changed'):
             self._editor._snapshot_if_changed(coalesce=True, label='arpeggio_resize')
@@ -575,19 +592,228 @@ class NoteTool(BaseTool):
 
     def on_left_click(self, x: float, y: float) -> None:
         super().on_left_click(x, y)
+        if self._suppress_note_edit_until_release or self._notehead_dialog_active:
+            return
+        if self._ignore_next_left_release:
+            return
         # Click handled on press; avoid duplicate creation on release-click path
         return
 
     def on_left_double_click(self, x: float, y: float) -> None:
         super().on_left_double_click(x, y)
+        score: SCORE = self._editor.current_score()
+        if score is None:
+            self._pending_notehead_dialog_note_id = None
+            return
+        found, _hit_rect, y_mm_abs = self._hit_note_and_rect(score, x, y)
+        if found is None:
+            self._pending_notehead_dialog_note_id = None
+            return
+        note_top_mm, note_bottom_mm = self._notehead_vertical_bounds_mm(score, found)
+        if not (float(note_top_mm) <= float(y_mm_abs) <= float(note_bottom_mm)):
+            self._pending_notehead_dialog_note_id = None
+            return
+
+        # Queue dialog handling for release so mouse state is fully settled.
+        self._pending_notehead_dialog_note_id = int(getattr(found, '_id', -1) or -1)
+
+    def on_left_double_unpress(self, x: float, y: float) -> None:
+        super().on_left_double_unpress(x, y)
+        note_id = self._pending_notehead_dialog_note_id
+        self._pending_notehead_dialog_note_id = None
+        if note_id is None:
+            return
+
+        score: SCORE = self._editor.current_score()
+        if score is None:
+            return
+
+        found = None
+        for n in getattr(score.events, 'note', []) or []:
+            if int(getattr(n, '_id', -1) or -1) == int(note_id):
+                found = n
+                break
+        if found is None:
+            return
+
+        # Check if this notehead is custom (not auto)
+        current_notehead = str(getattr(found, 'notehead', 'auto') or 'auto').strip()
+        is_custom = current_notehead != "auto"
+        
+        # If custom, reset to auto instead of opening dialog
+        if is_custom:
+            found.notehead = "auto"
+            self._cancel_active_note_edit(redraw=False)
+            if hasattr(self._editor, 'force_redraw_from_model'):
+                self._editor.force_redraw_from_model()
+            else:
+                self._editor.draw_frame()
+            if hasattr(self._editor, '_snapshot_if_changed'):
+                self._editor._snapshot_if_changed(coalesce=True, label='notehead_reset')
+            return
+
+        # Otherwise, open the notehead dialog
+        self._notehead_dialog_active = True
+        self._cancel_active_note_edit(redraw=False)
+
+        parent = QtWidgets.QApplication.activeWindow()
+        layout = getattr(score, 'layout', None)
+        default_black_above = self._black_note_above_stem(score, found)
+        selected, accepted = NoteheadDialog.get_notehead(
+            note=found,
+            layout=layout,
+            semitone_space_mm=float(getattr(self._editor, 'semitone_dist', 0.5) or 0.5),
+            notation_color=self._editor.notation_color,
+            paper_color=self._editor.paper_color,
+            default_black_above=default_black_above,
+            parent=parent,
+        )
+        self._notehead_dialog_active = False
+        if not accepted:
+            self._refresh_cursor_overlay_from_pointer()
+            return
+
+        found.notehead = selected
+        self._cancel_active_note_edit(redraw=False)
+        self._refresh_cursor_overlay_from_pointer()
+        if hasattr(self._editor, 'force_redraw_from_model'):
+            self._editor.force_redraw_from_model()
+        else:
+            self._editor.draw_frame()
+        if hasattr(self._editor, '_snapshot_if_changed'):
+            self._editor._snapshot_if_changed(coalesce=True, label='notehead_override')
 
     def on_left_drag_start(self, x: float, y: float) -> None:
         super().on_left_drag_start(x, y)
+        if self._notehead_dialog_active or self._suppress_note_edit_until_release:
+            return
         # Nothing to do; edit_note is established on press
         return
 
+    def _cancel_active_note_edit(self, redraw: bool) -> None:
+        self._velocity_dragging = False
+        self._velocity_target = None
+        self._velocity_targets = []
+        self._velocity_display_value = None
+        self._velocity_display_x_mm = None
+        self._velocity_display_y_mm = None
+        self.edit_note = None
+        self._editing_existing = False
+        self._duration_edit_armed = False
+        self._last_audition_pitch = None
+        self._move_pitch_time_mode = False
+        self._editor.guides_active = True
+        if redraw:
+            if hasattr(self._editor, 'force_redraw_from_model'):
+                self._editor.force_redraw_from_model()
+            else:
+                self._editor.draw_frame()
+
+    def _refresh_cursor_overlay_from_pointer(self) -> None:
+        """Recompute cursor guides from current pointer position after modal dialogs."""
+        try:
+            widget = getattr(self._editor, 'widget', None)
+            if widget is None:
+                return
+            pos = widget.mapFromGlobal(QtGui.QCursor.pos())
+            x = float(pos.x())
+            y = float(pos.y())
+            self._editor.mouse_move(x, y, 0.0, 0.0)
+            if hasattr(widget, 'request_overlay_refresh'):
+                widget.request_overlay_refresh()
+            else:
+                widget.update()
+        except Exception:
+            return
+
+    def _editor_left_button_down(self) -> bool:
+        try:
+            widget = getattr(self._editor, 'widget', None)
+            if widget is not None:
+                return bool(getattr(widget, '_left_down', False))
+        except Exception:
+            pass
+        return bool(getattr(self._editor, '_left_pressed', False))
+
+    def _finalize_notehead_dialog_transition(self) -> None:
+        # Fully clear tool/editor/widget mouse states touched by double-click dialog path.
+        self._notehead_dialog_active = False
+        self._suppress_note_edit_until_release = False
+        self._ignore_next_left_release = False
+        self._cancel_active_note_edit(redraw=False)
+        try:
+            setattr(self._editor, '_ignore_next_left_release', False)
+            setattr(self._editor, '_left_pressed', False)
+            setattr(self._editor, '_dragging_left', False)
+            setattr(self._editor, '_left_selection_mode', False)
+            widget = getattr(self._editor, 'widget', None)
+            if widget is not None:
+                setattr(widget, '_left_down', False)
+                try:
+                    widget.releaseMouse()
+                except Exception:
+                    pass
+        except Exception:
+            pass
+
+    def _black_note_above_stem(self, score: SCORE, note: Note) -> bool:
+        layout = getattr(score, 'layout', None)
+        rule = str(getattr(layout, 'black_note_rule', 'below_stem') or 'below_stem')
+        if rule == 'above_stem':
+            return True
+        t0 = float(getattr(note, 'time', 0.0) or 0.0)
+        p0 = int(getattr(note, 'pitch', 0) or 0)
+        note_id = int(getattr(note, '_id', -1) or -1)
+        op = Operator(7)
+        if rule in ('above_stem_if_collision', 'only_above_stem_if_collision'):
+            for other in getattr(score.events, 'note', []) or []:
+                if int(getattr(other, '_id', -2) or -2) == note_id:
+                    continue
+                if not op.eq(float(getattr(other, 'time', 0.0) or 0.0), t0):
+                    continue
+                if abs(int(getattr(other, 'pitch', 0) or 0) - p0) == 1:
+                    return True
+            return False
+        if rule == 'above_stem_if_chord_and_white_note':
+            for other in getattr(score.events, 'note', []) or []:
+                if int(getattr(other, '_id', -2) or -2) == note_id:
+                    continue
+                if not op.eq(float(getattr(other, 'time', 0.0) or 0.0), t0):
+                    continue
+                other_pitch = int(getattr(other, 'pitch', 0) or 0)
+                if other_pitch not in BLACK_KEYS and other_pitch != p0:
+                    return True
+            return False
+        if rule != 'above_stem_if_chord_and_white_note_same_hand':
+            return False
+        hand0 = str(getattr(note, 'hand', 'l') or 'l')
+        for other in getattr(score.events, 'note', []) or []:
+            if int(getattr(other, '_id', -2) or -2) == note_id:
+                continue
+            if not op.eq(float(getattr(other, 'time', 0.0) or 0.0), t0):
+                continue
+            if str(getattr(other, 'hand', 'l') or 'l') != hand0:
+                continue
+            other_pitch = int(getattr(other, 'pitch', 0) or 0)
+            if other_pitch not in BLACK_KEYS and other_pitch != p0:
+                return True
+        return False
+
+    def _notehead_vertical_bounds_mm(self, score: SCORE, note: Note) -> tuple[float, float]:
+        note_start_mm = float(self._editor.time_to_mm(float(getattr(note, 'time', 0.0) or 0.0)))
+        notehead_h_mm = float(getattr(self._editor, 'semitone_dist', 0.5) or 0.5) * 2.0
+        spec = resolve_notehead_spec(note, default_black_above=self._black_note_above_stem(score, note))
+        if bool(getattr(spec, 'is_up', False)):
+            return (float(note_start_mm - notehead_h_mm), float(note_start_mm))
+        return (float(note_start_mm), float(note_start_mm + notehead_h_mm))
+
     def on_left_drag(self, x: float, y: float, dx: float, dy: float) -> None:
         super().on_left_drag(x, y, dx, dy)
+        if not self._editor_left_button_down():
+            self._cancel_active_note_edit(redraw=False)
+            return
+        if self._notehead_dialog_active or self._suppress_note_edit_until_release:
+            return
         if self._arpeggio_dragging:
             self._update_arpeggio_duration_from_cursor(x, y)
             return
@@ -663,6 +889,8 @@ class NoteTool(BaseTool):
 
     def on_left_drag_end(self, x: float, y: float) -> None:
         super().on_left_drag_end(x, y)
+        if self._notehead_dialog_active or self._suppress_note_edit_until_release:
+            return
         # Finalize edit session
         if self._arpeggio_dragging and hasattr(self._editor, '_snapshot_if_changed'):
             self._editor._snapshot_if_changed(coalesce=True, label='arpeggio_resize')

@@ -412,6 +412,45 @@ class StyleDialog(QtWidgets.QDialog):
     values_changed = QtCore.Signal()
     tab_changed = QtCore.Signal(int)
 
+    def _coerce_layout_fonts(self, layout_obj: Layout) -> None:
+        """Ensure all LayoutFont-typed fields are dataclass instances, not dict payloads."""
+        try:
+            hints = getattr(self, '_type_hints', None)
+            if not isinstance(hints, dict):
+                try:
+                    hints = get_type_hints(Layout)
+                except Exception:
+                    hints = {}
+            defaults = Layout()
+            for f in fields(Layout):
+                name = f.name
+                hint = hints.get(name, f.type)
+                if hint is not LayoutFont:
+                    continue
+                val = getattr(layout_obj, name, getattr(defaults, name))
+                if isinstance(val, dict):
+                    try:
+                        val = LayoutFont(**val)
+                    except Exception:
+                        val = getattr(defaults, name)
+                    try:
+                        setattr(layout_obj, name, val)
+                    except Exception:
+                        pass
+        except Exception:
+            pass
+
+    def _font_family_from_value(self, value: Any, fallback: str = "Edwin") -> str:
+        try:
+            if isinstance(value, dict):
+                fam = value.get('family', fallback)
+            else:
+                fam = getattr(value, 'family', fallback)
+            fam = str(fam or fallback)
+            return fam
+        except Exception:
+            return str(fallback)
+
     def __init__(self, parent=None, layout: Layout | None = None, score: SCORE | None = None) -> None:
         super().__init__(parent)
         self.setWindowTitle("Style")
@@ -609,6 +648,7 @@ class StyleDialog(QtWidgets.QDialog):
         except Exception:
             type_hints = {}
         self._type_hints = type_hints
+        self._coerce_layout_fonts(self._layout)
         _hide_fields = {
             "measure_grouping",
         }
@@ -934,7 +974,7 @@ class StyleDialog(QtWidgets.QDialog):
         combo = QtWidgets.QFontComboBox(self)
         self._all_fonts_combo = combo
         font_title = getattr(self._layout, 'font_title', LayoutFont())
-        combo.setCurrentFont(QtGui.QFont(str(font_title.family)))
+        combo.setCurrentFont(QtGui.QFont(self._font_family_from_value(font_title)))
         combo.currentFontChanged.connect(lambda f: self._set_all_font_families(f.family()))
         try:
             form.insertRow(0, label, combo)
@@ -1056,6 +1096,7 @@ class StyleDialog(QtWidgets.QDialog):
             self._apply_layout_object(layout_obj)
 
     def _apply_layout_to_editors(self, layout_obj: Layout) -> None:
+        self._coerce_layout_fonts(layout_obj)
         for f in fields(Layout):
             name = f.name
             editor = self._editors.get(name)
@@ -1068,7 +1109,7 @@ class StyleDialog(QtWidgets.QDialog):
             try:
                 self._all_fonts_combo.blockSignals(True)
                 font_title = getattr(layout_obj, 'font_title', LayoutFont())
-                self._all_fonts_combo.setCurrentFont(QtGui.QFont(str(font_title.family)))
+                self._all_fonts_combo.setCurrentFont(QtGui.QFont(self._font_family_from_value(font_title)))
             finally:
                 self._all_fonts_combo.blockSignals(False)
         self.values_changed.emit()

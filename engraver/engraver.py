@@ -12,6 +12,7 @@ from file_model.base_grid import resolve_grid_layer_offsets
 from file_model.info import Info
 from file_model.analysis import Analysis
 from ui.style import Style
+from symbol_design.noteheads import Notehead, resolve_notehead_spec
 
 _MP_CONTEXT = mp.get_context("spawn")
 
@@ -2712,9 +2713,10 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                 if y_end < y_start:
                     y_start, y_end = y_end, y_start
                 w = semitone_mm
+                default_black_above = p in BLACK_KEYS and _black_note_above_stem(item, black_rule, line_notes, op_time)
+                spec = resolve_notehead_spec(n, default_black_above=default_black_above)
                 note_y = y_start
-                black_above = p in BLACK_KEYS and _black_note_above_stem(item, black_rule, line_notes, op_time)
-                if black_above:
+                if bool(getattr(spec, 'is_up', False)):
                     note_y = y_start - (w * 2.0)
                 # Problem solved: draw the note body with auto-by-hand or explicit hex color.
                 raw_color = n.get('color', 'auto')
@@ -2776,32 +2778,18 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
 
                 # Problem solved: avoid duplicated heads on continuations.
                 if not continues_from_prev_line and bool(layout.get('note_head_visible', True)):
-                    outline_w = float(layout.get('note_stem_thickness_mm', 0.5) or 0.5) * scale
-                    head_scale = float(layout.get('note_width_scaling', 0.75) or 0.75)
-                    if p in BLACK_KEYS:
-                        du.add_oval(
-                            x - (w * head_scale),
-                            note_y,
-                            x + (w * head_scale),
-                            note_y + (w * 2.0),
-                            stroke_color=notation_color,
-                            stroke_width_mm=0.1,
-                            fill_color=notation_color,
-                            id=int(item.get('id', 0) or 0),
-                            tags=['notehead_black'],
-                        )
-                    else:
-                        du.add_oval(
-                            x - (w * head_scale),
-                            note_y,
-                            x + (w * head_scale),
-                            note_y + (w * 2.0),
-                            stroke_color=notation_color,
-                            stroke_width_mm=outline_w,
-                            fill_color=paper_color,
-                            id=int(item.get('id', 0) or 0),
-                            tags=['notehead_white'],
-                        )
+                    notehead = Notehead.from_note(
+                        x_mm=float(x),
+                        y_mm=float(y_start),
+                        note=n,
+                        layout=layout,
+                        semitone_space_mm=float(semitone_mm),
+                        notation_color=notation_color,
+                        paper_color=paper_color,
+                        default_black_above=default_black_above,
+                    )
+                    tag = 'notehead_black' if bool(getattr(notehead, 'filled', False)) else 'notehead_white'
+                    notehead.draw_notehead(du, item_id=int(item.get('id', 0) or 0), tags=[tag])
 
                 # Problem solved: attach stems only to non-continuation heads.
                 if not continues_from_prev_line and bool(layout.get('note_stem_visible', True)):
@@ -2818,23 +2806,6 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                         width_mm=stem_w,
                         id=0,
                         tags=['stem'],
-                    )
-
-                # Problem solved: left-hand dot uses inverse fill on black keys.
-                if (not continues_from_prev_line) and bool(layout.get('note_leftdot_visible', True)) and hand_key == 'l':
-                    w2 = w * 2.0
-                    dot_d = w2 * 0.3
-                    cy = note_y + (w2 / 2.0)
-                    fill = paper_color if p in BLACK_KEYS else notation_color
-                    du.add_oval(
-                        x - (dot_d / 3.0),
-                        cy - (dot_d / 3.0),
-                        x + (dot_d / 3.0),
-                        cy + (dot_d / 3.0),
-                        stroke_color=None,
-                        fill_color=fill,
-                        id=0,
-                        tags=['left_dot'],
                     )
 
                 # Problem solved: show ledger lines only when manual ranges

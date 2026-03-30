@@ -1,7 +1,7 @@
 from __future__ import annotations
 from typing import Literal, Optional, Tuple, Dict, Type, TYPE_CHECKING
 import math, bisect, copy, heapq
-from PySide6 import QtCore
+from PySide6 import QtCore, QtGui
 
 from editor.tool.base_tool import BaseTool
 from editor.tool_manager import ToolManager
@@ -116,6 +116,11 @@ class Editor(QtCore.QObject,
         self._press_pos: Tuple[float, float] = (0.0, 0.0)
         self._dragging_left: bool = False
         self._dragging_right: bool = False
+        self._ignore_next_left_release: bool = False
+        self._pending_left_double_release: bool = False
+        self._pending_right_double_release: bool = False
+        self._pending_left_double_pos: tuple[float, float] | None = None
+        self._pending_right_double_pos: tuple[float, float] | None = None
 
         # layout metrics (mm)
         self.margin: float = None
@@ -645,6 +650,34 @@ class Editor(QtCore.QObject,
                 self._selection_active = True
 
     def mouse_move(self, x: float, y: float, dx: float, dy: float) -> None:
+        # Recover from stale press state (e.g., modal dialogs interrupt release events).
+        try:
+            buttons = QtGui.QGuiApplication.mouseButtons()
+            left_phys_down = bool(buttons & QtCore.Qt.MouseButton.LeftButton)
+            right_phys_down = bool(buttons & QtCore.Qt.MouseButton.RightButton)
+        except Exception:
+            left_phys_down = self._left_pressed
+            right_phys_down = self._right_pressed
+
+        if self._left_pressed and not left_phys_down:
+            try:
+                if not self._left_selection_mode:
+                    self._tool.on_left_unpress(x, y)
+            except Exception:
+                pass
+            self._left_pressed = False
+            self._dragging_left = False
+            self._left_selection_mode = False
+
+        if self._right_pressed and not right_phys_down:
+            try:
+                self._tool.on_right_unpress(x, y)
+            except Exception:
+                pass
+            self._right_pressed = False
+            self._dragging_right = False
+            self._right_selection_mode = False
+
         if self._left_pressed:
             if not self._dragging_left and (abs(dx) > self.DRAG_THRESHOLD or abs(dy) > self.DRAG_THRESHOLD):
                 self._dragging_left = True
@@ -720,6 +753,19 @@ class Editor(QtCore.QObject,
 
     def mouse_release(self, button: int, x: float, y: float) -> None:
         if button == 1:
+            is_left_double_release = bool(self._pending_left_double_release)
+            if self._ignore_next_left_release:
+                self._ignore_next_left_release = False
+                try:
+                    if not self._left_selection_mode:
+                        self._tool.on_left_unpress(x, y)
+                except Exception:
+                    pass
+                self._selection_active = False
+                self._left_pressed = False
+                self._dragging_left = False
+                self._left_selection_mode = False
+                return
             if self._dragging_left:
                 if not self._left_selection_mode:
                     self._tool.on_left_drag_end(x, y)
@@ -728,7 +774,7 @@ class Editor(QtCore.QObject,
             else:
                 # Click if moved <= threshold
                 px, py = self._press_pos
-                if (abs(x - px) <= self.DRAG_THRESHOLD and abs(y - py) <= self.DRAG_THRESHOLD):
+                if (not is_left_double_release) and (abs(x - px) <= self.DRAG_THRESHOLD and abs(y - py) <= self.DRAG_THRESHOLD):
                     if not self._left_selection_mode:
                         self._tool.on_left_click(x, y)
                         # Capture click changes (non-coalesced)
@@ -742,6 +788,7 @@ class Editor(QtCore.QObject,
             self._dragging_left = False
             self._left_selection_mode = False
         elif button == 2:
+            is_right_double_release = bool(self._pending_right_double_release)
             if self._dragging_right:
                 if not self._right_selection_mode:
                     self._tool.on_right_drag_end(x, y)
@@ -750,7 +797,7 @@ class Editor(QtCore.QObject,
                 # Do not modify clipboard on selection changes
             else:
                 px, py = self._press_pos
-                if (abs(x - px) <= self.DRAG_THRESHOLD and abs(y - py) <= self.DRAG_THRESHOLD):
+                if (not is_right_double_release) and (abs(x - px) <= self.DRAG_THRESHOLD and abs(y - py) <= self.DRAG_THRESHOLD):
                     self._tool.on_right_click(x, y)
                 self._snapshot_if_changed(coalesce=False, label="right_click")
             # Stop drawing selection on any click
@@ -763,10 +810,57 @@ class Editor(QtCore.QObject,
 
     def mouse_double_click(self, button: int, x: float, y: float) -> None:
         if button == 1:
+            self._pending_left_double_release = True
+            self._pending_left_double_pos = (x, y)
             if not self._shift_down:
                 self._tool.on_left_double_click(x, y)
+            self._schedule_double_unpress_dispatch(button=1)
         elif button == 2:
+            self._pending_right_double_release = True
+            self._pending_right_double_pos = (x, y)
             self._tool.on_right_double_click(x, y)
+            self._schedule_double_unpress_dispatch(button=2)
+
+    def _schedule_double_unpress_dispatch(self, button: int) -> None:
+        def _try_dispatch() -> None:
+            try:
+                buttons = QtGui.QGuiApplication.mouseButtons()
+                left_down = bool(buttons & QtCore.Qt.MouseButton.LeftButton)
+                right_down = bool(buttons & QtCore.Qt.MouseButton.RightButton)
+            except Exception:
+                left_down = False
+                right_down = False
+
+            if button == 1:
+                if not self._pending_left_double_release:
+                    return
+                if left_down:
+                    QtCore.QTimer.singleShot(0, _try_dispatch)
+                    return
+                pos = self._pending_left_double_pos or self._press_pos
+                self._pending_left_double_release = False
+                self._pending_left_double_pos = None
+                if not self._shift_down:
+                    try:
+                        self._tool.on_left_double_unpress(float(pos[0]), float(pos[1]))
+                    except Exception:
+                        pass
+                return
+
+            if not self._pending_right_double_release:
+                return
+            if right_down:
+                QtCore.QTimer.singleShot(0, _try_dispatch)
+                return
+            pos = self._pending_right_double_pos or self._press_pos
+            self._pending_right_double_release = False
+            self._pending_right_double_pos = None
+            try:
+                self._tool.on_right_double_unpress(float(pos[0]), float(pos[1]))
+            except Exception:
+                pass
+
+        QtCore.QTimer.singleShot(0, _try_dispatch)
 
     '''
         ---- Editor drawer mixin helper methods ----
@@ -1353,7 +1447,9 @@ class Editor(QtCore.QObject,
             self._hit_rects = [r for r in self._hit_rects if r.get('type') != 'velocity']
             score = self.current_score()
             if score is not None:
-                velocity_color = (0.5, 0, 0, 1)
+                # Get custom notehead color and convert from RGB (0-255) to normalized RGBA (0-1)
+                color_rgb = Style.get_named_rgb('accent_color2', (128, 0, 0))
+                velocity_color = (float(color_rgb[0]) / 255.0, float(color_rgb[1]) / 255.0, float(color_rgb[2]) / 255.0, 1.0)
                 selected_note_ids = self.get_selected_note_ids_cached(score)
                 top_mm = float(self._view_y_mm_offset or 0.0)
                 bottom_mm = top_mm + float(self._viewport_h_mm or 0.0)
