@@ -340,20 +340,14 @@ class TextTool(BaseTool):
         def _apply_live(commit_snapshot: bool = False) -> None:
             dlg.apply_to_event(ev)
             if commit_snapshot:
-                try:
-                    self._editor._snapshot_if_changed(coalesce=False, label='text_edit')
-                except Exception:
-                    pass
+                self._editor._snapshot_if_changed(coalesce=False, label='text_edit')
             self._schedule_preview()
 
         def _apply():
             _apply_live(commit_snapshot=True)
 
         def _revert_state() -> None:
-            try:
-                TextDialog.restore_event(ev, original_state)
-            except Exception:
-                pass
+            TextDialog.restore_event(ev, original_state)
             self._schedule_preview()
 
         dlg.valueChanged.connect(lambda: _apply_live(False))
@@ -397,10 +391,7 @@ class TextTool(BaseTool):
             self._created_on_press = True
             self._pending_new_text = tx
             self._cached_center = None
-            try:
-                self._editor._snapshot_if_changed(coalesce=True, label='text_create')
-            except Exception:
-                pass
+            self._editor._snapshot_if_changed(coalesce=True, label='text_create')
             if hasattr(self._editor, 'force_redraw_from_model'):
                 self._editor.force_redraw_from_model()
             else:
@@ -422,25 +413,13 @@ class TextTool(BaseTool):
             if self._rotation_steps and self._rotation_steps > 0 and not ctrl_down:
                 step = 360.0 / float(self._rotation_steps)
                 ang = round(ang / step) * step
-            try:
-                self._active_text.rotation = float(ang)
-            except Exception:
-                pass
+            self._active_text.rotation = float(ang)
         elif self._active_mode == 'move':
-            try:
-                t_raw = float(self._editor.y_to_time(y))
-                t_snap = float(self._editor.snap_time(t_raw))
-            except Exception:
-                t_snap = 0.0
-            try:
-                rp = self.x_mm_to_relative_x(x_mm)
-            except Exception:
-                rp = 0
-            try:
-                self._active_text.time = float(t_snap)
-                self._active_text.x_rpitch = int(rp)
-            except Exception:
-                pass
+            t_raw = float(self._editor.y_to_time(y))
+            t_snap = float(self._editor.snap_time(t_raw))
+            rp = self.x_mm_to_relative_x(x_mm)
+            self._active_text.time = float(t_snap)
+            self._active_text.x_rpitch = int(rp)
         if hasattr(self._editor, 'force_redraw_from_model'):
             self._editor.force_redraw_from_model()
         else:
@@ -452,10 +431,7 @@ class TextTool(BaseTool):
             return
         if self._active_text is not None:
             label = 'text_rotate' if self._active_mode == 'rotate' else 'text_move'
-            try:
-                self._editor._snapshot_if_changed(coalesce=True, label=label)
-            except Exception:
-                pass
+            self._editor._snapshot_if_changed(coalesce=True, label=label)
         self._active_mode = None
         self._cached_center = None
 
@@ -495,13 +471,10 @@ class TextTool(BaseTool):
         hit, _mode, _ = self._hit_test(x_mm, y_mm)
         if hit is None:
             return
-        try:
-            lst = list(getattr(score.events, 'text', []) or [])
-            lst = [t for t in lst if int(getattr(t, '_id', -1) or -1) != int(getattr(hit, '_id', -2) or -2)]
-            score.events.text = lst
-            self._editor._snapshot_if_changed(coalesce=True, label='text_delete')
-        except Exception:
-            pass
+        lst = list(getattr(score.events, 'text', []) or [])
+        lst = [t for t in lst if int(getattr(t, '_id', -1) or -1) != int(getattr(hit, '_id', -2) or -2)]
+        score.events.text = lst
+        self._editor._snapshot_if_changed(coalesce=True, label='text_delete')
         if hasattr(self._editor, 'force_redraw_from_model'):
             self._editor.force_redraw_from_model()
         else:

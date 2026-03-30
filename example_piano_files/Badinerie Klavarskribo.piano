@@ -20,7 +20,7 @@
         "pages":1,
         "measures":20,
         "lines":4,
-        "updated_at":"2026-03-30T07:39:05"
+        "updated_at":"2026-03-30T08:18:17"
     },
     "base_grid":[
         {
@@ -191,10 +191,10 @@
     "app_state":{
         "zoom_mm_per_quarter":28.531167061100078,
         "print_view_page_index":0,
-        "editor_scroll_pos":0,
+        "editor_scroll_pos":6,
         "snap_base":16,
         "snap_divide":1,
-        "selected_tool":"text",
+        "selected_tool":"note",
         "style_dialog_tab_index":4,
         "note_velocity_mode":false
     },
@@ -240,15 +240,6 @@
                 "pitch":20,
                 "time":18048,
                 "duration":64,
-                "velocity":64,
-                "hand":"l",
-                "notehead":"auto",
-                "color":"auto"
-            },
-            {
-                "pitch":22,
-                "time":0.0,
-                "duration":64.0,
                 "velocity":64,
                 "hand":"l",
                 "notehead":"auto",
@@ -393,6 +384,15 @@
                 "pitch":26,
                 "time":15360,
                 "duration":64,
+                "velocity":64,
+                "hand":"l",
+                "notehead":"auto",
+                "color":"auto"
+            },
+            {
+                "pitch":27,
+                "time":0.0,
+                "duration":64.0,
                 "velocity":64,
                 "hand":"l",
                 "notehead":"auto",
@@ -4029,7 +4029,7 @@
             {
                 "time":0.0,
                 "margin_mm":[
-                    13.5,
+                    8.0,
                     5.0
                 ],
                 "stave_range":"auto",
@@ -4057,7 +4057,7 @@
                 "time":15360.0,
                 "margin_mm":[
                     5.0,
-                    8.0
+                    5.0
                 ],
                 "stave_range":"auto",
                 "page_break":false

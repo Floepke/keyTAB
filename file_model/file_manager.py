@@ -461,6 +461,63 @@ class FileManager:
         adm.set("recent_files", recent)
         adm.save()
 
+    def _replace_recent_file_path(self, old_path: str, new_path: str) -> None:
+        old_p = str(old_path or "").strip()
+        new_p = str(new_path or "").strip()
+        if not new_p:
+            return
+        adm = get_appdata_manager()
+        recent = adm.get("recent_files", []) or []
+        if not isinstance(recent, list):
+            recent = []
+        normalized = [str(x) for x in recent if str(x).strip()]
+        replaced = [new_p if x == old_p else x for x in normalized]
+        # Keep unique order, new path first.
+        deduped: list[str] = []
+        seen: set[str] = set()
+        for x in [new_p] + replaced:
+            if x in seen:
+                continue
+            seen.add(x)
+            deduped.append(x)
+        adm.set("recent_files", deduped[:100])
+        adm.save()
+
+    def rename_current_file(self, new_path: Path | str) -> bool:
+        """Rename the current on-disk project file and update tracked path metadata."""
+        if self._path is None:
+            self._show_error("Rename file", "Current project has no saved file path.")
+            return False
+        old_path = Path(self._path)
+        if not old_path.exists() or not old_path.is_file():
+            self._show_error("Rename file", "Current file does not exist on disk.")
+            return False
+
+        target = Path(new_path).expanduser()
+        if target == old_path:
+            return True
+        if target.exists():
+            self._show_error("Rename file", f"Target already exists:\n{target}")
+            return False
+        if target.parent != old_path.parent and not target.parent.exists():
+            self._show_error("Rename file", f"Target directory does not exist:\n{target.parent}")
+            return False
+
+        try:
+            old_path.rename(target)
+        except Exception as exc:
+            self._show_error("Rename file", f"Failed to rename file:\n{exc}")
+            return False
+
+        self._path = target
+        self._last_dir = target.parent
+        adm = get_appdata_manager()
+        adm.set("last_file_dialog_dir", str(self._last_dir))
+        adm.set("last_opened_file", str(self._path))
+        adm.save()
+        self._replace_recent_file_path(str(old_path), str(target))
+        return True
+
     def _refresh_analysis(self) -> None:
         """Recompute analysis so it persists in saved files.
 

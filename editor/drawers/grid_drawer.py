@@ -107,6 +107,7 @@ class GridDrawerMixin:
         if op is None:
             op = Operator(7)
         notes_view = list(cache.get('notes_view') or []) if isinstance(cache, dict) else []
+        notes_by_hand_cache = dict(cache.get('notes_by_hand') or {}) if isinstance(cache, dict) else {}
         beam_markers = dict(cache.get('beam_by_hand') or {}) if isinstance(cache, dict) else {}
 
         note_stem_visible = bool(getattr(layout, 'note_stem_visible', True)) if layout is not None else True
@@ -131,8 +132,12 @@ class GridDrawerMixin:
             return 'l' if v == 'l' else 'r'
 
         notes_by_norm: dict[str, list] = {'l': [], 'r': []}
-        for n in notes_view:
-            notes_by_norm[_norm_hand_key(str(getattr(n, 'hand', 'l') or 'l'))].append(n)
+        if notes_by_hand_cache:
+            for hand, notes in notes_by_hand_cache.items():
+                notes_by_norm[_norm_hand_key(str(hand or 'l'))].extend(list(notes or []))
+        else:
+            for n in notes_view:
+                notes_by_norm[_norm_hand_key(str(getattr(n, 'hand', 'l') or 'l'))].append(n)
 
         markers_by_norm: dict[str, list] = {'l': [], 'r': []}
         for hand, markers in beam_markers.items():
@@ -179,9 +184,11 @@ class GridDrawerMixin:
 
         beam_segments: list[dict[str, float]] = []
         beam_connect_segments: list[dict[str, float]] = []
-        # Use the same timeline source as beam drawing so collision beams are
-        # grouped per grid subdivision, not per measure barline only.
-        beam_time_boundaries = grid_den_times if grid_den_times else barline_times
+        # Use a combined boundary timeline so the first measure start (t=0)
+        # is always included even when grid_den_times has only subdivisions.
+        beam_time_boundaries = sorted(
+            {round(float(t), 6) for t in (list(grid_den_times or []) + list(barline_times or []))}
+        )
         grid_windows = _build_grid_windows(beam_time_boundaries)
         for hand_norm in ('r', 'l'):
             notes_hand = notes_by_norm.get(hand_norm, [])
@@ -286,8 +293,6 @@ class GridDrawerMixin:
             for seg in beam_segments:
                 t0 = float(seg.get('t_start', 0.0) or 0.0)
                 t1 = float(seg.get('t_end', 0.0) or 0.0)
-                if not _barline_time_eq(float(t0), float(ticks)):
-                    continue
                 if not _barline_time_in_range(float(ticks), float(t0), float(t1)):
                     continue
                 dt = float(t1 - t0)
@@ -301,9 +306,6 @@ class GridDrawerMixin:
                 ))
             for conn in beam_connect_segments:
                 c_t = float(conn.get('time', 0.0) or 0.0)
-                c_bstart = float(conn.get('beam_start', -1.0) or -1.0)
-                if not _barline_time_eq(float(c_bstart), float(ticks)):
-                    continue
                 if not _barline_time_eq(float(c_t), float(ticks)):
                     continue
                 c_x0 = float(conn.get('x0', 0.0) or 0.0)

@@ -196,6 +196,10 @@ class MainWindow(QtWidgets.QMainWindow):
         self._startup_status_message = str(status_msg or "")
 
         self._update_title()
+        try:
+            self._refresh_recent_files_menu()
+        except Exception:
+            pass
 
         # Build a container with the canvas and external vertical scrollbar
         editor_container = QtWidgets.QWidget()
@@ -600,6 +604,11 @@ class MainWindow(QtWidgets.QMainWindow):
         file_menu.addAction(save_as_act)
         self._recent_menu = file_menu.addMenu("Recent Files")
         self._recent_menu.setToolTipsVisible(True)
+        self._rename_file_act = QtGui.QAction("Rename...", self)
+        self._rename_file_act.setToolTip("Rename the currently opened file and update Recent Files.")
+        self._rename_file_act.triggered.connect(self._rename_current_file)
+        file_menu.addAction(self._rename_file_act)
+        self._refresh_rename_file_action()
         file_menu.addSeparator()
 
         style_act = QtGui.QAction("Style...", self)
@@ -2001,10 +2010,62 @@ class MainWindow(QtWidgets.QMainWindow):
                 act = QtGui.QAction(path, self)
                 act.triggered.connect(lambda _c=False, p=path: self._open_recent_file(p))
                 menu.addAction(act)
+
         menu.addSeparator()
         clear_act = QtGui.QAction("Clear Recent Files", self)
         clear_act.triggered.connect(self._clear_recent_files)
         menu.addAction(clear_act)
+        self._refresh_rename_file_action()
+
+    def _refresh_rename_file_action(self) -> None:
+        act = getattr(self, '_rename_file_act', None)
+        if act is None:
+            return
+        try:
+            current_path = self.file_manager.path()
+            visible = current_path is not None and Path(current_path).is_file()
+        except Exception:
+            visible = False
+        act.setVisible(bool(visible))
+        act.setEnabled(bool(visible))
+
+    def _rename_current_file(self) -> None:
+        try:
+            cur_path = self.file_manager.path()
+        except Exception:
+            cur_path = None
+        if cur_path is None or not Path(cur_path).is_file():
+            return
+
+        current = Path(cur_path)
+        new_name, ok = QtWidgets.QInputDialog.getText(
+            self,
+            "Rename File",
+            "New file name:",
+            QtWidgets.QLineEdit.EchoMode.Normal,
+            current.name,
+        )
+        if not ok:
+            return
+
+        new_name = str(new_name or "").strip()
+        if not new_name or new_name == current.name:
+            return
+        if ("/" in new_name) or ("\\" in new_name):
+            QtWidgets.QMessageBox.warning(self, "Rename File", "Please enter only a file name, not a path.")
+            return
+
+        target = current.with_name(new_name)
+        if target.suffix == "" and current.suffix:
+            target = target.with_suffix(current.suffix)
+
+        if self.file_manager.rename_current_file(target):
+            self._session_restore_mode = False
+            self._refresh_recent_files_menu()
+            self._refresh_rename_file_action()
+            self._update_title()
+            self._show_status_default(force=True)
+            self._show_file_action_status("Renamed")
 
     def _open_recent_file(self, path: str) -> None:
         if not self.file_manager.confirm_save_for_action("opening another project", force_prompt=True):

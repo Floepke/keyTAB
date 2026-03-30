@@ -37,7 +37,6 @@ from editor.drawers.pedal_drawer import PedalDrawerMixin
 from editor.drawers.text_drawer import TextDrawerMixin
 from editor.drawers.slur_drawer import SlurDrawerMixin
 from editor.drawers.repeat_drawer import RepeatDrawerMixin
-from editor.drawers.double_bar_drawer import DoubleBarDrawerMixin
 from editor.drawers.count_line_drawer import CountLineDrawerMixin
 from editor.drawers.line_break_drawer import LineBreakDrawerMixin
 from editor.drawers.tempo_drawer import TempoDrawerMixin
@@ -71,7 +70,6 @@ class Editor(QtCore.QObject,
              CrescendoDrawerMixin,
              DecrescendoDrawerMixin,
              RepeatDrawerMixin,
-             DoubleBarDrawerMixin,
              CountLineDrawerMixin,
              LineBreakDrawerMixin,
              TempoDrawerMixin):
@@ -265,7 +263,6 @@ class Editor(QtCore.QObject,
             getattr(self, 'draw_slur', None),
             getattr(self, 'draw_start_repeat', None),
             getattr(self, 'draw_end_repeat', None),
-            getattr(self, 'draw_double_bar', None),
             getattr(self, 'draw_count_line', None),
             getattr(self, 'draw_tempo', None),
             getattr(self, 'draw_line_break', None),
