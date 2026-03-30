@@ -1323,6 +1323,8 @@ class Editor(QtCore.QObject,
                 bleed_mm = max(4.0, float(self.semitone_dist or 2.5) * 2.0)
                 margin = float(self.margin or 12.0)
                 stave_width = float(self.stave_width or 120.0)
+                view_left = 0.0
+                view_right = max(0.0, margin + stave_width + margin)
                 max_len = max(2.0, margin * 0.85)
                 handle_r = max(1.5, float(self.semitone_dist or 2.5) * 0.45)
                 for n in getattr(score.events, 'note', []) or []:
@@ -1336,14 +1338,15 @@ class Editor(QtCore.QObject,
                     if y_mm < (top_mm - bleed_mm) or y_mm > (bottom_mm + bleed_mm):
                         continue
                     ratio = max(0.0, min(1.0, float(vel) / 127.0))
+                    dist_from_inner = max_len * (1.0 - ratio)
                     if hand == 'l':
                         x_inner = margin
-                        x_outer = x_inner - max_len * ratio
-                        x1, x2 = x_outer, x_inner
+                        x_outer = x_inner - dist_from_inner
+                        x1, x2 = view_left, x_outer
                     else:
                         x_inner = margin + stave_width
-                        x_outer = x_inner + max_len * ratio
-                        x1, x2 = x_inner, x_outer
+                        x_outer = x_inner + dist_from_inner
+                        x1, x2 = x_outer, view_right
                     du.add_line(
                         x1,
                         y_mm,

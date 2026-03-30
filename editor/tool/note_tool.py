@@ -335,7 +335,7 @@ class NoteTool(BaseTool):
         else:
             dist = max(0.0, float(x_mm) - float(margin + stave_width))
         ratio = max(0.0, min(1.0, dist / max_len))
-        new_vel = int(round(ratio * 127.0))
+        new_vel = int(round((1.0 - ratio) * 127.0))
         self._velocity_target.velocity = new_vel
         t = float(getattr(self._velocity_target, 'time', 0.0) or 0.0)
         self._velocity_display_y_mm = float(self._editor.time_to_mm(t))
