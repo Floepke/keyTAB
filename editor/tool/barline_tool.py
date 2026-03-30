@@ -105,6 +105,14 @@ class BarlineTool(BaseTool):
         else:
             score.new_double_bar(time=float(t))
 
+    def _has_mode_event_at_barline(self, score, t_bar: float, op: Operator) -> bool:
+        # Block duplicates of the currently selected symbol type.
+        # Cross-type combos at one barline (e.g. end+start) stay allowed.
+        for ev in self._event_list(score):
+            if op.eq(float(getattr(ev, "time", 0.0) or 0.0), float(t_bar)):
+                return True
+        return False
+
     def on_left_click(self, x: float, y: float) -> None:
         if self._editor is None:
             return
@@ -114,9 +122,8 @@ class BarlineTool(BaseTool):
         if t_bar is None:
             return
         op = Operator(SHORTEST_DURATION)
-        for ev in self._event_list(score):
-            if op.eq(float(getattr(ev, "time", 0.0) or 0.0), float(t_bar)):
-                return
+        if self._has_mode_event_at_barline(score, float(t_bar), op):
+            return
         self._create_event(score, float(t_bar))
         self._editor._snapshot_if_changed(coalesce=False, label="barline_symbol_create")
         if hasattr(self._editor, "force_redraw_from_model"):

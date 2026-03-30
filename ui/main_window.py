@@ -240,7 +240,7 @@ class MainWindow(QtWidgets.QMainWindow):
         # Keep separators slim but clickable so left dock width can be adjusted
         self.setStyleSheet(
             "QMainWindow::separator { width: 6px; height: 6px; background: transparent; margin: 0px; }\n"
-            "QMainWindow::separator:hover { background: rgba(0,0,0,0.12); }"
+            "QMainWindow::separator:hover { background: rgb(180,180,180); }"
         )
         # Place Snap Size dock above the Tool Selector dock on the left
         self.snap_dock = SnapSizeDock(self)
@@ -2609,6 +2609,10 @@ class MainWindow(QtWidgets.QMainWindow):
             # Establish anchor if missing or if we've scrolled beyond visible block
             anchor = self._playhead_anchor_measure or measure_idx
             last_visible = self._playhead_last_visible_measure or anchor
+
+            # Repeat jumps can move playhead backward; reset anchor to follow.
+            if measure_idx < anchor:
+                anchor = measure_idx
 
             if measure_idx > last_visible:
                 anchor = measure_idx

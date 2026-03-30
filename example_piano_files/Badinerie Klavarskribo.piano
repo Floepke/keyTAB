@@ -20,7 +20,7 @@
         "pages":2,
         "measures":20,
         "lines":5,
-        "updated_at":"2026-03-30T08:56:32"
+        "updated_at":"2026-03-30T10:57:03"
     },
     "base_grid":[
         {
@@ -189,13 +189,13 @@
         ]
     },
     "app_state":{
-        "zoom_mm_per_quarter":28.531167061100078,
+        "zoom_mm_per_quarter":27.172540058190545,
         "print_view_page_index":0,
-        "editor_scroll_pos":0,
+        "editor_scroll_pos":10153,
         "snap_base":16,
         "snap_divide":1,
         "selected_tool":"barline",
-        "style_dialog_tab_index":1,
+        "style_dialog_tab_index":0,
         "note_velocity_mode":false
     },
     "events":{
@@ -4008,6 +4008,9 @@
         "end_repeat":[
             {
                 "time":8192.0
+            },
+            {
+                "time":20480.0
             }
         ],
         "double_bar":[
@@ -4045,7 +4048,7 @@
                     5.0
                 ],
                 "stave_range":"auto",
-                "page_break":false
+                "page_break":true
             },
             {
                 "time":12288.0,
@@ -4054,7 +4057,7 @@
                     5.0
                 ],
                 "stave_range":"auto",
-                "page_break":true
+                "page_break":false
             },
             {
                 "time":16384.0,

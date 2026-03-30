@@ -648,6 +648,7 @@ class Player:
         self._t0: float = 0.0
         self._start_units: float = 0.0
         self._last_event_count: int = 0
+        self._playhead_timeline: Optional[List[Tuple[float, float, float, float]]] = None
         self._off_epsilon_sec: float = 0.003  # ~3 ms safety gap before offs
         self._min_duration_units: float = 4.0
         self._grace_duration_units: float = 32.0  # Default grace note length (32nd note)
@@ -820,19 +821,53 @@ class Player:
             self._start_units = 0.0
         except Exception:
             pass
+
+        playable: List[Tuple[float, float, int, int]] = []
+        score_end_units = 0.0
         for n, dur_units in self._iter_playable_events(score):
             if dur_units < float(self._min_duration_units):
                 continue
             start_units = float(getattr(n, 'time', 0.0) or 0.0)
             end_units = float(start_units + dur_units)
-            start_sec = self._seconds_between(0.0, start_units, segs)
-            dur_sec = self._seconds_between(start_units, end_units, segs)
             vel = int(getattr(n, 'velocity', 64) or 64)
             app_pitch = int(getattr(n, 'pitch', 0))
             midi_pitch = max(0, min(127, app_pitch + self._pitch_offset))
-            events.append(('on', start_sec, midi_pitch, vel))
-            off_t = max(0.0, start_sec + max(0.0, dur_sec) - float(self._off_epsilon_sec))
-            events.append(('off', off_t, midi_pitch, 0))
+            playable.append((start_units, end_units, midi_pitch, vel))
+            if end_units > score_end_units:
+                score_end_units = end_units
+
+        if not playable:
+            self._playhead_timeline = None
+            self._last_event_count = 0
+            return events
+
+        score_end_units = self._resolve_playback_end_units(score, score_end_units)
+
+        # Repeat flow is applied only to full playback (play button from beginning).
+        # Inline playback from the current cursor intentionally ignores repeat jumps.
+        play_segments = self._build_repeat_play_segments(score, score_end_units)
+        segment_sec_cursor = 0.0
+        timed_segments: List[Tuple[float, float, float]] = []
+        playhead_timeline: List[Tuple[float, float, float, float]] = []
+        for seg_start, seg_end in play_segments:
+            timed_segments.append((seg_start, seg_end, segment_sec_cursor))
+            seg_sec = self._seconds_between(seg_start, seg_end, segs)
+            playhead_timeline.append((seg_start, seg_end, segment_sec_cursor, segment_sec_cursor + seg_sec))
+            segment_sec_cursor += seg_sec
+
+        self._playhead_timeline = playhead_timeline
+
+        for note_start, note_end, midi_pitch, vel in playable:
+            for seg_start, seg_end, seg_sec_start in timed_segments:
+                ov_start = max(note_start, seg_start)
+                ov_end = min(note_end, seg_end)
+                if ov_end <= ov_start:
+                    continue
+                on_t = seg_sec_start + self._seconds_between(seg_start, ov_start, segs)
+                off_t = seg_sec_start + self._seconds_between(seg_start, ov_end, segs)
+                events.append(('on', float(on_t), int(midi_pitch), int(vel)))
+                events.append(('off', max(0.0, float(off_t) - float(self._off_epsilon_sec)), int(midi_pitch), 0))
+
         events.sort(key=lambda e: (e[1], 0 if e[0] == 'off' else 1))
         try:
             self._last_event_count = int(len([1 for e in events if e[0] == 'on']))
@@ -843,6 +878,7 @@ class Player:
     def _build_events_from_time(self, start_units: float, score) -> List[Tuple[str, float, int, int]]:
         segs = self._get_tempo_segments(score)
         su = float(max(0.0, start_units))
+        self._playhead_timeline = None
         try:
             self._bpm = float(segs[0][2]) if segs else 120.0
             self._start_units = float(su)
@@ -903,6 +939,104 @@ class Player:
             if overlap_end is not None:
                 dur_units = max(dur_units, float(overlap_end - start_units))
             yield g, dur_units
+
+    def _build_repeat_play_segments(self, score, score_end_units: float) -> List[Tuple[float, float]]:
+        """Build source-time segments in playback order using start/end repeat symbols.
+
+        Each end-repeat triggers one jump back to the nearest preceding start-repeat
+        (or to 0.0 when none exists), which matches common repeat playback behavior.
+        """
+        score_end = float(max(0.0, score_end_units))
+        if score_end <= 0.0:
+            return []
+
+        events_obj = getattr(score, 'events', None)
+        start_repeat_events = list(getattr(events_obj, 'start_repeat', []) or [])
+        end_repeat_events = list(getattr(events_obj, 'end_repeat', []) or [])
+
+        start_times = sorted(
+            float(getattr(ev, 'time', 0.0) or 0.0)
+            for ev in start_repeat_events
+            if float(getattr(ev, 'time', 0.0) or 0.0) >= 0.0
+        )
+        end_times = sorted(
+            float(getattr(ev, 'time', 0.0) or 0.0)
+            for ev in end_repeat_events
+            if 0.0 <= float(getattr(ev, 'time', 0.0) or 0.0) <= score_end
+        )
+
+        if not end_times:
+            return [(0.0, score_end)]
+
+        eps = 1e-9
+
+        def _nearest_repeat_start(end_t: float) -> float:
+            nearest: Optional[float] = None
+            for st in start_times:
+                # Start+end at the same barline is valid (:||:). For an end-repeat
+                # jump target, only consider starts strictly before the end marker.
+                if st < (end_t - eps):
+                    nearest = st
+                else:
+                    break
+            if nearest is None:
+                return 0.0
+            return float(nearest)
+
+        cursor = 0.0
+        consumed_end_idx: set[int] = set()
+        segments: List[Tuple[float, float]] = []
+        # Safety bound prevents malformed repeat data from causing an infinite loop.
+        max_steps = max(16, len(end_times) * 4 + 16)
+        steps = 0
+
+        while cursor < (score_end - eps) and steps < max_steps:
+            steps += 1
+            next_idx: Optional[int] = None
+            for i, t_end in enumerate(end_times):
+                if t_end > (cursor + eps):
+                    next_idx = i
+                    break
+
+            if next_idx is None:
+                segments.append((cursor, score_end))
+                break
+
+            end_t = float(end_times[next_idx])
+            if end_t > score_end:
+                segments.append((cursor, score_end))
+                break
+
+            if end_t > (cursor + eps):
+                segments.append((cursor, end_t))
+
+            if next_idx not in consumed_end_idx:
+                consumed_end_idx.add(next_idx)
+                jump_t = _nearest_repeat_start(end_t)
+                if jump_t < (end_t - eps):
+                    cursor = jump_t
+                else:
+                    cursor = end_t
+            else:
+                cursor = end_t
+
+        if steps >= max_steps and cursor < (score_end - eps):
+            segments.append((cursor, score_end))
+
+        return [(a, b) for (a, b) in segments if b > (a + eps)]
+
+    def _resolve_playback_end_units(self, score, note_end_units: float) -> float:
+        """Playback end should include explicit repeat end markers, not only note ends."""
+        end_u = float(max(0.0, note_end_units))
+        try:
+            events_obj = getattr(score, 'events', None)
+            for ev in list(getattr(events_obj, 'end_repeat', []) or []):
+                t = float(getattr(ev, 'time', 0.0) or 0.0)
+                if t > end_u:
+                    end_u = t
+        except Exception:
+            pass
+        return end_u
 
     # ------------------------------------------------------------------
     # Tempo helpers
@@ -1003,6 +1137,15 @@ class Player:
                 units = float(self._start_units) + float(elapsed) / float(s_per_unit)
                 return units
             segs = self._get_tempo_segments(score)
+            if self._playhead_timeline:
+                eps = 1e-9
+                for u0, u1, s0, s1 in self._playhead_timeline:
+                    if elapsed < (s1 - eps):
+                        local_elapsed = max(0.0, float(elapsed - s0))
+                        u_local = self._units_from_elapsed(local_elapsed, float(u0), segs)
+                        return min(float(u1), float(u_local))
+                if self._playhead_timeline:
+                    return float(self._playhead_timeline[-1][1])
             u = self._units_from_elapsed(float(elapsed), float(self._start_units), segs)
             return u
         except Exception:

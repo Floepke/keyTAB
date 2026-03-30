@@ -2241,8 +2241,13 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
             measure_pad = 1.5
             measure_symbol_anchor: dict[float, tuple[float, float, float]] = {}
             measure_symbol_default_right_x = float(grid_right + measure_pad * 2.0)
-            measure_guide_width_mm = max(0.12, 0.15 * scale)
-            measure_guide_dash_pattern = [0.8 * scale, 0.8 * scale]
+            measure_guide_width_mm = max(0.1, bar_width_mm)
+            # Shared guide dash pattern for measure numbers and repeat symbols in mm (pre-scale).
+            # Tweak this list to fine-tune both at once.
+            measure_guide_dash_pattern_mm = [1.0, 2.5]  # 1mm dash, 2mm gap
+            measure_guide_dash_pattern = [
+                float(v) * scale for v in measure_guide_dash_pattern_mm
+            ] if measure_guide_dash_pattern_mm else None
 
             def _note_x_range(it: dict, include_stem: bool) -> tuple[float, float]:
                 p = int(it.get('pitch', 0) or 0)
