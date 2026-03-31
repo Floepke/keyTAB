@@ -810,10 +810,7 @@ class MainWindow(QtWidgets.QMainWindow):
                 QtGui.QKeySequence(QtGui.QKeySequence.StandardKey.ZoomIn)
             ])
         except Exception:
-            try:
-                zoom_in_act.setShortcut(QtGui.QKeySequence("="))
-            except Exception:
-                pass
+            zoom_in_act.setShortcut(QtGui.QKeySequence("="))
         zoom_out_act = QtGui.QAction("Zoom Out", self)
         zoom_out_act.setToolTip("Zoom out from the editor view.")
         try:
@@ -822,10 +819,7 @@ class MainWindow(QtWidgets.QMainWindow):
                 QtGui.QKeySequence(QtGui.QKeySequence.StandardKey.ZoomOut)
             ])
         except Exception:
-            try:
-                zoom_out_act.setShortcut(QtGui.QKeySequence("-"))
-            except Exception:
-                pass
+            zoom_out_act.setShortcut(QtGui.QKeySequence("-"))
         view_menu.addSeparator()
         full_screen_act = QtGui.QAction("Full Screen", self)
         full_screen_act.setToolTip("Toggle full screen mode.")
@@ -890,13 +884,11 @@ class MainWindow(QtWidgets.QMainWindow):
     def _configure_editor_scrollbar(self) -> None:
         extent = int(self.style().pixelMetric(QtWidgets.QStyle.PixelMetric.PM_ScrollBarExtent))
         width = max(12, int(extent * 2))
-        if sys.platform == "darwin":
-            width = int(Style.get_macos_scrollbar_width(width))
-            self.editor_vscroll.setStyleSheet(
-                "QScrollBar:vertical {"
-                f"width: {width}px;"
-                "}"
-            )
+        self.editor_vscroll.setStyleSheet(
+            "QScrollBar:vertical {"
+            f"width: {width}px;"
+            "}"
+        )
         self.editor_vscroll.setFixedWidth(int(width))
         self.editor_vscroll.setToolTip("Editor scrollbar. Drag to scroll. Click outside the scrollbar handle to jump. Hover outside the scrollbar handle to preview the current destination measure.")
         self.editor_vscroll.set_tooltip_provider(self._editor_scrollbar_tooltip_text)
@@ -1782,6 +1774,14 @@ class MainWindow(QtWidgets.QMainWindow):
         original_layout = asdict(layout) if layout is not None else None
         dlg = StyleDialog(parent=self, layout=layout, score=sc)
 
+        try:
+            adm = get_appdata_manager()
+            dlg_w = int(adm.get('style_dialog_width', 600) or 600)
+            dlg_h = int(adm.get('style_dialog_height', 550) or 550)
+            dlg.resize(max(280, dlg_w), max(300, dlg_h))
+        except Exception:
+            pass
+
         app_state = self._current_app_state()
         dlg.set_current_tab(int(getattr(app_state, 'style_dialog_tab_index', 0) or 0))
 
@@ -1818,6 +1818,13 @@ class MainWindow(QtWidgets.QMainWindow):
         def _persist_tab_index() -> None:
             app_state.style_dialog_tab_index = int(dlg.current_tab_index())
             self._flush_app_state_save()
+            try:
+                adm = get_appdata_manager()
+                adm.set('style_dialog_width', int(dlg.width()))
+                adm.set('style_dialog_height', int(dlg.height()))
+                adm.save()
+            except Exception:
+                pass
 
         dlg.finished.connect(lambda _res: _persist_tab_index())
         dlg.accepted.connect(lambda: self.file_manager.save() if self.file_manager.path() is not None else None)
@@ -2102,26 +2109,14 @@ class MainWindow(QtWidgets.QMainWindow):
     def _edit_undo(self) -> None:
         self.editor_controller.undo()
         self._refresh_views_from_score()
-        try:
-            self.editor_controller.set_score(self.file_manager.current())
-        except Exception:
-            pass
-        try:
-            self.editor_controller.force_redraw_from_model()
-        except Exception:
-            pass
+        self.editor_controller.set_score(self.file_manager.current())
+        self.editor_controller.force_redraw_from_model()
 
     def _edit_redo(self) -> None:
         self.editor_controller.redo()
         self._refresh_views_from_score()
-        try:
-            self.editor_controller.set_score(self.file_manager.current())
-        except Exception:
-            pass
-        try:
-            self.editor_controller.force_redraw_from_model()
-        except Exception:
-            pass
+        self.editor_controller.set_score(self.file_manager.current())
+        self.editor_controller.force_redraw_from_model()
 
     def _edit_copy(self) -> None:
         try:

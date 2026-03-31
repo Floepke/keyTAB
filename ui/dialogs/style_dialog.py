@@ -474,6 +474,43 @@ class FontPicker(QtWidgets.QWidget):
         )
 
 
+class RadioGroupWidget(QtWidgets.QWidget):
+    valueChanged = QtCore.Signal(str)
+
+    def __init__(self, options: list[tuple[str, str]], value: str, parent=None) -> None:
+        super().__init__(parent)
+        lay = QtWidgets.QVBoxLayout(self)
+        lay.setContentsMargins(0, 0, 0, 0)
+        lay.setSpacing(2)
+        self._buttons: list[tuple[QtWidgets.QRadioButton, str]] = []
+        for label, val in options:
+            rb = QtWidgets.QRadioButton(label, self)
+            lay.addWidget(rb)
+            self._buttons.append((rb, val))
+            rb.toggled.connect(lambda checked, v=val: self.valueChanged.emit(v) if checked else None)
+        self.set_value(value)
+
+    def set_value(self, value: str) -> None:
+        val_str = str(value) if value is not None else ''
+        matched = False
+        for rb, val in self._buttons:
+            rb.blockSignals(True)
+            rb.setChecked(val == val_str)
+            if val == val_str:
+                matched = True
+            rb.blockSignals(False)
+        if not matched and self._buttons:
+            self._buttons[0][0].blockSignals(True)
+            self._buttons[0][0].setChecked(True)
+            self._buttons[0][0].blockSignals(False)
+
+    def value(self) -> str:
+        for rb, val in self._buttons:
+            if rb.isChecked():
+                return val
+        return self._buttons[0][1] if self._buttons else ''
+
+
 class StyleDialog(QtWidgets.QDialog):
     values_changed = QtCore.Signal()
     tab_changed = QtCore.Signal(int)
@@ -522,17 +559,8 @@ class StyleDialog(QtWidgets.QDialog):
         self.setWindowTitle("Style")
         self.setModal(True)
         self.setWindowModality(QtCore.Qt.NonModal)
-        try:
-            screen = QtWidgets.QApplication.primaryScreen()
-            if screen is not None:
-                max_h = int(screen.availableGeometry().height() / 3)
-        except Exception:
-            pass
-        try:
-            self.setMinimumWidth(600)
-            self.resize(750, 400)
-        except Exception:
-            pass
+        self.setMinimumSize(280, 300)
+        self.resize(768, 512)
 
         self._layout = layout or Layout()
         self._editors: dict[str, QtWidgets.QWidget] = {}
@@ -558,9 +586,27 @@ class StyleDialog(QtWidgets.QDialog):
         category_list.setSelectionMode(QtWidgets.QAbstractItemView.SelectionMode.SingleSelection)
         category_list.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         category_list.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarPolicy.ScrollBarAsNeeded)
-        category_list.setMinimumWidth(150)
-        category_list.setMaximumWidth(220)
+        category_list.setMinimumWidth(100)
+        category_list.setMaximumWidth(160)
+        
+        # Make category list respond to wheel events to navigate tabs
+        class CategoryListWheelFilter(QtCore.QObject):
+            def eventFilter(self, obj: QtCore.QObject, ev: QtCore.QEvent) -> bool:
+                if ev.type() == QtCore.QEvent.Type.Wheel:
+                    wheel_ev = ev  # type: QtGui.QWheelEvent
+                    if wheel_ev.angleDelta().y() > 0:
+                        new_row = max(0, category_list.currentRow() - 1)
+                    else:
+                        new_row = min(category_list.count() - 1, category_list.currentRow() + 1)
+                    category_list.setCurrentRow(new_row)
+                    ev.accept()
+                    return True
+                return False
+        
+        wheel_filter = CategoryListWheelFilter(self)
+        category_list.installEventFilter(wheel_filter)
         self._category_list = category_list
+        self._category_wheel_filter = wheel_filter
         pages_row.addWidget(category_list, 0)
 
         stack = QtWidgets.QStackedWidget(self)
@@ -579,6 +625,7 @@ class StyleDialog(QtWidgets.QDialog):
             "Stave",
             "Grid",
             "Time signature",
+            "Measure Numbering",
             "Fonts",
             "Note",
             "Grace note",
@@ -591,18 +638,18 @@ class StyleDialog(QtWidgets.QDialog):
             "Visibility",
         ]
 
-        def _make_tab(title: str) -> QtWidgets.QFormLayout:
+        def _make_tab(title: str) -> QtWidgets.QVBoxLayout:
             page = QtWidgets.QWidget(self)
             page_layout = QtWidgets.QVBoxLayout(page)
             page_layout.setContentsMargins(0, 0, 0, 0)
-            page_layout.setSpacing(6)
+            page_layout.setSpacing(0)
             scroll = QtWidgets.QScrollArea(page)
             scroll.setWidgetResizable(True)
             content = QtWidgets.QWidget(scroll)
-            form = QtWidgets.QFormLayout(content)
-            form.setContentsMargins(8, 8, 8, 8)
-            form.setSpacing(6)
-            content.setLayout(form)
+            vbox = QtWidgets.QVBoxLayout(content)
+            vbox.setContentsMargins(6, 6, 6, 6)
+            vbox.setSpacing(4)
+            content.setLayout(vbox)
             scroll.setWidget(content)
             page_layout.addWidget(scroll, 1)
             if self._stack is not None:
@@ -612,9 +659,9 @@ class StyleDialog(QtWidgets.QDialog):
             self._tab_titles.append(title)
             self._tab_scrolls.append(scroll)
             self._tab_contents.append(content)
-            return form
+            return vbox
 
-        tab_forms: dict[str, QtWidgets.QFormLayout] = {t: _make_tab(t) for t in tab_order}
+        tab_forms: dict[str, QtWidgets.QVBoxLayout] = {t: _make_tab(t) for t in tab_order}
         if self._category_list is not None and self._category_list.count() > 0:
             self._category_list.setCurrentRow(0)
 
@@ -677,15 +724,18 @@ class StyleDialog(QtWidgets.QDialog):
             'stave_ledger_line_length_mm': 'Stave',
             'stave_clef_line_dash_pattern_mm': 'Stave',
             # Fonts
-            'font_text': 'Fonts',
+            'font_text': 'Text',
             'font_title': 'Fonts',
             'font_composer': 'Fonts',
             'font_copyright': 'Fonts',
             'font_arranger': 'Fonts',
             'font_lyricist': 'Fonts',
-            'time_signature_indicator_classic_font': 'Fonts',
-            'time_signature_indicator_klavarskribo_font': 'Fonts',
-            'measure_numbering_font': 'Fonts',
+            'time_signature_indicator_classic_font': 'Time signature',
+            'time_signature_indicator_klavarskribo_font': 'Time signature',
+            # Measure Numbering
+            'grid_measure_numbering_guide_thickness_mm': 'Measure Numbering',
+            'measure_numbering_placement': 'Measure Numbering',
+            'measure_numbering_font': 'Measure Numbering',
             # Visibility
             'note_head_visible': 'Visibility',
             'note_stem_visible': 'Visibility',
@@ -706,6 +756,8 @@ class StyleDialog(QtWidgets.QDialog):
             'repeat_start_visible': 'Visibility',
             'repeat_end_visible': 'Visibility',
             'double_barline_visible': 'Visibility',
+            'measure_numbering_guide_visible': 'Visibility',
+            'measure_numbers_visible': 'Visibility',
         }
 
         type_hints = {}
@@ -724,7 +776,7 @@ class StyleDialog(QtWidgets.QDialog):
             name = f.name
             if name in _hide_fields:
                 continue
-            label = name.replace('_', ' ').capitalize() + ":"
+            label = name.replace('_', ' ').capitalize()
             value = getattr(self._layout, name)
             field_type = type_hints.get(name, f.type)
             editor = self._make_editor(field_type, value, name)
@@ -732,11 +784,20 @@ class StyleDialog(QtWidgets.QDialog):
                 continue
             self._editors[name] = editor
             tab_name = field_tabs.get(name, 'Page')
-            form = tab_forms.get(tab_name, tab_forms['Page'])
-            form.addRow(QtWidgets.QLabel(label, self), editor)
+            vbox = tab_forms.get(tab_name, tab_forms['Page'])
+            box = QtWidgets.QGroupBox(label, self)
+            box_layout = QtWidgets.QVBoxLayout(box)
+            box_layout.setContentsMargins(6, 2, 6, 6)
+            box_layout.setSpacing(0)
+            box_layout.addWidget(editor)
+            vbox.addWidget(box)
             self._wire_editor_change(editor)
 
-        self._add_all_fonts_control(tab_forms.get('Fonts'))
+        self._add_all_fonts_control(tab_forms.get('Fonts'))  # type: ignore[arg-type]
+
+        # Add stretch to each tab's layout to push groupboxes to the top
+        for vbox in tab_forms.values():
+            vbox.addStretch(1)
 
         # Style file actions
         actions_row = QtWidgets.QHBoxLayout()
@@ -777,64 +838,14 @@ class StyleDialog(QtWidgets.QDialog):
 
     def _fit_to_contents(self) -> None:
         category_list = self._category_list
-        stack = self._stack
-        if category_list is None or stack is None or not self._tab_scrolls or not self._tab_contents:
+        if category_list is None or not self._tab_scrolls:
             return
         try:
-            screen = QtWidgets.QApplication.primaryScreen()
-            max_h = int(screen.availableGeometry().height()) if screen is not None else 800
-            max_w = int(screen.availableGeometry().width()) if screen is not None else 1200
+            list_w = int(max(100, min(160, category_list.sizeHintForColumn(0) + 28 if category_list.count() > 0 else 130)))
+            category_list.setMinimumWidth(list_w)
+            category_list.setMaximumWidth(list_w)
         except Exception:
-            max_h = 800
-            max_w = 1200
-
-        max_content_h = 0
-        max_content_w = 0
-        for content in self._tab_contents:
-            try:
-                max_content_h = max(max_content_h, int(content.sizeHint().height()))
-                max_content_w = max(max_content_w, int(content.sizeHint().width()))
-            except Exception:
-                continue
-
-        list_w = int(max(140, min(220, category_list.sizeHintForColumn(0) + 28 if category_list.count() > 0 else 170)))
-        category_list.setMinimumWidth(list_w)
-        category_list.setMaximumWidth(list_w)
-        action_h = int(getattr(self, 'save_style_btn', QtWidgets.QPushButton()).sizeHint().height())
-        action_w = int(getattr(self, 'save_style_btn', QtWidgets.QPushButton()).sizeHint().width()) * 3
-        msg_h = int(self.msg_label.sizeHint().height())
-        msg_w = int(self.msg_label.sizeHint().width())
-        btns_h = int(self.btns.sizeHint().height())
-        btns_w = int(self.btns.sizeHint().width())
-
-        lay = self.layout()
-        margins = lay.contentsMargins() if lay is not None else QtCore.QMargins()
-        spacing = int(lay.spacing()) if lay is not None else 0
-        gaps = 3
-
-        non_scroll_h = margins.top() + margins.bottom() + action_h + msg_h + btns_h + (spacing * gaps)
-        desired_scroll_h = max_content_h
-        max_scroll_h = max(1, max_h - non_scroll_h)
-        scroll_h = min(desired_scroll_h, max_scroll_h)
-
-        non_scroll_w = margins.left() + margins.right()
-        right_w = max(420, min(max_content_w, int(max_w * 0.6)))
-        desired_w = list_w + right_w + non_scroll_w + spacing
-        total_w = min(desired_w, max_w)
-
-        for scroll in self._tab_scrolls:
-            frame = int(scroll.frameWidth()) * 2
-            scroll.setMinimumHeight(scroll_h + frame)
-            scroll.setMaximumHeight(scroll_h + frame)
-
-        total_h = non_scroll_h + scroll_h
-        if total_h > max_h:
-            total_h = max_h
-        self.setMinimumHeight(total_h)
-        self.setMaximumHeight(total_h)
-        self.setMinimumWidth(total_w)
-        self.setMaximumWidth(total_w)
-        self.resize(total_w, total_h)
+            pass
 
     def set_current_tab(self, index: int) -> None:
         category_list = self._category_list
@@ -958,16 +969,20 @@ class StyleDialog(QtWidgets.QDialog):
         args = get_args(field_type)
 
         if origin is Literal and args:
-            combo = QtWidgets.QComboBox(self)
-            options = [str(a) for a in args]
-            combo.addItems(options)
-            combo.setCurrentText(str(value))
-            return combo
+            options = [(str(a).replace('_', ' ').capitalize(), str(a)) for a in args]
+            return RadioGroupWidget(options, str(value) if value is not None else str(args[0]), self)
 
         if field_type is bool:
             cb = QtWidgets.QCheckBox(self)
             cb.setChecked(bool(value))
             return cb
+
+        if field_name == 'measure_numbering_placement':
+            options = [
+                ('Place measure numbering on top of every system', 'system'),
+                ('Place measure numbering on every barline', 'barline'),
+            ]
+            return RadioGroupWidget(options, str(value) if value is not None else 'system', self)
 
         if field_type is int:
             sb = QtWidgets.QSpinBox(self)
@@ -1032,20 +1047,23 @@ class StyleDialog(QtWidgets.QDialog):
             editor.textChanged.connect(lambda _v: self.values_changed.emit())
         elif isinstance(editor, ColorPickerEdit):
             editor.valueChanged.connect(lambda _v: self.values_changed.emit())
+        elif isinstance(editor, RadioGroupWidget):
+            editor.valueChanged.connect(lambda _v: self.values_changed.emit())
 
-    def _add_all_fonts_control(self, form: QtWidgets.QFormLayout | None) -> None:
-        if form is None:
+    def _add_all_fonts_control(self, vbox: QtWidgets.QVBoxLayout | None) -> None:
+        if vbox is None:
             return
-        label = QtWidgets.QLabel("Apply family to all fonts:", self)
         combo = QtWidgets.QFontComboBox(self)
         self._all_fonts_combo = combo
         font_title = getattr(self._layout, 'font_title', LayoutFont())
         combo.setCurrentFont(QtGui.QFont(self._font_family_from_value(font_title)))
         combo.currentFontChanged.connect(lambda f: self._set_all_font_families(f.family()))
-        try:
-            form.insertRow(0, label, combo)
-        except Exception:
-            form.addRow(label, combo)
+        box = QtWidgets.QGroupBox("Apply family to all fonts", self)
+        box_layout = QtWidgets.QVBoxLayout(box)
+        box_layout.setContentsMargins(6, 2, 6, 6)
+        box_layout.setSpacing(0)
+        box_layout.addWidget(combo)
+        vbox.insertWidget(0, box)
 
     def _set_all_font_families(self, family: str) -> None:
         if not family:
@@ -1077,9 +1095,22 @@ class StyleDialog(QtWidgets.QDialog):
         elif origin is list and args and args[0] is float and isinstance(editor, QtWidgets.QLineEdit):
             editor.setText(self._format_float_list(value))
         elif isinstance(editor, QtWidgets.QComboBox):
-            editor.setCurrentText(str(value))
+            if field_type is int:
+                int_val = int(value) if value is not None else 0
+                matched = False
+                for i in range(editor.count()):
+                    if editor.itemData(i) == int_val:
+                        editor.setCurrentIndex(i)
+                        matched = True
+                        break
+                if not matched:
+                    editor.setCurrentText(str(int_val))
+            else:
+                editor.setCurrentText(str(value))
         elif isinstance(editor, QtWidgets.QLineEdit):
             editor.setText(str(value) if value is not None else "")
+        elif isinstance(editor, RadioGroupWidget):
+            editor.set_value(str(value) if value is not None else '')
 
     def _save_style_to_disk(self) -> None:
         name, ok = QtWidgets.QInputDialog.getText(self, "Save Style", "Enter your custom style name here:")
@@ -1217,9 +1248,17 @@ class StyleDialog(QtWidgets.QDialog):
             elif origin is list and args and args[0] is float and isinstance(editor, QtWidgets.QLineEdit):
                 data[name] = self._parse_float_list(editor.text())
             elif isinstance(editor, QtWidgets.QComboBox):
-                data[name] = str(editor.currentText())
+                if field_type is int:
+                    try:
+                        data[name] = int(editor.currentText())
+                    except (ValueError, TypeError):
+                        data[name] = getattr(self._layout, name, 0)
+                else:
+                    data[name] = str(editor.currentText())
             elif isinstance(editor, QtWidgets.QLineEdit):
                 data[name] = str(editor.text())
+            elif isinstance(editor, RadioGroupWidget):
+                data[name] = editor.value()
         return Layout(**data)
 
     def _format_float_list(self, value: Any) -> str:

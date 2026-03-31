@@ -46,6 +46,7 @@ class Style:
         "notation_color": (0, 0, 30),
         "left_midi_color": (153, 179, 204),
         "right_midi_color": (204, 179, 153),
+        "snap_band": (230, 230, 230),
     }
 
     _DARK = {
@@ -57,6 +58,7 @@ class Style:
         "notation_color": (0, 0, 30),
         "left_midi_color": (153, 179, 204),
         "right_midi_color": (204, 179, 153),
+        "snap_band": (153, 153, 153),
     }
 
     # Palette role → dict key mapping using the four-theme colors above.
@@ -99,6 +101,7 @@ class Style:
         'notation': (0, 16, 0),
         'midi_left': (153, 179, 204),
         'midi_right': (204, 179, 153),
+        'snap_band': (230, 230, 230),
     }
     _THEME_SYNCED: bool = False
     _APP_STYLE_PROXY: QProxyStyle | None = None
@@ -141,6 +144,7 @@ class Style:
         _set_named('notation', 'notation_color')
         _set_named('midi_left', 'left_midi_color')
         _set_named('midi_right', 'right_midi_color')
+        _set_named('snap_band', 'snap_band')
         cls._NAMED['draw_util'] = (255, 255, 255)
         cls._NAMED['accent_color2'] = (128, 0, 0)  # Fixed custom notehead color
         cls._NAMED['editor'] = cls._NAMED['paper']
@@ -233,6 +237,10 @@ class Style:
             Style._NAMED['notation'] = (notation.red(), notation.green(), notation.blue())
             Style._NAMED['midi_left'] = (midi_left.red(), midi_left.green(), midi_left.blue())
             Style._NAMED['midi_right'] = (midi_right.red(), midi_right.green(), midi_right.blue())
+            # snap_band: interpolated from palette
+            snap_band_color = colors_by_key.get('snap_band')
+            if snap_band_color is not None:
+                Style._NAMED['snap_band'] = (snap_band_color.red(), snap_band_color.green(), snap_band_color.blue())
             Style._NAMED['draw_util'] = (255, 255, 255)
             Style._NAMED['accent_color2'] = (128, 0, 0)  # Fixed custom notehead color
             Style._NAMED['editor'] = Style._NAMED['paper']

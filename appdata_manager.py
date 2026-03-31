@@ -273,6 +273,8 @@ def get_appdata_manager() -> AppDataManager:
         adm.register("window_maximized", True, "Start maximized; updated on exit")
         adm.register("window_geometry", "", "Base64-encoded Qt window geometry for normal state")
         adm.register("left_panel_width_px", 220, "Last width of the left docked panel area in pixels")
+        adm.register("style_dialog_width", 768, "Last width of the Style dialog in pixels")
+        adm.register("style_dialog_height", 512, "Last height of the Style dialog in pixels")
         adm.register("score_template", {}, "Default score template for new scores (dict of score fields except events)")
         adm.register("fonts_install_ok", False, "True when all required embedded fonts are installed to the user font directory")
         adm.register("user_soundfont_path", "", "Absolute path to last selected user soundfont (.sf2/.sf3)")

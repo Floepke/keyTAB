@@ -59,13 +59,11 @@ class ToolSelectorWidget(QtWidgets.QListWidget):
 
     def _apply_platform_scrollbar_width(self) -> None:
         try:
-            if sys.platform != "darwin":
-                return
             vscroll = self.verticalScrollBar()
             if vscroll is None:
                 return
             extent = int(self.style().pixelMetric(QtWidgets.QStyle.PixelMetric.PM_ScrollBarExtent))
-            width = int(Style.get_macos_scrollbar_width(max(12, int(extent * 2))))
+            width = max(12, int(extent * 2))
             vscroll.setFixedWidth(width)
             vscroll.setStyleSheet(
                 "QScrollBar:vertical {"

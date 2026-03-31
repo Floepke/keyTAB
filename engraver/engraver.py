@@ -1851,8 +1851,6 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                 for seg in beam_segments_for_barlines:
                     t0 = float(seg.get('t_start', 0.0) or 0.0)
                     t1 = float(seg.get('t_end', 0.0) or 0.0)
-                    if not op_time.eq(float(t0), float(ticks)):
-                        continue
                     if op_time.lt(float(ticks), t0) or op_time.gt(float(ticks), t1):
                         continue
                     dt = t1 - t0
@@ -1867,9 +1865,6 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
 
                 for conn in beam_connect_segments_for_barlines:
                     c_t = float(conn.get('time', 0.0) or 0.0)
-                    c_bstart = float(conn.get('beam_start', -1.0) or -1.0)
-                    if not op_time.eq(c_bstart, float(ticks)):
-                        continue
                     if not op_time.eq(c_t, float(ticks)):
                         continue
                     c_x0 = float(conn.get('x0', 0.0) or 0.0)
@@ -1881,7 +1876,14 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
 
                 return _merge_intervals(intervals)
 
-            def _draw_barline_segments(yb: float, cuts: list[tuple[float, float]], width_mm: float, tags: list[str], item_id: int = 0) -> None:
+            def _draw_barline_segments(
+                yb: float,
+                cuts: list[tuple[float, float]],
+                width_mm: float,
+                tags: list[str],
+                item_id: int = 0,
+                dash_pattern: list[float] | None = None,
+            ) -> None:
                 if not cuts:
                     du.add_line(
                         grid_left,
@@ -1892,7 +1894,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                         width_mm=width_mm,
                         id=item_id,
                         tags=tags,
-                        dash_pattern=None,
+                        dash_pattern=dash_pattern,
                     )
                     return
                 x_cursor_seg = float(grid_left)
@@ -1908,7 +1910,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                             width_mm=width_mm,
                             id=item_id,
                             tags=tags,
-                            dash_pattern=None,
+                            dash_pattern=dash_pattern,
                         )
                     x_cursor_seg = max(x_cursor_seg, c1)
                 if float(grid_right) - x_cursor_seg > min_seg:
@@ -1921,7 +1923,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                         width_mm=width_mm,
                         id=item_id,
                         tags=tags,
-                        dash_pattern=None,
+                        dash_pattern=dash_pattern,
                     )
 
             def _draw_barline_constructive(ticks: float, width_mm: float, tag: str = 'barline') -> None:
@@ -1935,6 +1937,18 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                 gap = max(0.1, float(gap_mm))
                 tags = ['barline', 'double_barline']
                 _draw_barline_segments(float(yb + gap), cuts, float(width_mm), tags, int(ev_id))
+
+            def _draw_gridline_constructive(ticks: float, width_mm: float, dash: list[float] | None) -> None:
+                yb = _time_to_y(float(ticks))
+                cuts = _barline_cut_intervals(float(ticks))
+                _draw_barline_segments(
+                    float(yb),
+                    cuts,
+                    float(width_mm),
+                    ['grid_line'],
+                    0,
+                    dash_pattern=dash,
+                )
 
             time_cursor = 0.0
             has_any_barlines = False
@@ -2015,18 +2029,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                             continue
                         if not grid_line_visible:
                             continue
-                        y = _time_to_y(t)
-                        du.add_line(
-                            grid_left,
-                            y,
-                            grid_right,
-                            y,
-                            color=grid_color,
-                            width_mm=max(0.1, grid_width_mm),
-                            id=0,
-                            tags=['grid_line'],
-                            dash_pattern=dash_pattern,
-                        )
+                        _draw_gridline_constructive(t, max(0.1, grid_width_mm), dash_pattern)
                     time_cursor += measure_len
                 if op_time.gt(time_cursor, float(line['time_end'])):
                     break
@@ -2310,6 +2313,11 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                 float(v) * scale for v in measure_guide_dash_pattern_mm
             ] if measure_guide_dash_pattern_mm else None
 
+            mn_placement = str(layout.get('measure_numbering_placement', 'system') or 'system')
+            mn_guide_visible = layout.get('measure_numbering_guide_visible', True) is not False
+            mn_numbers_visible = layout.get('measure_numbers_visible', True) is not False
+            line_time_start = float(line.get('time_start', 0.0) or 0.0)
+
             def _note_x_range(it: dict, include_stem: bool) -> tuple[float, float]:
                 p = int(it.get('pitch', 0) or 0)
                 x = _key_to_x(p)
@@ -2354,6 +2362,11 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                 m_end = float(mw.get('end', 0.0))
                 if op_time.ge(m_start, float(line['time_end'])) or op_time.le(m_end, float(line['time_start'])):
                     continue
+                # Apply measure_numbering_placement filter
+                if mn_placement == 'system':
+                    if not op_time.eq(m_start, line_time_start):
+                        continue
+                # 'barline': draw at every measure start (no filter)
                 num_txt = str(int(mw.get('number', 0) or 0))
                 if not num_txt:
                     continue
@@ -2383,30 +2396,32 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                     x1 = x_pos + text_w_mm
                     tries += 1
                 guide_y = _time_to_y(t0)
-                du.add_line(
-                    grid_right,
-                    guide_y,
-                    x_pos + text_w_mm,
-                    guide_y,
-                    color=notation_color,
-                    width_mm=measure_guide_width_mm,
-                    id=0,
-                    tags=['measure_number_guide'],
-                    dash_pattern=measure_guide_dash_pattern,
-                )
-                du.add_text(
-                    x_pos,
-                    y_text,
-                    num_txt,
-                    size_pt=size_pt,
-                    color=notation_color,
-                    id=0,
-                    tags=['measure_number'],
-                    anchor='nw',
-                    family=mn_family,
-                    bold=mn_bold,
-                    italic=mn_italic,
-                )
+                if mn_guide_visible:
+                    du.add_line(
+                        grid_right,
+                        guide_y,
+                        x_pos + text_w_mm,
+                        guide_y,
+                        color=notation_color,
+                        width_mm=measure_guide_width_mm,
+                        id=0,
+                        tags=['measure_number_guide'],
+                        dash_pattern=measure_guide_dash_pattern,
+                    )
+                if mn_numbers_visible:
+                    du.add_text(
+                        x_pos,
+                        y_text,
+                        num_txt,
+                        size_pt=size_pt,
+                        color=notation_color,
+                        id=0,
+                        tags=['measure_number'],
+                        anchor='nw',
+                        family=mn_family,
+                        bold=mn_bold,
+                        italic=mn_italic,
+                    )
                 measure_symbol_anchor[round(float(m_start), 6)] = (
                     float(x_pos),
                     float(text_w_mm),

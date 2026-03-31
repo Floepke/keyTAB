@@ -22,23 +22,16 @@ class LayoutFont:
 
 @dataclass
 class Layout:
-    # Page dimensions and margins
+    scale: float = 0.35
     page_width_mm: float = 210.0
     page_height_mm: float = 297.0
     page_top_margin_mm: float = 7.5
     page_bottom_margin_mm: float = 5.0
     page_left_margin_mm: float = 5.0
     page_right_margin_mm: float = 5.0
-    
-    # header/footer area settings
     header_height_mm: float = 15.0
     footer_height_mm: float = 7.5
-
-    # Global drawing options
-    scale: float = 0.35
     black_note_rule: Literal['above_stem', 'below_stem', 'above_stem_if_collision', 'above_stem_if_chord_and_white_note', 'above_stem_if_chord_and_white_note_same_hand'] = 'above_stem'
-
-    # Note appearance
     note_head_visible: bool = True
     note_stem_visible: bool = True
     note_stop_visible: bool = True
@@ -51,38 +44,24 @@ class Layout:
     note_midinote_left_color: str = '#ccc'
     note_midinote_right_color: str = '#ccc'
     note_width_scaling: float = 1.05 # Scaling factor for black noteheads when it sits under the stem while a white note sits next to it (0.05 to 1.0)
-
-    # Beam appearance
     beam_visible: bool = True
     beam_thickness_mm: float = 2.0
-
-    # Grace note appearance
     grace_note_visible: bool = True
     grace_note_outline_width_mm: float = 1.0
     grace_note_scale: float = 0.75
-
-    # Pedal appearance
     pedal_lane_enabled: bool = False
     pedal_lane_width_mm: float = 2.5
-
-    # Text appearance
     text_visible: bool = True
     text_background_padding_mm: float = 0.5
-
-    # Slur appearance
     slur_visible: bool = True
     slur_width_sides_mm: float = 0.3
     slur_width_middle_mm: float = 1.5
-
-    # Hairpin (crescendo / decrescendo) appearance
     hairpin_visible: bool = True
     hairpin_line_width_mm: float = 1.0
     hairpin_spread_mm: float = 10.0  # width of the open end of the hairpin in mm
     hairpin_text_gap_mm: float = 0.75  # gap between hairpin and text in mm
     dynamic_symbol_font_size_pt: float = 12.0  # Font size for standalone dynamic symbols
     dynamic_symbol_background_padding_mm: float = 2.5
-
-    # Repeat markers
     repeat_start_visible: bool = True
     repeat_end_visible: bool = True
     double_barline_visible: bool = True
@@ -127,6 +106,10 @@ class Layout:
         bold=True,
     ))
     grid_measure_numbering_guide_thickness_mm: float = 1.0
+    # 'system': number at top of each system; 'barline': number at every barline
+    measure_numbering_placement: str = 'system'
+    measure_numbering_guide_visible: bool = True
+    measure_numbers_visible: bool = True
     measure_numbering_font: LayoutFont = field(default_factory=lambda: LayoutFont(
         family="Edwin",
         size_pt=25.0,
