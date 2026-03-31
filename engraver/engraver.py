@@ -8,6 +8,7 @@ from utils.CONSTANT import BE_KEYS, QUARTER_NOTE_UNIT, PIANO_KEY_AMOUNT, SHORTES
 from utils.tiny_tool import key_class_filter
 from utils.operator import Operator
 from file_model.SCORE import SCORE
+from file_model.layout import Layout
 from file_model.base_grid import resolve_grid_layer_offsets
 from file_model.info import Info
 from file_model.analysis import Analysis
@@ -303,8 +304,38 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
     stave_three_w = float(layout.get('stave_three_line_thickness_mm', 0.5) or 0.5) * scale
     stave_clef_w = float(layout.get('stave_clef_line_thickness_mm', 0.5) or 0.5) * scale
     stave_ledger_len = float(layout.get('stave_ledger_line_length_mm', 7.0) or 7.0) * scale
-    clef_dash_raw = list(layout.get('stave_clef_line_dash_pattern_mm', []) or [])
-    clef_dash = [float(v) * scale for v in clef_dash_raw] if clef_dash_raw else None
+
+    def _scaled_dash_pattern_with_default(raw_value, fallback_mm: list[float], local_scale: float) -> list[float] | None:
+        parsed: list[float] = []
+        try:
+            if isinstance(raw_value, str):
+                tokens = [p.strip() for p in str(raw_value).split(',') if p.strip() != '']
+                parsed = [float(v) for v in tokens]
+            elif isinstance(raw_value, (list, tuple)):
+                parsed = [float(v) for v in raw_value]
+            elif raw_value is not None:
+                parsed = [float(raw_value)]
+        except Exception:
+            parsed = []
+
+        valid_mm = [float(v) for v in parsed if float(v) > 0.0]
+        if not valid_mm:
+            try:
+                valid_mm = [float(v) for v in (fallback_mm or []) if float(v) > 0.0]
+            except Exception:
+                valid_mm = []
+        if not valid_mm:
+            valid_mm = [3.0]
+        return [float(v) * float(local_scale) for v in valid_mm]
+
+    default_clef_dash_mm = list(getattr(Layout(), 'stave_clef_line_dash_pattern_mm', [3.0]) or [3.0])
+    default_grid_dash_mm = list(getattr(Layout(), 'grid_gridline_dash_pattern_mm', [2.5, 4.0]) or [2.5, 4.0])
+    clef_dash = _scaled_dash_pattern_with_default(
+        layout.get('stave_clef_line_dash_pattern_mm', default_clef_dash_mm),
+        default_clef_dash_mm,
+        scale,
+    )
+
     op_time = Operator(SHORTEST_DURATION)
     barline_positions: list[float] = []
     group_boundary_times: list[float] = []
@@ -1680,8 +1711,11 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
             grid_width_mm = float(layout.get('grid_gridline_thickness_mm', 0.15) or 0.15) * scale
             barline_visible = bool(layout.get('barline_visible', True))
             grid_line_visible = bool(layout.get('grid_line_visible', True))
-            dash_pattern_raw = list(layout.get('grid_gridline_dash_pattern_mm', []) or [])
-            dash_pattern = [float(v) * scale for v in dash_pattern_raw] if dash_pattern_raw else None
+            dash_pattern = _scaled_dash_pattern_with_default(
+                layout.get('grid_gridline_dash_pattern_mm', default_grid_dash_mm),
+                default_grid_dash_mm,
+                scale,
+            )
 
             # Build collision geometry for constructive barline drawing.
             line_start_ticks_local = float(line.get('time_start', 0.0) or 0.0)
@@ -2265,7 +2299,10 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
             measure_pad = 1.5
             measure_symbol_anchor: dict[float, tuple[float, float, float]] = {}
             measure_symbol_default_right_x = float(grid_right + measure_pad * 2.0)
-            measure_guide_width_mm = max(0.1, bar_width_mm)
+            measure_guide_width_mm = max(
+                0.05,
+                float(layout.get('grid_measure_numbering_guide_thickness_mm', 1.0) or 1.0) * scale,
+            )
             # Shared guide dash pattern for measure numbers and repeat symbols in mm (pre-scale).
             # Tweak this list to fine-tune both at once.
             measure_guide_dash_pattern_mm = [1.0, 2.5]  # 1mm dash, 2mm gap

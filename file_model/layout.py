@@ -126,6 +126,7 @@ class Layout:
         size_pt=25.0,
         bold=True,
     ))
+    grid_measure_numbering_guide_thickness_mm: float = 1.0
     measure_numbering_font: LayoutFont = field(default_factory=lambda: LayoutFont(
         family="Edwin",
         size_pt=25.0,
@@ -202,6 +203,7 @@ LAYOUT_FLOAT_CONFIG: dict[str, dict[str, float]] = {
     'countline_thickness_mm': {'min': 0.05, 'max': 5.0, 'step': 0.05},
     'grid_barline_thickness_mm': {'min': 0.05, 'max': 5.0, 'step': 0.05},
     'grid_gridline_thickness_mm': {'min': 0.05, 'max': 5.0, 'step': 0.05},
+    'grid_measure_numbering_guide_thickness_mm': {'min': 0.05, 'max': 5.0, 'step': 0.05},
     'time_signature_indicator_lane_width_mm': {'min': 0.05, 'max': 100.0, 'step': 0.05},
     'time_signature_indicator_guide_thickness_mm': {'min': 0.05, 'max': 5.0, 'step': 0.05},
     'time_signature_indicator_divide_guide_thickness_mm': {'min': 0.05, 'max': 5.0, 'step': 0.05},
