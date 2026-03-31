@@ -17,6 +17,10 @@ _NOTEHEAD_CHOICES: list[tuple[str, str]] = [
     ("circle_white_down", "Circle White Down"),
     ("circle_black_up", "Circle Black Up"),
     ("circle_black_down", "Circle Black Down"),
+    ("triangle_white_up", "Triangle White Up"),
+    ("triangle_white_down", "Triangle White Down"),
+    ("triangle_black_up", "Triangle Black Up"),
+    ("triangle_black_down", "Triangle Black Down"),
 ]
 
 
