@@ -2149,7 +2149,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                 line_end = float(line.get('time_end', 0.0) or 0.0)
                 for ds in norm_dynamic_symbols:
                     t_time = float(ds.get('time', 0.0) or 0.0)
-                    if op_time.lt(t_time, float(line_start)) or op_time.ge(t_time, float(line_end)):
+                    if op_time.lt(t_time, float(line_start)) or op_time.gt(t_time, float(line_end)):
                         continue
                     line_dynamic_symbols.append(ds)
 

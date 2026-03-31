@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from typing import Literal
 
 from file_model.events.note import Note
+from symbol_design.noteheads.bullet import draw_bullet_left_dot, draw_bullet_notehead
 from symbol_design.noteheads.circle import draw_circle_left_dot, draw_circle_notehead
 from symbol_design.noteheads.triangle import draw_triangle_left_dot, draw_triangle_notehead
 from symbol_design.symbol_util import SymbolUtil
@@ -197,6 +198,22 @@ class Notehead(SymbolUtil):
                 fill_color_override=fill_override,
             )
             draw_triangle_left_dot(du, self)
+            return
+
+        if self.form == "bullet":
+            draw_bullet_notehead(
+                du,
+                self,
+                x_mm=float(self.x_mm),
+                y_mm=float(self.y_mm),
+                direction=self.direction,
+                filled=bool(self.filled),
+                item_id=int(item_id),
+                tags=draw_tags,
+                stroke_color_override=stroke_override,
+                fill_color_override=fill_override,
+            )
+            draw_bullet_left_dot(du, self)
             return
 
         draw_circle_notehead(

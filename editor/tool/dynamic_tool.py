@@ -34,6 +34,7 @@ class DynamicTool(BaseTool):
         self._active_symbol = None
         self._created_on_press: bool = False
         self._dragged_symbol: bool = False
+        self._dragged_hairpin: bool = False
         self._suppress_next_left_interaction: bool = False
         self._dialog_open: bool = False  # Gate to prevent multiple dialogs opening
 
@@ -42,6 +43,7 @@ class DynamicTool(BaseTool):
         self._active_handle = None
         self._active_type = None
         self._active_symbol = None
+        self._dragged_hairpin = False
 
     def toolbar_spec(self) -> list[dict]:
         return [
@@ -193,6 +195,105 @@ class DynamicTool(BaseTool):
                 return symbol
         return None
 
+    def _symbols_at_point(self, point_time: float, point_rpitch: int) -> list[object]:
+        score = self._score()
+        if score is None:
+            return []
+        out: list[object] = []
+        for symbol in (getattr(score.events, 'dynamic_symbol', []) or []):
+            symbol_time = float(getattr(symbol, 'time', 0.0) or 0.0)
+            symbol_rpitch = int(getattr(symbol, 'x_rpitch', 0) or 0)
+            if abs(symbol_time - float(point_time)) < 0.1 and symbol_rpitch == int(point_rpitch):
+                out.append(symbol)
+        return out
+
+    def _hairpins_at_point(self, point_time: float, point_rpitch: int) -> list[tuple[object, str]]:
+        out: list[tuple[object, str]] = []
+        for hp in self._all_hairpins():
+            endpoint_rpitch = int(getattr(hp, 'x_rpitch', 0) or 0)
+            for handle in ('start', 'end'):
+                endpoint_time = self._hairpin_endpoint_time(hp, handle)
+                if abs(float(endpoint_time) - float(point_time)) < 0.1 and endpoint_rpitch == int(point_rpitch):
+                    out.append((hp, handle))
+        return out
+
+    def _other_handle(self, handle: str) -> str:
+        return 'end' if str(handle) == 'start' else 'start'
+
+    def _handle_point(self, hp, handle: str) -> tuple[float, int]:
+        return (
+            float(self._hairpin_endpoint_time(hp, handle)),
+            int(getattr(hp, 'x_rpitch', 0) or 0),
+        )
+
+    def _translate_symbol(self, symbol, delta_time: float, delta_rpitch: int) -> None:
+        symbol.time = float(max(0.0, float(getattr(symbol, 'time', 0.0) or 0.0) + float(delta_time)))
+        symbol.x_rpitch = int(getattr(symbol, 'x_rpitch', 0) or 0) + int(delta_rpitch)
+
+    def _translate_hairpin(self, hp, delta_time: float, delta_rpitch: int) -> None:
+        hp.time = float(max(0.0, float(getattr(hp, 'time', 0.0) or 0.0) + float(delta_time)))
+        hp.x_rpitch = int(getattr(hp, 'x_rpitch', 0) or 0) + int(delta_rpitch)
+
+    def _set_hairpin_handle(self, hp, handle: str, t_snap: float, rpitch: int) -> None:
+        self._apply_handle_drag(hp, handle, float(t_snap), int(rpitch))
+
+    def _propagate_chain_pitch_only(
+        self,
+        point_time: float,
+        point_rpitch: int,
+        delta_rpitch: int,
+        *,
+        visited_hairpins: set[int] | None = None,
+        visited_symbols: set[int] | None = None,
+    ) -> None:
+        visited_hairpins = visited_hairpins if visited_hairpins is not None else set()
+        visited_symbols = visited_symbols if visited_symbols is not None else set()
+
+        for symbol in self._symbols_at_point(point_time, point_rpitch):
+            sym_id = int(getattr(symbol, '_id', -1) or -1)
+            if sym_id in visited_symbols:
+                continue
+            visited_symbols.add(sym_id)
+            self._translate_symbol(symbol, 0.0, delta_rpitch)
+
+        for hp, matched_handle in self._hairpins_at_point(point_time, point_rpitch):
+            hp_id = int(getattr(hp, '_id', -1) or -1)
+            if hp_id in visited_hairpins:
+                continue
+            visited_hairpins.add(hp_id)
+            far_handle = self._other_handle(matched_handle)
+            far_time, far_rpitch = self._handle_point(hp, far_handle)
+            self._translate_hairpin(hp, 0.0, delta_rpitch)
+            self._propagate_chain_pitch_only(
+                far_time,
+                far_rpitch,
+                delta_rpitch,
+                visited_hairpins=visited_hairpins,
+                visited_symbols=visited_symbols,
+            )
+
+    def _set_symbol_for_handle(self, hp, handle: str, glyph: str) -> None:
+        score = self._score()
+        if score is None:
+            return
+        connected = self._find_connected_symbol_for_handle(hp, handle)
+        clean = str(glyph or '')
+        if connected is None:
+            if clean == '':
+                return
+            score.new_dynamic_symbol(
+                time=float(max(0.0, self._hairpin_endpoint_time(hp, handle))),
+                x_rpitch=int(getattr(hp, 'x_rpitch', 0) or 0),
+                symbol=clean,
+            )
+            return
+        if clean == '':
+            self._delete_dynamic_symbol(connected)
+            return
+        connected.symbol = clean
+        connected.time = float(max(0.0, self._hairpin_endpoint_time(hp, handle)))
+        connected.x_rpitch = int(getattr(hp, 'x_rpitch', 0) or 0)
+
     def _move_connected_symbol_with_handle(self, hp, handle: str, symbol) -> None:
         if symbol is None:
             return
@@ -228,9 +329,21 @@ class DynamicTool(BaseTool):
         self._editor.draw_frame()
         x_mm, y_mm = self._cursor_mm(x, y)
         self._dragged_symbol = False
+        self._dragged_hairpin = False
 
-        if self._mode == self._MODE_DYNAMIC_SYMBOL:
-            sym, _sym_type, _ = self._editor.hit_test_dynamic_symbol_mm(x_mm, y_mm)
+        # Handle editing is available in all three modes.
+        hp, hp_type, handle = self._editor.hit_test_hairpin_mm(x_mm, y_mm)
+        if hp is not None and handle is not None:
+            self._active_hairpin = hp
+            self._active_type = hp_type
+            self._active_handle = handle
+            self._active_symbol = None
+            self._created_on_press = False
+            return
+
+        # Dynamic symbols are editable in all three modes.
+        sym, _sym_type, _ = self._editor.hit_test_dynamic_symbol_mm(x_mm, y_mm)
+        if sym is not None:
             self._active_symbol = sym
             self._active_hairpin = None
             self._active_type = None
@@ -238,7 +351,14 @@ class DynamicTool(BaseTool):
             self._created_on_press = False
             return
 
-        hp, hp_type, handle = self._editor.hit_test_hairpin_mm(x_mm, y_mm)
+        if self._mode == self._MODE_DYNAMIC_SYMBOL:
+            self._active_symbol = None
+            self._active_hairpin = None
+            self._active_type = None
+            self._active_handle = None
+            self._created_on_press = False
+            return
+
         self._active_hairpin = hp
         self._active_type = hp_type
         self._active_handle = handle
@@ -257,7 +377,61 @@ class DynamicTool(BaseTool):
         super().on_left_drag(x, y, dx, dy)
         if self._suppress_next_left_interaction or self._dialog_open:
             return
-        if self._mode == self._MODE_DYNAMIC_SYMBOL:
+        if self._active_hairpin is not None and self._active_handle is not None:
+            old_joint_time = self._hairpin_endpoint_time(self._active_hairpin, self._active_handle)
+            old_joint_rpitch = int(getattr(self._active_hairpin, 'x_rpitch', 0) or 0)
+            far_handle = self._other_handle(self._active_handle)
+            old_far_time = self._hairpin_endpoint_time(self._active_hairpin, far_handle)
+            old_far_rpitch = int(getattr(self._active_hairpin, 'x_rpitch', 0) or 0)
+            connected_symbols = self._symbols_at_point(old_joint_time, old_joint_rpitch)
+            connected_hairpins = [
+                (hp, handle)
+                for hp, handle in self._hairpins_at_point(old_joint_time, old_joint_rpitch)
+                if hp is not self._active_hairpin
+            ]
+            t_snap = self._snap_time(y)
+            try:
+                x_mm, _ = self._cursor_mm(x, y)
+                rpitch = self._x_mm_to_rpitch(x_mm)
+            except Exception:
+                rpitch = int(getattr(self._active_hairpin, 'x_rpitch', 0) or 0)
+            self._apply_handle_drag(self._active_hairpin, self._active_handle, t_snap, rpitch)
+            new_joint_time = self._hairpin_endpoint_time(self._active_hairpin, self._active_handle)
+            new_joint_rpitch = int(getattr(self._active_hairpin, 'x_rpitch', 0) or 0)
+            delta_time = float(new_joint_time - old_joint_time)
+            delta_rpitch = int(new_joint_rpitch - old_joint_rpitch)
+
+            for symbol in connected_symbols:
+                self._translate_symbol(symbol, delta_time, delta_rpitch)
+
+            visited_hairpins: set[int] = {int(getattr(self._active_hairpin, '_id', -1) or -1)}
+            visited_symbols: set[int] = {int(getattr(sym, '_id', -1) or -1) for sym in connected_symbols}
+
+            for hp, matched_handle in connected_hairpins:
+                hp_id = int(getattr(hp, '_id', -1) or -1)
+                visited_hairpins.add(hp_id)
+                neighbor_far_handle = self._other_handle(matched_handle)
+                neighbor_far_time, neighbor_far_rpitch = self._handle_point(hp, neighbor_far_handle)
+                self._set_hairpin_handle(hp, matched_handle, new_joint_time, new_joint_rpitch)
+                self._propagate_chain_pitch_only(
+                    neighbor_far_time,
+                    neighbor_far_rpitch,
+                    delta_rpitch,
+                    visited_hairpins=visited_hairpins,
+                    visited_symbols=visited_symbols,
+                )
+
+            self._propagate_chain_pitch_only(
+                old_far_time,
+                old_far_rpitch,
+                delta_rpitch,
+                visited_hairpins=visited_hairpins,
+                visited_symbols=visited_symbols,
+            )
+            self._dragged_hairpin = True
+            self._redraw()
+            return
+        if self._active_symbol is not None:
             if self._active_symbol is None:
                 return
             t_snap = self._snap_time(y)
@@ -271,18 +445,7 @@ class DynamicTool(BaseTool):
             self._dragged_symbol = True
             self._redraw()
             return
-        if self._active_hairpin is None or self._active_handle is None:
-            return
-        connected_symbol = self._find_connected_symbol_for_handle(self._active_hairpin, self._active_handle)
-        t_snap = self._snap_time(y)
-        try:
-            x_mm, _ = self._cursor_mm(x, y)
-            rpitch = self._x_mm_to_rpitch(x_mm)
-        except Exception:
-            rpitch = int(getattr(self._active_hairpin, 'x_rpitch', 0) or 0)
-        self._apply_handle_drag(self._active_hairpin, self._active_handle, t_snap, rpitch)
-        self._move_connected_symbol_with_handle(self._active_hairpin, self._active_handle, connected_symbol)
-        self._redraw()
+        return
 
     def on_left_drag_end(self, x: float, y: float) -> None:
         super().on_left_drag_end(x, y)
@@ -292,19 +455,25 @@ class DynamicTool(BaseTool):
         super().on_left_click(x, y)
         if self._suppress_next_left_interaction or self._dialog_open:
             return
+        if self._active_symbol is not None and not self._dragged_symbol:
+            glyph, ok = self._select_dynamic_symbol(str(getattr(self._active_symbol, 'symbol', '') or ''))
+            if ok:
+                self._active_symbol.symbol = str(glyph or '')
+                self._redraw()
+            return
         if self._mode == self._MODE_DYNAMIC_SYMBOL:
-            if self._editor is None:
-                return
-            x_mm, y_mm = self._cursor_mm(x, y)
-            symbol_ev, _sym_type, _ = self._editor.hit_test_dynamic_symbol_mm(x_mm, y_mm)
-            if symbol_ev is not None and not self._dragged_symbol:
-                glyph, ok = self._select_dynamic_symbol(str(getattr(symbol_ev, 'symbol', '') or ''))
+            # In dynamic-symbol mode: click on a handle sets/edits a symbol at that handle endpoint.
+            if self._active_hairpin is not None and self._active_handle is not None and not self._dragged_hairpin:
+                connected = self._find_connected_symbol_for_handle(self._active_hairpin, self._active_handle)
+                current = str(getattr(connected, 'symbol', '') or '') if connected is not None else ''
+                glyph, ok = self._select_dynamic_symbol(current)
                 if ok:
-                    symbol_ev.symbol = str(glyph or '')
+                    self._set_symbol_for_handle(self._active_hairpin, self._active_handle, glyph)
                     self._redraw()
                 return
-
-            if symbol_ev is None:
+            if self._editor is None:
+                return
+            if self._active_symbol is None:
                 glyph, ok = self._select_dynamic_symbol('')
                 if not ok:
                     return
@@ -336,10 +505,8 @@ class DynamicTool(BaseTool):
         self._editor.draw_frame()
         x_mm, y_mm = self._cursor_mm(x, y)
 
-        if self._mode == self._MODE_DYNAMIC_SYMBOL:
-            sym, _sym_type, _ = self._editor.hit_test_dynamic_symbol_mm(x_mm, y_mm)
-            if sym is None:
-                return
+        sym, _sym_type, _ = self._editor.hit_test_dynamic_symbol_mm(x_mm, y_mm)
+        if sym is not None:
             self._delete_dynamic_symbol(sym)
             self._redraw()
             return

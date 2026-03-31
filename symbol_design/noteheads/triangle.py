@@ -29,7 +29,10 @@ def draw_triangle_notehead(
     stroke_color = stroke_color_override if stroke_color_override is not None else symbol.notation_color
     fill_color = fill_color_override if fill_color_override is not None else symbol.notation_color
 
-    if str(direction) == "up":
+    # Inverted orientation by design:
+    # - "down" noteheads point upward (apex at start point)
+    # - "up" noteheads point downward
+    if str(direction) == "down":
         points = [
             (float(x_mm), top_y),
             (float(x_mm) - half_w, top_y + full_h),
