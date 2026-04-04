@@ -38,7 +38,7 @@ class Layout:
     note_head_visible: bool = True
     note_stem_visible: bool = True
     note_stop_visible: bool = True
-    note_stem_length_semitone: int = 6
+    note_stem_length_semitone: int = 5
     note_stem_thickness_mm: float = 1.25 # Thickness of the stem as well the notehead outline width
     note_stopsign_thickness_mm: float = 1.25
     note_leftdot_visible: bool = False
@@ -46,7 +46,7 @@ class Layout:
     note_midinote_visible: bool = False
     note_midinote_left_color: str = '#ccc'
     note_midinote_right_color: str = '#ccc'
-    note_width_scaling: float = 1.05 # Scaling factor for black noteheads when it sits under the stem while a white note sits next to it (0.05 to 1.0)
+    note_width_scaling: float = .9 # Scaling factor for black noteheads when it sits under the stem while a white note sits next to it (0.05 to 1.0)
 
     # Beam appearance
     beam_visible: bool = True
@@ -74,7 +74,7 @@ class Layout:
     hairpin_visible: bool = True
     hairpin_line_width_mm: float = 1.0
     hairpin_spread_mm: float = 10.0  # width of the open end of the hairpin in mm
-    hairpin_text_gap_mm: float = 0.75  # gap between hairpin and text in mm
+    hairpin_text_gap_mm: float = 1.0  # gap between hairpin and text in mm
     dynamic_symbol_font_size_pt: float = 12.0  # Font size for standalone dynamic symbols
     dynamic_symbol_background_padding_mm: float = 2.5
 

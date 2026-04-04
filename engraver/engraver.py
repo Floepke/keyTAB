@@ -2999,7 +2999,8 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
             if bool(layout.get('hairpin_visible', True)) and (line_crescendos or line_decrescendos):
                 hairpin_w = float(layout.get('hairpin_line_width_mm', 0.5) or 0.5) * scale
                 hairpin_spread = float(layout.get('hairpin_spread_mm', 5.0) or 5.0) * scale
-                hairpin_gap = float(layout.get('hairpin_text_gap_mm', 5.0) or 5.0)
+                _hg = layout.get('hairpin_text_gap_mm')
+                hairpin_gap = float(_hg if _hg is not None else 5.0)
                 dynamic_symbol_font_size_pt = float(layout.get('dynamic_symbol_font_size_pt', 12.0) or 12.0)
                 dynamic_bg_pad = float(layout.get('dynamic_symbol_background_padding_mm', 0.5) or 0.5) * scale
 

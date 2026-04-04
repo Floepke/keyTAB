@@ -84,7 +84,8 @@ class CrescendoDrawerMixin:
         layout = getattr(score, 'layout', None) if score else None
         
         # Use hairpin_text_gap_mm from layout for spacing
-        gap_mm = float(getattr(layout, 'hairpin_text_gap_mm', 5.0) or 5.0) if layout else 5.0
+        _hg = getattr(layout, 'hairpin_text_gap_mm', None) if layout else None
+        gap_mm = float(_hg if _hg is not None else 5.0)
         
         # Check if there's a symbol at the start position
         symbol_at_start = self._get_dynamic_symbol_at_position(t_start, x_rpitch)
