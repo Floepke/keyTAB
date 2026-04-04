@@ -30,7 +30,7 @@ from scripting.engine import ScriptEngine
 class MainWindow(QtWidgets.QMainWindow):
     def __init__(self) -> None:
         super().__init__()
-        self.setWindowTitle("keyTAB - new project (unsaved)")
+        self.setWindowTitle(self.tr("keyTAB - new project (unsaved)"))
         self.resize(1200, 800)
         self.setAcceptDrops(True)
         # Ensure player attribute always exists
@@ -557,34 +557,35 @@ class MainWindow(QtWidgets.QMainWindow):
         return True
 
     def _create_menus(self) -> None:
+        tr = self.tr
         menubar = self.menuBar()
         # Keep menu inside the app window on macOS (also in fullscreen).
         if sys.platform == "darwin":
             menubar.setNativeMenuBar(False)
 
         # Create menus in normal left-to-right order (File, Edit, Selection, Document, Tools, View, Playback, About)
-        file_menu = menubar.addMenu("&File")
-        edit_menu = menubar.addMenu("&Edit")
-        view_menu = menubar.addMenu("&View")
-        selection_menu = menubar.addMenu("&Selection")
-        document_menu = menubar.addMenu("&Document")
-        tools_menu = menubar.addMenu("&Tools")
-        playback_menu = menubar.addMenu("&Playback")
-        help_menu = menubar.addMenu("&About")
+        file_menu = menubar.addMenu(tr("&File"))
+        edit_menu = menubar.addMenu(tr("&Edit"))
+        view_menu = menubar.addMenu(tr("&View"))
+        selection_menu = menubar.addMenu(tr("&Selection"))
+        document_menu = menubar.addMenu(tr("&Document"))
+        tools_menu = menubar.addMenu(tr("&Tools"))
+        playback_menu = menubar.addMenu(tr("&Playback"))
+        help_menu = menubar.addMenu(tr("&About"))
         for menu in (file_menu, edit_menu, selection_menu, view_menu, document_menu, tools_menu, playback_menu, help_menu):
             menu.setToolTipsVisible(True)
 
         # File actions
-        new_act = QtGui.QAction("New", self)
-        new_act.setToolTip("Create a new project.")
-        open_act = QtGui.QAction("Load...", self)
-        open_act.setToolTip("Open an existing project file.")
-        save_act = QtGui.QAction("Save", self)
-        save_act.setToolTip("Save the current project.")
-        save_as_act = QtGui.QAction("Save As...", self)
-        save_as_act.setToolTip("Save the current project under a new file name.")
-        exit_act = QtGui.QAction("Exit", self)
-        exit_act.setToolTip("Exit the application.")
+        new_act = QtGui.QAction(tr("New"), self)
+        new_act.setToolTip(tr("Create a new project."))
+        open_act = QtGui.QAction(tr("Load..."), self)
+        open_act.setToolTip(tr("Open an existing project file."))
+        save_act = QtGui.QAction(tr("Save"), self)
+        save_act.setToolTip(tr("Save the current project."))
+        save_as_act = QtGui.QAction(tr("Save As..."), self)
+        save_as_act.setToolTip(tr("Save the current project under a new file name."))
+        exit_act = QtGui.QAction(tr("Exit"), self)
+        exit_act.setToolTip(tr("Exit the application."))
         try:
             exit_act.setShortcut(QtGui.QKeySequence("Escape"))
         except Exception:
@@ -600,25 +601,25 @@ class MainWindow(QtWidgets.QMainWindow):
         file_menu.addAction(open_act)
         file_menu.addAction(save_act)
         file_menu.addAction(save_as_act)
-        self._recent_menu = file_menu.addMenu("Recent Files")
+        self._recent_menu = file_menu.addMenu(tr("Recent Files"))
         self._recent_menu.setToolTipsVisible(True)
-        self._rename_file_act = QtGui.QAction("Rename...", self)
-        self._rename_file_act.setToolTip("Rename the currently opened file and update Recent Files.")
+        self._rename_file_act = QtGui.QAction(tr("Rename..."), self)
+        self._rename_file_act.setToolTip(tr("Rename the currently opened file and update Recent Files."))
         self._rename_file_act.triggered.connect(self._rename_current_file)
         file_menu.addAction(self._rename_file_act)
         self._refresh_rename_file_action()
         file_menu.addSeparator()
 
-        style_act = QtGui.QAction("Style...", self)
-        style_act.setToolTip("Open appearance settings for the score.")
+        style_act = QtGui.QAction(tr("Style..."), self)
+        style_act.setToolTip(tr("Open appearance settings for the score."))
         style_act.setShortcut(QtGui.QKeySequence("S"))
         style_act.triggered.connect(self._open_style_dialog)
-        info_act = QtGui.QAction("Info...", self)
-        info_act.setToolTip("Open title and metadata settings.")
+        info_act = QtGui.QAction(tr("Info..."), self)
+        info_act.setToolTip(tr("Open title and metadata settings."))
         info_act.setShortcut(QtGui.QKeySequence("I"))
         info_act.triggered.connect(self._open_info_dialog)
-        line_break_act = QtGui.QAction("Line Breaks...", self)
-        line_break_act.setToolTip("Open line break and page break settings.")
+        line_break_act = QtGui.QAction(tr("Line Breaks..."), self)
+        line_break_act.setToolTip(tr("Open line break and page break settings."))
         line_break_act.setShortcut(QtGui.QKeySequence("L"))
         line_break_act.triggered.connect(self._open_line_break_dialog)
 
@@ -631,14 +632,14 @@ class MainWindow(QtWidgets.QMainWindow):
         tools_menu.aboutToShow.connect(self._rebuild_tools_menu)
         self._rebuild_tools_menu()
 
-        export_pdf_act = QtGui.QAction("Export PDF...", self)
-        export_pdf_act.setToolTip("Export the current score as a PDF document.")
+        export_pdf_act = QtGui.QAction(tr("Export PDF..."), self)
+        export_pdf_act.setToolTip(tr("Export the current score as a PDF document."))
         export_pdf_act.setShortcut(QtGui.QKeySequence("Ctrl+E"))
         export_pdf_act.triggered.connect(self._export_pdf)
         file_menu.addAction(export_pdf_act)
 
-        export_image_pdf_act = QtGui.QAction("Export Image PDF...", self)
-        export_image_pdf_act.setToolTip("Export the current score as a rasterized PDF document (600 DPI).")
+        export_image_pdf_act = QtGui.QAction(tr("Export Image PDF..."), self)
+        export_image_pdf_act.setToolTip(tr("Export the current score as a rasterized PDF document (600 DPI)."))
         export_image_pdf_act.setShortcut(QtGui.QKeySequence("Ctrl+Shift+E"))
         export_image_pdf_act.triggered.connect(self._export_image_pdf)
         file_menu.addAction(export_image_pdf_act)
@@ -649,50 +650,50 @@ class MainWindow(QtWidgets.QMainWindow):
         self._playback_mode_group.setExclusive(True)
 
         self._playback_mode_system_action = QtGui.QAction(self._playback_system_label(), self)
-        self._playback_mode_system_action.setToolTip("Use the system playback backend.")
+        self._playback_mode_system_action.setToolTip(tr("Use the system playback backend."))
         self._playback_mode_system_action.setCheckable(True)
         self._playback_mode_system_action.triggered.connect(lambda checked: self._set_playback_mode('system') if checked else None)
         playback_menu.addAction(self._playback_mode_system_action)
         self._playback_mode_group.addAction(self._playback_mode_system_action)
 
-        self._playback_mode_external_action = QtGui.QAction("Playback using External MIDI port", self)
-        self._playback_mode_external_action.setToolTip("Use an external MIDI output port for playback.")
+        self._playback_mode_external_action = QtGui.QAction(tr("Playback using External MIDI port"), self)
+        self._playback_mode_external_action.setToolTip(tr("Use an external MIDI output port for playback."))
         self._playback_mode_external_action.setCheckable(True)
         self._playback_mode_external_action.triggered.connect(lambda checked: self._set_playback_mode('external') if checked else None)
         playback_menu.addAction(self._playback_mode_external_action)
         self._playback_mode_group.addAction(self._playback_mode_external_action)
 
         playback_menu.addSeparator()
-        self._midi_port_menu = playback_menu.addMenu("MIDI port")
+        self._midi_port_menu = playback_menu.addMenu(tr("MIDI port"))
         self._midi_port_menu.setToolTipsVisible(True)
         self._midi_port_menu.aboutToShow.connect(self._rebuild_midi_port_menu)
         self._rebuild_midi_port_menu()
         playback_menu.addSeparator()
 
-        test_tone_act = QtGui.QAction("Play Test Tone", self)
-        test_tone_act.setToolTip("Play a short test tone.")
+        test_tone_act = QtGui.QAction(tr("Play Test Tone"), self)
+        test_tone_act.setToolTip(tr("Play a short test tone."))
         test_tone_act.triggered.connect(self._play_test_tone)
         playback_menu.addAction(test_tone_act)
 
         if sys.platform.startswith("linux"):
             playback_menu.addSeparator()
-            select_sf_act = QtGui.QAction("Select Custom SoundFont (.sf2/.sf3) for FluidSynth", self)
-            select_sf_act.setToolTip("Select a custom SoundFont file for FluidSynth playback.")
+            select_sf_act = QtGui.QAction(tr("Select Custom SoundFont (.sf2/.sf3) for FluidSynth"), self)
+            select_sf_act.setToolTip(tr("Select a custom SoundFont file for FluidSynth playback."))
             select_sf_act.triggered.connect(lambda: self._prompt_for_soundfont(force_dialog=True))
             playback_menu.addAction(select_sf_act)
 
-            unset_sf_act = QtGui.QAction("Use Default FluidSynth SoundFont", self)
-            unset_sf_act.setToolTip("Switch back to the default FluidSynth SoundFont.")
+            unset_sf_act = QtGui.QAction(tr("Use Default FluidSynth SoundFont"), self)
+            unset_sf_act.setToolTip(tr("Switch back to the default FluidSynth SoundFont."))
             unset_sf_act.triggered.connect(self._unset_soundfont)
             playback_menu.addAction(unset_sf_act)
 
         self._set_playback_mode(str(self._get_playback_mode_from_appdata() or 'system'), show_status=False)
 
-        about_act = QtGui.QAction("About keyTAB", self)
-        about_act.setToolTip("Show information about keyTAB.")
+        about_act = QtGui.QAction(tr("About keyTAB"), self)
+        about_act.setToolTip(tr("Show information about keyTAB."))
         about_act.triggered.connect(self._open_about_dialog)
-        about_qt_act = QtGui.QAction("About Qt", self)
-        about_qt_act.setToolTip("Show information about the Qt framework.")
+        about_qt_act = QtGui.QAction(tr("About Qt"), self)
+        about_qt_act.setToolTip(tr("Show information about the Qt framework."))
         about_qt_act.triggered.connect(lambda: QtWidgets.QMessageBox.aboutQt(self))
         help_menu.addAction(about_act)
         help_menu.addSeparator()
@@ -707,11 +708,11 @@ class MainWindow(QtWidgets.QMainWindow):
         file_menu.addAction(exit_act)
 
         # Edit actions
-        undo_act = QtGui.QAction("Undo", self)
-        undo_act.setToolTip("Undo the last editing action.")
+        undo_act = QtGui.QAction(tr("Undo"), self)
+        undo_act.setToolTip(tr("Undo the last editing action."))
         undo_act.setShortcut(QtGui.QKeySequence.StandardKey.Undo)
-        redo_act = QtGui.QAction("Redo", self)
-        redo_act.setToolTip("Redo the last undone editing action.")
+        redo_act = QtGui.QAction(tr("Redo"), self)
+        redo_act.setToolTip(tr("Redo the last undone editing action."))
         # Use platform-aware Redo shortcut to avoid ambiguity; explicit combos handled in editor
         try:
             redo_act.setShortcut(QtGui.QKeySequence.StandardKey.Redo)
@@ -720,22 +721,22 @@ class MainWindow(QtWidgets.QMainWindow):
         edit_menu.addAction(undo_act)
         edit_menu.addAction(redo_act)
         # Cut/Copy/Paste actions (platform-aware shortcuts)
-        cut_act = QtGui.QAction("Cut", self)
-        cut_act.setToolTip("Cut the current selection.")
+        cut_act = QtGui.QAction(tr("Cut"), self)
+        cut_act.setToolTip(tr("Cut the current selection."))
         cut_act.setShortcut(QtGui.QKeySequence.StandardKey.Cut)
-        copy_act = QtGui.QAction("Copy", self)
-        copy_act.setToolTip("Copy the current selection.")
+        copy_act = QtGui.QAction(tr("Copy"), self)
+        copy_act.setToolTip(tr("Copy the current selection."))
         copy_act.setShortcut(QtGui.QKeySequence.StandardKey.Copy)
-        paste_act = QtGui.QAction("Paste", self)
-        paste_act.setToolTip("Paste clipboard content.")
+        paste_act = QtGui.QAction(tr("Paste"), self)
+        paste_act.setToolTip(tr("Paste clipboard content."))
         paste_act.setShortcut(QtGui.QKeySequence.StandardKey.Paste)
         edit_menu.addSeparator()
         edit_menu.addAction(cut_act)
         edit_menu.addAction(copy_act)
         edit_menu.addAction(paste_act)
         # Delete selection action with visible shortcuts (Delete, Backspace)
-        delete_act = QtGui.QAction("Delete", self)
-        delete_act.setToolTip("Delete the current selection.")
+        delete_act = QtGui.QAction(tr("Delete"), self)
+        delete_act.setToolTip(tr("Delete the current selection."))
         try:
             delete_act.setShortcuts([
                 QtGui.QKeySequence(QtGui.QKeySequence.StandardKey.Delete),
@@ -751,38 +752,38 @@ class MainWindow(QtWidgets.QMainWindow):
         edit_menu.addSeparator()
 
         # Selection menu (discoverability for selection shortcuts/actions)
-        select_all_act = QtGui.QAction("Select All", self)
-        select_all_act.setToolTip("Select all editable events.")
+        select_all_act = QtGui.QAction(tr("Select All"), self)
+        select_all_act.setToolTip(tr("Select all editable events."))
         select_all_act.setShortcut(QtGui.QKeySequence.StandardKey.SelectAll)
 
-        transpose_left_act = QtGui.QAction("Transpose -1 Semitone", self)
-        transpose_left_act.setToolTip("Transpose Selection Down by One Semitone.")
+        transpose_left_act = QtGui.QAction(tr("Transpose -1 Semitone"), self)
+        transpose_left_act.setToolTip(tr("Transpose Selection Down by One Semitone."))
         transpose_left_act.setShortcut(QtGui.QKeySequence(QtCore.Qt.Key_Left))
         transpose_left_act.setShortcutContext(QtCore.Qt.ShortcutContext.WidgetShortcut)
 
-        transpose_right_act = QtGui.QAction("Transpose +1 Semitone", self)
-        transpose_right_act.setToolTip("Transpose Selection Up by One Semitone.")
+        transpose_right_act = QtGui.QAction(tr("Transpose +1 Semitone"), self)
+        transpose_right_act.setToolTip(tr("Transpose Selection Up by One Semitone."))
         transpose_right_act.setShortcut(QtGui.QKeySequence(QtCore.Qt.Key_Right))
         transpose_right_act.setShortcutContext(QtCore.Qt.ShortcutContext.WidgetShortcut)
 
-        shift_earlier_act = QtGui.QAction("Move Earlier by Snap Band", self)
-        shift_earlier_act.setToolTip("Move Selection Earlier by One Snap Band.")
+        shift_earlier_act = QtGui.QAction(tr("Move Earlier by Snap Band"), self)
+        shift_earlier_act.setToolTip(tr("Move Selection Earlier by One Snap Band."))
         shift_earlier_act.setShortcut(QtGui.QKeySequence(QtCore.Qt.Key_Up))
         shift_earlier_act.setShortcutContext(QtCore.Qt.ShortcutContext.WidgetShortcut)
 
-        shift_later_act = QtGui.QAction("Move Later by Snap Band", self)
-        shift_later_act.setToolTip("Move Selection Later by One Snap Band.")
+        shift_later_act = QtGui.QAction(tr("Move Later by Snap Band"), self)
+        shift_later_act.setToolTip(tr("Move Selection Later by One Snap Band."))
         shift_later_act.setShortcut(QtGui.QKeySequence(QtCore.Qt.Key_Down))
         shift_later_act.setShortcutContext(QtCore.Qt.ShortcutContext.WidgetShortcut)
 
-        quantize_act = QtGui.QAction("Quantize Starts and Ends on Snap Band", self)
-        quantize_act.setToolTip("Quantize Selection Starts and Ends to the Current Snap Band.")
+        quantize_act = QtGui.QAction(tr("Quantize Starts and Ends on Snap Band"), self)
+        quantize_act.setToolTip(tr("Quantize Selection Starts and Ends to the Current Snap Band."))
         quantize_act.setShortcut(QtGui.QKeySequence("Q"))
         quantize_act.setShortcutContext(QtCore.Qt.ShortcutContext.WidgetShortcut)
-        quantize_start_act = QtGui.QAction("Quantize Starts on Snap Band", self)
-        quantize_start_act.setToolTip("Quantize Selection Starts to the Current Snap Band.")
-        quantize_end_act = QtGui.QAction("Quantize Ends on Snap Band", self)
-        quantize_end_act.setToolTip("Quantize Selection Ends to the Current Snap Band.")
+        quantize_start_act = QtGui.QAction(tr("Quantize Starts on Snap Band"), self)
+        quantize_start_act.setToolTip(tr("Quantize Selection Starts to the Current Snap Band."))
+        quantize_end_act = QtGui.QAction(tr("Quantize Ends on Snap Band"), self)
+        quantize_end_act.setToolTip(tr("Quantize Selection Ends to the Current Snap Band."))
 
         selection_menu.addAction(select_all_act)
         selection_menu.addSeparator()
@@ -796,14 +797,14 @@ class MainWindow(QtWidgets.QMainWindow):
         selection_menu.addAction(quantize_end_act)
         # Separator between Delete and Preferences
         edit_menu.addSeparator()
-        prefs_act = QtGui.QAction("Preferences…", self)
-        prefs_act.setToolTip("Open application preferences.")
+        prefs_act = QtGui.QAction(tr("Preferences..."), self)
+        prefs_act.setToolTip(tr("Open application preferences."))
         prefs_act.triggered.connect(self._open_preferences)
         edit_menu.addAction(prefs_act)
         
         # View actions
-        zoom_in_act = QtGui.QAction("Zoom In", self)
-        zoom_in_act.setToolTip("Zoom in on the editor view.")
+        zoom_in_act = QtGui.QAction(tr("Zoom In"), self)
+        zoom_in_act.setToolTip(tr("Zoom in on the editor view."))
         try:
             zoom_in_act.setShortcuts([
                 QtGui.QKeySequence("="),
@@ -811,8 +812,8 @@ class MainWindow(QtWidgets.QMainWindow):
             ])
         except Exception:
             zoom_in_act.setShortcut(QtGui.QKeySequence("="))
-        zoom_out_act = QtGui.QAction("Zoom Out", self)
-        zoom_out_act.setToolTip("Zoom out from the editor view.")
+        zoom_out_act = QtGui.QAction(tr("Zoom Out"), self)
+        zoom_out_act.setToolTip(tr("Zoom out from the editor view."))
         try:
             zoom_out_act.setShortcuts([
                 QtGui.QKeySequence("-"),
@@ -821,14 +822,50 @@ class MainWindow(QtWidgets.QMainWindow):
         except Exception:
             zoom_out_act.setShortcut(QtGui.QKeySequence("-"))
         view_menu.addSeparator()
-        full_screen_act = QtGui.QAction("Full Screen", self)
-        full_screen_act.setToolTip("Toggle full screen mode.")
+        full_screen_act = QtGui.QAction(tr("Full Screen"), self)
+        full_screen_act.setToolTip(tr("Toggle full screen mode."))
         full_screen_act.setShortcut(QtGui.QKeySequence("F11"))
         full_screen_act.setCheckable(True)
         view_menu.addAction(zoom_in_act)
         view_menu.addAction(zoom_out_act)
         view_menu.addSeparator()
         view_menu.addAction(full_screen_act)
+        view_menu.addSeparator()
+
+        # Language actions
+        language_menu = view_menu.addMenu(tr("Language"))
+        language_menu.setToolTipsVisible(True)
+        self._language_action_group = QtGui.QActionGroup(self)
+        self._language_action_group.setExclusive(True)
+
+        self._language_system_action = QtGui.QAction(tr("System"), self)
+        self._language_system_action.setToolTip(tr("Use the operating system language for the user interface."))
+        self._language_system_action.setCheckable(True)
+        self._language_system_action.triggered.connect(
+            lambda checked: self._set_ui_language_preference("system") if checked else None
+        )
+        self._language_action_group.addAction(self._language_system_action)
+        language_menu.addAction(self._language_system_action)
+
+        self._language_en_action = QtGui.QAction(tr("English"), self)
+        self._language_en_action.setToolTip(tr("Use English for the user interface."))
+        self._language_en_action.setCheckable(True)
+        self._language_en_action.triggered.connect(
+            lambda checked: self._set_ui_language_preference("en") if checked else None
+        )
+        self._language_action_group.addAction(self._language_en_action)
+        language_menu.addAction(self._language_en_action)
+
+        self._language_nl_action = QtGui.QAction(tr("Dutch"), self)
+        self._language_nl_action.setToolTip(tr("Use Dutch for the user interface."))
+        self._language_nl_action.setCheckable(True)
+        self._language_nl_action.triggered.connect(
+            lambda checked: self._set_ui_language_preference("nl") if checked else None
+        )
+        self._language_action_group.addAction(self._language_nl_action)
+        language_menu.addAction(self._language_nl_action)
+
+        self._sync_ui_language_actions()
 
         # Wire up triggers
         new_act.triggered.connect(self._file_new)
@@ -1161,12 +1198,12 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def _playback_system_label(self) -> str:
         if sys.platform.startswith('linux'):
-            return "Playback using FluidSynth"
+            return self.tr("Playback using FluidSynth")
         if sys.platform == 'darwin':
-            return "Playback using CoreMIDI"
+            return self.tr("Playback using CoreMIDI")
         if sys.platform.startswith('win'):
-            return "Playback using WinMM"
-        return "Playback using System Synth"
+            return self.tr("Playback using WinMM")
+        return self.tr("Playback using System Synth")
 
     def _get_playback_mode_from_appdata(self) -> str:
         adm = get_appdata_manager()
@@ -1563,11 +1600,11 @@ class MainWindow(QtWidgets.QMainWindow):
             p = None
         session_mode = bool(getattr(self, '_session_restore_mode', False)) and p is None
         if p is None:
-            state = "Unsaved changes" if dirty else "New project"
+            state = self.tr("Unsaved changes") if dirty else self.tr("New project")
         else:
-            state = "Unsaved changes" if dirty else "Saved"
-        path_text = str(p) if p else ("(session.piano restored)" if session_mode else "(unsaved project)")
-        prefix = "Session mode • " if session_mode else ""
+            state = self.tr("Unsaved changes") if dirty else self.tr("Saved")
+        path_text = str(p) if p else (self.tr("(session.piano restored)") if session_mode else self.tr("(unsaved project)"))
+        prefix = self.tr("Session mode") + " • " if session_mode else ""
         return f"{prefix}{state} • {path_text}"
 
     def _current_file_label_for_status(self) -> str:
@@ -1578,8 +1615,8 @@ class MainWindow(QtWidgets.QMainWindow):
         except Exception:
             pass
         if bool(getattr(self, '_session_restore_mode', False)):
-            return "session.piano"
-        return "(unsaved project)"
+            return self.tr("session.piano")
+        return self.tr("(unsaved project)")
 
     def _show_file_action_status(self, action: str, timeout_ms: int = 2500) -> None:
         label = self._current_file_label_for_status()
@@ -1605,6 +1642,62 @@ class MainWindow(QtWidgets.QMainWindow):
     def _open_preferences(self) -> None:
         # Ensure preferences file exists and open in system editor
         open_preferences(self)
+
+    def _normalized_ui_language(self, language: str) -> str:
+        lang = str(language or "system").strip().lower()
+        if lang not in ("system", "en", "nl"):
+            return "system"
+        return lang
+
+    def _current_ui_language_preference(self) -> str:
+        pm = get_preferences_manager()
+        return self._normalized_ui_language(str(pm.get("ui_language", "system") or "system"))
+
+    def _sync_ui_language_actions(self) -> None:
+        selected = self._current_ui_language_preference()
+        mapping = {
+            "system": getattr(self, "_language_system_action", None),
+            "en": getattr(self, "_language_en_action", None),
+            "nl": getattr(self, "_language_nl_action", None),
+        }
+        for key, action in mapping.items():
+            if action is not None:
+                action.setChecked(key == selected)
+
+    def _language_display_name(self, lang: str) -> str:
+        normalized = self._normalized_ui_language(lang)
+        if normalized == "en":
+            return self.tr("English")
+        if normalized == "nl":
+            return self.tr("Dutch")
+        return self.tr("System")
+
+    def _set_ui_language_preference(self, language: str) -> None:
+        lang = self._normalized_ui_language(language)
+        current = self._current_ui_language_preference()
+        self._sync_ui_language_actions()
+        if lang == current:
+            return
+
+        pm = get_preferences_manager()
+        pm.set("ui_language", lang)
+        pm.save()
+        self._sync_ui_language_actions()
+
+        result = QtWidgets.QMessageBox.question(
+            self,
+            self.tr("Restart keyTAB"),
+            self.tr("Language changed to {language}. Restart now to apply it?").format(
+                language=self._language_display_name(lang)
+            ),
+            QtWidgets.QMessageBox.StandardButton.Yes | QtWidgets.QMessageBox.StandardButton.No,
+            QtWidgets.QMessageBox.StandardButton.Yes,
+        )
+        if result == QtWidgets.QMessageBox.StandardButton.Yes:
+            self._status(self.tr("Restarting keyTAB to apply language change..."), 2000)
+            QtCore.QTimer.singleShot(150, self._request_app_restart)
+        else:
+            self._status(self.tr("Language preference saved. Restart keyTAB to apply it."), 4000)
 
     def _open_about_dialog(self) -> None:
         """Show licensing and attribution info."""
@@ -1713,7 +1806,7 @@ class MainWindow(QtWidgets.QMainWindow):
             pass
         self._update_title()
         self._show_status_default(force=True)
-        self._show_file_action_status("Opened")
+        self._show_file_action_status(self.tr("Opened"))
 
     def _file_save(self) -> None:
         if self.file_manager.save():
@@ -1721,7 +1814,7 @@ class MainWindow(QtWidgets.QMainWindow):
                 self._session_restore_mode = False
             self._update_title()
             self._show_status_default(force=True)
-            self._show_file_action_status("Saved")
+            self._show_file_action_status(self.tr("Saved"))
 
     def _file_save_as(self) -> None:
         if self.file_manager.save_as():
@@ -1729,7 +1822,7 @@ class MainWindow(QtWidgets.QMainWindow):
                 self._session_restore_mode = False
             self._update_title()
             self._show_status_default(force=True)
-            self._show_file_action_status("Saved As")
+            self._show_file_action_status(self.tr("Saved As"))
 
     def _refresh_views_from_score(self, delay_engrave_ms: int = 0) -> None:
         try:
@@ -1890,12 +1983,12 @@ class MainWindow(QtWidgets.QMainWindow):
                 self.script_engine = ScriptEngine(self.file_manager, self.editor_controller, parent=self)
                 engine = self.script_engine
             except Exception as exc:
-                self._show_error_dialog("Run Script", f"Failed to initialize scripting: {exc}", details=self._format_exception_details(exc))
+                self._show_error_dialog(self.tr("Run Script"), self.tr("Failed to initialize scripting: {error}").format(error=exc), details=self._format_exception_details(exc))
                 return
         try:
             engine.choose_and_run()
         except Exception as exc:
-            self._show_error_dialog("Run Script", f"Script failed: {exc}", details=self._format_exception_details(exc))
+            self._show_error_dialog(self.tr("Run Script"), self.tr("Script failed: {error}").format(error=exc), details=self._format_exception_details(exc))
 
     def _scripts_dir(self) -> Path:
         return Path(__file__).resolve().parent.parent / "scripts"
@@ -1907,12 +2000,12 @@ class MainWindow(QtWidgets.QMainWindow):
                 self.script_engine = ScriptEngine(self.file_manager, self.editor_controller, parent=self)
                 engine = self.script_engine
             except Exception as exc:
-                self._show_error_dialog("Run Script", f"Failed to initialize scripting: {exc}", details=self._format_exception_details(exc))
+                self._show_error_dialog(self.tr("Run Script"), self.tr("Failed to initialize scripting: {error}").format(error=exc), details=self._format_exception_details(exc))
                 return
         try:
             engine.run_script(Path(script_path))
         except Exception as exc:
-            self._show_error_dialog("Run Script", f"Script failed: {exc}", details=self._format_exception_details(exc))
+            self._show_error_dialog(self.tr("Run Script"), self.tr("Script failed: {error}").format(error=exc), details=self._format_exception_details(exc))
 
     def _rebuild_tools_menu(self) -> None:
         menu = getattr(self, "_tools_menu", None)
@@ -1920,15 +2013,15 @@ class MainWindow(QtWidgets.QMainWindow):
             return
         menu.clear()
 
-        run_script_act = QtGui.QAction("Run Script...", self)
-        run_script_act.setToolTip("Load and run a Python script with preview and cancel support.")
+        run_script_act = QtGui.QAction(self.tr("Run Script..."), self)
+        run_script_act.setToolTip(self.tr("Load and run a Python script with preview and cancel support."))
         run_script_act.triggered.connect(self._run_script_dialog)
         menu.addAction(run_script_act)
         menu.addSeparator()
 
         scripts_dir = self._scripts_dir()
         if not scripts_dir.exists() or not scripts_dir.is_dir():
-            empty_act = QtGui.QAction("No scripts folder found", self)
+            empty_act = QtGui.QAction(self.tr("No scripts folder found"), self)
             empty_act.setEnabled(False)
             menu.addAction(empty_act)
             return
@@ -1938,7 +2031,7 @@ class MainWindow(QtWidgets.QMainWindow):
             key=lambda p: p.name.lower(),
         )
         if not script_files:
-            empty_act = QtGui.QAction("No scripts found", self)
+            empty_act = QtGui.QAction(self.tr("No scripts found"), self)
             empty_act.setEnabled(False)
             menu.addAction(empty_act)
             return
@@ -1963,7 +2056,7 @@ class MainWindow(QtWidgets.QMainWindow):
             recent = []
         recent = [str(p) for p in recent if str(p).strip()]
         if not recent:
-            empty_act = QtGui.QAction("No recent files", self)
+            empty_act = QtGui.QAction(self.tr("No recent files"), self)
             empty_act.setEnabled(False)
             menu.addAction(empty_act)
         else:
@@ -1973,7 +2066,7 @@ class MainWindow(QtWidgets.QMainWindow):
                 menu.addAction(act)
 
         menu.addSeparator()
-        clear_act = QtGui.QAction("Clear Recent Files", self)
+        clear_act = QtGui.QAction(self.tr("Clear Recent Files"), self)
         clear_act.triggered.connect(self._clear_recent_files)
         menu.addAction(clear_act)
         self._refresh_rename_file_action()
@@ -2001,8 +2094,8 @@ class MainWindow(QtWidgets.QMainWindow):
         current = Path(cur_path)
         new_name, ok = QtWidgets.QInputDialog.getText(
             self,
-            "Rename File",
-            "New file name:",
+            self.tr("Rename File"),
+            self.tr("New file name:"),
             QtWidgets.QLineEdit.EchoMode.Normal,
             current.name,
         )
@@ -2013,7 +2106,7 @@ class MainWindow(QtWidgets.QMainWindow):
         if not new_name or new_name == current.name:
             return
         if ("/" in new_name) or ("\\" in new_name):
-            QtWidgets.QMessageBox.warning(self, "Rename File", "Please enter only a file name, not a path.")
+            QtWidgets.QMessageBox.warning(self, self.tr("Rename File"), self.tr("Please enter only a file name, not a path."))
             return
 
         target = current.with_name(new_name)
@@ -2026,7 +2119,7 @@ class MainWindow(QtWidgets.QMainWindow):
             self._refresh_rename_file_action()
             self._update_title()
             self._show_status_default(force=True)
-            self._show_file_action_status("Renamed")
+            self._show_file_action_status(self.tr("Renamed"))
 
     def _open_recent_file(self, path: str) -> None:
         if not self.file_manager.confirm_save_for_action("opening another project", force_prompt=True):
@@ -2121,7 +2214,7 @@ class MainWindow(QtWidgets.QMainWindow):
     def _edit_copy(self) -> None:
         try:
             self.editor_controller.copy_selection()
-            self._status("Copied selection", 1200)
+            self._status(self.tr("Copied selection"), 1200)
         except Exception:
             pass
 
@@ -2137,7 +2230,7 @@ class MainWindow(QtWidgets.QMainWindow):
                 self.editor_controller.force_redraw_from_model()
             except Exception:
                 pass
-            self._status("Cut selection", 1200)
+            self._status(self.tr("Cut selection"), 1200)
         except Exception:
             pass
 
@@ -2153,7 +2246,7 @@ class MainWindow(QtWidgets.QMainWindow):
                 self.editor_controller.force_redraw_from_model()
             except Exception:
                 pass
-            self._status("Pasted selection", 1200)
+            self._status(self.tr("Pasted selection"), 1200)
         except Exception:
             pass
 
@@ -2172,9 +2265,9 @@ class MainWindow(QtWidgets.QMainWindow):
                     self.editor_controller.force_redraw_from_model()
                 except Exception:
                     pass
-                self._status("Deleted selection", 1200)
+                self._status(self.tr("Deleted selection"), 1200)
             else:
-                self._status("No selection to delete", 1200)
+                self._status(self.tr("No selection to delete"), 1200)
         except Exception:
             pass
 
@@ -2185,7 +2278,7 @@ class MainWindow(QtWidgets.QMainWindow):
                 self.editor_canvas.update()
             except Exception:
                 pass
-            self._status("Selected all", 1200)
+            self._status(self.tr("Selected all"), 1200)
         except Exception:
             pass
 
@@ -2197,9 +2290,9 @@ class MainWindow(QtWidgets.QMainWindow):
                     self.editor_canvas.update()
                 except Exception:
                     pass
-                self._status(f"Transposed selection {int(semitones):+d} semitone", 1200)
+                self._status(self.tr("Transposed selection {semitones:+d} semitone").format(semitones=int(semitones)), 1200)
             else:
-                self._status("No selection to transpose", 1200)
+                self._status(self.tr("No selection to transpose"), 1200)
         except Exception:
             pass
 
@@ -2215,10 +2308,10 @@ class MainWindow(QtWidgets.QMainWindow):
                     self.editor_canvas.update()
                 except Exception:
                     pass
-                direction = "earlier" if delta < 0 else "later"
-                self._status(f"Moved selection {direction} by snap", 1200)
+                direction = self.tr("earlier") if delta < 0 else self.tr("later")
+                self._status(self.tr("Moved selection {direction} by snap").format(direction=direction), 1200)
             else:
-                self._status("No selection to move", 1200)
+                self._status(self.tr("No selection to move"), 1200)
         except Exception:
             pass
 
@@ -2232,13 +2325,13 @@ class MainWindow(QtWidgets.QMainWindow):
                     pass
                 mode = str(qtype or 'start/end').strip().lower()
                 if mode == 'start':
-                    self._status("Quantized selection starts to snap", 1200)
+                    self._status(self.tr("Quantized selection starts to snap"), 1200)
                 elif mode == 'end':
-                    self._status("Quantized selection ends to snap", 1200)
+                    self._status(self.tr("Quantized selection ends to snap"), 1200)
                 else:
-                    self._status("Quantized selection starts and ends to snap", 1200)
+                    self._status(self.tr("Quantized selection starts and ends to snap"), 1200)
             else:
-                self._status("No selection to quantize", 1200)
+                self._status(self.tr("No selection to quantize"), 1200)
         except Exception:
             pass
 
@@ -2365,13 +2458,13 @@ class MainWindow(QtWidgets.QMainWindow):
             return
         self._last_engraver_error_signature = signature or None
         self._show_error_dialog(
-            "Engraving failed",
-            str(error_text or "The engraver failed."),
+            self.tr("Engraving failed"),
+            str(error_text or self.tr("The engraver failed.")),
             details=str(error_details or ""),
-            informative_text="Use 'Copy Error Log' and keep the copied traceback for debugging.",
+            informative_text=self.tr("Use 'Copy Error Log' and keep the copied traceback for debugging."),
         )
         try:
-            self._status("Engraving failed. See error dialog for details.", 10000)
+            self._status(self.tr("Engraving failed. See error dialog for details."), 10000)
         except Exception:
             pass
 
@@ -2516,10 +2609,12 @@ class MainWindow(QtWidgets.QMainWindow):
                     try:
                         QtWidgets.QMessageBox.warning(
                             self,
-                            "Playback",
+                            self.tr("Playback"),
                             (
-                                f"External MIDI playback failed: {exc}\n\n"
-                                f"Switched automatically to {switched_to}."
+                                self.tr("External MIDI playback failed: {error}\n\nSwitched automatically to {backend}.").format(
+                                    error=exc,
+                                    backend=switched_to,
+                                )
                             ),
                         )
                     except Exception:
@@ -2532,10 +2627,13 @@ class MainWindow(QtWidgets.QMainWindow):
                     try:
                         QtWidgets.QMessageBox.critical(
                             self,
-                            "Playback",
+                            self.tr("Playback"),
                             (
-                                f"External MIDI playback failed: {exc}\n\n"
-                                f"Automatic fallback to {switched_to} also failed: {fallback_exc}"
+                                self.tr("External MIDI playback failed: {error}\n\nAutomatic fallback to {backend} also failed: {fallback_error}").format(
+                                    error=exc,
+                                    backend=switched_to,
+                                    fallback_error=fallback_exc,
+                                )
                             ),
                         )
                     except Exception:
@@ -2547,8 +2645,11 @@ class MainWindow(QtWidgets.QMainWindow):
             try:
                 QtWidgets.QMessageBox.critical(
                     self,
-                    "Playback",
-                    f"Playback failed: {exc}\n\nTry '{_system_method_name()}' from the Playback menu.",
+                    self.tr("Playback"),
+                    self.tr("Playback failed: {error}\n\nTry '{backend}' from the Playback menu.").format(
+                        error=exc,
+                        backend=_system_method_name(),
+                    ),
                 )
             except Exception:
                 print(f"Playback failed: {exc}")
@@ -2725,7 +2826,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
     # FX/editor hooks removed; FluidSynth is the single backend
     def _open_fx_editor(self) -> None:
-        self._status("Synth FX editor removed", 2000)
+        self._status(self.tr("Synth FX editor removed"), 2000)
 
     def _set_playback_mode(self, mode: str, show_status: bool = True) -> None:
         mode_norm = str(mode or 'system').strip().lower()
@@ -2747,9 +2848,14 @@ class MainWindow(QtWidgets.QMainWindow):
             self._rebuild_midi_port_menu()
         if show_status:
             if mode_norm == 'external':
-                self._status("Playback mode: External MIDI port", 2500)
+                self._status(self.tr("Playback mode: External MIDI port"), 2500)
             else:
-                self._status(f"Playback mode: {self._playback_system_label().replace('Playback using ', '')}", 2500)
+                self._status(
+                    self.tr("Playback mode: {backend}").format(
+                        backend=self._playback_system_label().replace(self.tr("Playback using "), "")
+                    ),
+                    2500,
+                )
         try:
             # Recreate backend immediately so audition/test tone keep working after a mode switch.
             self._ensure_player_with_soundfont()
@@ -2759,19 +2865,19 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def _set_send_midi_transport(self, enabled: bool) -> None:
         # Legacy stub kept for signal compatibility
-        self._status("MIDI transport settings removed", 2000)
+        self._status(self.tr("MIDI transport settings removed"), 2000)
 
     def _play_test_tone(self) -> None:
         try:
             self._ensure_player_with_soundfont()
             self.player.audition_note(pitch=49, velocity=100, duration_sec=1.0)
-            self._status("Test tone", 1500)
+            self._status(self.tr("Test tone"), 1500)
         except Exception as exc:
             self._notify_fluidsynth_missing(exc)
-            self._status("Test tone unavailable", 2000)
+            self._status(self.tr("Test tone unavailable"), 2000)
 
     def _choose_audio_device(self) -> None:
-        self._status("Audio output is selected by the active playback backend", 2000)
+        self._status(self.tr("Audio output is selected by the active playback backend"), 2000)
 
     def _play_system_test_tone(self) -> None:
         self._play_test_tone()
@@ -2944,11 +3050,11 @@ class MainWindow(QtWidgets.QMainWindow):
         adm.set("fonts_install_ok", False)
         msg = QtWidgets.QMessageBox(self)
         msg.setIcon(QtWidgets.QMessageBox.Icon.Information)
-        msg.setWindowTitle("Install required fonts")
-        lines = ["keyTAB can install embedded fonts to your user font folder so editing and engraving match:"]
+        msg.setWindowTitle(self.tr("Install required fonts"))
+        lines = [self.tr("keyTAB can install embedded fonts to your user font folder so editing and engraving match:")]
         for f in missing:
             lines.append(f"- {f['family']}: {f['desc']}")
-        lines.append("Install all missing fonts now?")
+        lines.append(self.tr("Install all missing fonts now?"))
         msg.setText("\n".join(lines))
         msg.setStandardButtons(QtWidgets.QMessageBox.StandardButton.Yes | QtWidgets.QMessageBox.StandardButton.No)
         msg.setDefaultButton(QtWidgets.QMessageBox.StandardButton.Yes)
@@ -2974,8 +3080,8 @@ class MainWindow(QtWidgets.QMainWindow):
         if successes:
             QtWidgets.QMessageBox.information(
                 self,
-                "Fonts installed",
-                "The following fonts were installed. keyTAB will restart to apply them:\n" + "\n".join(successes),
+                self.tr("Fonts installed"),
+                self.tr("The following fonts were installed. keyTAB will restart to apply them:\n") + "\n".join(successes),
             )
             QtCore.QTimer.singleShot(100, self._request_app_restart)
         if failures or still_missing:
@@ -2986,8 +3092,8 @@ class MainWindow(QtWidgets.QMainWindow):
                 details += "Still missing: " + ", ".join(str(f["family"]) for f in still_missing)
             QtWidgets.QMessageBox.warning(
                 self,
-                "Font installation failed",
-                f"keyTAB could not install some fonts automatically:\n{details}",
+                self.tr("Font installation failed"),
+                self.tr("keyTAB could not install some fonts automatically:\n{details}").format(details=details),
             )
 
     def _request_app_restart(self) -> None:
@@ -3077,14 +3183,14 @@ class MainWindow(QtWidgets.QMainWindow):
     def _run_close_progress(self, path_text: str) -> None:
         """Show a short closing progress animation (~0.4s)."""
         dlg = QtWidgets.QDialog(self)
-        dlg.setWindowTitle("Closing")
+        dlg.setWindowTitle(self.tr("Closing"))
         dlg.setModal(True)
         dlg.setFixedWidth(380)
         layout = QtWidgets.QVBoxLayout(dlg)
         layout.setContentsMargins(16, 16, 16, 16)
         layout.setSpacing(10)
 
-        label = QtWidgets.QLabel(f"Saving...\n\n {path_text}")
+        label = QtWidgets.QLabel(self.tr("Saving...\n\n {path}").format(path=path_text))
         label.setWordWrap(True)
         bar = QtWidgets.QProgressBar()
         bar.setRange(0, 100)
@@ -3118,7 +3224,7 @@ class MainWindow(QtWidgets.QMainWindow):
         adm.set("last_session_path", str(self.file_manager.path() or ""))
         adm.save()
         # Show short closing progress animation
-        path_text = str(self.file_manager.path() or "unsaved session")
+        path_text = str(self.file_manager.path() or self.tr("unsaved session"))
         self._run_close_progress(path_text)
         # Persist sizes via prepare_close
         self.prepare_close()

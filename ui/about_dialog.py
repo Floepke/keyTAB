@@ -10,7 +10,7 @@ class AboutDialog(QtWidgets.QDialog):
 
     def __init__(self, parent: QtWidgets.QWidget | None = None) -> None:
         super().__init__(parent)
-        self.setWindowTitle("About keyTAB")
+        self.setWindowTitle(self.tr("About keyTAB"))
         self.setModal(True)
         self.setMinimumWidth(768)
 
@@ -24,27 +24,13 @@ class AboutDialog(QtWidgets.QDialog):
         header_layout.setSpacing(8)
 
         header = QtWidgets.QLabel(
-            """
-                <h2 style="margin-bottom: 10px;">keyTAB</h2>
-                <div style="margin-bottom: 10px;font-size: 10px;">
-                    keyTAB is a long-running passion project. With modern tooling I can focus on the hard part: shaping a clearer way to read and engrave music.
-                </div>
-
-                <div style="margin-bottom: 10px;font-size: 10px;">
-                    Built on Klavarskribo notation, keyTAB turns MIDI into readable plots. Music flows top-to-bottom on a vertical timeline over a customizable, time-signature-aware grid.
-                </div>
-
-                <div style="margin-bottom: 10px;font-size: 10px;">
-                    Stave lines map directly to the black piano keys: black noteheads sit on black key lines, white noteheads land between lines. Pitch reads like the piano keyboard—no key signatures, sharps/flats, clef changes, or other detours.
-                </div>
-
-                <div style="margin-bottom: 10px;font-size: 10px;">
-                    I hope keyTAB helps musicians, composers, and curious listeners visualize and refine this MIDI style notation with clarity. Feedback is always welcome.
-                </div>
-
-                <div style="margin-bottom: 10px;font-size: 10px;">Have fun exploring your MIDI with keyTAB!</div>
-                <div style="margin-bottom: 0; font-size: 12px;">Philip Bergwerf</div>
-            """
+            "<h2 style='margin-bottom: 10px;'>keyTAB</h2>"
+            f"<div style='margin-bottom: 10px;font-size: 10px;'>{self.tr('keyTAB is a long-running passion project. With modern tooling I can focus on the hard part: shaping a clearer way to read and engrave music.')}</div>"
+            f"<div style='margin-bottom: 10px;font-size: 10px;'>{self.tr('Built on Klavarskribo notation, keyTAB turns MIDI into readable plots. Music flows top-to-bottom on a vertical timeline over a customizable, time-signature-aware grid.')}</div>"
+            f"<div style='margin-bottom: 10px;font-size: 10px;'>{self.tr('Stave lines map directly to the black piano keys: black noteheads sit on black key lines, white noteheads land between lines. Pitch reads like the piano keyboard\u2014no key signatures, sharps/flats, clef changes, or other detours.')}</div>"
+            f"<div style='margin-bottom: 10px;font-size: 10px;'>{self.tr('I hope keyTAB helps musicians, composers, and curious listeners visualize and refine this MIDI style notation with clarity. Feedback is always welcome.')}</div>"
+            f"<div style='margin-bottom: 10px;font-size: 10px;'>{self.tr('Have fun exploring your MIDI with keyTAB!')}</div>"
+            "<div style='margin-bottom: 0; font-size: 12px;'>Philip Bergwerf</div>"
         )
         header.setTextFormat(QtCore.Qt.TextFormat.RichText)
         header.setWordWrap(True)
@@ -79,15 +65,13 @@ class AboutDialog(QtWidgets.QDialog):
 
     def _credits_html(self) -> str:
         return (
-            """
-            <p><b style="font-size: 10px;">Project license:</b> MIT License.</p>
-            <p><b style="font-size: 10px;">Credits and third-party components:</b></p>
-            <ul style="margin-top: 4px;font-size: 10px;">
-                <li>User-provided SoundFont (.sf2/.sf3).</li>
-                <li>FluidSynth — LGPL-2.1-or-later.</li>
-                <li>PySide6 / Qt — LGPL-3.0.</li>
-                <li>pretty_midi, mido, python-rtmidi, numpy — permissive licenses.</li>
-            </ul>
-            <p style="margin-top: 0px;font-size: 10px;"> </p>
-            """
+            f'<p><b style="font-size: 10px;">{self.tr("Project license:")} </b>MIT License.</p>'
+            f'<p><b style="font-size: 10px;">{self.tr("Credits and third-party components:")}</b></p>'
+            '<ul style="margin-top: 4px;font-size: 10px;">'
+            f'<li>{self.tr("User-provided SoundFont (.sf2/.sf3).")}</li>'
+            f'<li>{self.tr("FluidSynth \u2014 LGPL-2.1-or-later.")}</li>'
+            f'<li>{self.tr("PySide6 / Qt \u2014 LGPL-3.0.")}</li>'
+            f'<li>{self.tr("pretty_midi, mido, python-rtmidi, numpy \u2014 permissive licenses.")}</li>'
+            '</ul>'
+            '<p style="margin-top: 0px;font-size: 10px;"> </p>'
         )

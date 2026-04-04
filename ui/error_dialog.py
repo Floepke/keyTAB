@@ -2,6 +2,9 @@ from __future__ import annotations
 
 from PySide6 import QtCore, QtWidgets
 
+def _tr(text: str) -> str:
+    return QtCore.QCoreApplication.translate("ErrorDialog", text)
+
 
 def show_error_dialog(
     parent,
@@ -18,8 +21,8 @@ def show_error_dialog(
     """
     msg = QtWidgets.QMessageBox(parent)
     msg.setIcon(icon)
-    msg.setWindowTitle(str(title or "Error"))
-    msg.setText(str(text or "An error occurred."))
+    msg.setWindowTitle(str(title or _tr("Error")))
+    msg.setText(str(text or _tr("An error occurred.")))
     if informative_text:
         msg.setInformativeText(str(informative_text))
     detail_text = str(details or "").strip()
@@ -36,7 +39,7 @@ def show_error_dialog(
     ok_btn = msg.addButton(QtWidgets.QMessageBox.StandardButton.Ok)
     copy_btn = None
     if detail_text or text:
-        copy_btn = msg.addButton("Copy Error Log", QtWidgets.QMessageBox.ButtonRole.ActionRole)
+        copy_btn = msg.addButton(_tr("Copy Error Log"), QtWidgets.QMessageBox.ButtonRole.ActionRole)
 
     while True:
         msg.exec()

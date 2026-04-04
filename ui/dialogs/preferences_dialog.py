@@ -13,8 +13,9 @@ class PreferencesDialog(QtWidgets.QDialog):
 
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
+        tr = self.tr
         self.setWindowFlags(self.windowFlags())
-        self.setWindowTitle("Preferences")
+        self.setWindowTitle(tr("Preferences"))
         self.setModal(True)
         self.resize(768, 768)
 
@@ -25,13 +26,13 @@ class PreferencesDialog(QtWidgets.QDialog):
         layout = QtWidgets.QVBoxLayout(self)
 
         restart_notice = QtWidgets.QLabel(
-            "Changes are applied by restarting keyTAB when you press Apply and Restart keyTAB.",
+            tr("Changes are applied by restarting keyTAB when you press Apply and Restart keyTAB."),
             self,
         )
         restart_notice.setWordWrap(True)
         layout.addWidget(restart_notice)
 
-        prefs_group = QtWidgets.QGroupBox("Preferences", self)
+        prefs_group = QtWidgets.QGroupBox(tr("Preferences"), self)
         group_layout = QtWidgets.QVBoxLayout(prefs_group)
         scroll = QtWidgets.QScrollArea(self)
         scroll.setWidgetResizable(True)
@@ -72,7 +73,7 @@ class PreferencesDialog(QtWidgets.QDialog):
         layout.addWidget(prefs_group, stretch=1)
 
         buttons = QtWidgets.QDialogButtonBox(self)
-        apply_button = buttons.addButton("Apply and Restart keyTAB", QtWidgets.QDialogButtonBox.ButtonRole.AcceptRole)
+        apply_button = buttons.addButton(tr("Apply and Restart keyTAB"), QtWidgets.QDialogButtonBox.ButtonRole.AcceptRole)
         buttons.addButton(QtWidgets.QDialogButtonBox.StandardButton.Close)
         apply_button.clicked.connect(self._on_accept)
         buttons.rejected.connect(self.reject)
@@ -90,11 +91,31 @@ class PreferencesDialog(QtWidgets.QDialog):
 
     def _build_editor(self, key: str, pref) -> tuple[QtWidgets.QWidget, str]:
         value = self._pm.get(key, pref.default)
+        if key == "ui_language":
+            combo = QtWidgets.QComboBox()
+            options = [
+                (self.tr("System"), "system"),
+                (self.tr("English"), "en"),
+                (self.tr("Dutch"), "nl"),
+            ]
+            for label, stored in options:
+                combo.addItem(label, stored)
+            try:
+                idx = combo.findData(str(value))
+                combo.setCurrentIndex(idx if idx >= 0 else 0)
+            except Exception:
+                combo.setCurrentIndex(0)
+            return combo, "ui_language"
         if key == "theme":
             combo = QtWidgets.QComboBox()
-            combo.addItems(["light", "dark"])
+            options = [
+                (self.tr("Light"), "light"),
+                (self.tr("Dark"), "dark"),
+            ]
+            for label, stored in options:
+                combo.addItem(label, stored)
             try:
-                idx = combo.findText(str(value))
+                idx = combo.findData(str(value))
                 combo.setCurrentIndex(idx if idx >= 0 else 0)
             except Exception:
                 combo.setCurrentIndex(0)
@@ -170,8 +191,8 @@ class PreferencesDialog(QtWidgets.QDialog):
     def _apply_changes(self) -> None:
         for key, (kind, widget) in self._fields.items():
             try:
-                if kind == "theme":
-                    value = str(widget.currentText())
+                if kind in ("theme", "ui_language"):
+                    value = str(widget.currentData())
                 elif kind == "bool":
                     value = bool(widget.isChecked())
                 elif kind == "int":

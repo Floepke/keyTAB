@@ -40,6 +40,23 @@ Welcome to **keyTAB**, a passion project for creating, editing, and engraving Kl
 - Python 3.x with PySide6, Cairo, pretty_midi/mido (see `requirements.txt`).
 - Create a venv, `pip install -r requirements.txt`, then run the app entry point (e.g., `python keyTAB.py`).
 
+## Translations (PySide6 / Qt Linguist)
+- keyTAB includes a Qt translation workflow with TS/QM files in `i18n/`.
+- Set `ui_language` in Preferences to `system`, `en`, or `nl`.
+- Update translatable source strings:
+	- `bash scripts/update_translations.sh`
+- Translate Dutch strings with Qt Linguist:
+	- Open `i18n/keytab_nl.ts` in Qt Linguist and fill missing entries.
+- Optional: prefill untranslated strings using a translation service (LibreTranslate-compatible API):
+	- `python scripts/auto_translate_ts.py i18n/keytab_nl.ts --source en --target nl`
+	- Restrict to dialog contexts only (example):
+		- `python scripts/auto_translate_ts.py i18n/keytab_nl.ts --source en --target nl --only-context InfoDialog --only-context LineBreakDialog --only-context StyleDialog`
+	- If your service requires an API key or custom URL:
+		- `python scripts/auto_translate_ts.py i18n/keytab_nl.ts --url https://your-service/translate --api-key YOUR_KEY`
+- Build runtime translation file (`.qm`):
+	- `bash scripts/build_translations.sh`
+- Restart keyTAB to apply language changes.
+
 ## Project Status
 Active and evolving. Expect iterative improvements and occasional breaking changes while features solidify.
 

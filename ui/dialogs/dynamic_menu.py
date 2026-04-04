@@ -78,9 +78,9 @@ class DynamicSymbolGrid(QtWidgets.QListWidget):
         self.setFont(symbol_font)
         
         # Add 'none' option
-        no_symbol_item = QtWidgets.QListWidgetItem('none')
+        no_symbol_item = QtWidgets.QListWidgetItem(self.tr('none'))
         no_symbol_item.setData(QtCore.Qt.ItemDataRole.UserRole, '')
-        no_symbol_item.setToolTip('Use no dynamic symbol')
+        no_symbol_item.setToolTip(self.tr('Use no dynamic symbol'))
         no_symbol_item.setFont(app_font)
         no_symbol_item.setTextAlignment(int(QtCore.Qt.AlignmentFlag.AlignHCenter | QtCore.Qt.AlignmentFlag.AlignVCenter))
         no_symbol_item.setSizeHint(QtCore.QSize(cell_w, cell_h))

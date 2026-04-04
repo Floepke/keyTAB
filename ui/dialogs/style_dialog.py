@@ -19,7 +19,6 @@ FONT_OFFSET_FIELDS = {
     'font_lyricist',
 }
 
-
 class ClickSlider(QtWidgets.QSlider):
     def mousePressEvent(self, ev: QtGui.QMouseEvent) -> None:
         if ev.button() == QtCore.Qt.MouseButton.LeftButton:
@@ -284,7 +283,7 @@ class ColorPickerEdit(QtWidgets.QWidget):
         self._hex_edit.setValidator(
             QtGui.QRegularExpressionValidator(QtCore.QRegularExpression(r"#?[0-9a-fA-F]{0,8}"), self)
         )
-        self._button = QtWidgets.QPushButton("Pick", self)
+        self._button = QtWidgets.QPushButton(self.tr("Pick"), self)
         self._button.setFixedWidth(48)
         self._combo.setMinimumWidth(170)
         layout = QtWidgets.QHBoxLayout(self)
@@ -399,8 +398,8 @@ class FontPicker(QtWidgets.QWidget):
             self._size.setKeyboardTracking(True)
         except Exception:
             pass
-        self._bold = QtWidgets.QCheckBox("Bold", self)
-        self._italic = QtWidgets.QCheckBox("Italic", self)
+        self._bold = QtWidgets.QCheckBox(self.tr("Bold"), self)
+        self._italic = QtWidgets.QCheckBox(self.tr("Italic"), self)
         self._x_offset: FlexibleDoubleSpinBox | None = None
         self._y_offset: FlexibleDoubleSpinBox | None = None
         if self._show_offsets:
@@ -412,7 +411,7 @@ class FontPicker(QtWidgets.QWidget):
                 spin.setSingleStep(0.25)
                 spin.setMinimumWidth(70)
                 spin.setKeyboardTracking(True)
-                spin.setToolTip(f"{axis}-offset (mm).")
+                spin.setToolTip(self.tr("{axis}-offset (mm).").format(axis=axis))
 
         layout = QtWidgets.QHBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
@@ -515,6 +514,87 @@ class StyleDialog(QtWidgets.QDialog):
     values_changed = QtCore.Signal()
     tab_changed = QtCore.Signal(int)
 
+    def _style_field_labels(self) -> dict[str, str]:
+        return {
+            'scale': self.tr('Scale'),
+            'page_width_mm': self.tr('Page width (mm)'),
+            'page_height_mm': self.tr('Page height (mm)'),
+            'page_top_margin_mm': self.tr('Top margin (mm)'),
+            'page_bottom_margin_mm': self.tr('Bottom margin (mm)'),
+            'page_left_margin_mm': self.tr('Left margin (mm)'),
+            'page_right_margin_mm': self.tr('Right margin (mm)'),
+            'header_height_mm': self.tr('Header height (mm)'),
+            'footer_height_mm': self.tr('Footer height (mm)'),
+            'black_note_rule': self.tr('Black note rule'),
+            'note_head_visible': self.tr('Note head visible'),
+            'note_stem_visible': self.tr('Note stem visible'),
+            'note_stop_visible': self.tr('Note stop visible'),
+            'note_stem_length_semitone': self.tr('Note stem length (semitones)'),
+            'note_stem_thickness_mm': self.tr('Note stem thickness (mm)'),
+            'note_stopsign_thickness_mm': self.tr('Note stop thickness (mm)'),
+            'note_leftdot_visible': self.tr('Continuation dot visible'),
+            'note_continuation_dot_size_mm': self.tr('Continuation dot size (mm)'),
+            'note_midinote_visible': self.tr('MIDI note blocks visible'),
+            'note_midinote_left_color': self.tr('MIDI note color (left hand)'),
+            'note_midinote_right_color': self.tr('MIDI note color (right hand)'),
+            'note_width_scaling': self.tr('Note width scaling'),
+            'beam_visible': self.tr('Beam visible'),
+            'beam_thickness_mm': self.tr('Beam thickness (mm)'),
+            'grace_note_visible': self.tr('Grace note visible'),
+            'grace_note_outline_width_mm': self.tr('Grace note outline thickness (mm)'),
+            'grace_note_scale': self.tr('Grace note scale'),
+            'pedal_lane_enabled': self.tr('Pedal lane enabled'),
+            'pedal_lane_width_mm': self.tr('Pedal lane width (mm)'),
+            'text_visible': self.tr('Text visible'),
+            'text_background_padding_mm': self.tr('Text background padding (mm)'),
+            'slur_visible': self.tr('Slur visible'),
+            'slur_width_sides_mm': self.tr('Slur side thickness (mm)'),
+            'slur_width_middle_mm': self.tr('Slur middle thickness (mm)'),
+            'hairpin_visible': self.tr('Hairpin visible'),
+            'hairpin_line_width_mm': self.tr('Hairpin line thickness (mm)'),
+            'hairpin_spread_mm': self.tr('Hairpin spread (mm)'),
+            'hairpin_text_gap_mm': self.tr('Hairpin text gap (mm)'),
+            'dynamic_symbol_font_size_pt': self.tr('Dynamic symbol font size (pt)'),
+            'dynamic_symbol_background_padding_mm': self.tr('Dynamic symbol background padding (mm)'),
+            'repeat_start_visible': self.tr('Start repeat visible'),
+            'repeat_end_visible': self.tr('End repeat visible'),
+            'double_barline_visible': self.tr('Double barline visible'),
+            'countline_visible': self.tr('Count line visible'),
+            'countline_dash_pattern': self.tr('Count line dash pattern'),
+            'countline_thickness_mm': self.tr('Count line thickness (mm)'),
+            'stave_visible': self.tr('Stave visible'),
+            'barline_visible': self.tr('Barline visible'),
+            'grid_line_visible': self.tr('Grid line visible'),
+            'grid_band_visible': self.tr('Grid band visible'),
+            'grid_barline_thickness_mm': self.tr('Grid barline thickness (mm)'),
+            'grid_gridline_thickness_mm': self.tr('Grid line thickness (mm)'),
+            'grid_gridline_dash_pattern_mm': self.tr('Grid line dash pattern (mm)'),
+            'grid_band_color': self.tr('Grid band color'),
+            'grid_band_start_phase': self.tr('Grid band start phase'),
+            'time_signature_indicator_type': self.tr('Time signature indicator type'),
+            'time_signature_indicator_lane_width_mm': self.tr('Time signature lane width (mm)'),
+            'time_signature_indicator_guide_thickness_mm': self.tr('Time signature guide thickness (mm)'),
+            'time_signature_indicator_divide_guide_thickness_mm': self.tr('Time signature divider thickness (mm)'),
+            'time_signature_indicator_classic_font': self.tr('Time signature classic font'),
+            'time_signature_indicator_klavarskribo_font': self.tr('Time signature Klavarskribo font'),
+            'grid_measure_numbering_guide_thickness_mm': self.tr('Measure numbering guide thickness (mm)'),
+            'measure_numbering_placement': self.tr('Measure numbering placement'),
+            'measure_numbering_guide_visible': self.tr('Measure numbering guide visible'),
+            'measure_numbers_visible': self.tr('Measure numbers visible'),
+            'measure_numbering_font': self.tr('Measure numbering font'),
+            'font_text': self.tr('Text font'),
+            'font_title': self.tr('Title font'),
+            'font_composer': self.tr('Composer font'),
+            'font_copyright': self.tr('Copyright font'),
+            'font_arranger': self.tr('Arranger font'),
+            'font_lyricist': self.tr('Lyricist font'),
+            'stave_two_line_thickness_mm': self.tr('Stave two-line thickness (mm)'),
+            'stave_three_line_thickness_mm': self.tr('Stave three-line thickness (mm)'),
+            'stave_clef_line_thickness_mm': self.tr('Stave clef line thickness (mm)'),
+            'stave_ledger_line_length_mm': self.tr('Stave ledger line length (mm)'),
+            'stave_clef_line_dash_pattern_mm': self.tr('Stave clef line dash pattern (mm)'),
+        }
+
     def _coerce_layout_fonts(self, layout_obj: Layout) -> None:
         """Ensure all LayoutFont-typed fields are dataclass instances, not dict payloads."""
         try:
@@ -556,7 +636,7 @@ class StyleDialog(QtWidgets.QDialog):
 
     def __init__(self, parent=None, layout: Layout | None = None, score: SCORE | None = None) -> None:
         super().__init__(parent)
-        self.setWindowTitle("Style")
+        self.setWindowTitle(self.tr("Style"))
         self.setModal(True)
         self.setWindowModality(QtCore.Qt.NonModal)
         self.setMinimumSize(280, 300)
@@ -621,21 +701,21 @@ class StyleDialog(QtWidgets.QDialog):
         category_list.currentRowChanged.connect(_on_category_changed)
 
         tab_order = [
-            "Page",
-            "Stave",
-            "Grid",
-            "Time signature",
-            "Measure Numbering",
-            "Fonts",
-            "Note",
-            "Grace note",
-            "Beam",
-            "Hairpin",
-            "Slur",
-            "Text",
-            "Countline",
-            "Pedal",
-            "Visibility",
+            self.tr("Page"),
+            self.tr("Stave"),
+            self.tr("Grid"),
+            self.tr("Time signature"),
+            self.tr("Measure Numbering"),
+            self.tr("Fonts"),
+            self.tr("Note"),
+            self.tr("Grace note"),
+            self.tr("Beam"),
+            self.tr("Hairpin"),
+            self.tr("Slur"),
+            self.tr("Text"),
+            self.tr("Countline"),
+            self.tr("Pedal"),
+            self.tr("Visibility"),
         ]
 
         def _make_tab(title: str) -> QtWidgets.QVBoxLayout:
@@ -771,20 +851,22 @@ class StyleDialog(QtWidgets.QDialog):
             "measure_grouping",
         }
         self._field_tabs = field_tabs
+        field_labels = self._style_field_labels()
 
         for f in fields(Layout):
             name = f.name
             if name in _hide_fields:
                 continue
-            label = name.replace('_', ' ').capitalize()
+            fallback_label = name.replace('_', ' ').capitalize()
+            label = field_labels.get(name, self.tr(fallback_label))
             value = getattr(self._layout, name)
             field_type = type_hints.get(name, f.type)
             editor = self._make_editor(field_type, value, name)
             if editor is None:
                 continue
             self._editors[name] = editor
-            tab_name = field_tabs.get(name, 'Page')
-            vbox = tab_forms.get(tab_name, tab_forms['Page'])
+            tab_name = self.tr(field_tabs.get(name, 'Page'))
+            vbox = tab_forms.get(tab_name, tab_forms[self.tr('Page')])
             box = QtWidgets.QGroupBox(label, self)
             box_layout = QtWidgets.QVBoxLayout(box)
             box_layout.setContentsMargins(6, 2, 6, 6)
@@ -793,7 +875,7 @@ class StyleDialog(QtWidgets.QDialog):
             vbox.addWidget(box)
             self._wire_editor_change(editor)
 
-        self._add_all_fonts_control(tab_forms.get('Fonts'))  # type: ignore[arg-type]
+        self._add_all_fonts_control(tab_forms.get(self.tr('Fonts')))  # type: ignore[arg-type]
 
         # Add stretch to each tab's layout to push groupboxes to the top
         for vbox in tab_forms.values():
@@ -803,9 +885,9 @@ class StyleDialog(QtWidgets.QDialog):
         actions_row = QtWidgets.QHBoxLayout()
         actions_row.setContentsMargins(0, 0, 0, 0)
         actions_row.setSpacing(8)
-        self.save_style_btn = QtWidgets.QPushButton("Save Style", self)
-        self.load_style_btn = QtWidgets.QPushButton("Load…", self)
-        self.load_tab_style_btn = QtWidgets.QPushButton("Load into current tab", self)
+        self.save_style_btn = QtWidgets.QPushButton(self.tr("Save Style"), self)
+        self.load_style_btn = QtWidgets.QPushButton(self.tr("Load…"), self)
+        self.load_tab_style_btn = QtWidgets.QPushButton(self.tr("Load into current tab"), self)
         actions_row.addWidget(self.save_style_btn, 0)
         actions_row.addWidget(self.load_style_btn, 0)
         actions_row.addWidget(self.load_tab_style_btn, 0)
@@ -947,7 +1029,7 @@ class StyleDialog(QtWidgets.QDialog):
         # Update only editors mapped to the given tab
         for f in fields(Layout):
             name = f.name
-            if self._field_tabs.get(name, "Page") != tab_name:
+            if self.tr(self._field_tabs.get(name, "Page")) != tab_name:
                 continue
             editor = self._editors.get(name)
             if editor is None:
@@ -979,8 +1061,8 @@ class StyleDialog(QtWidgets.QDialog):
 
         if field_name == 'measure_numbering_placement':
             options = [
-                ('Place measure numbering on top of every system', 'system'),
-                ('Place measure numbering on every barline', 'barline'),
+                (self.tr('Place measure numbering on top of every system'), 'system'),
+                (self.tr('Place measure numbering on every barline'), 'barline'),
             ]
             return RadioGroupWidget(options, str(value) if value is not None else 'system', self)
 
@@ -1058,7 +1140,7 @@ class StyleDialog(QtWidgets.QDialog):
         font_title = getattr(self._layout, 'font_title', LayoutFont())
         combo.setCurrentFont(QtGui.QFont(self._font_family_from_value(font_title)))
         combo.currentFontChanged.connect(lambda f: self._set_all_font_families(f.family()))
-        box = QtWidgets.QGroupBox("Apply family to all fonts", self)
+        box = QtWidgets.QGroupBox(self.tr("Apply family to all fonts"), self)
         box_layout = QtWidgets.QVBoxLayout(box)
         box_layout.setContentsMargins(6, 2, 6, 6)
         box_layout.setSpacing(0)
@@ -1113,17 +1195,17 @@ class StyleDialog(QtWidgets.QDialog):
             editor.set_value(str(value) if value is not None else '')
 
     def _save_style_to_disk(self) -> None:
-        name, ok = QtWidgets.QInputDialog.getText(self, "Save Style", "Enter your custom style name here:")
+        name, ok = QtWidgets.QInputDialog.getText(self, self.tr("Save Style"), self.tr("Enter your custom style name here:"))
         if not ok:
             return
         stem = str(name or "").strip()
         if not stem:
-            self.msg_label.setText("Style name cannot be empty.")
+            self.msg_label.setText(self.tr("Style name cannot be empty."))
             return
         # Basic character whitelist
         allowed = set("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 -_.")
         if any(ch not in allowed for ch in stem):
-            self.msg_label.setText("Name contains invalid characters.")
+            self.msg_label.setText(self.tr("Name contains invalid characters."))
             return
         stem = " ".join(stem.split())
         if stem.lower().endswith(".pstyle"):
@@ -1133,26 +1215,32 @@ class StyleDialog(QtWidgets.QDialog):
             payload = self._serialize_layout(self.get_values())
             with path.open("w", encoding="utf-8") as fh:
                 json.dump(payload, fh, indent=2, ensure_ascii=True)
-            self.msg_label.setText(f"Saved style to {path.name}.")
+            self.msg_label.setText(self.tr("Saved style to {name}.").format(name=path.name))
         except Exception:
-            self.msg_label.setText("Failed to save style.")
+            self.msg_label.setText(self.tr("Failed to save style."))
 
     def _show_load_menu(self, scope: str = "all", global_pos: QtCore.QPoint | None = None) -> None:
         menu = QtWidgets.QMenu(self)
-        default_action = menu.addAction("keyTAB Default")
+        default_action = menu.addAction(self.tr("keyTAB Default"))
+        default_action.setData("__default__")
         menu.addSeparator()
         for p in self._list_pstyle_paths():
             menu.addAction(p.stem)
         menu.addSeparator()
-        prompt_action = menu.addAction("Browse…")
+        prompt_action = menu.addAction(self.tr("Browse…"))
+        prompt_action.setData("__browse__")
 
         def _handle(action: QtGui.QAction) -> None:
             if action is None:
                 return
-            text = action.text()
-            if text == "Browse…":
+            marker = str(action.data() or "")
+            if marker == "__browse__":
                 self._browse_and_load(scope)
                 return
+            if marker == "__default__":
+                self._load_and_apply("keyTAB Default", scope)
+                return
+            text = action.text()
             self._load_and_apply(text, scope)
 
         menu.triggered.connect(_handle)
@@ -1160,9 +1248,9 @@ class StyleDialog(QtWidgets.QDialog):
         menu.exec(pos)
 
     def _browse_and_load(self, scope: str) -> None:
-        dlg = QtWidgets.QFileDialog(self, "Load Style", str(self._pstyle_dir()))
+        dlg = QtWidgets.QFileDialog(self, self.tr("Load Style"), str(self._pstyle_dir()))
         dlg.setFileMode(QtWidgets.QFileDialog.FileMode.ExistingFile)
-        dlg.setNameFilter("Style Files (*.pstyle)")
+        dlg.setNameFilter(self.tr("Style Files (*.pstyle)"))
         if dlg.exec() != QtWidgets.QDialog.DialogCode.Accepted:
             return
         files = dlg.selectedFiles()
@@ -1173,17 +1261,17 @@ class StyleDialog(QtWidgets.QDialog):
         try:
             lay = self._layout_from_dict(json.loads(path.read_text(encoding="utf-8")))
             self._apply_loaded_layout(lay, scope)
-            self.msg_label.setText(f"Loaded style '{stem}'.")
+            self.msg_label.setText(self.tr("Loaded style '{name}'.").format(name=stem))
         except Exception:
-            self.msg_label.setText("Failed to load style.")
+            self.msg_label.setText(self.tr("Failed to load style."))
 
     def _load_and_apply(self, name: str, scope: str) -> None:
         try:
             lay = self._load_layout_from_file(name)
             self._apply_loaded_layout(lay, scope)
-            self.msg_label.setText(f"Loaded style '{name}'.")
+            self.msg_label.setText(self.tr("Loaded style '{name}'.").format(name=name))
         except Exception:
-            self.msg_label.setText("Failed to load style.")
+            self.msg_label.setText(self.tr("Failed to load style."))
 
     def _apply_loaded_layout(self, layout_obj: Layout, scope: str) -> None:
         if scope == "tab":
@@ -1215,7 +1303,7 @@ class StyleDialog(QtWidgets.QDialog):
         try:
             _ = self.get_values()
         except Exception:
-            self.msg_label.setText("Invalid layout values.")
+            self.msg_label.setText(self.tr("Invalid layout values."))
             return
         self.msg_label.setText("")
         self.accept()

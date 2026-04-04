@@ -82,11 +82,41 @@ class ToolSelectorWidget(QtWidgets.QListWidget):
 
     def _populate(self) -> None:
         self.clear()
+        _names = {
+            'note':           self.tr("Note"),
+            'grace_note':     self.tr("Grace Note"),
+            'count_line':     self.tr("Count Line"),
+            'dynamic':        self.tr("Dynamics"),
+            'beam':           self.tr("Beam Grouping"),
+            'line_break':     self.tr("Line/Page Break"),
+            'time_signature': self.tr("Time Signature"),
+            'grid_band':      self.tr("Grid Band"),
+            'tempo':          self.tr("Tempo"),
+            'slur':           self.tr("Slur"),
+            'text':           self.tr("Text"),
+            'barline':        self.tr("Barline"),
+            'pedal':          self.tr("Pedal"),
+        }
+        _tooltips = {
+            'note':           self.tr("Note tool. Enter and edit notes. To edit duration, click and drag on a colored midi-rectangle and move down/up. To edit pitch+time, click and drag on the notehead. To delete, right click on a note."),
+            'grace_note':     self.tr("Grace Note tool. Enter small ornamental notes without normal rhythmic duration. Use this for trills, mordents, and similar decorations. Click in empty space to add. Drag on existing grace note to edit time+pitch. Right click to delete."),
+            'count_line':     self.tr("Count Line tool. Draw guide lines to highlight rhythmic grid subdivisions. Left click on empty space to add. Drag on a handle to edit. Right click on a handle to delete."),
+            'dynamic':        self.tr("Dynamics tool. Insert crescendo (<) and decrescendo (>) hairpins, or choose dynamic mode to place standalone dynamic symbols."),
+            'beam':           self.tr("Beam Grouping tool. Overwrite the default time signature beam grouping by placing beam markers. Click/drag to the left/right of the clef to add/edit for left/right hand. Right click left/right of the clef in a marker time range to delete."),
+            'line_break':     self.tr("Line/Page Break tool. Insert system or page breaks. Click an existing break to edit its properties."),
+            'time_signature': self.tr("Time Signature tool. Configure meter and base grid subdivision."),
+            'grid_band':      self.tr("Grid Band tool. Add and edit grid band markers. Click below pitch 39 for left hand, above 45 for right hand, or between 39-45 for both. Drag a marker to set its length; snapping keeps ends on the current snap size. Drag back to its start for zero duration (renders a red line). Right click deletes markers only."),
+            'tempo':          self.tr("Tempo tool. Add tempo regions in units per minute over a duration."),
+            'slur':           self.tr("Slur tool. Place phrasing slurs."),
+            'text':           self.tr("Text tool. Place text annotations."),
+            'barline':        self.tr("Barline tool. Insert start repeat, end repeat, and double barline symbols at barline positions."),
+            'pedal':          self.tr("Pedal tool. Add pedal markings."),
+        }
         for conf in TOOL_ITEMS:
             name = str(conf.get('name', ''))
             icon_name = str(conf.get('icon', name))
-            label = str(conf.get('displayed_name', name.replace('_', ' ').capitalize()))
-            tooltip = str(conf.get('tooltip', label))
+            label = _names.get(name, str(conf.get('displayed_name', name.replace('_', ' ').capitalize())))
+            tooltip = _tooltips.get(name, str(conf.get('tooltip', label)))
             # Request high-DPI crisp icon at 36x36 CSS pixels
             icon = get_qicon(icon_name, size=(36, 36)) or QtGui.QIcon()
             it = QtWidgets.QListWidgetItem(icon, label)
@@ -141,6 +171,7 @@ class ToolSelectorWidget(QtWidgets.QListWidget):
 class ToolSelectorDock(QtWidgets.QDockWidget):
     def __init__(self, parent=None):
         super().__init__("Tools", parent)
+        self.setWindowTitle(self.tr("Tools"))
         self.setObjectName("ToolSelectorDock")
         # Lock dock: no moving, no floating, no closing
         self.setAllowedAreas(QtCore.Qt.DockWidgetArea.LeftDockWidgetArea | QtCore.Qt.DockWidgetArea.RightDockWidgetArea)

@@ -20,7 +20,7 @@ class TimeSignatureDialog(QtWidgets.QDialog):
         editor_widget: Optional[QtWidgets.QWidget] = None,
     ):
         super().__init__(parent)
-        self.setWindowTitle("Set Time Signature")
+        self.setWindowTitle(self.tr("Set Time Signature"))
         self.setModal(True)
         self.setWindowModality(QtCore.Qt.WindowModality.WindowModal)
 
@@ -40,14 +40,14 @@ class TimeSignatureDialog(QtWidgets.QDialog):
         ts_row = QtWidgets.QHBoxLayout()
         ts_row.setContentsMargins(0, 0, 0, 0)
         ts_row.setSpacing(6)
-        ts_row.addWidget(QtWidgets.QLabel("Time-Signature:", self))
+        ts_row.addWidget(QtWidgets.QLabel(self.tr("Time signature:"), self))
         self.ts_edit = QtWidgets.QLineEdit(self)
-        self.ts_edit.setPlaceholderText("e.g., 4/4")
+        self.ts_edit.setPlaceholderText(self.tr("e.g., 4/4"))
         self.ts_edit.setText(f"{self._numer}/{self._denom}")
         ts_row.addWidget(self.ts_edit, 1)
         lay.addLayout(ts_row)
 
-        self.indicator_enabled_cb = QtWidgets.QCheckBox("Time-signature indicator enabled", self)
+        self.indicator_enabled_cb = QtWidgets.QCheckBox(self.tr("Time-signature indicator enabled"), self)
         self.indicator_enabled_cb.setChecked(self._indicator_enabled)
         lay.addWidget(self.indicator_enabled_cb)
 
@@ -83,19 +83,19 @@ class TimeSignatureDialog(QtWidgets.QDialog):
     def _parse_ts(self, text: str) -> tuple[Optional[int], Optional[int], Optional[str]]:
         raw = str(text or "").strip().replace(" ", "")
         if not raw:
-            return None, None, "Enter time signature as N/D."
+            return None, None, self.tr("Enter time signature as N/D.")
         parts = raw.split('/')
         if len(parts) != 2:
-            return None, None, "Format must be N/D (e.g., 4/4)."
+            return None, None, self.tr("Format must be N/D (e.g., 4/4).")
         n_s, d_s = parts
         if (not n_s.isdigit()) or (not d_s.isdigit()):
-            return None, None, "Time signature accepts only digits and '/'."
+            return None, None, self.tr("Time signature accepts only digits and '/'.")
         n = int(n_s)
         d = int(d_s)
         if n <= 0:
-            return None, None, "Numerator must be > 0."
+            return None, None, self.tr("Numerator must be > 0.")
         if d not in VALID_DENOMS:
-            return None, None, f"Denominator must be one of {VALID_DENOMS}."
+            return None, None, self.tr("Denominator must be one of {values}.").format(values=VALID_DENOMS)
         return n, d, None
 
     def _default_grid_positions(self, numer: int, denom: int) -> list[float]:

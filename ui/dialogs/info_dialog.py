@@ -12,14 +12,14 @@ class InfoDialog(QtWidgets.QDialog):
     def __init__(self, score: SCORE, parent=None) -> None:
         super().__init__(parent)
         self.setWindowFlags(self.windowFlags())
-        self.setWindowTitle("Titles, info & analysis")
+        self.setWindowTitle(self.tr("Titles, info & analysis"))
         self.setModal(True)
         self.resize(768, 768)
         self._score = score
 
         layout = QtWidgets.QVBoxLayout(self)
 
-        info_group = QtWidgets.QGroupBox("Info", self)
+        info_group = QtWidgets.QGroupBox(self.tr("Info"), self)
         info_form = QtWidgets.QFormLayout(info_group)
         info_form.setLabelAlignment(QtCore.Qt.AlignmentFlag.AlignRight | QtCore.Qt.AlignmentFlag.AlignVCenter)
         self._title_edit = QtWidgets.QLineEdit(self)
@@ -34,7 +34,7 @@ class InfoDialog(QtWidgets.QDialog):
         self._copyright_btn.setFixedWidth(28)
         self._copyright_btn.setFixedHeight(self._copyright_edit.sizeHint().height())
         self._copyright_btn.setFocusPolicy(QtCore.Qt.FocusPolicy.NoFocus)
-        self._copyright_btn.setToolTip("Insert © symbol at cursor")
+        self._copyright_btn.setToolTip(self.tr("Insert © symbol at cursor"))
         self._copyright_btn.clicked.connect(self._insert_copyright_symbol)
         copyright_row = QtWidgets.QWidget(self)
         copyright_hl = QtWidgets.QHBoxLayout(copyright_row)
@@ -43,36 +43,43 @@ class InfoDialog(QtWidgets.QDialog):
         copyright_hl.addWidget(self._copyright_edit)
         copyright_hl.addWidget(self._copyright_btn)
 
-        info_form.addRow("Title:", self._title_edit)
-        info_form.addRow("Composer:", self._composer_edit)
-        info_form.addRow("Copyright:", copyright_row)
-        info_form.addRow("Arranger:", self._arranger_edit)
-        info_form.addRow("Lyricist:", self._lyricist_edit)
-        info_form.addRow("Comment:", self._comment_edit)
+        info_form.addRow(self.tr("Title:"), self._title_edit)
+        info_form.addRow(self.tr("Composer:"), self._composer_edit)
+        info_form.addRow(self.tr("Copyright:"), copyright_row)
+        info_form.addRow(self.tr("Arranger:"), self._arranger_edit)
+        info_form.addRow(self.tr("Lyricist:"), self._lyricist_edit)
+        info_form.addRow(self.tr("Comment:"), self._comment_edit)
         layout.addWidget(info_group, stretch=1)
 
-        meta_group = QtWidgets.QGroupBox("Meta data", self)
+        meta_group = QtWidgets.QGroupBox(self.tr("Meta data"), self)
         meta_form = QtWidgets.QFormLayout(meta_group)
         meta_form.setLabelAlignment(QtCore.Qt.AlignmentFlag.AlignRight | QtCore.Qt.AlignmentFlag.AlignVCenter)
         self._meta_labels: dict[str, QtWidgets.QLabel] = {}
+        meta_label_map = {
+            "description": self.tr("Description:"),
+            "extension": self.tr("Extension:"),
+            "format": self.tr("Format:"),
+            "creation_timestamp": self.tr("Creation timestamp:"),
+            "modification_timestamp": self.tr("Modification timestamp:"),
+        }
         for f in fields(MetaData):
             label = QtWidgets.QLabel(self)
             label.setText("")
             key = str(f.name)
-            meta_form.addRow(f"{key.replace('_', ' ').capitalize()}:", label)
+            meta_form.addRow(meta_label_map.get(key, self.tr("Metadata:")), label)
             self._meta_labels[key] = label
         layout.addWidget(meta_group)
 
-        analysis_group = QtWidgets.QGroupBox("Analysis", self)
+        analysis_group = QtWidgets.QGroupBox(self.tr("Analysis"), self)
         analysis_form = QtWidgets.QFormLayout(analysis_group)
         analysis_form.setLabelAlignment(QtCore.Qt.AlignmentFlag.AlignRight | QtCore.Qt.AlignmentFlag.AlignVCenter)
         self._analysis_labels: dict[str, QtWidgets.QLabel] = {}
         for key, label_text in (
-            ("notes", "Notes:"),
-            ("grace_notes", "Grace notes:"),
-            ("pages", "Pages:"),
-            ("measures", "Measures:"),
-            ("lines", "Lines:"),
+            ("notes", self.tr("Notes:")),
+            ("grace_notes", self.tr("Grace notes:")),
+            ("pages", self.tr("Pages:")),
+            ("measures", self.tr("Measures:")),
+            ("lines", self.tr("Lines:")),
         ):
             label = QtWidgets.QLabel(self)
             label.setText("")
@@ -97,7 +104,7 @@ class InfoDialog(QtWidgets.QDialog):
             value = ""
             if meta is not None:
                 value = str(getattr(meta, key, "") or "")
-            label.setText(value or "(not set)")
+            label.setText(value or self.tr("(not set)"))
 
         info = getattr(self._score, "info", None) or Info()
         self._title_edit.setText(str(getattr(info, "title", "") or ""))
@@ -126,7 +133,7 @@ class InfoDialog(QtWidgets.QDialog):
             except Exception:
                 value = None
             if key == "pages" and (value is None or value <= 0):
-                text = "Not engraved yet"
+                text = self.tr("Not engraved yet")
             else:
                 text = str(value if value is not None else 0)
             label.setText(text)

@@ -35,12 +35,12 @@ class SnapSizeSelector(QtWidgets.QWidget):
         self.list.setSelectionMode(QtWidgets.QAbstractItemView.SelectionMode.SingleSelection)
         self.list.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.list.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        self.list.setToolTip(
+        self.list.setToolTip(self.tr(
             "Select here your base note length. "
             "You can also scroll on the listbox to select. "
             "The snap size is visual as snap bands in the editor and the edit cursor will snap to these divisions when moving or placing elements. "
             "The snap size is also the editor scroll step when using the mouse wheel over the editor."
-        )
+        ))
         self.list.itemSelectionChanged.connect(self._emit_changed)
         layout.addWidget(self.list)
         # State (set before populating to avoid early signal using unset fields)
@@ -68,7 +68,7 @@ class SnapSizeSelector(QtWidgets.QWidget):
             self.minus_btn.setText("")
         else:
             self.minus_btn.setText("-")
-        self.minus_btn.setToolTip("Decrease the snap divider by one step.")
+        self.minus_btn.setToolTip(self.tr("Decrease the snap divider by one step."))
         self.minus_btn.clicked.connect(self._dec_divide)
         # Button visual size square 54x54 (25% smaller)
         self.minus_btn.setFixedSize(54, 54)
@@ -101,12 +101,12 @@ class SnapSizeSelector(QtWidgets.QWidget):
             fl.setPointSize(20)
         self.label.setFont(fl)
         self.label.setMinimumHeight(54)
-        self.label.setToolTip(
+        self.label.setToolTip(self.tr(
             "Snap divider. The divider splits the selected base note into equal sub-steps. "
-            "For example, base Quarter ÷ 3 gives quarter-note triplet steps. "
+            "For example, base Quarter \u00F7 3 gives quarter-note triplet steps. "
             "You can click the label to reset the divider to 1. "
             "You can also scroll on the label to change the divider up/down."
-        )
+        ))
         row.addWidget(self.label, 1)
 
         self.plus_btn = QtWidgets.QToolButton(self)
@@ -124,7 +124,7 @@ class SnapSizeSelector(QtWidgets.QWidget):
             self.plus_btn.setText("")
         else:
             self.plus_btn.setText("+")
-        self.plus_btn.setToolTip("Increase the snap divider by one step.")
+        self.plus_btn.setToolTip(self.tr("Increase the snap divider by one step."))
         self.plus_btn.clicked.connect(self._inc_divide)
         # Button visual size square 54x54 (25% smaller)
         self.plus_btn.setFixedSize(54, 54)
@@ -163,7 +163,17 @@ class SnapSizeSelector(QtWidgets.QWidget):
     def _populate_list(self) -> None:
         self.list.clear()
         row_h = 28
-        for base, name in BASE_ITEMS:
+        base_names = [
+            (1, self.tr("Whole")),
+            (2, self.tr("Half")),
+            (4, self.tr("Quarter")),
+            (8, self.tr("Eighth")),
+            (16, self.tr("Sixteenth")),
+            (32, self.tr("Thirty-second")),
+            (64, self.tr("Sixty-fourth")),
+            (128, self.tr("One hundred twenty-eighth")),
+        ]
+        for base, name in base_names:
             text = f"{base} - {name}"
             it = QtWidgets.QListWidgetItem(text)
             # Compact row height

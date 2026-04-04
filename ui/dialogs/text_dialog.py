@@ -19,7 +19,7 @@ class TextDialog(QtWidgets.QDialog):
 
     def __init__(self, ev, default_font: LayoutFont | None, parent=None) -> None:
         super().__init__(parent)
-        self.setWindowTitle("Edit Text")
+        self.setWindowTitle(self.tr("Edit Text"))
         self._default_font = deepcopy(default_font or LayoutFont())
 
         cur_font = self._coerce_font(getattr(ev, "font", None), self._default_font)
@@ -30,16 +30,16 @@ class TextDialog(QtWidgets.QDialog):
 
         self.txt_edit = QtWidgets.QLineEdit(self)
         self.txt_edit.setText(str(getattr(ev, "text", "")))
-        self._add_labeled_row(layout, "Text", self.txt_edit, "Edit the displayed text content.")
+        self._add_labeled_row(layout, self.tr("Text"), self.txt_edit, self.tr("Edit the displayed text content."))
 
         self.x_off_edit = FloatSliderEdit(float(getattr(ev, "x_offset_mm", 0.0) or 0.0), -25.0, 25.0, 0.1, self)
-        self._add_labeled_row(layout, "X offset (mm)", self.x_off_edit, "Shift text horizontally in millimeters.")
+        self._add_labeled_row(layout, self.tr("X offset (mm)"), self.x_off_edit, self.tr("Shift text horizontally in millimeters."))
 
         self.y_off_edit = FloatSliderEdit(float(getattr(ev, "y_offset_mm", 0.0) or 0.0), -25.0, 25.0, 0.1, self)
-        self._add_labeled_row(layout, "Y offset (mm)", self.y_off_edit, "Shift text vertically in millimeters.")
+        self._add_labeled_row(layout, self.tr("Y offset (mm)"), self.y_off_edit, self.tr("Shift text vertically in millimeters."))
 
         self.width_off_edit = FloatSliderEdit(float(getattr(ev, "text_background_width_offset_mm", 0.0) or 0.0), -20.0, 20.0, 0.05, self)
-        width_off_tip = (
+        width_off_tip = self.tr(
             "Some fonts report width differently, so the background can end too early or too late at the last character. "
             "Use this as a manual correction for this text only: positive extends the background to the right, negative makes it narrower. "
             "It changes only the background rectangle, not the text position."
@@ -48,18 +48,18 @@ class TextDialog(QtWidgets.QDialog):
         width_off_row_layout = QtWidgets.QHBoxLayout(width_off_row)
         width_off_row_layout.setContentsMargins(0, 0, 0, 0)
         width_off_row_layout.addWidget(self.width_off_edit)
-        self._add_labeled_row(layout, "Background width offset (mm)", width_off_row, width_off_tip)
+        self._add_labeled_row(layout, self.tr("Background width offset (mm)"), width_off_row, width_off_tip)
 
         self.rot_edit = FloatSliderEdit(float(getattr(ev, "rotation", 0.0) or 0.0), 0.0, 360.0, 0.1, self)
-        self._add_labeled_row(layout, "Rotation (degrees)", self.rot_edit, "Rotate text clockwise in degrees.")
+        self._add_labeled_row(layout, self.tr("Rotation (degrees)"), self.rot_edit, self.tr("Rotate text clockwise in degrees."))
 
-        self.use_custom_chk = QtWidgets.QCheckBox("Use custom font", self)
+        self.use_custom_chk = QtWidgets.QCheckBox(self.tr("Use custom font"), self)
         self.use_custom_chk.setChecked(bool(getattr(ev, "use_custom_font", False)))
-        self.use_custom_chk.setToolTip("When enabled, this text uses its own font instead of the layout default font.")
+        self.use_custom_chk.setToolTip(self.tr("When enabled, this text uses its own font instead of the layout default font."))
         layout.addRow(self.use_custom_chk)
 
         self.font_picker = FontPicker(cur_font, parent=self)
-        self.font_picker.setToolTip("Select family, size, weight, and style for this text when custom font is enabled.")
+        self.font_picker.setToolTip(self.tr("Select family, size, weight, and style for this text when custom font is enabled."))
         layout.addRow(self.font_picker)
 
         self.use_custom_chk.toggled.connect(self._toggle_custom)

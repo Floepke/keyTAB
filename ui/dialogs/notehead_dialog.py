@@ -55,6 +55,24 @@ class _NoteheadDelegate(QtWidgets.QStyledItemDelegate):
 class NoteheadDialog(QtWidgets.QDialog):
     _PREVIEW_LAYERING = ["preview_background", "preview_stem", "notehead_white", "notehead_black", "left_dot"]
 
+    def _translated_choice_label(self, literal: str, fallback: str) -> str:
+        labels = {
+            "auto": self.tr("Auto"),
+            "circle_white_up": self.tr("Circle White Up"),
+            "circle_white_down": self.tr("Circle White Down"),
+            "circle_black_up": self.tr("Circle Black Up"),
+            "circle_black_down": self.tr("Circle Black Down"),
+            "bullet_white_up": self.tr("Bullet White Up"),
+            "bullet_white_down": self.tr("Bullet White Down"),
+            "bullet_black_up": self.tr("Bullet Black Up"),
+            "bullet_black_down": self.tr("Bullet Black Down"),
+            "triangle_white_up": self.tr("Triangle White Up"),
+            "triangle_white_down": self.tr("Triangle White Down"),
+            "triangle_black_up": self.tr("Triangle Black Up"),
+            "triangle_black_down": self.tr("Triangle Black Down"),
+        }
+        return labels.get(literal, fallback)
+
     def __init__(
         self,
         *,
@@ -70,7 +88,7 @@ class NoteheadDialog(QtWidgets.QDialog):
         parent: Optional[QtWidgets.QWidget] = None,
     ) -> None:
         super().__init__(parent)
-        self.setWindowTitle("Notehead Override")
+        self.setWindowTitle(self.tr("Notehead Override"))
         self.setModal(True)
         self.setWindowModality(QtCore.Qt.WindowModality.WindowModal)
         self.setMinimumWidth(420)
@@ -89,7 +107,7 @@ class NoteheadDialog(QtWidgets.QDialog):
         lay.setContentsMargins(10, 10, 10, 10)
         lay.setSpacing(8)
 
-        info = QtWidgets.QLabel("Choose a manual notehead override. Auto keeps the current layout-driven behavior.", self)
+        info = QtWidgets.QLabel(self.tr("Choose a manual notehead override. Auto keeps the current layout-driven behavior."), self)
         info.setWordWrap(True)
         lay.addWidget(info)
 
@@ -116,7 +134,7 @@ class NoteheadDialog(QtWidgets.QDialog):
     def _populate_choices(self) -> None:
         self.combo.clear()
         for literal, label in self._choices:
-            self.combo.addItem(label)
+            self.combo.addItem(self._translated_choice_label(literal, label))
             idx = self.combo.count() - 1
             self.combo.setItemData(idx, literal, QtCore.Qt.ItemDataRole.UserRole)
             pix = self._render_preview(literal, size=QtCore.QSize(88, 52), px_per_mm=4.0)

@@ -308,6 +308,11 @@ def get_preferences_manager() -> PreferencesManager:
             description="UI theme 'light' or 'dark'",
         )
         pm.register(
+            key="ui_language",
+            default="system",
+            description="User interface language: 'system', 'en', or 'nl'.",
+        )
+        pm.register(
             key="editor_fps_limit",
             default=25,
             description="The maximum frames per second (FPS) for the editor's rendering loop. Higher values may improve visual smoothness but can increase CPU/GPU usage.",

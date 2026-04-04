@@ -1,11 +1,99 @@
 from __future__ import annotations
 import copy
-from typing import Callable, Optional
+from typing import Callable, Optional, Tuple
 from PySide6 import QtCore, QtGui, QtWidgets
 
 from utils.CONSTANT import BE_KEYS, CF_KEYS, QUARTER_NOTE_UNIT
 
 from file_model.events.line_break import LineBreak
+
+
+class BulkKeyRangeDialog(QtWidgets.QDialog):
+    """Dialog to set key range for all line/page breaks at once."""
+    
+    def __init__(self, parent=None, default_low: int = 1, default_high: int = 88) -> None:
+        super().__init__(parent)
+        self.setWindowTitle(self.tr("Set All Key Ranges"))
+        self.setModal(True)
+        self.setWindowModality(QtCore.Qt.ApplicationModal)
+        
+        layout = QtWidgets.QVBoxLayout(self)
+        layout.setContentsMargins(8, 8, 8, 8)
+        layout.setSpacing(8)
+        
+        # Info label
+        info = QtWidgets.QLabel(
+            self.tr("Apply this key range to all existing line/page breaks:"),
+            self
+        )
+        layout.addWidget(info)
+        
+        # Combo box row
+        combo_layout = QtWidgets.QHBoxLayout()
+        combo_layout.setContentsMargins(0, 0, 0, 0)
+        combo_layout.setSpacing(8)
+        
+        # Helper to convert key number to note name
+        def _note_name(key_num: int) -> str:
+            midi_note = int(key_num) + 20  # Piano key 1 corresponds to MIDI 21 (A0)
+            names = ['c', 'c#', 'd', 'd#', 'e', 'f', 'f#', 'g', 'g#', 'a', 'a#', 'b']
+            name = names[midi_note % 12]
+            octave = (midi_note // 12) - 1
+            return f"{name}{octave}"
+        
+        # From key combo
+        from_label = QtWidgets.QLabel(self.tr("From:"), self)
+        self.from_combo = QtWidgets.QComboBox(self)
+        self.from_combo.setSizeAdjustPolicy(QtWidgets.QComboBox.SizeAdjustPolicy.AdjustToContents)
+        cf_keys = sorted(set(CF_KEYS + [1]))
+        for key in cf_keys:
+            self.from_combo.addItem(
+                self.tr("key {key} ({note})").format(key=key, note=_note_name(key)),
+                key
+            )
+        # Set default
+        from_idx = self.from_combo.findData(default_low)
+        if from_idx >= 0:
+            self.from_combo.setCurrentIndex(from_idx)
+        
+        combo_layout.addWidget(from_label)
+        combo_layout.addWidget(self.from_combo)
+        
+        # To key combo
+        to_label = QtWidgets.QLabel(self.tr("To:"), self)
+        self.to_combo = QtWidgets.QComboBox(self)
+        self.to_combo.setSizeAdjustPolicy(QtWidgets.QComboBox.SizeAdjustPolicy.AdjustToContents)
+        be_keys = sorted(BE_KEYS)
+        for key in be_keys:
+            self.to_combo.addItem(
+                self.tr("key {key} ({note})").format(key=key, note=_note_name(key)),
+                key
+            )
+        # Set default
+        to_idx = self.to_combo.findData(default_high)
+        if to_idx >= 0:
+            self.to_combo.setCurrentIndex(to_idx)
+        
+        combo_layout.addWidget(to_label)
+        combo_layout.addWidget(self.to_combo)
+        combo_layout.addStretch(1)
+        
+        layout.addLayout(combo_layout)
+        
+        # Buttons
+        btns = QtWidgets.QDialogButtonBox(
+            QtWidgets.QDialogButtonBox.Ok | QtWidgets.QDialogButtonBox.Cancel,
+            parent=self,
+        )
+        btns.accepted.connect(self.accept)
+        btns.rejected.connect(self.reject)
+        layout.addWidget(btns)
+    
+    def get_range(self) -> Tuple[int, int]:
+        """Return (low_key, high_key) selected by user."""
+        low = int(self.from_combo.currentData())
+        high = int(self.to_combo.currentData())
+        return (low, high)
 
 
 class FlexibleDoubleSpinBox(QtWidgets.QDoubleSpinBox):
@@ -45,7 +133,7 @@ class LineBreakDialog(QtWidgets.QDialog):
                  measure_resolver: Optional[Callable[[float], int]] = None,
                  on_change: Optional[Callable[[], None]] = None) -> None:
         super().__init__(parent)
-        self.setWindowTitle("Line/Page Break")
+        self.setWindowTitle(self.tr("Line/Page Break"))
         self.setModal(True)
         self.setWindowModality(QtCore.Qt.NonModal)
         try:
@@ -69,16 +157,16 @@ class LineBreakDialog(QtWidgets.QDialog):
         self._measure_starts_mm: list[float] = self._build_measure_starts()
         self._suppress_measure_change: bool = False
 
-        list_label = QtWidgets.QLabel("Line/Page breaks:", self)
+        list_label = QtWidgets.QLabel(self.tr("Line/Page breaks:"), self)
         self.break_table = QtWidgets.QTableWidget(self)
         self.break_table.setColumnCount(6)
         self.break_table.setHorizontalHeaderLabels([
             " ",
-            " Start Measure ",
-            " Type ",
-            " Left margin " ,
-            " Right margin ",
-            " Key range ",
+            self.tr(" Start Measure "),
+            self.tr(" Type "),
+            self.tr(" Left margin "),
+            self.tr(" Right margin "),
+            self.tr(" Key range "),
         ])
         self.break_table.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectionBehavior.SelectRows)
         self.break_table.setSelectionMode(QtWidgets.QAbstractItemView.SelectionMode.SingleSelection)
@@ -97,11 +185,11 @@ class LineBreakDialog(QtWidgets.QDialog):
         quick_row = QtWidgets.QHBoxLayout()
         quick_row.setContentsMargins(0, 0, 0, 0)
         quick_row.setSpacing(6)
-        self.measure_grouping_label = QtWidgets.QLabel("Measure Grouping:", self)
+        self.measure_grouping_label = QtWidgets.QLabel(self.tr("Measure Grouping:"), self)
         self.measure_grouping_edit = QtWidgets.QLineEdit(self)
-        self.measure_grouping_edit.setPlaceholderText("e.g. 4 6 4")
+        self.measure_grouping_edit.setPlaceholderText(self.tr("e.g. 4 6 4"))
         self.measure_grouping_edit.setText(self._measure_grouping_text)
-        self.apply_grouping_btn = QtWidgets.QPushButton("Apply Measure Grouping", self)
+        self.apply_grouping_btn = QtWidgets.QPushButton(self.tr("Apply Measure Grouping"), self)
         self.apply_grouping_btn.clicked.connect(self._on_apply_grouping_clicked)
         quick_row.addWidget(self.measure_grouping_label)
         quick_row.addWidget(self.measure_grouping_edit, 1)
@@ -111,12 +199,15 @@ class LineBreakDialog(QtWidgets.QDialog):
         bulk_row = QtWidgets.QHBoxLayout()
         bulk_row.setContentsMargins(0, 0, 0, 0)
         bulk_row.setSpacing(6)
-        self.edit_all_left_btn = QtWidgets.QPushButton("Edit All Left Margins", self)
-        self.edit_all_right_btn = QtWidgets.QPushButton("Edit All Right Margins", self)
+        self.edit_all_left_btn = QtWidgets.QPushButton(self.tr("Edit All Left Margins"), self)
+        self.edit_all_right_btn = QtWidgets.QPushButton(self.tr("Edit All Right Margins"), self)
+        self.set_all_key_ranges_btn = QtWidgets.QPushButton(self.tr("Set All Key Ranges"), self)
         self.edit_all_left_btn.clicked.connect(lambda: self._edit_all_margins(side="left"))
         self.edit_all_right_btn.clicked.connect(lambda: self._edit_all_margins(side="right"))
+        self.set_all_key_ranges_btn.clicked.connect(self._set_all_key_ranges)
         bulk_row.addWidget(self.edit_all_left_btn)
         bulk_row.addWidget(self.edit_all_right_btn)
+        bulk_row.addWidget(self.set_all_key_ranges_btn)
         bulk_row.addStretch(1)
         lay.addLayout(bulk_row)
 
@@ -182,7 +273,7 @@ class LineBreakDialog(QtWidgets.QDialog):
             " padding: 0 8px;"
             " }"
         )
-        btn.setToolTip("Page break." if is_page else "Line break.")
+        btn.setToolTip(self.tr("Page break.") if is_page else self.tr("Line break."))
         return btn
 
     def _create_margin_spin(self, value: float) -> FlexibleDoubleSpinBox:
@@ -223,21 +314,24 @@ class LineBreakDialog(QtWidgets.QDialog):
 
         auto_cb = QtWidgets.QCheckBox(wrapper)
         auto_cb.setChecked(is_auto)
-        auto_cb.setText("Automatic key range")
+        auto_cb.setText(self.tr("Automatic key range"))
 
         # Allow starting range at key 1 (A0) for allowing to select full range
         cf_keys = sorted(set(CF_KEYS + [1]))
         be_keys = sorted(BE_KEYS)
 
+        from_text = self.tr("from")
+        to_text = self.tr("to")
+
         def _build_combo(prefix: str, keys: list[int]) -> QtWidgets.QComboBox:
             combo = QtWidgets.QComboBox(wrapper)
             combo.setSizeAdjustPolicy(QtWidgets.QComboBox.SizeAdjustPolicy.AdjustToContents)
             for key in keys:
-                combo.addItem(f"{prefix} key {key} ({_note_name(key)})", key)
+                combo.addItem(self.tr("{prefix} key {key} ({note})").format(prefix=prefix, key=key, note=_note_name(key)), key)
             return combo
 
-        from_combo = _build_combo("from", cf_keys)
-        to_combo = _build_combo("to", be_keys)
+        from_combo = _build_combo(from_text, cf_keys)
+        to_combo = _build_combo(to_text, be_keys)
 
         def _set_combo_value(combo: QtWidgets.QComboBox, value: int, keys: list[int]) -> None:
             target = _closest(keys, value)
@@ -380,7 +474,7 @@ class LineBreakDialog(QtWidgets.QDialog):
         def _toggle_type() -> None:
             lb.page_break = not bool(getattr(lb, 'page_break', False))
             type_btn.setText("P" if lb.page_break else "L")
-            type_btn.setToolTip("Page break." if lb.page_break else "Line break.")
+            type_btn.setToolTip(self.tr("Page break.") if lb.page_break else self.tr("Line break."))
             self.valuesChanged.emit()
 
         def _left_changed(val: float) -> None:
@@ -425,7 +519,7 @@ class LineBreakDialog(QtWidgets.QDialog):
         delete_btn = QtWidgets.QToolButton(self)
         delete_btn.setText("✕")
         delete_btn.setAutoRaise(True)
-        delete_btn.setToolTip("Delete this line break entry.")
+        delete_btn.setToolTip(self.tr("Delete this line break entry."))
         delete_btn.setFixedWidth(28)
 
         def _delete_break() -> None:
@@ -518,7 +612,7 @@ class LineBreakDialog(QtWidgets.QDialog):
         txt = self.measure_grouping_edit.text().strip()
         groups = self._parse_grouping(txt)
         if groups is None:
-            self.msg_label.setText("Enter one or more positive integers separated by spaces.")
+            self.msg_label.setText(self.tr("Enter one or more positive integers separated by spaces."))
             return
         self.msg_label.setText("")
         if self._layout is not None:
@@ -534,24 +628,24 @@ class LineBreakDialog(QtWidgets.QDialog):
         if ok:
             self._reload_line_breaks()
         else:
-            self.msg_label.setText("Could not apply measure grouping.")
+            self.msg_label.setText(self.tr("Could not apply measure grouping."))
 
     def _on_help_clicked(self) -> None:
         msg = (
-            "Measure Grouping lets you generate line breaks by measures.\n"
-            "Enter positive integers separated by spaces (e.g. '4 6 4'). Each number\n"
-            "is the count of measures on a line; after the list is exhausted, the last\n"
-            "number repeats. Existing margins, ranges, and page/line types are reused\n"
-            "in order. Click 'Apply Measure Grouping' to generate breaks; OK saves\n"
-            "other edits, Cancel reverts to the original state."
+            self.tr("Measure Grouping lets you generate line breaks by measures.\n"
+                    "Enter positive integers separated by spaces (e.g. '4 6 4'). Each number\n"
+                    "is the count of measures on a line; after the list is exhausted, the last\n"
+                    "number repeats. Existing margins, ranges, and page/line types are reused\n"
+                    "in order. Click 'Apply Measure Grouping' to generate breaks; OK saves\n"
+                    "other edits, Cancel reverts to the original state.")
         )
-        QtWidgets.QMessageBox.information(self, "Line Break Help", msg)
+        QtWidgets.QMessageBox.information(self, self.tr("Line Break Help"), msg)
 
     def _edit_all_margins(self, side: str) -> None:
         if side not in ("left", "right"):
             return
-        title = "Edit All Left Margins" if side == "left" else "Edit All Right Margins"
-        label = "All left margins (mm):" if side == "left" else "All right margins (mm):"
+        title = self.tr("Edit All Left Margins") if side == "left" else self.tr("Edit All Right Margins")
+        label = self.tr("All left margins (mm):") if side == "left" else self.tr("All right margins (mm):")
         val = self._prompt_margin_value(title, label, 5.0)
         if val is None:
             return
@@ -599,6 +693,37 @@ class LineBreakDialog(QtWidgets.QDialog):
             return None
         return float(spin.value())
 
+    def _set_all_key_ranges(self) -> None:
+        """Open dialog to set key range for all line/page breaks at once."""
+        if not self._line_breaks:
+            return
+        
+        # Get default range from first line break
+        defaults = LineBreak()
+        first_lb = self._line_breaks[0]
+        first_range = getattr(first_lb, 'stave_range', defaults.stave_range)
+        is_auto = bool(first_range == 'auto' or first_range is True or first_range is None)
+        if is_auto:
+            default_low = 1
+            default_high = 88
+        else:
+            rng = list(first_range) if first_range is not None else [1, 88]
+            default_low = int(rng[0]) if len(rng) > 0 else 1
+            default_high = int(rng[1]) if len(rng) > 1 else 88
+        
+        # Show dialog
+        dlg = BulkKeyRangeDialog(self, default_low, default_high)
+        if dlg.exec() != QtWidgets.QDialog.Accepted:
+            return
+        
+        # Apply range to all line breaks
+        low_key, high_key = dlg.get_range()
+        for lb in self._line_breaks:
+            lb.stave_range = [int(low_key), int(high_key)]
+        
+        self._populate_break_list()
+        self.valuesChanged.emit()
+
     def _validate_form(self) -> bool:
         msg = ""
         defaults = LineBreak()
@@ -609,13 +734,13 @@ class LineBreakDialog(QtWidgets.QDialog):
             try:
                 low, high = int(lb_range[0]), int(lb_range[1])
             except Exception:
-                msg = "Key range must contain two numbers."
+                msg = self.tr("Key range must contain two numbers.")
                 break
             if not (1 <= low <= 88 and 1 <= high <= 88):
-                msg = "Key range must stay between key 1 and key 88."
+                msg = self.tr("Key range must stay between key 1 and key 88.")
                 break
             if low >= high:
-                msg = "Key range must have 'from key' lower than 'to key'."
+                msg = self.tr("Key range must have 'from key' lower than 'to key'.")
                 break
 
         self.msg_label.setText(msg)

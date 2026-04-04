@@ -21,6 +21,54 @@ MIME_TYPES_MUSICXML = [
     "application/vnd.recordare.musicxml+xml",
     "application/vnd.recordare.musicxml",
 ]
+SUPPORTED_UI_LANGUAGES = {"en", "nl"}
+
+
+def _resolve_ui_language(preferences: dict) -> str:
+    raw = str(preferences.get("ui_language", "system") or "system").strip().lower()
+    if raw == "system":
+        raw = str(QtCore.QLocale.system().name() or "en").split("_", 1)[0].lower()
+    if raw not in SUPPORTED_UI_LANGUAGES:
+        return "en"
+    return raw
+
+
+def _translation_search_paths() -> list[Path]:
+    paths: list[Path] = [
+        Path(__file__).resolve().parent / "i18n",
+        Path(sys.argv[0]).resolve().parent / "i18n",
+    ]
+    appdir = os.environ.get("APPDIR")
+    if appdir:
+        paths.append(Path(appdir) / "usr" / "share" / APP_NAME / "i18n")
+
+    seen: set[str] = set()
+    unique_paths: list[Path] = []
+    for path in paths:
+        key = str(path)
+        if key in seen:
+            continue
+        seen.add(key)
+        unique_paths.append(path)
+    return unique_paths
+
+
+def _install_ui_translator(app: QtWidgets.QApplication, preferences: dict) -> None:
+    lang = _resolve_ui_language(preferences)
+    if lang == "en":
+        return
+
+    translator = QtCore.QTranslator(app)
+    file_name = f"keytab_{lang}.qm"
+    for base_dir in _translation_search_paths():
+        candidate = base_dir / file_name
+        if not candidate.exists():
+            continue
+        if translator.load(str(candidate)):
+            app.installTranslator(translator)
+            # Keep a strong reference for the lifetime of the app.
+            setattr(app, "_ui_translator", translator)
+            return
 
 
 class KeyTabApplication(QtWidgets.QApplication):
@@ -131,7 +179,7 @@ def _find_appimage_icon() -> Path | None:
 
 def install_desktop_integration() -> None:
     if not sys.platform.startswith("linux"):
-        print("--install is supported on Linux only.")
+        print(QtCore.QCoreApplication.translate("keyTAB", "--install is supported on Linux only."))
         return
 
     appimage_path = os.environ.get("APPIMAGE") or sys.argv[0]
@@ -149,7 +197,7 @@ def install_desktop_integration() -> None:
     _write_desktop_entry(appimage_path, _find_appimage_icon())
     _write_mime_package()
     _update_xdg_databases()
-    print("Installed desktop entry and MIME types.")
+    print(QtCore.QCoreApplication.translate("keyTAB", "Installed desktop entry and MIME types."))
 
 
 def prompt_install_if_needed() -> None:
@@ -164,25 +212,31 @@ def prompt_install_if_needed() -> None:
         return
 
     message = (
-        "<b>Install keyTAB for desktop integration?</b><br><br>"
-        "This will:<ul>"
-        "<li>Add keyTAB to your application menu</li>"
-        "<li>Associate .piano, .mid/.midi, and .musicxml/.mxl files with keyTAB</li>"
-        "<li>Copy this AppImage to a stable location in your home folder</li>"
-        "</ul>"
-        "You can remove the integration later by deleting the desktop entry in "
-        "~/.local/share/applications and the AppImage in ~/.local/share/keyTAB."
+        QtCore.QCoreApplication.translate("keyTAB", "<b>Install keyTAB for desktop integration?</b><br><br>")
+        + QtCore.QCoreApplication.translate("keyTAB", "This will:<ul>")
+        + QtCore.QCoreApplication.translate("keyTAB", "<li>Add keyTAB to your application menu</li>")
+        + QtCore.QCoreApplication.translate("keyTAB", "<li>Associate .piano, .mid/.midi, and .musicxml/.mxl files with keyTAB</li>")
+        + QtCore.QCoreApplication.translate("keyTAB", "<li>Copy this AppImage to a stable location in your home folder</li>")
+        + QtCore.QCoreApplication.translate("keyTAB", "</ul>")
+        + QtCore.QCoreApplication.translate("keyTAB", "You can remove the integration later by deleting the desktop entry in ")
+        + QtCore.QCoreApplication.translate("keyTAB", "~/.local/share/applications and the AppImage in ~/.local/share/keyTAB.")
     )
 
     dialog = QtWidgets.QMessageBox()
     dialog.setIcon(QtWidgets.QMessageBox.Icon.Question)
-    dialog.setWindowTitle("Install keyTAB")
+    dialog.setWindowTitle(QtCore.QCoreApplication.translate("keyTAB", "Install keyTAB"))
     dialog.setTextFormat(QtCore.Qt.TextFormat.RichText)
     dialog.setText(message)
-    dont_show_checkbox = QtWidgets.QCheckBox("Don't show again")
+    dont_show_checkbox = QtWidgets.QCheckBox(QtCore.QCoreApplication.translate("keyTAB", "Don't show again"))
     dialog.setCheckBox(dont_show_checkbox)
-    install_button = dialog.addButton("Install", QtWidgets.QMessageBox.ButtonRole.AcceptRole)
-    dialog.addButton("Not now", QtWidgets.QMessageBox.ButtonRole.RejectRole)
+    install_button = dialog.addButton(
+        QtCore.QCoreApplication.translate("keyTAB", "Install"),
+        QtWidgets.QMessageBox.ButtonRole.AcceptRole,
+    )
+    dialog.addButton(
+        QtCore.QCoreApplication.translate("keyTAB", "Not now"),
+        QtWidgets.QMessageBox.ButtonRole.RejectRole,
+    )
     dialog.exec()
 
     if dont_show_checkbox.isChecked():
@@ -197,9 +251,9 @@ def prompt_install_if_needed() -> None:
         except Exception as exc:
             QtWidgets.QMessageBox.warning(
                 None,
-                "Install failed",
-                f"Install failed: {exc}",
-                "You can still use the AppImage without installing.",
+                QtCore.QCoreApplication.translate("keyTAB", "Install failed"),
+                QtCore.QCoreApplication.translate("keyTAB", "Install failed: {error}").format(error=exc),
+                QtCore.QCoreApplication.translate("keyTAB", "You can still use the AppImage without installing."),
             )
 
 
@@ -249,6 +303,7 @@ def main(argv: list[str] | None = None):
         os.environ.pop("QT_QPA_PLATFORMTHEME", None)
     # Create QApplication with argv to ensure proper initialization paths on macOS
     app = KeyTabApplication([sys.argv[0], *qt_args])
+    _install_ui_translator(app, preferences)
 
     # Suppress unhelpful Qt platform warning about grabMouse on non-popup windows.
     # grabMouse() is used to track mouse releases outside the widget; this warning
