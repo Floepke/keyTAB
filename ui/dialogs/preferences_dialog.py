@@ -16,7 +16,7 @@ class PreferencesDialog(QtWidgets.QDialog):
         tr = self.tr
         self.setWindowFlags(self.windowFlags())
         self.setWindowTitle(tr("Preferences"))
-        self.setModal(True)
+        self.setModal(False)
         self.resize(768, 768)
 
         self._pm = get_preferences_manager()

@@ -18,6 +18,7 @@ from ui.widgets.draw_view import DrawUtilView
 from ui.about_dialog import AboutDialog
 from ui.error_dialog import show_error_dialog
 from ui.style import Style
+from ui.dialogs.fluidsynth_reverb_config_dialog import FluidSynthReverbConfigDialog
 from settings_manager import open_preferences, get_preferences_manager
 from appdata_manager import get_appdata_manager
 from utils.CONSTANT import UTILS_SAVE_DIR, QUARTER_NOTE_UNIT
@@ -686,6 +687,11 @@ class MainWindow(QtWidgets.QMainWindow):
             unset_sf_act.setToolTip(tr("Switch back to the default FluidSynth SoundFont."))
             unset_sf_act.triggered.connect(self._unset_soundfont)
             playback_menu.addAction(unset_sf_act)
+
+            reverb_config_act = QtGui.QAction(tr("FluidSynth Reverb Settings"), self)
+            reverb_config_act.setToolTip(tr("Configure FluidSynth reverb parameters."))
+            reverb_config_act.triggered.connect(self._open_reverb_config_dialog)
+            playback_menu.addAction(reverb_config_act)
 
         self._set_playback_mode(str(self._get_playback_mode_from_appdata() or 'system'), show_status=False)
 
@@ -1366,6 +1372,28 @@ class MainWindow(QtWidgets.QMainWindow):
                 return sel
         return existing if existing else None
 
+    def _open_reverb_config_dialog(self) -> None:
+        """Open the FluidSynth reverb configuration dialog (non-blocking)."""
+        dlg = FluidSynthReverbConfigDialog(self)
+        dlg.reverb_settings_changed.connect(self._apply_reverb_settings)
+        dlg.show()
+
+    def _apply_reverb_settings(self, settings: dict) -> None:
+        """Apply reverb settings to the current player."""
+        try:
+            if hasattr(self, 'player') and self.player is not None:
+                from midi.player import _FluidsynthBackend
+                if isinstance(self.player._backend, _FluidsynthBackend):
+                    backend = self.player._backend
+                    backend.set_reverb_enabled(settings.get('enabled', True))
+                    backend.set_reverb_room_size(settings.get('room_size', 0.6))
+                    backend.set_reverb_damp(settings.get('damp', 0.4))
+                    backend.set_reverb_width(settings.get('width', 3.0))
+                    backend.set_reverb_level(settings.get('level', 0.9))
+                    self._status("Reverb settings applied", 2000)
+        except Exception as exc:
+            self._status("Failed to apply reverb settings", 2000)
+
     def _ensure_player_with_soundfont(self) -> None:
         mode = self._get_playback_mode_from_appdata()
         if not (sys.platform.startswith('linux') and mode == 'system'):
@@ -1703,7 +1731,7 @@ class MainWindow(QtWidgets.QMainWindow):
         """Show licensing and attribution info."""
         try:
             dlg = AboutDialog(self)
-            dlg.exec()
+            dlg.show()
         except Exception:
             pass
 
@@ -1927,10 +1955,9 @@ class MainWindow(QtWidgets.QMainWindow):
         from ui.dialogs.info_dialog import InfoDialog
         sc = self.file_manager.current()
         dlg = InfoDialog(sc, self)
-        if dlg.exec() == QtWidgets.QDialog.Accepted:
-            dlg.apply_to_score()
-            self.file_manager.on_model_changed()
-            self._refresh_views_from_score()
+        # Connect accepted signal to apply changes
+        dlg.accepted.connect(lambda: (dlg.apply_to_score(), self.file_manager.on_model_changed(), self._refresh_views_from_score()))
+        dlg.show()
 
     def _open_line_break_dialog(self) -> None:
         from ui.dialogs.line_break_dialog import LineBreakDialog

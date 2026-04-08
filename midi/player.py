@@ -189,6 +189,12 @@ class _FluidsynthBackend(_Backend):
         self._sfid: Optional[int] = None
         self._channel: int = 0
         self._gain: float = 0.35
+        # Reverb settings (defaults match FluidSynth defaults)
+        self._reverb_enabled: bool = True
+        self._reverb_room_size: float = 0.6
+        self._reverb_damp: float = 0.4
+        self._reverb_width: float = 3.0
+        self._reverb_level: float = 0.9
         self._soundfont_path = soundfont_path or self._autodetect_soundfont()
         if self._soundfont_path is None:
             raise RuntimeError(
@@ -230,6 +236,7 @@ class _FluidsynthBackend(_Backend):
         self._sfid = self._fs.sfload(self._soundfont_path)
         self._fs.program_select(self._channel, self._sfid, 0, 0)
         self._fs.setting('synth.gain', self._gain)
+        self._apply_reverb_settings()
 
     def program_select(self) -> None:
         if self._fs is not None and self._sfid is not None:
@@ -239,6 +246,50 @@ class _FluidsynthBackend(_Backend):
         self._gain = max(0.0, float(gain))
         if self._fs is not None:
             self._fs.setting('synth.gain', self._gain)
+
+    def _apply_reverb_settings(self) -> None:
+        """Apply all reverb settings to the FluidSynth synthesizer."""
+        if self._fs is None:
+            return
+        try:
+            self._fs.setting('synth.reverb.active', 1 if self._reverb_enabled else 0)
+            self._fs.setting('synth.reverb.room-size', float(self._reverb_room_size))
+            self._fs.setting('synth.reverb.damp', float(self._reverb_damp))
+            self._fs.setting('synth.reverb.width', float(self._reverb_width))
+            self._fs.setting('synth.reverb.level', float(self._reverb_level))
+        except Exception:
+            # Silently ignore if reverb settings are not supported
+            pass
+
+    def set_reverb_enabled(self, enabled: bool) -> None:
+        self._reverb_enabled = bool(enabled)
+        self._apply_reverb_settings()
+
+    def set_reverb_room_size(self, value: float) -> None:
+        self._reverb_room_size = max(0.0, min(1.0, float(value)))
+        self._apply_reverb_settings()
+
+    def set_reverb_damp(self, value: float) -> None:
+        self._reverb_damp = max(0.0, min(1.0, float(value)))
+        self._apply_reverb_settings()
+
+    def set_reverb_width(self, value: float) -> None:
+        self._reverb_width = max(0.0, min(100.0, float(value)))
+        self._apply_reverb_settings()
+
+    def set_reverb_level(self, value: float) -> None:
+        self._reverb_level = max(0.0, min(1.0, float(value)))
+        self._apply_reverb_settings()
+
+    def get_reverb_settings(self) -> dict:
+        """Return current reverb settings as a dictionary."""
+        return {
+            'enabled': self._reverb_enabled,
+            'room_size': self._reverb_room_size,
+            'damp': self._reverb_damp,
+            'width': self._reverb_width,
+            'level': self._reverb_level,
+        }
 
     def note_on(self, midi_note: int, velocity: int) -> None:
         if self._fs is not None:
@@ -658,6 +709,10 @@ class Player:
         except Exception:
             pass
 
+        # Load and apply reverb settings for FluidSynth backend
+        if self._backend_kind == "fluidsynth" and isinstance(self._backend, _FluidsynthBackend):
+            self._load_reverb_settings_from_appdata()
+
     def set_soundfont(self, path: str) -> None:
         if self._backend_kind != "fluidsynth":
             return
@@ -678,6 +733,27 @@ class Player:
                 self._backend.set_gain(g)
             except Exception:
                 pass
+
+    def _load_reverb_settings_from_appdata(self) -> None:
+        """Load and apply reverb settings from appdata to the FluidSynth backend."""
+        try:
+            from appdata_manager import get_appdata_manager
+            adm = get_appdata_manager()
+            if adm is not None and isinstance(self._backend, _FluidsynthBackend):
+                enabled = bool(adm.get("fluidsynth_reverb_enabled", True))
+                room_size = float(adm.get("fluidsynth_reverb_room_size", 0.6))
+                damp = float(adm.get("fluidsynth_reverb_damp", 0.4))
+                width = float(adm.get("fluidsynth_reverb_width", 3.0))
+                level = float(adm.get("fluidsynth_reverb_level", 0.9))
+
+                self._backend.set_reverb_enabled(enabled)
+                self._backend.set_reverb_room_size(room_size)
+                self._backend.set_reverb_damp(damp)
+                self._backend.set_reverb_width(width)
+                self._backend.set_reverb_level(level)
+        except Exception:
+            # Silently ignore if unable to load settings
+            pass
 
     # ------------------------------------------------------------------
     # Playback control

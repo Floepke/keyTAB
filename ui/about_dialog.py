@@ -11,7 +11,7 @@ class AboutDialog(QtWidgets.QDialog):
     def __init__(self, parent: QtWidgets.QWidget | None = None) -> None:
         super().__init__(parent)
         self.setWindowTitle(self.tr("About keyTAB"))
-        self.setModal(True)
+        self.setModal(False)
         self.setMinimumWidth(768)
 
         layout = QtWidgets.QVBoxLayout(self)

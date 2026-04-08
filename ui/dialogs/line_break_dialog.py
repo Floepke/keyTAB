@@ -14,8 +14,8 @@ class BulkKeyRangeDialog(QtWidgets.QDialog):
     def __init__(self, parent=None, default_low: int = 1, default_high: int = 88) -> None:
         super().__init__(parent)
         self.setWindowTitle(self.tr("Set All Key Ranges"))
-        self.setModal(True)
-        self.setWindowModality(QtCore.Qt.ApplicationModal)
+        self.setModal(False)
+        self.setWindowModality(QtCore.Qt.NonModal)
         
         layout = QtWidgets.QVBoxLayout(self)
         layout.setContentsMargins(8, 8, 8, 8)
@@ -134,7 +134,7 @@ class LineBreakDialog(QtWidgets.QDialog):
                  on_change: Optional[Callable[[], None]] = None) -> None:
         super().__init__(parent)
         self.setWindowTitle(self.tr("Line/Page Break"))
-        self.setModal(True)
+        self.setModal(False)
         self.setWindowModality(QtCore.Qt.NonModal)
         try:
             self.resize(900, 600)

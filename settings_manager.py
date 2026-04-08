@@ -379,6 +379,6 @@ def open_preferences(parent=None) -> None:
     try:
         from ui.dialogs.preferences_dialog import PreferencesDialog
         dlg = PreferencesDialog(parent=parent)
-        dlg.exec()
+        dlg.show()
     except Exception:
         get_preferences_manager().open_in_editor()

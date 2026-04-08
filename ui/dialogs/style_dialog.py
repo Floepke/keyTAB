@@ -637,7 +637,7 @@ class StyleDialog(QtWidgets.QDialog):
     def __init__(self, parent=None, layout: Layout | None = None, score: SCORE | None = None) -> None:
         super().__init__(parent)
         self.setWindowTitle(self.tr("Style"))
-        self.setModal(True)
+        self.setModal(False)
         self.setWindowModality(QtCore.Qt.NonModal)
         self.setMinimumSize(280, 300)
         self.resize(768, 512)

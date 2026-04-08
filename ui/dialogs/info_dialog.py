@@ -13,7 +13,7 @@ class InfoDialog(QtWidgets.QDialog):
         super().__init__(parent)
         self.setWindowFlags(self.windowFlags())
         self.setWindowTitle(self.tr("Titles, info & analysis"))
-        self.setModal(True)
+        self.setModal(False)
         self.resize(768, 768)
         self._score = score
 

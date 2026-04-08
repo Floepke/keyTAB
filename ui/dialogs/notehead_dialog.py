@@ -89,8 +89,8 @@ class NoteheadDialog(QtWidgets.QDialog):
     ) -> None:
         super().__init__(parent)
         self.setWindowTitle(self.tr("Notehead Override"))
-        self.setModal(True)
-        self.setWindowModality(QtCore.Qt.WindowModality.WindowModal)
+        self.setModal(False)
+        self.setWindowModality(QtCore.Qt.WindowModality.NonModal)
         self.setMinimumWidth(420)
 
         self._note = note

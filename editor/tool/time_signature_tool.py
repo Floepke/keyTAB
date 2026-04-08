@@ -162,6 +162,7 @@ class TimeSignatureTool(BaseTool):
             self._dialog_open = False
             return
 
+        dialog_opened = False
         try:
             target_seg = None
             for seg in segs:
@@ -225,7 +226,21 @@ class TimeSignatureTool(BaseTool):
                 editor_widget=getattr(self._editor, 'widget', None),
             )
 
-            if dlg.exec() != QtWidgets.QDialog.Accepted:
+            def _finalize_change() -> None:
+                self._editor._snapshot_if_changed(coalesce=False, label='time_signature_change')
+                self._editor.update_score_length()
+                self._editor.force_redraw_from_model()
+
+            def _on_accepted():
+                numer, denom, grid_positions, indicator_enabled = dlg.get_values()
+                seg_bg.numerator = int(numer)
+                seg_bg.denominator = int(denom)
+                seg_bg.measure_amount = len(grid_positions) if grid_positions else 1
+                seg_bg.beat_grouping = [float(v) for v in (grid_positions or [])]
+                seg_bg.indicator_enabled = bool(indicator_enabled)
+                _finalize_change()
+
+            def _on_rejected():
                 if inserted_seg_index is not None:
                     try:
                         del score.base_grid[inserted_seg_index]
@@ -237,21 +252,24 @@ class TimeSignatureTool(BaseTool):
                             prev_bg.measure_amount = int(prev_bg.measure_amount) + int(seg_bg.measure_amount)
                     except Exception:
                         pass
-                self._editor.force_redraw_from_model()
+
+                _finalize_change()
                 return
 
-            numer, denom, grid_positions, indicator_enabled = dlg.get_values()
-            seg_bg.numerator = int(numer)
-            seg_bg.denominator = int(denom)
-            seg_bg.beat_grouping = [float(v) for v in (grid_positions or [])]
-            seg_bg.indicator_enabled = bool(indicator_enabled)
+            def _on_finished(_result: int) -> None:
+                self._dialog_open = False
+                self._dialog_cooldown_until = time.monotonic() + 0.20
 
-            self._editor._snapshot_if_changed(coalesce=False, label='time_signature_change')
-            self._editor.update_score_length()
-            self._editor.force_redraw_from_model()
+            dlg.accepted.connect(_on_accepted)
+            dlg.rejected.connect(_on_rejected)
+            dlg.finished.connect(_on_finished)
+            dialog_opened = True
+            dlg.show()
+            return
         finally:
-            self._dialog_open = False
-            self._dialog_cooldown_until = time.monotonic() + 0.20
+            if not dialog_opened:
+                self._dialog_open = False
+                self._dialog_cooldown_until = time.monotonic() + 0.20
 
     def on_left_unpress(self, x: float, y: float) -> None:
         super().on_left_unpress(x, y)

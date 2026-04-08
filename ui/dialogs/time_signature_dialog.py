@@ -21,8 +21,8 @@ class TimeSignatureDialog(QtWidgets.QDialog):
     ):
         super().__init__(parent)
         self.setWindowTitle(self.tr("Set Time Signature"))
-        self.setModal(True)
-        self.setWindowModality(QtCore.Qt.WindowModality.WindowModal)
+        self.setModal(False)
+        self.setWindowModality(QtCore.Qt.WindowModality.NonModal)
 
         self._editor_widget = editor_widget
         self._indicator_type = str(indicator_type or 'both')

@@ -115,6 +115,59 @@
     </message>
   </context>
   <context>
+    <name>FluidSynthReverbConfigDialog</name>
+    <message>
+      <location filename="../ui/dialogs/fluidsynth_reverb_config_dialog.py" line="18" />
+      <source>FluidSynth Reverb Configuration</source>
+      <translation type="unfinished" />
+    </message>
+    <message>
+      <location filename="../ui/dialogs/fluidsynth_reverb_config_dialog.py" line="29" />
+      <source>Reverb Settings</source>
+      <translation type="unfinished" />
+    </message>
+    <message>
+      <location filename="../ui/dialogs/fluidsynth_reverb_config_dialog.py" line="36" />
+      <source>Enable Reverb</source>
+      <translation type="unfinished" />
+    </message>
+    <message>
+      <location filename="../ui/dialogs/fluidsynth_reverb_config_dialog.py" line="47" />
+      <source>Room Size (0-1)</source>
+      <translation type="unfinished" />
+    </message>
+    <message>
+      <location filename="../ui/dialogs/fluidsynth_reverb_config_dialog.py" line="59" />
+      <source>Damping (0-1)</source>
+      <translation type="unfinished" />
+    </message>
+    <message>
+      <location filename="../ui/dialogs/fluidsynth_reverb_config_dialog.py" line="71" />
+      <source>Width (0-100)</source>
+      <translation type="unfinished" />
+    </message>
+    <message>
+      <location filename="../ui/dialogs/fluidsynth_reverb_config_dialog.py" line="83" />
+      <source>Level (0-1)</source>
+      <translation type="unfinished" />
+    </message>
+    <message>
+      <location filename="../ui/dialogs/fluidsynth_reverb_config_dialog.py" line="89" />
+      <source>Reset to Defaults</source>
+      <translation type="unfinished" />
+    </message>
+    <message>
+      <location filename="../ui/dialogs/fluidsynth_reverb_config_dialog.py" line="97" />
+      <source>Apply</source>
+      <translation type="unfinished" />
+    </message>
+    <message>
+      <location filename="../ui/dialogs/fluidsynth_reverb_config_dialog.py" line="98" />
+      <source>Close</source>
+      <translation type="unfinished" />
+    </message>
+  </context>
+  <context>
     <name>FontPicker</name>
     <message>
       <location filename="../ui/dialogs/style_dialog.py" line="401" />
@@ -420,721 +473,731 @@ andere bewerkingen op, Annuleren zet de oorspronkelijke toestand terug.</transla
   <context>
     <name>MainWindow</name>
     <message>
-      <location filename="../ui/main_window.py" line="33" />
+      <location filename="../ui/main_window.py" line="34" />
       <source>keyTAB - new project (unsaved)</source>
       <translation>keyTAB - nieuw project (niet opgeslagen)</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="567" />
+      <location filename="../ui/main_window.py" line="568" />
       <source>&amp;File</source>
       <translation>&amp;Bestand</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="568" />
+      <location filename="../ui/main_window.py" line="569" />
       <source>&amp;Edit</source>
       <translation>&amp;Bewerken</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="569" />
+      <location filename="../ui/main_window.py" line="570" />
       <source>&amp;View</source>
       <translation>&amp;Weergave</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="570" />
+      <location filename="../ui/main_window.py" line="571" />
       <source>&amp;Selection</source>
       <translation>&amp;Selectie</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="571" />
+      <location filename="../ui/main_window.py" line="572" />
       <source>&amp;Document</source>
       <translation>&amp;Document</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="572" />
+      <location filename="../ui/main_window.py" line="573" />
       <source>&amp;Tools</source>
       <translation>H&amp;ulpmiddelen</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="573" />
+      <location filename="../ui/main_window.py" line="574" />
       <source>&amp;Playback</source>
       <translation>&amp;Afspelen</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="574" />
+      <location filename="../ui/main_window.py" line="575" />
       <source>&amp;About</source>
       <translation>&amp;Info</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="579" />
+      <location filename="../ui/main_window.py" line="580" />
       <source>New</source>
       <translation>Nieuw</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="580" />
+      <location filename="../ui/main_window.py" line="581" />
       <source>Create a new project.</source>
       <translation>Maak een nieuw project.</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="581" />
+      <location filename="../ui/main_window.py" line="582" />
       <source>Load...</source>
       <translation>Laden...</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="582" />
+      <location filename="../ui/main_window.py" line="583" />
       <source>Open an existing project file.</source>
       <translation>Open een bestaand projectbestand.</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="583" />
+      <location filename="../ui/main_window.py" line="584" />
       <source>Save</source>
       <translation>Opslaan</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="584" />
+      <location filename="../ui/main_window.py" line="585" />
       <source>Save the current project.</source>
       <translation>Sla het huidige project op.</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="585" />
+      <location filename="../ui/main_window.py" line="586" />
       <source>Save As...</source>
       <translation>Opslaan als...</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="586" />
+      <location filename="../ui/main_window.py" line="587" />
       <source>Save the current project under a new file name.</source>
       <translation>Sla het huidige project op onder een nieuwe bestandsnaam.</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="587" />
+      <location filename="../ui/main_window.py" line="588" />
       <source>Exit</source>
       <translation>Afsluiten</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="588" />
+      <location filename="../ui/main_window.py" line="589" />
       <source>Exit the application.</source>
       <translation>Sluit de applicatie.</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="604" />
+      <location filename="../ui/main_window.py" line="605" />
       <source>Recent Files</source>
       <translation>Recente bestanden</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="606" />
+      <location filename="../ui/main_window.py" line="607" />
       <source>Rename...</source>
       <translation>Hernoemen...</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="607" />
+      <location filename="../ui/main_window.py" line="608" />
       <source>Rename the currently opened file and update Recent Files.</source>
       <translation>Hernoem het geopende bestand en werk Recente bestanden bij.</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="613" />
+      <location filename="../ui/main_window.py" line="614" />
       <source>Style...</source>
       <translation>Stijl...</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="614" />
+      <location filename="../ui/main_window.py" line="615" />
       <source>Open appearance settings for the score.</source>
       <translation>Open weergave-instellingen voor de partituur.</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="617" />
+      <location filename="../ui/main_window.py" line="618" />
       <source>Info...</source>
       <translation>Info...</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="618" />
+      <location filename="../ui/main_window.py" line="619" />
       <source>Open title and metadata settings.</source>
       <translation>Open titel- en metadata-instellingen.</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="621" />
+      <location filename="../ui/main_window.py" line="622" />
       <source>Line Breaks...</source>
       <translation>Regelafbrekingen...</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="622" />
+      <location filename="../ui/main_window.py" line="623" />
       <source>Open line break and page break settings.</source>
       <translation>Open instellingen voor regel- en pagina-afbrekingen.</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="635" />
+      <location filename="../ui/main_window.py" line="636" />
       <source>Export PDF...</source>
       <translation>PDF exporteren...</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="636" />
+      <location filename="../ui/main_window.py" line="637" />
       <source>Export the current score as a PDF document.</source>
       <translation>Exporteer de huidige partituur als PDF-document.</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="641" />
+      <location filename="../ui/main_window.py" line="642" />
       <source>Export Image PDF...</source>
       <translation>Afbeeldings-PDF exporteren...</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="642" />
+      <location filename="../ui/main_window.py" line="643" />
       <source>Export the current score as a rasterized PDF document (600 DPI).</source>
       <translation>Exporteer de huidige partituur als gerasterd PDF-document (600 DPI).</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="653" />
+      <location filename="../ui/main_window.py" line="654" />
       <source>Use the system playback backend.</source>
       <translation>Gebruik de ingebouwde afspeelbackend.</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="659" />
+      <location filename="../ui/main_window.py" line="660" />
       <source>Playback using External MIDI port</source>
       <translation>Afspelen via externe MIDI-poort</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="660" />
+      <location filename="../ui/main_window.py" line="661" />
       <source>Use an external MIDI output port for playback.</source>
       <translation>Gebruik een externe MIDI-uitvoerpoort voor afspelen.</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="667" />
+      <location filename="../ui/main_window.py" line="668" />
       <source>MIDI port</source>
       <translation>MIDI-poort</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="673" />
+      <location filename="../ui/main_window.py" line="674" />
       <source>Play Test Tone</source>
       <translation>Testtoon afspelen</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="674" />
+      <location filename="../ui/main_window.py" line="675" />
       <source>Play a short test tone.</source>
       <translation>Speel een korte testtoon af.</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="680" />
+      <location filename="../ui/main_window.py" line="681" />
       <source>Select Custom SoundFont (.sf2/.sf3) for FluidSynth</source>
       <translation>Aangepaste SoundFont (.sf2/.sf3) kiezen voor FluidSynth</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="681" />
+      <location filename="../ui/main_window.py" line="682" />
       <source>Select a custom SoundFont file for FluidSynth playback.</source>
       <translation>Kies een aangepast SoundFont-bestand voor FluidSynth-afspelen.</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="685" />
+      <location filename="../ui/main_window.py" line="686" />
       <source>Use Default FluidSynth SoundFont</source>
       <translation>Standaard FluidSynth SoundFont gebruiken</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="686" />
+      <location filename="../ui/main_window.py" line="687" />
       <source>Switch back to the default FluidSynth SoundFont.</source>
       <translation>Schakel terug naar het standaard FluidSynth SoundFont.</translation>
     </message>
     <message>
+      <location filename="../ui/main_window.py" line="691" />
+      <source>FluidSynth Reverb Settings</source>
+      <translation type="unfinished" />
+    </message>
+    <message>
       <location filename="../ui/main_window.py" line="692" />
+      <source>Configure FluidSynth reverb parameters.</source>
+      <translation type="unfinished" />
+    </message>
+    <message>
+      <location filename="../ui/main_window.py" line="698" />
       <source>About keyTAB</source>
       <translation>Over keyTAB</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="693" />
+      <location filename="../ui/main_window.py" line="699" />
       <source>Show information about keyTAB.</source>
       <translation>Toon informatie over keyTAB.</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="695" />
+      <location filename="../ui/main_window.py" line="701" />
       <source>About Qt</source>
       <translation>Over Qt</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="696" />
+      <location filename="../ui/main_window.py" line="702" />
       <source>Show information about the Qt framework.</source>
       <translation>Toon informatie over het Qt-framework.</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="711" />
+      <location filename="../ui/main_window.py" line="717" />
       <source>Undo</source>
       <translation>Ongedaan maken</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="712" />
+      <location filename="../ui/main_window.py" line="718" />
       <source>Undo the last editing action.</source>
       <translation>Maak de laatste bewerkingsactie ongedaan.</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="714" />
+      <location filename="../ui/main_window.py" line="720" />
       <source>Redo</source>
       <translation>Opnieuw</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="715" />
+      <location filename="../ui/main_window.py" line="721" />
       <source>Redo the last undone editing action.</source>
       <translation>Herhaal de laatst ongedaan gemaakte actie.</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="724" />
+      <location filename="../ui/main_window.py" line="730" />
       <source>Cut</source>
       <translation>Knippen</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="725" />
+      <location filename="../ui/main_window.py" line="731" />
       <source>Cut the current selection.</source>
       <translation>Knip de huidige selectie.</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="727" />
+      <location filename="../ui/main_window.py" line="733" />
       <source>Copy</source>
       <translation>Kopieren</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="728" />
+      <location filename="../ui/main_window.py" line="734" />
       <source>Copy the current selection.</source>
       <translation>Kopieer de huidige selectie.</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="730" />
+      <location filename="../ui/main_window.py" line="736" />
       <source>Paste</source>
       <translation>Plakken</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="731" />
+      <location filename="../ui/main_window.py" line="737" />
       <source>Paste clipboard content.</source>
       <translation>Plak klembordinhoud.</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="738" />
+      <location filename="../ui/main_window.py" line="744" />
       <source>Delete</source>
       <translation>Verwijderen</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="739" />
+      <location filename="../ui/main_window.py" line="745" />
       <source>Delete the current selection.</source>
       <translation>Verwijder de huidige selectie.</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="755" />
+      <location filename="../ui/main_window.py" line="761" />
       <source>Select All</source>
       <translation>Alles selecteren</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="756" />
+      <location filename="../ui/main_window.py" line="762" />
       <source>Select all editable events.</source>
       <translation>Selecteer alle bewerkbare gebeurtenissen.</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="759" />
+      <location filename="../ui/main_window.py" line="765" />
       <source>Transpose -1 Semitone</source>
       <translation>Transponeer -1 semitoon</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="760" />
+      <location filename="../ui/main_window.py" line="766" />
       <source>Transpose Selection Down by One Semitone.</source>
       <translation>Transponeer selectie omlaag met een semitoon.</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="764" />
+      <location filename="../ui/main_window.py" line="770" />
       <source>Transpose +1 Semitone</source>
       <translation>Transponeer +1 semitoon</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="765" />
+      <location filename="../ui/main_window.py" line="771" />
       <source>Transpose Selection Up by One Semitone.</source>
       <translation>Transponeer selectie omhoog met een semitoon.</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="769" />
+      <location filename="../ui/main_window.py" line="775" />
       <source>Move Earlier by Snap Band</source>
       <translation>Naar voren verplaatsen per snap-band</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="770" />
+      <location filename="../ui/main_window.py" line="776" />
       <source>Move Selection Earlier by One Snap Band.</source>
       <translation>Verplaats selectie naar voren met een snap-band.</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="774" />
+      <location filename="../ui/main_window.py" line="780" />
       <source>Move Later by Snap Band</source>
       <translation>Naar achteren verplaatsen per snap-band</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="775" />
+      <location filename="../ui/main_window.py" line="781" />
       <source>Move Selection Later by One Snap Band.</source>
       <translation>Verplaats selectie naar achteren met een snap-band.</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="779" />
+      <location filename="../ui/main_window.py" line="785" />
       <source>Quantize Starts and Ends on Snap Band</source>
       <translation>Kwantiseer begin en einde op snap-band</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="780" />
+      <location filename="../ui/main_window.py" line="786" />
       <source>Quantize Selection Starts and Ends to the Current Snap Band.</source>
       <translation>Kwantiseer begin en einde van selectie naar de huidige snap-band.</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="783" />
+      <location filename="../ui/main_window.py" line="789" />
       <source>Quantize Starts on Snap Band</source>
       <translation>Kwantiseer begin op snap-band</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="784" />
+      <location filename="../ui/main_window.py" line="790" />
       <source>Quantize Selection Starts to the Current Snap Band.</source>
       <translation>Kwantiseer begin van selectie naar de huidige snap-band.</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="785" />
+      <location filename="../ui/main_window.py" line="791" />
       <source>Quantize Ends on Snap Band</source>
       <translation>Kwantiseer einde op snap-band</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="786" />
+      <location filename="../ui/main_window.py" line="792" />
       <source>Quantize Selection Ends to the Current Snap Band.</source>
       <translation>Kwantiseer einde van selectie naar de huidige snap-band.</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="800" />
+      <location filename="../ui/main_window.py" line="806" />
       <source>Preferences...</source>
       <translation>Voorkeuren...</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="801" />
+      <location filename="../ui/main_window.py" line="807" />
       <source>Open application preferences.</source>
       <translation>Open applicatievoorkeuren.</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="806" />
+      <location filename="../ui/main_window.py" line="812" />
       <source>Zoom In</source>
       <translation>Inzoomen</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="807" />
+      <location filename="../ui/main_window.py" line="813" />
       <source>Zoom in on the editor view.</source>
       <translation>Zoom in op de editorweergave.</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="815" />
+      <location filename="../ui/main_window.py" line="821" />
       <source>Zoom Out</source>
       <translation>Uitzoomen</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="816" />
+      <location filename="../ui/main_window.py" line="822" />
       <source>Zoom out from the editor view.</source>
       <translation>Zoom uit van de editorweergave.</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="825" />
+      <location filename="../ui/main_window.py" line="831" />
       <source>Full Screen</source>
       <translation>Volledig scherm</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="826" />
+      <location filename="../ui/main_window.py" line="832" />
       <source>Toggle full screen mode.</source>
       <translation>Schakel volledig scherm in of uit.</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="836" />
+      <location filename="../ui/main_window.py" line="842" />
       <source>Language</source>
       <translation>Taal</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="1673" />
-      <location filename="../ui/main_window.py" line="841" />
+      <location filename="../ui/main_window.py" line="1701" />
+      <location filename="../ui/main_window.py" line="847" />
       <source>System</source>
       <translation>Systeem</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="842" />
+      <location filename="../ui/main_window.py" line="848" />
       <source>Use the operating system language for the user interface.</source>
       <translation>Gebruik de taal van het besturingssysteem voor de gebruikersinterface.</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="1670" />
-      <location filename="../ui/main_window.py" line="850" />
+      <location filename="../ui/main_window.py" line="1698" />
+      <location filename="../ui/main_window.py" line="856" />
       <source>English</source>
       <translation>Engels</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="851" />
+      <location filename="../ui/main_window.py" line="857" />
       <source>Use English for the user interface.</source>
       <translation>Gebruik Engels voor de gebruikersinterface.</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="1672" />
-      <location filename="../ui/main_window.py" line="859" />
+      <location filename="../ui/main_window.py" line="1700" />
+      <location filename="../ui/main_window.py" line="865" />
       <source>Dutch</source>
       <translation>Nederlands</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="860" />
+      <location filename="../ui/main_window.py" line="866" />
       <source>Use Dutch for the user interface.</source>
       <translation>Gebruik Nederlands voor de gebruikersinterface.</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="1201" />
+      <location filename="../ui/main_window.py" line="1207" />
       <source>Playback using FluidSynth</source>
       <translation>Afspelen met FluidSynth</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="1203" />
+      <location filename="../ui/main_window.py" line="1209" />
       <source>Playback using CoreMIDI</source>
       <translation>Afspelen met CoreMIDI</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="1205" />
+      <location filename="../ui/main_window.py" line="1211" />
       <source>Playback using WinMM</source>
       <translation>Afspelen met WinMM</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="1206" />
+      <location filename="../ui/main_window.py" line="1212" />
       <source>Playback using System Synth</source>
       <translation>Afspelen met systeem-synth</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="1605" />
-      <location filename="../ui/main_window.py" line="1603" />
+      <location filename="../ui/main_window.py" line="1633" />
+      <location filename="../ui/main_window.py" line="1631" />
       <source>Unsaved changes</source>
       <translation>Niet-opgeslagen wijzigingen</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="1603" />
+      <location filename="../ui/main_window.py" line="1631" />
       <source>New project</source>
       <translation>Nieuw project</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="1817" />
-      <location filename="../ui/main_window.py" line="1605" />
+      <location filename="../ui/main_window.py" line="1845" />
+      <location filename="../ui/main_window.py" line="1633" />
       <source>Saved</source>
       <translation>Opgeslagen</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="1606" />
+      <location filename="../ui/main_window.py" line="1634" />
       <source>(session.piano restored)</source>
       <translation>(session.piano hersteld)</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="1619" />
-      <location filename="../ui/main_window.py" line="1606" />
+      <location filename="../ui/main_window.py" line="1647" />
+      <location filename="../ui/main_window.py" line="1634" />
       <source>(unsaved project)</source>
       <translation>(niet-opgeslagen project)</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="1607" />
+      <location filename="../ui/main_window.py" line="1635" />
       <source>Session mode</source>
       <translation>Sessiemodus</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="1618" />
+      <location filename="../ui/main_window.py" line="1646" />
       <source>session.piano</source>
       <translation>session.piano</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="1689" />
+      <location filename="../ui/main_window.py" line="1717" />
       <source>Restart keyTAB</source>
       <translation>keyTAB herstarten</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="1690" />
+      <location filename="../ui/main_window.py" line="1718" />
       <source>Language changed to {language}. Restart now to apply it?</source>
       <translation>Taal gewijzigd naar {language}. Nu herstarten om dit toe te passen?</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="1697" />
+      <location filename="../ui/main_window.py" line="1725" />
       <source>Restarting keyTAB to apply language change...</source>
       <translation>keyTAB wordt herstart om de taalwijziging toe te passen...</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="1700" />
+      <location filename="../ui/main_window.py" line="1728" />
       <source>Language preference saved. Restart keyTAB to apply it.</source>
       <translation>Taalvoorkeur opgeslagen. Herstart keyTAB om dit toe te passen.</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="1809" />
+      <location filename="../ui/main_window.py" line="1837" />
       <source>Opened</source>
       <translation>Geopend</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="1825" />
+      <location filename="../ui/main_window.py" line="1853" />
       <source>Saved As</source>
       <translation>Opgeslagen als</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="2008" />
-      <location filename="../ui/main_window.py" line="2003" />
-      <location filename="../ui/main_window.py" line="1991" />
-      <location filename="../ui/main_window.py" line="1986" />
+      <location filename="../ui/main_window.py" line="2036" />
+      <location filename="../ui/main_window.py" line="2031" />
+      <location filename="../ui/main_window.py" line="2019" />
+      <location filename="../ui/main_window.py" line="2014" />
       <source>Run Script</source>
       <translation>Script uitvoeren</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="2003" />
-      <location filename="../ui/main_window.py" line="1986" />
+      <location filename="../ui/main_window.py" line="2031" />
+      <location filename="../ui/main_window.py" line="2014" />
       <source>Failed to initialize scripting: {error}</source>
       <translation>Initialiseren van scripting mislukt: {error}</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="2008" />
-      <location filename="../ui/main_window.py" line="1991" />
+      <location filename="../ui/main_window.py" line="2036" />
+      <location filename="../ui/main_window.py" line="2019" />
       <source>Script failed: {error}</source>
       <translation>Script mislukt: {error}</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="2016" />
+      <location filename="../ui/main_window.py" line="2044" />
       <source>Run Script...</source>
       <translation>Script uitvoeren...</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="2017" />
+      <location filename="../ui/main_window.py" line="2045" />
       <source>Load and run a Python script with preview and cancel support.</source>
       <translation>Laad en voer een Python-script uit met preview en annuleringsondersteuning.</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="2024" />
+      <location filename="../ui/main_window.py" line="2052" />
       <source>No scripts folder found</source>
       <translation>Geen map met scripts gevonden</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="2034" />
+      <location filename="../ui/main_window.py" line="2062" />
       <source>No scripts found</source>
       <translation>Geen scripts gevonden</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="2059" />
+      <location filename="../ui/main_window.py" line="2087" />
       <source>No recent files</source>
       <translation>Geen recente bestanden</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="2069" />
+      <location filename="../ui/main_window.py" line="2097" />
       <source>Clear Recent Files</source>
       <translation>Recente bestanden wissen</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="2109" />
-      <location filename="../ui/main_window.py" line="2097" />
+      <location filename="../ui/main_window.py" line="2137" />
+      <location filename="../ui/main_window.py" line="2125" />
       <source>Rename File</source>
       <translation>Bestand hernoemen</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="2098" />
+      <location filename="../ui/main_window.py" line="2126" />
       <source>New file name:</source>
       <translation>Nieuwe bestandsnaam:</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="2109" />
+      <location filename="../ui/main_window.py" line="2137" />
       <source>Please enter only a file name, not a path.</source>
       <translation>Voer alleen een bestandsnaam in, geen pad.</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="2122" />
+      <location filename="../ui/main_window.py" line="2150" />
       <source>Renamed</source>
       <translation>Hernoemd</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="2217" />
+      <location filename="../ui/main_window.py" line="2245" />
       <source>Copied selection</source>
       <translation>Selectie gekopieerd</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="2233" />
+      <location filename="../ui/main_window.py" line="2261" />
       <source>Cut selection</source>
       <translation>Selectie geknipt</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="2249" />
+      <location filename="../ui/main_window.py" line="2277" />
       <source>Pasted selection</source>
       <translation>Selectie geplakt</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="2268" />
+      <location filename="../ui/main_window.py" line="2296" />
       <source>Deleted selection</source>
       <translation>Selectie verwijderd</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="2270" />
+      <location filename="../ui/main_window.py" line="2298" />
       <source>No selection to delete</source>
       <translation>Geen selectie om te verwijderen</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="2281" />
+      <location filename="../ui/main_window.py" line="2309" />
       <source>Selected all</source>
       <translation>Alles geselecteerd</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="2293" />
+      <location filename="../ui/main_window.py" line="2321" />
       <source>Transposed selection {semitones:+d} semitone</source>
       <translation>Selectie {semitones:+d} semitoon getransponeerd</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="2295" />
+      <location filename="../ui/main_window.py" line="2323" />
       <source>No selection to transpose</source>
       <translation>Geen selectie om te transponeren</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="2311" />
+      <location filename="../ui/main_window.py" line="2339" />
       <source>earlier</source>
       <translation>eerder</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="2311" />
+      <location filename="../ui/main_window.py" line="2339" />
       <source>later</source>
       <translation>later</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="2312" />
+      <location filename="../ui/main_window.py" line="2340" />
       <source>Moved selection {direction} by snap</source>
       <translation>Selectie {direction} verplaatst per snap</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="2314" />
+      <location filename="../ui/main_window.py" line="2342" />
       <source>No selection to move</source>
       <translation>Geen selectie om te verplaatsen</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="2328" />
+      <location filename="../ui/main_window.py" line="2356" />
       <source>Quantized selection starts to snap</source>
       <translation>Beginpunten van selectie gekwantiseerd op snap</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="2330" />
+      <location filename="../ui/main_window.py" line="2358" />
       <source>Quantized selection ends to snap</source>
       <translation>Eindpunten van selectie gekwantiseerd op snap</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="2332" />
+      <location filename="../ui/main_window.py" line="2360" />
       <source>Quantized selection starts and ends to snap</source>
       <translation>Begin- en eindpunten van selectie gekwantiseerd op snap</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="2334" />
+      <location filename="../ui/main_window.py" line="2362" />
       <source>No selection to quantize</source>
       <translation>Geen selectie om te kwantiseren</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="2461" />
+      <location filename="../ui/main_window.py" line="2489" />
       <source>Engraving failed</source>
       <translation>Graveren mislukt</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="2462" />
+      <location filename="../ui/main_window.py" line="2490" />
       <source>The engraver failed.</source>
       <translation>De engraver is mislukt.</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="2464" />
+      <location filename="../ui/main_window.py" line="2492" />
       <source>Use 'Copy Error Log' and keep the copied traceback for debugging.</source>
       <translation>Gebruik 'Foutenlog kopieren' en bewaar de gekopieerde traceback voor debugging.</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="2467" />
+      <location filename="../ui/main_window.py" line="2495" />
       <source>Engraving failed. See error dialog for details.</source>
       <translation>Graveren mislukt. Zie het foutvenster voor details.</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="2648" />
-      <location filename="../ui/main_window.py" line="2630" />
-      <location filename="../ui/main_window.py" line="2612" />
+      <location filename="../ui/main_window.py" line="2676" />
+      <location filename="../ui/main_window.py" line="2658" />
+      <location filename="../ui/main_window.py" line="2640" />
       <source>Playback</source>
       <translation>Afspelen</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="2614" />
+      <location filename="../ui/main_window.py" line="2642" />
       <source>External MIDI playback failed: {error}
 
 Switched automatically to {backend}.</source>
@@ -1143,7 +1206,7 @@ Switched automatically to {backend}.</source>
     Automatisch overgeschakeld naar {backend}.</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="2632" />
+      <location filename="../ui/main_window.py" line="2660" />
       <source>External MIDI playback failed: {error}
 
 Automatic fallback to {backend} also failed: {fallback_error}</source>
@@ -1152,7 +1215,7 @@ Automatic fallback to {backend} also failed: {fallback_error}</source>
     Automatische fallback naar {backend} is ook mislukt: {fallback_error}</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="2649" />
+      <location filename="../ui/main_window.py" line="2677" />
       <source>Playback failed: {error}
 
 Try '{backend}' from the Playback menu.</source>
@@ -1161,91 +1224,91 @@ Try '{backend}' from the Playback menu.</source>
     Probeer '{backend}' via het menu Afspelen.</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="2829" />
+      <location filename="../ui/main_window.py" line="2857" />
       <source>Synth FX editor removed</source>
       <translation>Synth FX-editor verwijderd</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="2851" />
+      <location filename="../ui/main_window.py" line="2879" />
       <source>Playback mode: External MIDI port</source>
       <translation>Afspeelmodus: externe MIDI-poort</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="2854" />
+      <location filename="../ui/main_window.py" line="2882" />
       <source>Playback mode: {backend}</source>
       <translation>Afspeelmodus: {backend}</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="2855" />
+      <location filename="../ui/main_window.py" line="2883" />
       <source>Playback using </source>
       <translation>Afspelen met </translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="2868" />
+      <location filename="../ui/main_window.py" line="2896" />
       <source>MIDI transport settings removed</source>
       <translation>MIDI-transportinstellingen verwijderd</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="2874" />
+      <location filename="../ui/main_window.py" line="2902" />
       <source>Test tone</source>
       <translation>Testtoon</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="2877" />
+      <location filename="../ui/main_window.py" line="2905" />
       <source>Test tone unavailable</source>
       <translation>Testtoon niet beschikbaar</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="2880" />
+      <location filename="../ui/main_window.py" line="2908" />
       <source>Audio output is selected by the active playback backend</source>
       <translation>Audio-uitvoer wordt gekozen door de actieve afspeelbackend</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="3053" />
+      <location filename="../ui/main_window.py" line="3081" />
       <source>Install required fonts</source>
       <translation>Vereiste lettertypen installeren</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="3054" />
+      <location filename="../ui/main_window.py" line="3082" />
       <source>keyTAB can install embedded fonts to your user font folder so editing and engraving match:</source>
       <translation>keyTAB kan ingebedde lettertypen in je gebruikersmap voor lettertypen installeren zodat bewerken en graveren overeenkomen:</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="3057" />
+      <location filename="../ui/main_window.py" line="3085" />
       <source>Install all missing fonts now?</source>
       <translation>Alle ontbrekende lettertypen nu installeren?</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="3083" />
+      <location filename="../ui/main_window.py" line="3111" />
       <source>Fonts installed</source>
       <translation>Lettertypen geinstalleerd</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="3084" />
+      <location filename="../ui/main_window.py" line="3112" />
       <source>The following fonts were installed. keyTAB will restart to apply them:
 </source>
       <translation>De volgende lettertypen zijn geinstalleerd. keyTAB wordt herstart om ze toe te passen:
     </translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="3095" />
+      <location filename="../ui/main_window.py" line="3123" />
       <source>Font installation failed</source>
       <translation>Installatie van lettertypen mislukt</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="3096" />
+      <location filename="../ui/main_window.py" line="3124" />
       <source>keyTAB could not install some fonts automatically:
 {details}</source>
       <translation>keyTAB kon sommige lettertypen niet automatisch installeren:
     {details}</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="3186" />
+      <location filename="../ui/main_window.py" line="3214" />
       <source>Closing</source>
       <translation>Afsluiten</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="3193" />
+      <location filename="../ui/main_window.py" line="3221" />
       <source>Saving...
 
  {path}</source>
@@ -1254,7 +1317,7 @@ Try '{backend}' from the Playback menu.</source>
      {path}</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="3227" />
+      <location filename="../ui/main_window.py" line="3255" />
       <source>unsaved session</source>
       <translation>niet-opgeslagen sessie</translation>
     </message>
