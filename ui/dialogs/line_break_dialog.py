@@ -23,7 +23,7 @@ class BulkKeyRangeDialog(QtWidgets.QDialog):
         
         # Info label
         info = QtWidgets.QLabel(
-            self.tr("Apply this key range to all existing line/page breaks:"),
+            self.tr("Apply this key range to all existing line/page start markers:"),
             self
         )
         layout.addWidget(info)
@@ -157,7 +157,7 @@ class LineBreakDialog(QtWidgets.QDialog):
         self._measure_starts_mm: list[float] = self._build_measure_starts()
         self._suppress_measure_change: bool = False
 
-        list_label = QtWidgets.QLabel(self.tr("Line/Page breaks:"), self)
+        list_label = QtWidgets.QLabel(self.tr("Line/Page break markers:"), self)
         self.break_table = QtWidgets.QTableWidget(self)
         self.break_table.setColumnCount(6)
         self.break_table.setHorizontalHeaderLabels([
@@ -519,7 +519,7 @@ class LineBreakDialog(QtWidgets.QDialog):
         delete_btn = QtWidgets.QToolButton(self)
         delete_btn.setText("✕")
         delete_btn.setAutoRaise(True)
-        delete_btn.setToolTip(self.tr("Delete this line break entry."))
+        delete_btn.setToolTip(self.tr("Delete this line break."))
         delete_btn.setFixedWidth(28)
 
         def _delete_break() -> None:

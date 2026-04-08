@@ -25,7 +25,7 @@ class AboutDialog(QtWidgets.QDialog):
 
         header = QtWidgets.QLabel(
             "<h2 style='margin-bottom: 10px;'>keyTAB</h2>"
-            f"<div style='margin-bottom: 10px;font-size: 10px;'>{self.tr('keyTAB is a long-running passion project. With modern tooling I can focus on the hard part: shaping a clearer way to read and engrave music.')}</div>"
+            f"<div style='margin-bottom: 10px;font-size: 10px;'>{self.tr('keyTAB is a long-running passion project. With modern tooling I can focus on the hard part: shaping a clearer way to read and engrave Klavarskribo music.')}</div>"
             f"<div style='margin-bottom: 10px;font-size: 10px;'>{self.tr('Built on Klavarskribo notation, keyTAB turns MIDI into readable plots. Music flows top-to-bottom on a vertical timeline over a customizable, time-signature-aware grid.')}</div>"
             f"<div style='margin-bottom: 10px;font-size: 10px;'>{self.tr('Stave lines map directly to the black piano keys: black noteheads sit on black key lines, white noteheads land between lines. Pitch reads like the piano keyboard\u2014no key signatures, sharps/flats, clef changes, or other detours.')}</div>"
             f"<div style='margin-bottom: 10px;font-size: 10px;'>{self.tr('I hope keyTAB helps musicians, composers, and curious listeners visualize and refine this MIDI style notation with clarity. Feedback is always welcome.')}</div>"

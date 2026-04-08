@@ -2850,53 +2850,57 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                         tags=['accidental_line'],
                     )
 
-                # Problem solved: show ledger lines only when manual ranges
-                # would otherwise hide them.
-                if manual_range and bool(layout.get('stave_visible', True)):
+                def _draw_manual_ledgers_for_pitch_at_y(pitch_value: int, y_center: float) -> None:
+                    if not (manual_range and bool(layout.get('stave_visible', True))):
+                        return
                     ledger_groups: list[dict] = []
-                    if p < bound_left:
-                        g_start = _group_index_for_key(p)
+                    if pitch_value < bound_left:
+                        g_start = _group_index_for_key(pitch_value)
                         g_end = int(bound_group_low or 0) - 1
                         if g_start <= g_end:
                             ledger_groups = line_groups[g_start:g_end + 1]
-                    elif p > bound_right:
+                    elif pitch_value > bound_right:
                         g_start = int(bound_group_high or 0) + 1
-                        g_end = _group_index_for_key(p)
+                        g_end = _group_index_for_key(pitch_value)
                         if g_start <= g_end:
                             ledger_groups = line_groups[g_start:g_end + 1]
-                    if ledger_groups:
-                        y_center = note_y + w
-                        y_seg1 = y_center - w
-                        y_seg2 = y_seg1 + max(0.0, stave_ledger_len)
-                        for grp in ledger_groups:
-                            for key in grp.get('keys', []):
-                                x_pos = _key_to_x(int(key))
-                                is_clef_line = int(key) in (41, 43)
-                                is_three_line = int(key) in key_class_filter('FGA')
-                                if is_clef_line:
-                                    width_mm = max(stave_clef_w, semitone_mm / 6.0)
-                                    dash = clef_dash
-                                elif is_three_line:
-                                    width_mm = max(stave_three_w, semitone_mm / 3.0)
-                                    dash = None
-                                else:
-                                    width_mm = max(stave_two_w, semitone_mm / 10.0)
-                                    dash = None
-                                key_sig = (int(key), int(round(y_center * 1000)))
-                                if key_sig in ledger_drawn:
-                                    continue
-                                ledger_drawn.add(key_sig)
-                                du.add_line(
-                                    x_pos,
-                                    y_seg1,
-                                    x_pos,
-                                    y_seg2,
-                                    color=notation_color,
-                                    width_mm=width_mm,
-                                    dash_pattern=dash,
-                                    id=0,
-                                    tags=['stave'],
-                                )
+                    if not ledger_groups:
+                        return
+                    y_seg1 = float(y_center) - w
+                    y_seg2 = y_seg1 + max(0.0, stave_ledger_len)
+                    for grp in ledger_groups:
+                        for key in grp.get('keys', []):
+                            x_pos = _key_to_x(int(key))
+                            is_clef_line = int(key) in (41, 43)
+                            is_three_line = int(key) in key_class_filter('FGA')
+                            if is_clef_line:
+                                width_mm = max(stave_clef_w, semitone_mm / 6.0)
+                                dash = clef_dash
+                            elif is_three_line:
+                                width_mm = max(stave_three_w, semitone_mm / 3.0)
+                                dash = None
+                            else:
+                                width_mm = max(stave_two_w, semitone_mm / 10.0)
+                                dash = None
+                            key_sig = (int(key), int(round(float(y_center) * 1000)))
+                            if key_sig in ledger_drawn:
+                                continue
+                            ledger_drawn.add(key_sig)
+                            du.add_line(
+                                x_pos,
+                                y_seg1,
+                                x_pos,
+                                y_seg2,
+                                color=notation_color,
+                                width_mm=width_mm,
+                                dash_pattern=dash,
+                                id=0,
+                                tags=['stave'],
+                            )
+
+                # Problem solved: show ledger lines only when manual ranges
+                # would otherwise hide them.
+                _draw_manual_ledgers_for_pitch_at_y(int(p), float(note_y + w))
 
                 # Problem solved: continuation dots indicate overlapped starts/ends
                 # and line crossings for the same hand.
@@ -2954,6 +2958,8 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                                 break
                         if has_adjacent_start:
                             y_center += float(semitone_mm) * 2.0
+
+                        _draw_manual_ledgers_for_pitch_at_y(int(dot_pitch), float(y_center))
 
                         du.add_oval(
                             x - dot_d / 2.0,

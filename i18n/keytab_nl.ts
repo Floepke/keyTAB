@@ -10,13 +10,13 @@
     </message>
     <message>
       <location filename="../ui/about_dialog.py" line="28" />
-      <source>keyTAB is a long-running passion project. With modern tooling I can focus on the hard part: shaping a clearer way to read and engrave music.</source>
-      <translation>keyTAB is een langlopend passieproject. Met moderne gereedschappen kan ik me concentreren op het moeilijke deel: een helderdere manier om muziek te lezen en te graveren.</translation>
+      <source>keyTAB is a long-running passion project. With modern tooling I can focus on the hard part: shaping a clearer way to read and engrave Klavarskribo music.</source>
+      <translation>keyTAB is een langlopend passieproject. Met moderne gereedschappen kan ik me concentreren op het moeilijke deel: een helderdere manier om Klavarskribo-muziek te lezen en te graveren.</translation>
     </message>
     <message>
       <location filename="../ui/about_dialog.py" line="29" />
       <source>Built on Klavarskribo notation, keyTAB turns MIDI into readable plots. Music flows top-to-bottom on a vertical timeline over a customizable, time-signature-aware grid.</source>
-      <translation>Gebaseerd op de Klavarskribo-notatie zet keyTAB MIDI om in leesbare partituren. Muziek stroomt van boven naar beneden op een verticale tijdlijn over een aanpasbaar, maatsoort-bewust raster.</translation>
+      <translation>Gebaseerd op de Klavarskribo-notatie zet keyTAB MIDI om in leesbare partituren. Muziek stroomt van boven naar beneden op een verticale tijdlijn over een aanpasbaar, maatsoort-bewust tijd-raster.</translation>
     </message>
     <message>
       <location filename="../ui/about_dialog.py" line="30" />
@@ -73,8 +73,8 @@
     </message>
     <message>
       <location filename="../ui/dialogs/line_break_dialog.py" line="26" />
-      <source>Apply this key range to all existing line/page breaks:</source>
-      <translation>Dit toetsbereik toepassen op alle bestaande regel-/pagina-einden:</translation>
+      <source>Apply this key range to all existing line/page start markers:</source>
+      <translation>Pas dit toetsbereik toe op alle bestaande lijn/pagina start markeringen:</translation>
     </message>
     <message>
       <location filename="../ui/dialogs/line_break_dialog.py" line="45" />
@@ -119,52 +119,52 @@
     <message>
       <location filename="../ui/dialogs/fluidsynth_reverb_config_dialog.py" line="18" />
       <source>FluidSynth Reverb Configuration</source>
-      <translation type="unfinished" />
+      <translation>FluidSynth Reverb Configuratie</translation>
     </message>
     <message>
       <location filename="../ui/dialogs/fluidsynth_reverb_config_dialog.py" line="29" />
       <source>Reverb Settings</source>
-      <translation type="unfinished" />
+      <translation>Reverb Instellingen</translation>
     </message>
     <message>
       <location filename="../ui/dialogs/fluidsynth_reverb_config_dialog.py" line="36" />
       <source>Enable Reverb</source>
-      <translation type="unfinished" />
+      <translation>Reverb Inschakelen</translation>
     </message>
     <message>
       <location filename="../ui/dialogs/fluidsynth_reverb_config_dialog.py" line="47" />
       <source>Room Size (0-1)</source>
-      <translation type="unfinished" />
+      <translation>Kamer Grootte (0-1)</translation>
     </message>
     <message>
       <location filename="../ui/dialogs/fluidsynth_reverb_config_dialog.py" line="59" />
       <source>Damping (0-1)</source>
-      <translation type="unfinished" />
+      <translation>Demping (0-1)</translation>
     </message>
     <message>
       <location filename="../ui/dialogs/fluidsynth_reverb_config_dialog.py" line="71" />
       <source>Width (0-100)</source>
-      <translation type="unfinished" />
+      <translation>Breedte (0-100)</translation>
     </message>
     <message>
       <location filename="../ui/dialogs/fluidsynth_reverb_config_dialog.py" line="83" />
       <source>Level (0-1)</source>
-      <translation type="unfinished" />
+      <translation>Niveau (0-1)</translation>
     </message>
     <message>
       <location filename="../ui/dialogs/fluidsynth_reverb_config_dialog.py" line="89" />
       <source>Reset to Defaults</source>
-      <translation type="unfinished" />
+      <translation>Herstellen naar standaardwaarden</translation>
     </message>
     <message>
       <location filename="../ui/dialogs/fluidsynth_reverb_config_dialog.py" line="97" />
       <source>Apply</source>
-      <translation type="unfinished" />
+      <translation>Toepassen</translation>
     </message>
     <message>
       <location filename="../ui/dialogs/fluidsynth_reverb_config_dialog.py" line="98" />
       <source>Close</source>
-      <translation type="unfinished" />
+      <translation>Sluiten</translation>
     </message>
   </context>
   <context>
@@ -313,12 +313,12 @@
     <message>
       <location filename="../ui/dialogs/line_break_dialog.py" line="136" />
       <source>Line/Page Break</source>
-      <translation>Regel-/pagina-einde</translation>
+      <translation>Regel/Pagina breekpunt markers</translation>
     </message>
     <message>
       <location filename="../ui/dialogs/line_break_dialog.py" line="160" />
-      <source>Line/Page breaks:</source>
-      <translation>Regel-/pagina-einden:</translation>
+      <source>Line/Page break markers:</source>
+      <translation>Regel/Pagina breekpunt markers:</translation>
     </message>
     <message>
       <location filename="../ui/dialogs/line_break_dialog.py" line="165" />
@@ -381,13 +381,13 @@
       <location filename="../ui/dialogs/line_break_dialog.py" line="477" />
       <location filename="../ui/dialogs/line_break_dialog.py" line="276" />
       <source>Page break.</source>
-      <translation>Pagina-einde.</translation>
+      <translation>Pagina breekpunt.</translation>
     </message>
     <message>
       <location filename="../ui/dialogs/line_break_dialog.py" line="477" />
       <location filename="../ui/dialogs/line_break_dialog.py" line="276" />
       <source>Line break.</source>
-      <translation>Regeleinde.</translation>
+      <translation>Regel breekpunt.</translation>
     </message>
     <message>
       <location filename="../ui/dialogs/line_break_dialog.py" line="317" />
@@ -411,8 +411,8 @@
     </message>
     <message>
       <location filename="../ui/dialogs/line_break_dialog.py" line="522" />
-      <source>Delete this line break entry.</source>
-      <translation>Deze regel-/pagina-einde-invoer verwijderen.</translation>
+      <source>Delete this line break.</source>
+      <translation>Deze regel/pagina-begin verwijderen.</translation>
     </message>
     <message>
       <location filename="../ui/dialogs/line_break_dialog.py" line="615" />
@@ -432,17 +432,17 @@ is the count of measures on a line; after the list is exhausted, the last
 number repeats. Existing margins, ranges, and page/line types are reused
 in order. Click 'Apply Measure Grouping' to generate breaks; OK saves
 other edits, Cancel reverts to the original state.</source>
-      <translation>Maatgroepering laat je regel-einden op basis van maten genereren.
+      <translation>Maatgroepering laat je regel afbreek markers op basis van maten genereren.
 Voer positieve gehele getallen in, gescheiden door spaties (bijv. '4 6 4'). Elk getal
 is het aantal maten op een regel; nadat de lijst op is, wordt het laatste
 getal herhaald. Bestaande marges, bereiken en pagina-/regeltypes worden in
-volgorde hergebruikt. Klik op 'Maatgroepering toepassen' om einden te genereren; OK slaat
+volgorde hergebruikt. Klik op 'Maatgroepering toepassen' om regel afbreek markers te genereren; OK slaat
 andere bewerkingen op, Annuleren zet de oorspronkelijke toestand terug.</translation>
     </message>
     <message>
       <location filename="../ui/dialogs/line_break_dialog.py" line="642" />
       <source>Line Break Help</source>
-      <translation>Hulp bij regel-einden</translation>
+      <translation>Hulp bij regel breek markers</translation>
     </message>
     <message>
       <location filename="../ui/dialogs/line_break_dialog.py" line="648" />
@@ -685,12 +685,12 @@ andere bewerkingen op, Annuleren zet de oorspronkelijke toestand terug.</transla
     <message>
       <location filename="../ui/main_window.py" line="691" />
       <source>FluidSynth Reverb Settings</source>
-      <translation type="unfinished" />
+      <translation>FluidSynth Reverb Instellingen</translation>
     </message>
     <message>
       <location filename="../ui/main_window.py" line="692" />
       <source>Configure FluidSynth reverb parameters.</source>
-      <translation type="unfinished" />
+      <translation>Configureer FluidSynth reverb parameters.</translation>
     </message>
     <message>
       <location filename="../ui/main_window.py" line="698" />
@@ -1019,185 +1019,185 @@ andere bewerkingen op, Annuleren zet de oorspronkelijke toestand terug.</transla
       <translation>Opgeslagen als</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="2035" />
-      <location filename="../ui/main_window.py" line="2030" />
-      <location filename="../ui/main_window.py" line="2018" />
-      <location filename="../ui/main_window.py" line="2013" />
+      <location filename="../ui/main_window.py" line="2082" />
+      <location filename="../ui/main_window.py" line="2077" />
+      <location filename="../ui/main_window.py" line="2065" />
+      <location filename="../ui/main_window.py" line="2060" />
       <source>Run Script</source>
       <translation>Script uitvoeren</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="2030" />
-      <location filename="../ui/main_window.py" line="2013" />
+      <location filename="../ui/main_window.py" line="2077" />
+      <location filename="../ui/main_window.py" line="2060" />
       <source>Failed to initialize scripting: {error}</source>
       <translation>Initialiseren van scripting mislukt: {error}</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="2035" />
-      <location filename="../ui/main_window.py" line="2018" />
+      <location filename="../ui/main_window.py" line="2082" />
+      <location filename="../ui/main_window.py" line="2065" />
       <source>Script failed: {error}</source>
       <translation>Script mislukt: {error}</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="2043" />
+      <location filename="../ui/main_window.py" line="2090" />
       <source>Run Script...</source>
       <translation>Script uitvoeren...</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="2044" />
+      <location filename="../ui/main_window.py" line="2091" />
       <source>Load and run a Python script with preview and cancel support.</source>
       <translation>Laad en voer een Python-script uit met preview en annuleringsondersteuning.</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="2051" />
+      <location filename="../ui/main_window.py" line="2098" />
       <source>No scripts folder found</source>
       <translation>Geen map met scripts gevonden</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="2061" />
+      <location filename="../ui/main_window.py" line="2108" />
       <source>No scripts found</source>
       <translation>Geen scripts gevonden</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="2086" />
+      <location filename="../ui/main_window.py" line="2133" />
       <source>No recent files</source>
       <translation>Geen recente bestanden</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="2096" />
+      <location filename="../ui/main_window.py" line="2143" />
       <source>Clear Recent Files</source>
       <translation>Recente bestanden wissen</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="2136" />
-      <location filename="../ui/main_window.py" line="2124" />
+      <location filename="../ui/main_window.py" line="2183" />
+      <location filename="../ui/main_window.py" line="2171" />
       <source>Rename File</source>
       <translation>Bestand hernoemen</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="2125" />
+      <location filename="../ui/main_window.py" line="2172" />
       <source>New file name:</source>
       <translation>Nieuwe bestandsnaam:</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="2136" />
+      <location filename="../ui/main_window.py" line="2183" />
       <source>Please enter only a file name, not a path.</source>
       <translation>Voer alleen een bestandsnaam in, geen pad.</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="2149" />
+      <location filename="../ui/main_window.py" line="2196" />
       <source>Renamed</source>
       <translation>Hernoemd</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="2244" />
+      <location filename="../ui/main_window.py" line="2291" />
       <source>Copied selection</source>
       <translation>Selectie gekopieerd</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="2260" />
+      <location filename="../ui/main_window.py" line="2307" />
       <source>Cut selection</source>
       <translation>Selectie geknipt</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="2276" />
+      <location filename="../ui/main_window.py" line="2323" />
       <source>Pasted selection</source>
       <translation>Selectie geplakt</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="2295" />
+      <location filename="../ui/main_window.py" line="2342" />
       <source>Deleted selection</source>
       <translation>Selectie verwijderd</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="2297" />
+      <location filename="../ui/main_window.py" line="2344" />
       <source>No selection to delete</source>
       <translation>Geen selectie om te verwijderen</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="2308" />
+      <location filename="../ui/main_window.py" line="2355" />
       <source>Selected all</source>
       <translation>Alles geselecteerd</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="2320" />
+      <location filename="../ui/main_window.py" line="2367" />
       <source>Transposed selection {semitones:+d} semitone</source>
       <translation>Selectie {semitones:+d} semitoon getransponeerd</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="2322" />
+      <location filename="../ui/main_window.py" line="2369" />
       <source>No selection to transpose</source>
       <translation>Geen selectie om te transponeren</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="2338" />
+      <location filename="../ui/main_window.py" line="2385" />
       <source>earlier</source>
       <translation>eerder</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="2338" />
+      <location filename="../ui/main_window.py" line="2385" />
       <source>later</source>
       <translation>later</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="2339" />
+      <location filename="../ui/main_window.py" line="2386" />
       <source>Moved selection {direction} by snap</source>
       <translation>Selectie {direction} verplaatst per snap</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="2341" />
+      <location filename="../ui/main_window.py" line="2388" />
       <source>No selection to move</source>
       <translation>Geen selectie om te verplaatsen</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="2355" />
+      <location filename="../ui/main_window.py" line="2402" />
       <source>Quantized selection starts to snap</source>
       <translation>Beginpunten van selectie gekwantiseerd op snap</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="2357" />
+      <location filename="../ui/main_window.py" line="2404" />
       <source>Quantized selection ends to snap</source>
       <translation>Eindpunten van selectie gekwantiseerd op snap</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="2359" />
+      <location filename="../ui/main_window.py" line="2406" />
       <source>Quantized selection starts and ends to snap</source>
       <translation>Begin- en eindpunten van selectie gekwantiseerd op snap</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="2361" />
+      <location filename="../ui/main_window.py" line="2408" />
       <source>No selection to quantize</source>
       <translation>Geen selectie om te kwantiseren</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="2488" />
+      <location filename="../ui/main_window.py" line="2535" />
       <source>Engraving failed</source>
       <translation>Graveren mislukt</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="2489" />
+      <location filename="../ui/main_window.py" line="2536" />
       <source>The engraver failed.</source>
       <translation>De engraver is mislukt.</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="2491" />
+      <location filename="../ui/main_window.py" line="2538" />
       <source>Use 'Copy Error Log' and keep the copied traceback for debugging.</source>
       <translation>Gebruik 'Foutenlog kopieren' en bewaar de gekopieerde traceback voor debugging.</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="2494" />
+      <location filename="../ui/main_window.py" line="2541" />
       <source>Engraving failed. See error dialog for details.</source>
       <translation>Graveren mislukt. Zie het foutvenster voor details.</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="2675" />
-      <location filename="../ui/main_window.py" line="2657" />
-      <location filename="../ui/main_window.py" line="2639" />
+      <location filename="../ui/main_window.py" line="2722" />
+      <location filename="../ui/main_window.py" line="2704" />
+      <location filename="../ui/main_window.py" line="2686" />
       <source>Playback</source>
       <translation>Afspelen</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="2641" />
+      <location filename="../ui/main_window.py" line="2688" />
       <source>External MIDI playback failed: {error}
 
 Switched automatically to {backend}.</source>
@@ -1206,7 +1206,7 @@ Switched automatically to {backend}.</source>
     Automatisch overgeschakeld naar {backend}.</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="2659" />
+      <location filename="../ui/main_window.py" line="2706" />
       <source>External MIDI playback failed: {error}
 
 Automatic fallback to {backend} also failed: {fallback_error}</source>
@@ -1215,7 +1215,7 @@ Automatic fallback to {backend} also failed: {fallback_error}</source>
     Automatische fallback naar {backend} is ook mislukt: {fallback_error}</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="2676" />
+      <location filename="../ui/main_window.py" line="2723" />
       <source>Playback failed: {error}
 
 Try '{backend}' from the Playback menu.</source>
@@ -1224,91 +1224,91 @@ Try '{backend}' from the Playback menu.</source>
     Probeer '{backend}' via het menu Afspelen.</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="2856" />
+      <location filename="../ui/main_window.py" line="2903" />
       <source>Synth FX editor removed</source>
       <translation>Synth FX-editor verwijderd</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="2878" />
+      <location filename="../ui/main_window.py" line="2925" />
       <source>Playback mode: External MIDI port</source>
       <translation>Afspeelmodus: externe MIDI-poort</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="2881" />
+      <location filename="../ui/main_window.py" line="2928" />
       <source>Playback mode: {backend}</source>
       <translation>Afspeelmodus: {backend}</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="2882" />
+      <location filename="../ui/main_window.py" line="2929" />
       <source>Playback using </source>
       <translation>Afspelen met </translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="2895" />
+      <location filename="../ui/main_window.py" line="2942" />
       <source>MIDI transport settings removed</source>
       <translation>MIDI-transportinstellingen verwijderd</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="2901" />
+      <location filename="../ui/main_window.py" line="2948" />
       <source>Test tone</source>
       <translation>Testtoon</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="2904" />
+      <location filename="../ui/main_window.py" line="2951" />
       <source>Test tone unavailable</source>
       <translation>Testtoon niet beschikbaar</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="2907" />
+      <location filename="../ui/main_window.py" line="2954" />
       <source>Audio output is selected by the active playback backend</source>
       <translation>Audio-uitvoer wordt gekozen door de actieve afspeelbackend</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="3080" />
+      <location filename="../ui/main_window.py" line="3127" />
       <source>Install required fonts</source>
       <translation>Vereiste lettertypen installeren</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="3081" />
+      <location filename="../ui/main_window.py" line="3128" />
       <source>keyTAB can install embedded fonts to your user font folder so editing and engraving match:</source>
       <translation>keyTAB kan ingebedde lettertypen in je gebruikersmap voor lettertypen installeren zodat bewerken en graveren overeenkomen:</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="3084" />
+      <location filename="../ui/main_window.py" line="3131" />
       <source>Install all missing fonts now?</source>
       <translation>Alle ontbrekende lettertypen nu installeren?</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="3110" />
+      <location filename="../ui/main_window.py" line="3157" />
       <source>Fonts installed</source>
       <translation>Lettertypen geinstalleerd</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="3111" />
+      <location filename="../ui/main_window.py" line="3158" />
       <source>The following fonts were installed. keyTAB will restart to apply them:
 </source>
       <translation>De volgende lettertypen zijn geinstalleerd. keyTAB wordt herstart om ze toe te passen:
     </translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="3122" />
+      <location filename="../ui/main_window.py" line="3169" />
       <source>Font installation failed</source>
       <translation>Installatie van lettertypen mislukt</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="3123" />
+      <location filename="../ui/main_window.py" line="3170" />
       <source>keyTAB could not install some fonts automatically:
 {details}</source>
       <translation>keyTAB kon sommige lettertypen niet automatisch installeren:
     {details}</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="3213" />
+      <location filename="../ui/main_window.py" line="3260" />
       <source>Closing</source>
       <translation>Afsluiten</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="3220" />
+      <location filename="../ui/main_window.py" line="3267" />
       <source>Saving...
 
  {path}</source>
@@ -1317,7 +1317,7 @@ Try '{backend}' from the Playback menu.</source>
      {path}</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="3254" />
+      <location filename="../ui/main_window.py" line="3301" />
       <source>unsaved session</source>
       <translation>niet-opgeslagen sessie</translation>
     </message>
@@ -1567,37 +1567,37 @@ Try '{backend}' from the Playback menu.</source>
     <message>
       <location filename="../ui/dialogs/style_dialog.py" line="542" />
       <source>Note stem visible</source>
-      <translation>Notensteel zichtbaar</translation>
+      <translation>Nootstok zichtbaar</translation>
     </message>
     <message>
       <location filename="../ui/dialogs/style_dialog.py" line="543" />
       <source>Note stop visible</source>
-      <translation>Notenstop zichtbaar</translation>
+      <translation>Noot stop symbool zichtbaar</translation>
     </message>
     <message>
       <location filename="../ui/dialogs/style_dialog.py" line="544" />
       <source>Note stem length (semitones)</source>
-      <translation>Notensteellengte (semitonen)</translation>
+      <translation>Nootstok lengte (semitonen)</translation>
     </message>
     <message>
       <location filename="../ui/dialogs/style_dialog.py" line="545" />
-      <source>Note stem thickness (mm)</source>
-      <translation>Notensteeldikte (mm)</translation>
+      <source>Note stem thickness (mm) (Applies to both stem and the lines of the notehead symbol)</source>
+      <translation>Nootstok dikte (mm) (is van toepassing op zowel de stok als de lijnen van het nootkop symbool)</translation>
     </message>
     <message>
       <location filename="../ui/dialogs/style_dialog.py" line="546" />
       <source>Note stop thickness (mm)</source>
-      <translation>Notenstopdikte (mm)</translation>
+      <translation>Noot stop symbool dikte (mm)</translation>
     </message>
     <message>
       <location filename="../ui/dialogs/style_dialog.py" line="547" />
       <source>Continuation dot visible</source>
-      <translation>Voortzettingspunt zichtbaar</translation>
+      <translation>Doorklink stip zichtbaar</translation>
     </message>
     <message>
       <location filename="../ui/dialogs/style_dialog.py" line="548" />
       <source>Continuation dot size (mm)</source>
-      <translation>Grootte voortzettingspunt (mm)</translation>
+      <translation>Doorklink stip grootte (mm)</translation>
     </message>
     <message>
       <location filename="../ui/dialogs/style_dialog.py" line="549" />
@@ -1616,8 +1616,8 @@ Try '{backend}' from the Playback menu.</source>
     </message>
     <message>
       <location filename="../ui/dialogs/style_dialog.py" line="552" />
-      <source>Note width scaling</source>
-      <translation>Notenbreedte-schaal</translation>
+      <source>Noot width scaling (1 = Perfectly rounded)</source>
+      <translation>Noot breedte schaling (1 = Perfect rond)</translation>
     </message>
     <message>
       <location filename="../ui/dialogs/style_dialog.py" line="553" />
@@ -1752,37 +1752,37 @@ Try '{backend}' from the Playback menu.</source>
     <message>
       <location filename="../ui/dialogs/style_dialog.py" line="579" />
       <source>Grid line visible</source>
-      <translation>Rasterlijn zichtbaar</translation>
+      <translation>Basis tellijn zichtbaar</translation>
     </message>
     <message>
       <location filename="../ui/dialogs/style_dialog.py" line="580" />
       <source>Grid band visible</source>
-      <translation>Rasterband zichtbaar</translation>
+      <translation>Tijds-raster band zichtbaar</translation>
     </message>
     <message>
       <location filename="../ui/dialogs/style_dialog.py" line="581" />
       <source>Grid barline thickness (mm)</source>
-      <translation>Raster maatstreepdikte (mm)</translation>
+      <translation>Tijds-raster maatstreepdikte (mm)</translation>
     </message>
     <message>
       <location filename="../ui/dialogs/style_dialog.py" line="582" />
       <source>Grid line thickness (mm)</source>
-      <translation>Rasterlijndikte (mm)</translation>
+      <translation>Tijds-raster lijndikte (mm)</translation>
     </message>
     <message>
       <location filename="../ui/dialogs/style_dialog.py" line="583" />
       <source>Grid line dash pattern (mm)</source>
-      <translation>Rasterlijn streeppatroon (mm)</translation>
+      <translation>Tijds-raster lijn streeppatroon (mm)</translation>
     </message>
     <message>
       <location filename="../ui/dialogs/style_dialog.py" line="584" />
       <source>Grid band color</source>
-      <translation>Rasterbandkleur</translation>
+      <translation>Tijds-raster band kleur</translation>
     </message>
     <message>
       <location filename="../ui/dialogs/style_dialog.py" line="585" />
       <source>Grid band start phase</source>
-      <translation>Rasterband startfase</translation>
+      <translation>Tijds-raster band startfase</translation>
     </message>
     <message>
       <location filename="../ui/dialogs/style_dialog.py" line="586" />
@@ -1913,7 +1913,7 @@ Try '{backend}' from the Playback menu.</source>
     <message>
       <location filename="../ui/dialogs/style_dialog.py" line="718" />
       <source>Grid</source>
-      <translation>Tel Lijnen</translation>
+      <translation>Tijd-raster</translation>
     </message>
     <message>
       <location filename="../ui/dialogs/style_dialog.py" line="719" />
@@ -1964,7 +1964,7 @@ Try '{backend}' from the Playback menu.</source>
     <message>
       <location filename="../ui/dialogs/style_dialog.py" line="728" />
       <source>Countline</source>
-      <translation>Tellijn</translation>
+      <translation>Tel lijn</translation>
     </message>
     <message>
       <location filename="../ui/dialogs/style_dialog.py" line="729" />
@@ -2229,7 +2229,7 @@ Try '{backend}' from the Playback menu.</source>
     <message>
       <location filename="../ui/widgets/tool_selector.py" line="91" />
       <source>Line/Page Break</source>
-      <translation>Regel-/pagina-einde</translation>
+      <translation>Regel/pagina-marker</translation>
     </message>
     <message>
       <location filename="../ui/widgets/tool_selector.py" line="92" />
@@ -2279,12 +2279,12 @@ Try '{backend}' from the Playback menu.</source>
     <message>
       <location filename="../ui/widgets/tool_selector.py" line="103" />
       <source>Count Line tool. Draw guide lines to highlight rhythmic grid subdivisions. Left click on empty space to add. Drag on a handle to edit. Right click on a handle to delete.</source>
-      <translation>Tellijn Tool. Trek hulplijnen om ritmische rasteronderverdelingen te markeren. Linksklik op een lege plek om toe te voegen. Sleep een greep om te bewerken. Rechtsklik op een greep om te verwijderen.</translation>
+      <translation>Tellijn Tool. Trek hulplijnen om ritmische tijd-raster onderverdelingen te markeren. Linksklik op een lege plek om toe te voegen. Versleep een handel om te bewerken. Rechtsklik op een handel om te verwijderen.</translation>
     </message>
     <message>
       <location filename="../ui/widgets/tool_selector.py" line="104" />
       <source>Dynamics tool. Insert crescendo (&lt;) and decrescendo (&gt;) hairpins, or choose dynamic mode to place standalone dynamic symbols.</source>
-      <translation>Dynamiek Tool. Voeg crescendo (&lt;) en decrescendo (&gt;) haarpinnen in, of kies de dynamiekmodus om losse dynamieksymbolen te plaatsen.</translation>
+      <translation>Dynamiek Tool. Voeg crescendo (&lt;) en decrescendo (&gt;) haarspelden in, of kies de dynamiekmodus om losse dynamieksymbolen te plaatsen.</translation>
     </message>
     <message>
       <location filename="../ui/widgets/tool_selector.py" line="105" />
@@ -2293,18 +2293,18 @@ Try '{backend}' from the Playback menu.</source>
     </message>
     <message>
       <location filename="../ui/widgets/tool_selector.py" line="106" />
-      <source>Line/Page Break tool. Insert system or page breaks. Click an existing break to edit its properties.</source>
-      <translation>Regelafbreking/Pagina-einde Tool. Systeem- of pagina-einden invoegen. Klik op een bestaand einde om de eigenschappen te bewerken.</translation>
+      <source>Line/Page break tool. Insert line/page breaks. Click to insert a marker. Right-click to remove a marker. Click an existing marker to switch between a Line (L) and Page (P) marker.</source>
+      <translation>Regel/Pagina breek tool. Voeg lijn/pagina breekpunten in. Klik om een markering toe te voegen. Rechtsklik om een markering te verwijderen. Klik op een bestaande markering om te schakelen tussen een Regel (R) en Pagina (P) markering.</translation>
     </message>
     <message>
       <location filename="../ui/widgets/tool_selector.py" line="107" />
       <source>Time Signature tool. Configure meter and base grid subdivision.</source>
-      <translation>Maatsoorten Tool. Stel de maat en de basisrasterverdeling in.</translation>
+      <translation>Maatsoorten Tool. Stel de maatsoort en de basis tijd-raster verdeling in.</translation>
     </message>
     <message>
       <location filename="../ui/widgets/tool_selector.py" line="108" />
       <source>Grid Band tool. Add and edit grid band markers. Click below pitch 39 for left hand, above 45 for right hand, or between 39-45 for both. Drag a marker to set its length; snapping keeps ends on the current snap size. Drag back to its start for zero duration (renders a red line). Right click deletes markers only.</source>
-      <translation>Rasterband Tool. Rasterbandmarkeringen toevoegen en bewerken. Klik onder toonhoogte 39 voor linkerhand, boven 45 voor rechterhand, of ertussen voor beide. Sleep een markering om de lengte in te stellen; snappen houdt de einden op de huidige snapgrootte. Sleep terug naar het begin voor nulduur (weergegeven als rode lijn). Rechtsklik verwijdert alleen markeringen.</translation>
+      <translation>Tijd-raster band Tool. Tijd-raster band markeringen toevoegen en bewerken. Klik onder toonhoogte 39 voor linkerhand, boven 45 voor rechterhand, of ertussen voor beide. Sleep een markering om de lengte in te stellen; snappen houdt de einden op de huidige snapgrootte. Sleep terug naar het begin voor nulduur (weergegeven als rode lijn). Rechtsklik verwijdert alleen markeringen.</translation>
     </message>
     <message>
       <location filename="../ui/widgets/tool_selector.py" line="109" />

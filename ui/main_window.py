@@ -1900,6 +1900,19 @@ class MainWindow(QtWidgets.QMainWindow):
             dlg_w = int(adm.get('style_dialog_width', 600) or 600)
             dlg_h = int(adm.get('style_dialog_height', 550) or 550)
             dlg.resize(max(280, dlg_w), max(300, dlg_h))
+            dlg_x = int(adm.get('style_dialog_x', -1) or -1)
+            dlg_y = int(adm.get('style_dialog_y', -1) or -1)
+            if dlg_x >= 0 and dlg_y >= 0:
+                # Avoid restoring a stale off-screen position after monitor/layout changes.
+                target = QtCore.QPoint(dlg_x, dlg_y)
+                on_screen = False
+                for screen in QtGui.QGuiApplication.screens():
+                    geo = screen.availableGeometry()
+                    if geo.contains(target):
+                        on_screen = True
+                        break
+                if on_screen:
+                    dlg.move(target)
         except Exception:
             pass
 
@@ -1943,6 +1956,9 @@ class MainWindow(QtWidgets.QMainWindow):
                 adm = get_appdata_manager()
                 adm.set('style_dialog_width', int(dlg.width()))
                 adm.set('style_dialog_height', int(dlg.height()))
+                pos = dlg.pos()
+                adm.set('style_dialog_x', int(pos.x()))
+                adm.set('style_dialog_y', int(pos.y()))
                 adm.save()
             except Exception:
                 pass
@@ -1988,6 +2004,27 @@ class MainWindow(QtWidgets.QMainWindow):
             on_change=_schedule_preview,
         )
 
+        try:
+            adm = get_appdata_manager()
+            dlg_w = int(adm.get('line_break_dialog_width', 900) or 900)
+            dlg_h = int(adm.get('line_break_dialog_height', 700) or 700)
+            dlg.resize(max(420, dlg_w), max(320, dlg_h))
+            dlg_x = int(adm.get('line_break_dialog_x', -1) or -1)
+            dlg_y = int(adm.get('line_break_dialog_y', -1) or -1)
+            if dlg_x >= 0 and dlg_y >= 0:
+                # Avoid restoring stale off-screen positions after monitor/layout changes.
+                target = QtCore.QPoint(dlg_x, dlg_y)
+                on_screen = False
+                for screen in QtGui.QGuiApplication.screens():
+                    geo = screen.availableGeometry()
+                    if geo.contains(target):
+                        on_screen = True
+                        break
+                if on_screen:
+                    dlg.move(target)
+        except Exception:
+            pass
+
         def _on_accept() -> None:
             self.editor_controller._snapshot_if_changed(coalesce=False, label='line_break_edit')
             _schedule_preview()
@@ -1996,6 +2033,16 @@ class MainWindow(QtWidgets.QMainWindow):
             _schedule_preview()
 
         def _on_finished(_result: int) -> None:
+            try:
+                adm = get_appdata_manager()
+                adm.set('line_break_dialog_width', int(dlg.width()))
+                adm.set('line_break_dialog_height', int(dlg.height()))
+                pos = dlg.pos()
+                adm.set('line_break_dialog_x', int(pos.x()))
+                adm.set('line_break_dialog_y', int(pos.y()))
+                adm.save()
+            except Exception:
+                pass
             self.file_manager.on_model_changed()
 
         dlg.accepted.connect(_on_accept)
