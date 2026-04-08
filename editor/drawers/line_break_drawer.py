@@ -1,5 +1,6 @@
 from __future__ import annotations
 from typing import TYPE_CHECKING, cast
+from PySide6 import QtCore
 from ui.widgets.draw_util import DrawUtil
 
 if TYPE_CHECKING:
@@ -38,7 +39,7 @@ class LineBreakDrawerMixin:
             if y_mm < (top_mm - bleed_mm) or y_mm > (bottom_mm + bleed_mm):
                 continue
 
-            label = 'P' if is_page else 'L'
+            label = QtCore.QCoreApplication.translate('LineBreakDialog', 'P' if is_page else 'L')
             # Rectangle sized to text, top aligned at time position
             _, _, w_mm, h_mm = du._get_text_extents_mm(label, font_family, 18.0, False, True)
             rect_w = max(6.0, float(w_mm) + 4.0)

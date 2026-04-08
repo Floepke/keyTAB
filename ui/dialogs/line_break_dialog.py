@@ -242,6 +242,10 @@ class LineBreakDialog(QtWidgets.QDialog):
 
         QtCore.QTimer.singleShot(0, self._focus_first)
 
+    def _marker_label(self, is_page: bool) -> str:
+        # Keep marker glyphs localizable (e.g. Dutch uses R for "Regel").
+        return self.tr("P") if is_page else self.tr("L")
+
     def _focus_first(self) -> None:
         try:
             self.break_table.setFocus(QtCore.Qt.FocusReason.OtherFocusReason)
@@ -250,7 +254,7 @@ class LineBreakDialog(QtWidgets.QDialog):
 
     def _create_type_badge(self, is_page: bool) -> QtWidgets.QToolButton:
         btn = QtWidgets.QToolButton(self)
-        btn.setText("P" if is_page else "L")
+        btn.setText(self._marker_label(is_page))
         btn.setAutoRaise(True)
         btn.setSizePolicy(QtWidgets.QSizePolicy.Policy.Preferred, QtWidgets.QSizePolicy.Policy.Expanding)
         btn.setMinimumWidth(32)
@@ -473,7 +477,7 @@ class LineBreakDialog(QtWidgets.QDialog):
 
         def _toggle_type() -> None:
             lb.page_break = not bool(getattr(lb, 'page_break', False))
-            type_btn.setText("P" if lb.page_break else "L")
+            type_btn.setText(self._marker_label(bool(lb.page_break)))
             type_btn.setToolTip(self.tr("Page break.") if lb.page_break else self.tr("Line break."))
             self.valuesChanged.emit()
 

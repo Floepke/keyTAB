@@ -133,15 +133,9 @@ class ToolbarHandle(QtWidgets.QSplitterHandle):
         '''this button opens the line break dialog.'''
         self.line_break_btn = QtWidgets.QToolButton(self)
         self.line_break_btn.setFocusPolicy(QtCore.Qt.FocusPolicy.NoFocus)
-        self.line_break_btn.setText('L')
-        f = self.line_break_btn.font()
-        sz = f.pointSizeF()
-        if sz <= 0:
-            sz = float(f.pointSize())
-        if sz <= 0:
-            sz = 10.0
-        f.setPointSizeF(sz * 2.0)
-        self.line_break_btn.setFont(f)
+        ic_line_break = get_qicon('line_break', size=(64, 64))
+        if ic_line_break:
+            self.line_break_btn.setIcon(ic_line_break)
         self.line_break_btn.setToolTip(self.tr('Line breaks. Organize the document into systems and pages.'))
         self.line_break_btn.setIconSize(QtCore.QSize(self._button_size - 6, self._button_size - 6))
         self.line_break_btn.setFixedSize(self._button_size, self._button_size)
