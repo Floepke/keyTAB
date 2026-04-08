@@ -97,15 +97,12 @@ class ToolbarHandle(QtWidgets.QSplitterHandle):
         '''this button opens the style dialog.'''
         self.style_btn = QtWidgets.QToolButton(self)
         self.style_btn.setFocusPolicy(QtCore.Qt.FocusPolicy.NoFocus)
-        self.style_btn.setText('S')
-        f = self.style_btn.font()
-        sz = f.pointSizeF()
-        if sz <= 0:
-            sz = float(f.pointSize())
-        if sz <= 0:
-            sz = 10.0
-        f.setPointSizeF(sz * 2.0)
-        self.style_btn.setFont(f)
+        ic_style = get_qicon('style', size=(64, 64))
+        if ic_style:
+            self.style_btn.setIcon(ic_style)
+            self.style_btn.setText('')
+        else:
+            self.style_btn.setText('S')
         self.style_btn.setToolTip(self.tr('Appearance. Customize the visual style of the score.'))
         self.style_btn.setIconSize(QtCore.QSize(self._button_size - 6, self._button_size - 6))
         self.style_btn.setFixedSize(self._button_size, self._button_size)
@@ -115,15 +112,12 @@ class ToolbarHandle(QtWidgets.QSplitterHandle):
         '''this button opens the info dialog.'''
         self.info_btn = QtWidgets.QToolButton(self)
         self.info_btn.setFocusPolicy(QtCore.Qt.FocusPolicy.NoFocus)
-        self.info_btn.setText('I')
-        f = self.info_btn.font()
-        sz = f.pointSizeF()
-        if sz <= 0:
-            sz = float(f.pointSize())
-        if sz <= 0:
-            sz = 10.0
-        f.setPointSizeF(sz * 2.0)
-        self.info_btn.setFont(f)
+        ic_info = get_qicon('info', size=(64, 64))
+        if ic_info:
+            self.info_btn.setIcon(ic_info)
+            self.info_btn.setText('')
+        else:
+            self.info_btn.setText('I')
         self.info_btn.setToolTip(self.tr('Title info. Edit title, composer, and copyright. View analysis information.'))
         self.info_btn.setIconSize(QtCore.QSize(self._button_size - 6, self._button_size - 6))
         self.info_btn.setFixedSize(self._button_size, self._button_size)
@@ -146,12 +140,10 @@ class ToolbarHandle(QtWidgets.QSplitterHandle):
         sep = QtWidgets.QFrame(self)
         sep.setFrameShape(QtWidgets.QFrame.Shape.NoFrame)
         sep.setFixedHeight(4)
-        pal = self.palette()
-        btn = pal.color(QtGui.QPalette.Button)
-        line_r = max(0, min(255, int(btn.red() * 0.75)))
-        line_g = max(0, min(255, int(btn.green() * 0.75)))
-        line_b = max(0, min(255, int(btn.blue() * 0.75)))
-        sep.setStyleSheet(f"background-color: rgb({line_r}, {line_g}, {line_b});")
+        sep.setStyleSheet(
+            "background-color: rgb(0, 0, 0);"
+            "border-radius: 2px;"
+        )
         layout.addWidget(sep)
 
         # Contextual tool area managed by ToolManager
