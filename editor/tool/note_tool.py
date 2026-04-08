@@ -9,7 +9,7 @@ from file_model.events.note import Note
 from file_model.events.arpeggio import Arpeggio
 from symbol_design.noteheads import resolve_notehead_spec
 from ui.dialogs.notehead_dialog import NoteheadDialog
-from PySide6 import QtGui, QtWidgets
+from PySide6 import QtCore, QtGui, QtWidgets
 
 
 class NoteTool(BaseTool):
@@ -18,6 +18,8 @@ class NoteTool(BaseTool):
     _arp_op: Operator = Operator(float(SHORTEST_DURATION))
     def __init__(self):
         super().__init__()
+        self._acc_cycle: tuple[int, ...] = (0, 1, -1, 2, -2)
+        self._acc_toggle: int = 0
         # Currently edited/created note during a press/drag session
         self.edit_note = None
         self._hand: str = 'l'
@@ -399,6 +401,7 @@ class NoteTool(BaseTool):
 
     def on_activate(self) -> None:
         super().on_activate()
+        self._acc_toggle = 0
         try:
             score = self._editor.current_score()
             if score is not None and getattr(score, 'app_state', None) is not None:
@@ -513,6 +516,7 @@ class NoteTool(BaseTool):
             # Edit existing note
             self.edit_note = found
             self._editing_existing = True
+            self._apply_active_accidental_to_note(found)
             self._move_pitch_time_mode = False
             try:
                 self._last_audition_pitch = int(getattr(found, 'pitch', pitch_press) or pitch_press)
@@ -534,7 +538,8 @@ class NoteTool(BaseTool):
         else:
             # Create a new note at the snapped press time with minimum duration = snap size
             units = float(max(1e-6, getattr(self._editor, 'snap_size_units', 8.0)))
-            self.edit_note = score.new_note(pitch=pitch_press, time=t_press_snap, duration=units, hand=self._hand)
+            acc_preview = int(self.preview_accidental_for_pitch(int(pitch_press)))
+            self.edit_note = score.new_note(pitch=pitch_press, time=t_press_snap, duration=units, hand=self._hand, acc=acc_preview)
             self._editing_existing = False
             self._orig_duration = float(units)
             self._press_start_time = float(t_press_snap)
@@ -860,6 +865,7 @@ class NoteTool(BaseTool):
                     return
                 prev_pitch = int(getattr(note, 'pitch', cur_pitch) or cur_pitch)
                 note.pitch = candidate_pitch
+                self._apply_active_accidental_to_note(note)
                 if cur_pitch != prev_pitch and cur_pitch != self._last_audition_pitch:
                     self._audition_pitch(cur_pitch)
                 note.time = candidate_time
@@ -875,6 +881,7 @@ class NoteTool(BaseTool):
             if op.le(cur_t_raw, start_t):
                 prev_pitch = int(getattr(note, 'pitch', cur_pitch) or cur_pitch)
                 note.pitch = cur_pitch
+                self._apply_active_accidental_to_note(note)
                 if cur_pitch != prev_pitch and cur_pitch != self._last_audition_pitch:
                     self._audition_pitch(cur_pitch)
             else:
@@ -1001,6 +1008,18 @@ class NoteTool(BaseTool):
     def on_mouse_move(self, x: float, y: float) -> None:
         super().on_mouse_move(x, y)
 
+    def on_key_press(self, key: int, modifiers) -> bool:
+        if self._editor is None:
+            return False
+        if key == QtCore.Qt.Key.Key_A and modifiers == QtCore.Qt.KeyboardModifier.NoModifier:
+            self._cycle_accidental_toggle()
+            if hasattr(self._editor, 'widget') and getattr(self._editor, 'widget', None) is not None:
+                w = getattr(self._editor, 'widget')
+                if hasattr(w, 'request_overlay_refresh'):
+                    w.request_overlay_refresh()
+            return True
+        return False
+
     def on_toolbar_button(self, name: str) -> None:
         if self._editor is None:
             return
@@ -1039,3 +1058,30 @@ class NoteTool(BaseTool):
             w = getattr(self._editor, 'widget')
             if hasattr(w, 'request_overlay_refresh'):
                 w.request_overlay_refresh()
+
+    def accidental_toggle_value(self) -> int:
+        return int(self._acc_toggle)
+
+    def preview_accidental_for_pitch(self, pitch: int) -> int:
+        try:
+            p = int(pitch)
+        except Exception:
+            return 0
+        if int(self._acc_toggle) == 0:
+            return 0
+        probe = Note(pitch=int(p), acc=int(self._acc_toggle))
+        return int(self._acc_toggle) if Note.is_valid_accidental(probe) else 0
+
+    def _cycle_accidental_toggle(self) -> None:
+        cycle = list(self._acc_cycle)
+        try:
+            idx = cycle.index(int(self._acc_toggle))
+        except ValueError:
+            idx = 0
+        self._acc_toggle = int(cycle[(idx + 1) % len(cycle)])
+
+    def _apply_active_accidental_to_note(self, note: Note) -> None:
+        """Overwrite note accidental from current accidental toggle during editing."""
+        pitch = int(getattr(note, 'pitch', 0) or 0)
+        acc = int(self.preview_accidental_for_pitch(pitch))
+        setattr(note, 'acc', int(acc))

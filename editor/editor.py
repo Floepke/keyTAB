@@ -31,6 +31,7 @@ from editor.drawers.snap_drawer import SnapDrawerMixin
 from editor.drawers.grid_band_drawer import GridBandDrawerMixin
 from editor.drawers.grid_drawer import GridDrawerMixin
 from editor.drawers.note_drawer import NoteDrawerMixin
+from editor.drawers.accidental_drawer import AccidentalDrawerMixin
 from editor.drawers.grace_note_drawer import GraceNoteDrawerMixin
 from editor.drawers.beam_drawer import BeamDrawerMixin
 from editor.drawers.pedal_drawer import PedalDrawerMixin
@@ -60,6 +61,7 @@ class Editor(QtCore.QObject,
              GridDrawerMixin,
              TimeSignatureDrawerMixin,
              NoteDrawerMixin,
+             AccidentalDrawerMixin,
              ArpeggioDrawerMixin,
              GraceNoteDrawerMixin,
              BeamDrawerMixin,
@@ -1413,6 +1415,32 @@ class Editor(QtCore.QObject,
                         id=0,
                         tags=["cursor"],
                     )
+
+                # Accidental preview toggle (A-key cycle): draw only valid accidentals.
+                preview_acc = 0
+                try:
+                    if hasattr(self._tool, 'preview_accidental_for_pitch'):
+                        preview_acc = int(self._tool.preview_accidental_for_pitch(int(self.pitch_cursor)))
+                except Exception:
+                    preview_acc = 0
+                if preview_acc != 0:
+                    try:
+                        target_pitch = int(self.pitch_cursor) + int(preview_acc)
+                        x_target = float(self.pitch_to_x(int(target_pitch)))
+                        y_anchor = float(y_mm + h)
+                        y_target = float(y_anchor + float(self.semitone_dist or 0.5))
+                        du.add_line(
+                            x_mm,
+                            y_anchor,
+                            x_target,
+                            y_target,
+                            color=self.accent_color,
+                            width_mm=0.6,
+                            id=0,
+                            tags=['cursor'],
+                        )
+                    except Exception:
+                        pass
 
             if (isinstance(self._tool, GraceNoteTool)) and (self.time_cursor is not None) and (self.pitch_cursor is not None):
                 x_mm = float(self.pitch_to_x(int(self.pitch_cursor)))

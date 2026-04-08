@@ -386,9 +386,10 @@ class FlexibleDoubleSpinBox(QtWidgets.QDoubleSpinBox):
 class FontPicker(QtWidgets.QWidget):
     valueChanged = QtCore.Signal()
 
-    def __init__(self, value: LayoutFont, parent=None, show_offsets: bool = False) -> None:
+    def __init__(self, value: LayoutFont | dict[str, Any], parent=None, show_offsets: bool = False) -> None:
         super().__init__(parent)
-        self._font_cls = type(value)
+        coerced = self._coerce_font_value(value)
+        self._font_cls = type(coerced) if isinstance(coerced, LayoutFont) else LayoutFont
         self._show_offsets = bool(show_offsets)
         self._combo = QtWidgets.QFontComboBox(self)
         self._size = QtWidgets.QSpinBox(self)
@@ -424,7 +425,7 @@ class FontPicker(QtWidgets.QWidget):
             layout.addWidget(self._x_offset, 0)
             layout.addWidget(self._y_offset, 0)
 
-        self.set_value(value)
+        self.set_value(coerced)
         self._combo.currentFontChanged.connect(lambda _f: self.valueChanged.emit())
         self._size.valueChanged.connect(lambda _v: self.valueChanged.emit())
         try:
@@ -437,7 +438,18 @@ class FontPicker(QtWidgets.QWidget):
             self._x_offset.valueChanged.connect(lambda _v: self.valueChanged.emit())
             self._y_offset.valueChanged.connect(lambda _v: self.valueChanged.emit())
 
-    def set_value(self, value: LayoutFont) -> None:
+    def _coerce_font_value(self, value: LayoutFont | dict[str, Any]) -> LayoutFont:
+        if isinstance(value, LayoutFont):
+            return value
+        if isinstance(value, dict):
+            try:
+                return LayoutFont(**value)
+            except Exception:
+                pass
+        return LayoutFont()
+
+    def set_value(self, value: LayoutFont | dict[str, Any]) -> None:
+        value = self._coerce_font_value(value)
         try:
             self._combo.setCurrentFont(QtGui.QFont(str(value.family)))
         except Exception:
@@ -460,7 +472,7 @@ class FontPicker(QtWidgets.QWidget):
         self._combo.setCurrentFont(QtGui.QFont(str(family)))
 
     def value(self) -> LayoutFont:
-        font_cls = self._font_cls or LayoutFont
+        font_cls = self._font_cls if isinstance(self._font_cls, type) and issubclass(self._font_cls, LayoutFont) else LayoutFont
         x_off = float(self._x_offset.value()) if self._x_offset is not None else 0.0
         y_off = float(self._y_offset.value()) if self._y_offset is not None else 0.0
         return font_cls(

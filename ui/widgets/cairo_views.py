@@ -452,17 +452,25 @@ class CairoEditorWidget(QtWidgets.QWidget):
         key = ev.key()
         mods = ev.modifiers()
         if self._editor is not None:
-            try:
-                if ev.matches(QtGui.QKeySequence.StandardKey.SelectAll):
-                    self._editor.select_all()
+            tool = getattr(self._editor, '_tool', None)
+            if tool is not None and hasattr(tool, 'on_key_press'):
+                if bool(tool.on_key_press(key, mods)):
+                    self._content_cache_image = None
+                    self._content_cache_key = None
                     if hasattr(self, 'request_overlay_refresh'):
                         self.request_overlay_refresh()
                     else:
                         self.update()
                     ev.accept()
                     return
-            except Exception:
-                pass
+            if ev.matches(QtGui.QKeySequence.StandardKey.SelectAll):
+                self._editor.select_all()
+                if hasattr(self, 'request_overlay_refresh'):
+                    self.request_overlay_refresh()
+                else:
+                    self.update()
+                ev.accept()
+                return
             # Home/End stretch selection to song bounds
             if key in (QtCore.Qt.Key_Home, QtCore.Qt.Key_End):
                 if getattr(self._editor, '_selection_active', False):

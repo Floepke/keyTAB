@@ -103,11 +103,13 @@ class NoteDrawerMixin:
         # Do not clear caches here; when using shared cache, Editor manages lifecycle
 
     def _draw_single_note(self, du: DrawUtil, n, x: float, y1: float, y2: float, draw_mode: str = 'note') -> None:
+        self = cast("Editor", self)
         # In tiny mode, render only noteheads and a simple hit rect
         if getattr(self, 'is_tiny_mode', None) and self.is_tiny_mode():
             self._draw_notehead(du, n, x, y1, draw_mode)
             self._draw_midinote(du, n, x, y1, y2, draw_mode)
             self._draw_stem(du, n, x, y1, draw_mode)
+            self._draw_note_accidental(du, n, x, y1)
             try:
                 w = float(self.semitone_dist or 0.5)
                 layout = self.current_score().layout
@@ -126,6 +128,7 @@ class NoteDrawerMixin:
         self._draw_notehead(du, n, x, y1, draw_mode)
         self._draw_notestop(du, n, x, y2, draw_mode)
         self._draw_stem(du, n, x, y1, draw_mode)
+        self._draw_note_accidental(du, n, x, y1)
         self._draw_note_continuation_dot(du, n, x, y1, y2, draw_mode)
         self._draw_connect_stem(du, n, x, y1, draw_mode)
 
@@ -415,35 +418,35 @@ class NoteDrawerMixin:
         t0 = float(getattr(n, 'time', 0.0) or 0.0)
         p0 = int(getattr(n, 'pitch', 0) or 0)
         if rule in ('above_stem_if_collision', 'only_above_stem_if_collision'):
-            for m in notes_view:
-                if getattr(m, '_id', None) == getattr(n, '_id', None):
+            for note in notes_view:
+                if getattr(note, '_id', None) == getattr(n, '_id', None):
                     continue
-                if not self._time_op.eq(float(getattr(m, 'time', 0.0) or 0.0), t0):
+                if not self._time_op.eq(float(getattr(note, 'time', 0.0) or 0.0), t0):
                     continue
-                if abs(int(getattr(m, 'pitch', 0) or 0) - p0) == 1:
+                if abs(int(getattr(note, 'pitch', 0) or 0) - p0) == 1:
                     return True
             return False
         if rule == 'above_stem_if_chord_and_white_note':
-            for m in notes_view:
-                if getattr(m, '_id', None) == getattr(n, '_id', None):
+            for note in notes_view:
+                if getattr(note, '_id', None) == getattr(n, '_id', None):
                     continue
-                if not self._time_op.eq(float(getattr(m, 'time', 0.0) or 0.0), t0):
+                if not self._time_op.eq(float(getattr(note, 'time', 0.0) or 0.0), t0):
                     continue
-                mp = int(getattr(m, 'pitch', 0) or 0)
+                mp = int(getattr(note, 'pitch', 0) or 0)
                 if mp not in BLACK_KEYS and mp != p0:
                     return True
             return False
         if rule != 'above_stem_if_chord_and_white_note_same_hand':
             return False
         hand0 = str(getattr(n, 'hand', 'l') or 'l')
-        for m in notes_view:
-            if getattr(m, '_id', None) == getattr(n, '_id', None):
+        for note in notes_view:
+            if getattr(note, '_id', None) == getattr(n, '_id', None):
                 continue
-            if not self._time_op.eq(float(getattr(m, 'time', 0.0) or 0.0), t0):
+            if not self._time_op.eq(float(getattr(note, 'time', 0.0) or 0.0), t0):
                 continue
-            if str(getattr(m, 'hand', 'l') or 'l') != hand0:
+            if str(getattr(note, 'hand', 'l') or 'l') != hand0:
                 continue
-            mp = int(getattr(m, 'pitch', 0) or 0)
+            mp = int(getattr(note, 'pitch', 0) or 0)
             if mp not in BLACK_KEYS and mp != p0:
                 return True
         return False

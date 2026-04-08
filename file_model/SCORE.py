@@ -124,6 +124,11 @@ def _merge_with_defaults(dc_type, incoming: dict, context: str, skip_keys: set =
 		if h not in ('l', 'r'):
 			h = 'l'
 		incoming['hand'] = h
+		try:
+			acc = int(incoming.get('acc', 0) or 0)
+		except Exception:
+			acc = 0
+		incoming['acc'] = int(max(-2, min(2, acc)))
 		raw_color = incoming.get('color', 'auto')
 		if isinstance(raw_color, str):
 			color = raw_color.strip()
@@ -182,12 +187,17 @@ class SCORE:
 		return i
 
 	def new_note(self, **kwargs) -> Note:
-		base = {'pitch': 40, 'time': 0.0, 'duration': 100.0, 'hand': 'l', 'color': 'auto'}
+		base = {'pitch': 40, 'time': 0.0, 'duration': 100.0, 'hand': 'l', 'color': 'auto', 'acc': 0}
 		base.update(kwargs)
 		h = str(base.get('hand', 'l') or 'l').strip()
 		if h not in ('l', 'r'):
 			h = 'l'
 		base['hand'] = h
+		try:
+			acc = int(base.get('acc', 0) or 0)
+		except Exception:
+			acc = 0
+		base['acc'] = int(max(-2, min(2, acc)))
 		raw_color = base.get('color', 'auto')
 		if isinstance(raw_color, str):
 			color = raw_color.strip()
@@ -599,6 +609,12 @@ class SCORE:
 			if h not in ('l', 'r'):
 				h = 'l'
 			setattr(n, 'hand', h)
+			try:
+				acc = int(getattr(n, 'acc', 0) or 0)
+			except Exception:
+				acc = 0
+			acc = int(max(-2, min(2, acc)))
+			setattr(n, 'acc', acc)
 			c = str(getattr(n, 'color', '') or '').strip()
 			if not c:
 				setattr(n, 'color', 'auto')

@@ -40,6 +40,10 @@ class BaseTool:
     def on_toolbar_button(self, name: str) -> None:
         pass
 
+    def on_key_press(self, key: int, modifiers) -> bool:
+        """Return True when a tool handled the key press."""
+        return False
+
     # Editor wiring
     def set_editor(self, editor: Editor) -> None:
         """Provide the active Editor instance to tools for convenience wrappers."""

@@ -14,6 +14,7 @@ from file_model.info import Info
 from file_model.analysis import Analysis
 from ui.style import Style
 from symbol_design.noteheads import Notehead, resolve_notehead_spec
+from file_model.events.note import Note
 
 _MP_CONTEXT = mp.get_context("spawn")
 
@@ -2823,6 +2824,30 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                         width_mm=stem_w,
                         id=0,
                         tags=['stem'],
+                    )
+
+                # Problem solved: accidental guide line points to derived pitch position.
+                try:
+                    acc = int(n.get('acc', 0) or 0)
+                except Exception:
+                    acc = 0
+                if acc != 0 and Note.is_valid_accidental(n):
+                    derived_pitch = int(p + acc)
+                    x_target = _key_to_x(derived_pitch)
+                    note_h = float(semitone_mm * 2.0)
+                    is_above_stem = bool(getattr(spec, 'is_up', False))
+                    y_anchor = float(y_start - note_h) if is_above_stem else float(y_start + note_h)
+                    y_target = float(y_anchor - semitone_mm) if is_above_stem else float(y_anchor + semitone_mm)
+                    acc_line_w = max(0.1, float(layout.get('note_stem_thickness_mm', 0.5) or 0.5) * scale * 0.9)
+                    du.add_line(
+                        float(x),
+                        float(y_anchor),
+                        float(x_target),
+                        float(y_target),
+                        color=notation_color,
+                        width_mm=acc_line_w,
+                        id=0,
+                        tags=['accidental_line'],
                     )
 
                 # Problem solved: show ledger lines only when manual ranges
