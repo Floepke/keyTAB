@@ -16,7 +16,7 @@
     <message>
       <location filename="../ui/about_dialog.py" line="29" />
       <source>Built on Klavarskribo notation, keyTAB turns MIDI into readable plots. Music flows top-to-bottom on a vertical timeline over a customizable, time-signature-aware grid.</source>
-      <translation>Gebaseerd op de Klavarskribo-notatie zet keyTAB MIDI om in leesbare partituren. Muziek stroomt van boven naar beneden op een verticale tijdlijn over een aanpasbaar, maatsoort-bewust tijd-raster.</translation>
+      <translation>Gebaseerd op de Klavarskribo-notatie zet keyTAB MIDI om in leesbare partituren. Muziek stroomt van boven naar beneden op een verticale tijdlijn over een aanpasbaar, maatsoort bewust tijdraster.</translation>
     </message>
     <message>
       <location filename="../ui/about_dialog.py" line="30" />
@@ -1632,12 +1632,12 @@ Try '{backend}' from the Playback menu.</source>
     <message>
       <location filename="../ui/dialogs/style_dialog.py" line="553" />
       <source>Beam visible</source>
-      <translation>Balk zichtbaar</translation>
+      <translation>Groeperingssymbool zichtbaar</translation>
     </message>
     <message>
       <location filename="../ui/dialogs/style_dialog.py" line="554" />
       <source>Beam thickness (mm)</source>
-      <translation>Balkdikte (mm)</translation>
+      <translation>Groeperingssymbool dikte (mm)</translation>
     </message>
     <message>
       <location filename="../ui/dialogs/style_dialog.py" line="555" />
@@ -1767,32 +1767,32 @@ Try '{backend}' from the Playback menu.</source>
     <message>
       <location filename="../ui/dialogs/style_dialog.py" line="580" />
       <source>Grid band visible</source>
-      <translation>Tijds-raster band zichtbaar</translation>
+      <translation>Rasterband zichtbaar</translation>
     </message>
     <message>
       <location filename="../ui/dialogs/style_dialog.py" line="581" />
       <source>Grid barline thickness (mm)</source>
-      <translation>Tijds-raster maatstreepdikte (mm)</translation>
+      <translation>Maatstreep dikte (mm)</translation>
     </message>
     <message>
       <location filename="../ui/dialogs/style_dialog.py" line="582" />
       <source>Grid line thickness (mm)</source>
-      <translation>Tijds-raster lijndikte (mm)</translation>
+      <translation>Basis tellijn dikte (mm)</translation>
     </message>
     <message>
       <location filename="../ui/dialogs/style_dialog.py" line="583" />
       <source>Grid line dash pattern (mm)</source>
-      <translation>Tijds-raster lijn streeppatroon (mm)</translation>
+      <translation>Basis tellijn streeppatroon (mm)</translation>
     </message>
     <message>
       <location filename="../ui/dialogs/style_dialog.py" line="584" />
       <source>Grid band color</source>
-      <translation>Tijds-raster band kleur</translation>
+      <translation>Rasterband kleur</translation>
     </message>
     <message>
       <location filename="../ui/dialogs/style_dialog.py" line="585" />
       <source>Grid band start phase</source>
-      <translation>Tijds-raster band startfase</translation>
+      <translation>Rasterband start fase</translation>
     </message>
     <message>
       <location filename="../ui/dialogs/style_dialog.py" line="586" />
@@ -1802,7 +1802,7 @@ Try '{backend}' from the Playback menu.</source>
     <message>
       <location filename="../ui/dialogs/style_dialog.py" line="587" />
       <source>Time signature lane width (mm)</source>
-      <translation>Breedte maatsoortbaan (mm)</translation>
+      <translation>Breedte maatsoort baan (mm)</translation>
     </message>
     <message>
       <location filename="../ui/dialogs/style_dialog.py" line="588" />
@@ -1812,7 +1812,7 @@ Try '{backend}' from the Playback menu.</source>
     <message>
       <location filename="../ui/dialogs/style_dialog.py" line="589" />
       <source>Time signature divider thickness (mm)</source>
-      <translation>Dikte maatsoortscheider (mm)</translation>
+      <translation>Dikte maatsoortscheiderlijn (mm)</translation>
     </message>
     <message>
       <location filename="../ui/dialogs/style_dialog.py" line="590" />
@@ -1918,12 +1918,12 @@ Try '{backend}' from the Playback menu.</source>
     <message>
       <location filename="../ui/dialogs/style_dialog.py" line="717" />
       <source>Stave</source>
-      <translation>Balk</translation>
+      <translation>Notenbalk</translation>
     </message>
     <message>
       <location filename="../ui/dialogs/style_dialog.py" line="718" />
       <source>Grid</source>
-      <translation>Tijd-raster</translation>
+      <translation>Tijdraster</translation>
     </message>
     <message>
       <location filename="../ui/dialogs/style_dialog.py" line="719" />
@@ -1974,7 +1974,7 @@ Try '{backend}' from the Playback menu.</source>
     <message>
       <location filename="../ui/dialogs/style_dialog.py" line="728" />
       <source>Countline</source>
-      <translation>Tel lijn</translation>
+      <translation>Tellijn</translation>
     </message>
     <message>
       <location filename="../ui/dialogs/style_dialog.py" line="729" />
@@ -2078,6 +2078,19 @@ Try '{backend}' from the Playback menu.</source>
       <location filename="../ui/dialogs/style_dialog.py" line="1318" />
       <source>Invalid layout values.</source>
       <translation>Ongeldige layoutwaarden.</translation>
+    </message>
+  </context>
+  <context>
+    <name>TempoTool</name>
+    <message>
+      <location filename="../editor/tool/tempo_tool.py" line="77" />
+      <source>Edit Tempo</source>
+      <translation>Tempo bewerken</translation>
+    </message>
+    <message>
+      <location filename="../editor/tool/tempo_tool.py" line="84" />
+      <source>This many of these units in one minute:</source>
+      <translation>Zoveel van deze eenheden per minuut:</translation>
     </message>
   </context>
   <context>
@@ -2238,8 +2251,8 @@ Try '{backend}' from the Playback menu.</source>
     </message>
     <message>
       <location filename="../ui/widgets/tool_selector.py" line="91" />
-      <source>Line/Page Break</source>
-      <translation>Regel/pagina-marker</translation>
+      <source>Line/Page Break Marker</source>
+      <translation>Regel/Pagina Afbreek Marker</translation>
     </message>
     <message>
       <location filename="../ui/widgets/tool_selector.py" line="92" />
@@ -2268,8 +2281,8 @@ Try '{backend}' from the Playback menu.</source>
     </message>
     <message>
       <location filename="../ui/widgets/tool_selector.py" line="97" />
-      <source>Barline</source>
-      <translation>Maatstreep</translation>
+      <source>Barline Symbols</source>
+      <translation>Barline Symbolen</translation>
     </message>
     <message>
       <location filename="../ui/widgets/tool_selector.py" line="98" />
@@ -2289,7 +2302,7 @@ Try '{backend}' from the Playback menu.</source>
     <message>
       <location filename="../ui/widgets/tool_selector.py" line="103" />
       <source>Count Line tool. Draw guide lines to highlight rhythmic grid subdivisions. Left click on empty space to add. Drag on a handle to edit. Right click on a handle to delete.</source>
-      <translation>Tellijn Tool. Trek hulplijnen om ritmische tijd-raster onderverdelingen te markeren. Linksklik op een lege plek om toe te voegen. Versleep een handel om te bewerken. Rechtsklik op een handel om te verwijderen.</translation>
+      <translation>Tellijn Tool. Trek hulplijnen om ritmische tijdraster onderverdelingen te markeren. Linksklik op een lege plek om toe te voegen. Versleep een handel om te bewerken. Rechtsklik op een handel om te verwijderen.</translation>
     </message>
     <message>
       <location filename="../ui/widgets/tool_selector.py" line="104" />
@@ -2303,18 +2316,18 @@ Try '{backend}' from the Playback menu.</source>
     </message>
     <message>
       <location filename="../ui/widgets/tool_selector.py" line="106" />
-      <source>Line/Page break tool. Insert line/page breaks. Click to insert a marker. Right-click to remove a marker. Click an existing marker to switch between a Line (L) and Page (P) marker.</source>
-      <translation>Regel/Pagina breek tool. Voeg lijn/pagina breekpunten in. Klik om een markering toe te voegen. Rechtsklik om een markering te verwijderen. Klik op een bestaande markering om te schakelen tussen een Regel (R) en Pagina (P) markering.</translation>
+      <source>Line/Page Break marker tool. Insert line/page breaks. Click to insert a marker. Right-click to remove a marker. Click an existing marker to switch between a Line (L) and Page (P) marker.</source>
+      <translation>Regel/Pagina Afbreek Marker Tool. Voeg regel/pagina afbrekingen in. Klik om een markering toe te voegen. Rechtsklik om een markering te verwijderen. Klik op een bestaande markering om te schakelen tussen een Regel (R) en Pagina (P) markering.</translation>
     </message>
     <message>
       <location filename="../ui/widgets/tool_selector.py" line="107" />
       <source>Time Signature tool. Configure meter and base grid subdivision.</source>
-      <translation>Maatsoorten Tool. Stel de maatsoort en de basis tijd-raster verdeling in.</translation>
+      <translation>Maatsoorten Tool. Stel de maatsoort en de basis tijdraster verdeling in.</translation>
     </message>
     <message>
       <location filename="../ui/widgets/tool_selector.py" line="108" />
       <source>Grid Band tool. Add and edit grid band markers. Click below pitch 39 for left hand, above 45 for right hand, or between 39-45 for both. Drag a marker to set its length; snapping keeps ends on the current snap size. Drag back to its start for zero duration (renders a red line). Right click deletes markers only.</source>
-      <translation>Tijd-raster band Tool. Tijd-raster band markeringen toevoegen en bewerken. Klik onder toonhoogte 39 voor linkerhand, boven 45 voor rechterhand, of ertussen voor beide. Sleep een markering om de lengte in te stellen; snappen houdt de einden op de huidige snapgrootte. Sleep terug naar het begin voor nulduur (weergegeven als rode lijn). Rechtsklik verwijdert alleen markeringen.</translation>
+      <translation>Tijdraster band Tool. Tijdraster band markeringen toevoegen en bewerken. Klik onder toonhoogte 39 voor linkerhand, boven 45 voor rechterhand, of ertussen voor beide. Sleep een markering om de lengte in te stellen; snappen houdt de einden op de huidige snapgrootte. Sleep terug naar het begin voor nulduur (weergegeven als rode lijn). Rechtsklik verwijdert alleen markeringen.</translation>
     </message>
     <message>
       <location filename="../ui/widgets/tool_selector.py" line="109" />
@@ -2333,8 +2346,8 @@ Try '{backend}' from the Playback menu.</source>
     </message>
     <message>
       <location filename="../ui/widgets/tool_selector.py" line="112" />
-      <source>Barline tool. Insert start repeat, end repeat, and double barline symbols at barline positions.</source>
-      <translation>Maatstreep Tool. Herhaalbegin-, herhaaleinde- en dubbelmaatstreepsymbolen invoegen op maatstreepposities.</translation>
+      <source>Barline Symbols tool. Insert start repeat, end repeat and double barline symbols.</source>
+      <translation>Barline Symbolen Tool. Voeg start herhaling, einde herhaling en dubbele barline symbolen toe.</translation>
     </message>
     <message>
       <location filename="../ui/widgets/tool_selector.py" line="113" />
@@ -2375,17 +2388,17 @@ Try '{backend}' from the Playback menu.</source>
       <translation>Afspelen direct stoppen. &lt;spatie&gt; schakelt het afspelen in/uit vanaf de muiscursorpositie.</translation>
     </message>
     <message>
-      <location filename="../ui/widgets/toolbar_splitter.py" line="109" />
+      <location filename="../ui/widgets/toolbar_splitter.py" line="106" />
       <source>Appearance. Customize the visual style of the score.</source>
       <translation>Uiterlijk. Pas de visuele stijl van de partituur aan.</translation>
     </message>
     <message>
-      <location filename="../ui/widgets/toolbar_splitter.py" line="127" />
+      <location filename="../ui/widgets/toolbar_splitter.py" line="121" />
       <source>Title info. Edit title, composer, and copyright. View analysis information.</source>
       <translation>Titelinfo. Bewerk titel, componist en copyright. Bekijk analyseinformatie.</translation>
     </message>
     <message>
-      <location filename="../ui/widgets/toolbar_splitter.py" line="139" />
+      <location filename="../ui/widgets/toolbar_splitter.py" line="133" />
       <source>Line breaks. Organize the document into systems and pages.</source>
       <translation>Regelafbrekingen. Organiseer het document in systemen en pagina's.</translation>
     </message>

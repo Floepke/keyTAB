@@ -519,6 +519,8 @@ def main() -> int:
         "--hidden-import=fluidsynth",
         "--collect-all=fluidsynth",
     ])
+    # Bundle translation files so non-English UI works inside the AppImage.
+    cmd.append(f"--add-data={str(project_root / 'i18n')}:i18n")
     fluidsynth_module = resolve_fluidsynth_module_file()
     if fluidsynth_module is not None:
         # Ensure the binding file is present at runtime even when module graph

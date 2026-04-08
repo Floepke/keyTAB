@@ -19,15 +19,15 @@ TOOL_ITEMS: list[dict] = [
     { 'name': 'grace_note',     'displayed_name': 'Grace Note',     'icon': 'grace_note',     'tooltip': 'Grace Note tool. Enter small ornamental notes without normal rhythmic duration. Use this for trills, mordents, and similar decorations. Click in empty space to add. Drag on existing grace note to edit time+pitch. Right click to delete.' },
     { 'name': 'count_line',     'displayed_name': 'Count Line',     'icon': 'count_line',     'tooltip': 'Count Line tool. Draw guide lines to highlight rhythmic grid subdivisions. Left click on empty space to add. Drag on a handle to edit. Right click on a handle to delete.' },
     { 'name': 'dynamic',        'displayed_name': 'Dynamics',       'icon': 'dynamics',       'tooltip': 'Dynamics tool. Insert crescendo (<) and decrescendo (>) hairpins, or choose dynamic mode to place standalone dynamic symbols.' },
-    { 'name': 'beam',           'displayed_name': 'Beam Grouping',  'icon': 'beam',           'tooltip': 'Beam Grouping tool. Overwrite the default time signature beam grouping by placing beam markers. Click/drag to the left/right of the clef to add/edit for left/right hand. Right click left/right of the clef in a marker time range to delete. ' },
+    { 'name': 'text',           'displayed_name': 'Text',           'icon': 'text',           'tooltip': 'Text tool. Place text annotations.' },
+    { 'name': 'beam',           'displayed_name': 'Note Grouping',  'icon': 'beam',           'tooltip': 'Note Grouping tool. Overwrite the default time signature beam grouping by placing beam markers. Click/drag to the left/right of the clef to add/edit for left/right hand. Right click left/right of the clef in a marker time range to delete. ' },
     # layout elements
-    { 'name': 'line_break',     'displayed_name': 'Line/Page-Break Marker','icon': 'line_break',     'tooltip': 'Line/Page break tool. Insert line/page breaks. Click to insert a marker. Right-click to remove a marker. Click an existing marker to switch between a Line (L) and Page (P) marker.' },
+    { 'name': 'line_break',     'displayed_name': 'Line/Page-Break Marker','icon': 'line_break',     'tooltip': 'Line/Page Break Marker tool. Insert line/page breaks. Click to insert a marker. Right-click to remove a marker. Click an existing marker to switch between a Line (L) and Page (P) marker.' },
     { 'name': 'time_signature', 'displayed_name': 'Time Signature', 'icon': 'time_signature', 'tooltip': 'Time Signature tool. Configure meter and base grid subdivision.' },
     { 'name': 'grid_band',      'displayed_name': 'Grid Band',      'icon': 'grid_band',      'tooltip': 'Grid Band tool. Add and edit grid band markers. Click below pitch 39 for left hand, above 45 for right hand, or between 39-45 for both. Drag a marker to set its length; snapping keeps ends on the current snap size. Drag back to its start for zero duration (renders a red line). Right click deletes markers only.' },
     { 'name': 'tempo',          'displayed_name': 'Tempo',          'icon': 'metronome',      'tooltip': 'Tempo tool. Add tempo regions in units per minute over a duration.'} ,
     { 'name': 'slur',           'displayed_name': 'Slur',           'icon': 'slur',           'tooltip': 'Slur tool. Place phrasing slurs.' },
-    { 'name': 'text',           'displayed_name': 'Text',           'icon': 'text',           'tooltip': 'Text tool. Place text annotations.' },
-    { 'name': 'barline',        'displayed_name': 'Barline',        'icon': 'repeats',        'tooltip': 'Barline tool. Insert start repeat, end repeat, and double barline symbols at barline positions.' },
+    { 'name': 'barline',        'displayed_name': 'Barline Symbols','icon': 'repeats',        'tooltip': 'Barline Symbols tool. Insert start repeat, end repeat and double barline symbols.' },
     { 'name': 'pedal',          'displayed_name': 'Pedal',          'icon': 'pedal',          'tooltip': 'Pedal tool. Add pedal markings.' },
 ]
 
@@ -88,13 +88,13 @@ class ToolSelectorWidget(QtWidgets.QListWidget):
             'count_line':     self.tr("Count Line"),
             'dynamic':        self.tr("Dynamics"),
             'beam':           self.tr("Beam Grouping"),
-            'line_break':     self.tr("Line/Page Break"),
+            'line_break':     self.tr("Line/Page Break Marker"),
             'time_signature': self.tr("Time Signature"),
             'grid_band':      self.tr("Grid Band"),
             'tempo':          self.tr("Tempo"),
             'slur':           self.tr("Slur"),
             'text':           self.tr("Text"),
-            'barline':        self.tr("Barline"),
+            'barline':        self.tr("Barline Symbols"),
             'pedal':          self.tr("Pedal"),
         }
         _tooltips = {
@@ -103,13 +103,13 @@ class ToolSelectorWidget(QtWidgets.QListWidget):
             'count_line':     self.tr("Count Line tool. Draw guide lines to highlight rhythmic grid subdivisions. Left click on empty space to add. Drag on a handle to edit. Right click on a handle to delete."),
             'dynamic':        self.tr("Dynamics tool. Insert crescendo (<) and decrescendo (>) hairpins, or choose dynamic mode to place standalone dynamic symbols."),
             'beam':           self.tr("Beam Grouping tool. Overwrite the default time signature beam grouping by placing beam markers. Click/drag to the left/right of the clef to add/edit for left/right hand. Right click left/right of the clef in a marker time range to delete."),
-            'line_break':     self.tr("Line/Page break tool. Insert line/page breaks. Click to insert a marker. Right-click to remove a marker. Click an existing marker to switch between a Line (L) and Page (P) marker."),
+            'line_break':     self.tr("Line/Page Break marker tool. Insert line/page breaks. Click to insert a marker. Right-click to remove a marker. Click an existing marker to switch between a Line (L) and Page (P) marker."),
             'time_signature': self.tr("Time Signature tool. Configure meter and base grid subdivision."),
             'grid_band':      self.tr("Grid Band tool. Add and edit grid band markers. Click below pitch 39 for left hand, above 45 for right hand, or between 39-45 for both. Drag a marker to set its length; snapping keeps ends on the current snap size. Drag back to its start for zero duration (renders a red line). Right click deletes markers only."),
             'tempo':          self.tr("Tempo tool. Add tempo regions in units per minute over a duration."),
             'slur':           self.tr("Slur tool. Place phrasing slurs."),
             'text':           self.tr("Text tool. Place text annotations."),
-            'barline':        self.tr("Barline tool. Insert start repeat, end repeat, and double barline symbols at barline positions."),
+            'barline':        self.tr("Barline Symbols tool. Insert start repeat, end repeat and double barline symbols."),
             'pedal':          self.tr("Pedal tool. Add pedal markings."),
         }
         for conf in TOOL_ITEMS:
