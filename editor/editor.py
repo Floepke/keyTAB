@@ -162,6 +162,10 @@ class Editor(QtCore.QObject,
         # snap size in time units (default matches SnapSizeSelector: base=8, divide=1 -> 128)
         self.snap_size_units: float = (QUARTER_NOTE_UNIT * 4.0) / 8.0
 
+        # Global editor-only stroke width override (mm) for selected symbol lines.
+        # This does not affect engraving/print output.
+        self.editor_line_width_global: float = .5
+
         # Cache for key x-positions (index by piano key number 1..88)
         self._x_positions: Optional[list[float]] = None
 

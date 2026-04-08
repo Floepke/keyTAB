@@ -37,9 +37,7 @@ class RepeatDrawerMixin:
         ext_len = semitone_dx * 3.0
         x_left = x_stave_right
         x_right = x_left + ext_len
-        style_scale = float(getattr(layout, 'scale', 1.0) or 1.0)
-        bar_width_mm = float(getattr(layout, 'grid_barline_thickness_mm', 0.25) or 0.25) * style_scale
-        thick_w = max(0.1, bar_width_mm)
+        thick_w = max(0.01, float(getattr(self, 'editor_line_width_global', 0.1) or 0.1))
         dot_d = semitone_dx
         # Dot center is semitone_dist away from the outer edge of the line.
         dot_y = thick_w / 2.0 + semitone_dx + dot_d / 2.0

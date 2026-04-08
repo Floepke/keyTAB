@@ -34,7 +34,13 @@ class NoteDrawerMixin:
     _cached_window_hi: int | None = None
     _cached_notes_view: list | None = None
     _cached_barline_positions: list[float] | None = None
-    _STEM_WIDTH_FACTOR: float = 1.2
+    _STEM_WIDTH_FACTOR: float = 1.0
+
+    def _editor_line_width_mm(self) -> float:
+        try:
+            return max(0.01, float(getattr(self, 'editor_line_width_global', 0.1) or 0.1))
+        except Exception:
+            return 0.1
 
     def draw_note(self, du: DrawUtil) -> None:
         """Editor drawer entry point as used by draw_all()."""
@@ -191,8 +197,7 @@ class NoteDrawerMixin:
             return
         w = float(self.semitone_dist or 0.5)
         stem_len = float(layout.note_stem_length_semitone or 3) * w
-        style_scale = float(getattr(layout, 'scale', 1.0) or 1.0)
-        thickness = float(layout.grid_barline_thickness_mm or 0.25) * style_scale
+        thickness = self._editor_line_width_mm()
         hand = getattr(n, 'hand', 'l')
         if hand == 'l':
             x1 = x
@@ -228,6 +233,7 @@ class NoteDrawerMixin:
     def _draw_notehead(self, du: DrawUtil, n, x: float, y1: float, draw_mode: str) -> None:
         self = cast("Editor", self)
         layout = self.current_score().layout
+        outline_w = self._editor_line_width_mm()
         paper_r, paper_g, paper_b = Style.get_named_rgb('paper', (255, 255, 255))
         bg_fill = (paper_r / 255.0, paper_g / 255.0, paper_b / 255.0, 1.0)
         notehead = Notehead.from_note(
@@ -239,6 +245,7 @@ class NoteDrawerMixin:
             notation_color=self.notation_color,
             paper_color=bg_fill,
             default_black_above=self._black_note_above_stem(n, layout),
+            outline_width_mm_override=outline_w,
         )
         tag = "notehead_black" if bool(getattr(notehead, 'filled', False)) else "notehead_white"
         notehead.draw_notehead(du, item_id=int(getattr(n, '_id', 0) or 0), tags=[tag], use_custom_color=True)
@@ -278,8 +285,7 @@ class NoteDrawerMixin:
         self = cast("Editor", self)
         layout = self.current_score().layout
         stem_len = float(layout.note_stem_length_semitone or 3) * float(self.semitone_dist or 0.5)
-        style_scale = float(getattr(layout, 'scale', 1.0) or 1.0)
-        stem_w = max(0.1, float(getattr(layout, 'note_stem_thickness_mm', 0.75) or 0.75) * style_scale * self._STEM_WIDTH_FACTOR)
+        stem_w = self._editor_line_width_mm()
         # Stem direction based on hand
         if getattr(n, 'hand', 'l') == 'l':
             x2 = x - stem_len
@@ -371,8 +377,7 @@ class NoteDrawerMixin:
         self = cast("Editor", self)
         # Connect notes in a chord (same start time, same hand)
         layout = self.current_score().layout
-        style_scale = float(getattr(layout, 'scale', 1.0) or 1.0)
-        stem_w = max(0.1, float(getattr(layout, 'note_stem_thickness_mm', 0.75) or 0.75) * style_scale * self._STEM_WIDTH_FACTOR)
+        stem_w = self._editor_line_width_mm()
         hand = getattr(n, 'hand', 'l')
         t = float(n.time)
         cache = cast("Editor", self)._draw_cache or {}

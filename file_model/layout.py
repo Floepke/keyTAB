@@ -172,7 +172,6 @@ class Layout:
     stave_ledger_line_length_mm: float = 10.0
     stave_clef_line_dash_pattern_mm: list[float] = field(default_factory=lambda: [3.0])  # Dash pattern for clef lines (e.g., [dash_length, gap_length])
 
-
 LAYOUT_FLOAT_CONFIG: dict[str, dict[str, float]] = {
     'page_width_mm': {'min': 50.0, 'max': 10000.0, 'step': 0.5},
     'page_height_mm': {'min': 50.0, 'max': 100000.0, 'step': 0.5},

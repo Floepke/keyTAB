@@ -300,6 +300,8 @@ def run_pyinstaller(
         "--hidden-import=mido.backends.rtmidi",
         "--collect-all=mido",
     ])
+    # Bundle translation files so non-English UI works inside the .app.
+    cmd.extend(["--add-data", f"{str(PROJECT_ROOT / 'i18n')}:i18n"])
 
     for module in exclude_modules:
         cmd.extend(["--exclude-module", module])

@@ -72,7 +72,7 @@ class GridDrawerMixin:
         meas_size = 20.0
         color = self.notation_color
         style_scale = float(getattr(layout, 'scale', 1.0) or 1.0) if layout is not None else 1.0
-        bar_width_mm = (float(getattr(layout, 'grid_barline_thickness_mm', 0.25) or 0.25) * style_scale) if layout is not None else 0.25
+        bar_width_mm = max(0.01, float(getattr(self, 'editor_line_width_global', 0.1) or 0.1))
         grid_width_mm = (float(getattr(layout, 'grid_gridline_thickness_mm', 0.15) or 0.15) * style_scale) if layout is not None else 0.15
 
         cache = getattr(self, '_draw_cache', None) or {}
@@ -411,7 +411,7 @@ class GridDrawerMixin:
                 is_last = idx == (len(barline_times) - 1)
                 _draw_barline_constructive(
                     float(t),
-                    (bar_width_mm * 3.0) if is_last else bar_width_mm,
+                    bar_width_mm,
                     (["barline", "end_barline"] if is_last else ["barline"]),
                 )
 

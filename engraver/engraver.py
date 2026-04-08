@@ -1129,7 +1129,8 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
             and op_time.lt(float(seg.get('start', 0.0) or 0.0), float(line['time_end']))
         ]
         if ts_segments_in_line:
-            ts_lane_width = float(layout.get('time_signature_indicator_lane_width_mm', 22.0) or 22.0)
+            ts_lane_width_raw = layout.get('time_signature_indicator_lane_width_mm', 22.0)
+            ts_lane_width = float(ts_lane_width_raw or 22.0) * scale
             ts_lane_padding_mm = 1  # Hard-coded right padding so lane ends before the stave.
             min_pitch = None
             for seg in ts_segments_in_line:

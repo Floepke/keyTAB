@@ -43,9 +43,7 @@ class AccidentalDrawerMixin:
         # Short diagonal hint: upward for above-stem heads, downward for under-stem heads.
         y_target = float(y_anchor - semitone) if is_above_stem else float(y_anchor + semitone)
 
-        style_scale = float(getattr(layout, 'scale', 1.0) or 1.0)
-        stem_w = max(0.1, float(getattr(layout, 'note_stem_thickness_mm', 0.75) or 0.75) * style_scale)
-        line_w = max(0.1, stem_w * 0.9)
+        line_w = max(0.01, float(getattr(self, 'editor_line_width_global', 0.1) or 0.1))
 
         du.add_line(
             float(x),
