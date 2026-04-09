@@ -28,6 +28,9 @@ class AccidentalDrawerMixin:
             return
         layout = score.layout
 
+        if not bool(getattr(layout, 'accidental_visible', True)):
+            return
+
         default_black_above = self._black_note_above_stem(note, layout)
         spec = resolve_notehead_spec(note, default_black_above=default_black_above)
         is_above_stem = bool(getattr(spec, 'is_up', False))

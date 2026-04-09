@@ -20,6 +20,8 @@ class TimeSignatureDrawerMixin:
         tool_name = getattr(tool, "TOOL_NAME", "")
         # Read global indicator type from Layout
         layout = score.layout
+        if not bool(getattr(layout, 'time_signature_visible', True)):
+            return
         indicator_type = getattr(layout, 'time_signature_indicator_type', 'classical')
 
         def _resolve_font_family(font) -> str:

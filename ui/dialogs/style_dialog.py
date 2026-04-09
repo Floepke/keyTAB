@@ -540,6 +540,8 @@ class StyleDialog(QtWidgets.QDialog):
             'black_note_rule': self.tr('Black note rule'),
             'note_head_visible': self.tr('Note head visible'),
             'note_stem_visible': self.tr('Note stem visible'),
+            'accidental_visible': self.tr('Accidental line visible'),
+            'chord_connect_visible': self.tr('Chord connector visible'),
             'note_stop_visible': self.tr('Note stop visible'),
             'note_stem_length_semitone': self.tr('Note stem length (semitones)'),
             'note_stem_thickness_mm': self.tr('Note stem thickness (mm) (Applies to both stem and the lines of the notehead symbol)'),
@@ -570,6 +572,7 @@ class StyleDialog(QtWidgets.QDialog):
             'hairpin_text_gap_mm': self.tr('Hairpin text gap (mm)'),
             'dynamic_symbol_font_size_pt': self.tr('Dynamic symbol font size (pt)'),
             'dynamic_symbol_background_padding_mm': self.tr('Dynamic symbol background padding (mm)'),
+            'dynamic_symbol_visible': self.tr('Dynamic symbol visible'),
             'repeat_start_visible': self.tr('Start repeat visible'),
             'repeat_end_visible': self.tr('End repeat visible'),
             'double_barline_visible': self.tr('Double barline visible'),
@@ -585,6 +588,7 @@ class StyleDialog(QtWidgets.QDialog):
             'grid_gridline_dash_pattern_mm': self.tr('Grid line dash pattern (mm)'),
             'grid_band_color': self.tr('Grid band color'),
             'grid_band_start_phase': self.tr('Grid band start phase'),
+            'time_signature_visible': self.tr('Time signature visible'),
             'time_signature_indicator_type': self.tr('Time signature indicator type'),
             'time_signature_indicator_lane_width_mm': self.tr('Time signature lane width (mm)'),
             'time_signature_indicator_guide_thickness_mm': self.tr('Time signature guide thickness (mm)'),
@@ -718,13 +722,14 @@ class StyleDialog(QtWidgets.QDialog):
             self.tr("Page"),
             self.tr("Stave"),
             self.tr("Grid"),
+            self.tr("Grid band"),
             self.tr("Time signature"),
             self.tr("Measure Numbering"),
             self.tr("Fonts"),
             self.tr("Note"),
             self.tr("Grace note"),
             self.tr("Beam"),
-            self.tr("Hairpin"),
+            self.tr("Dynamic"),
             self.tr("Slur"),
             self.tr("Text"),
             self.tr("Countline"),
@@ -782,12 +787,12 @@ class StyleDialog(QtWidgets.QDialog):
             # Beam
             'beam_thickness_mm': 'Beam',
             'beam_corner_radius_mm': 'Beam',
-            # Hairpin
-            'hairpin_line_width_mm': 'Hairpin',
-            'hairpin_width_mm': 'Hairpin',
-            'hairpin_font_size_pt': 'Hairpin',
-            'hairpin_text_gap_mm': 'Hairpin',
-            'dynamic_symbol_background_padding_mm': 'Hairpin',
+            # Dynamic
+            'hairpin_line_width_mm': 'Dynamic',
+            'hairpin_width_mm': 'Dynamic',
+            'hairpin_font_size_pt': 'Dynamic',
+            'hairpin_text_gap_mm': 'Dynamic',
+            'dynamic_symbol_background_padding_mm': 'Dynamic',
             # Pedal
             'pedal_lane_width_mm': 'Pedal',
             # Grace note
@@ -810,8 +815,9 @@ class StyleDialog(QtWidgets.QDialog):
             'grid_barline_thickness_mm': 'Grid',
             'grid_gridline_thickness_mm': 'Grid',
             'grid_gridline_dash_pattern_mm': 'Grid',
-            'grid_band_color': 'Grid',
-            'grid_band_start_phase': 'Grid',
+            # Grid band
+            'grid_band_color': 'Grid band',
+            'grid_band_start_phase': 'Grid band',
             # Stave
             'stave_two_line_thickness_mm': 'Stave',
             'stave_three_line_thickness_mm': 'Stave',
@@ -854,6 +860,10 @@ class StyleDialog(QtWidgets.QDialog):
             'double_barline_visible': 'Visibility',
             'measure_numbering_guide_visible': 'Visibility',
             'measure_numbers_visible': 'Visibility',
+            'time_signature_visible': 'Visibility',
+            'dynamic_symbol_visible': 'Visibility',
+            'accidental_visible': 'Visibility',
+            'chord_connect_visible': 'Visibility',
         }
 
         type_hints = {}

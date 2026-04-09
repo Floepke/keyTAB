@@ -2028,7 +2028,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                 if measure_amount <= 0:
                     continue
                 measure_len = float(numerator) * (4.0 / float(max(1, denominator))) * float(QUARTER_NOTE_UNIT)
-                if op_time.ge(float(time_cursor), float(line['time_start'])) and op_time.lt(float(time_cursor), float(line['time_end'])) and indicator_enabled:
+                if op_time.ge(float(time_cursor), float(line['time_start'])) and op_time.lt(float(time_cursor), float(line['time_end'])) and indicator_enabled and bool(layout.get('time_signature_visible', True)):
                     y_ts = _time_to_y(float(time_cursor))
                     if indicator_type == 'classical':
                         _draw_classical_ts(numerator, denominator, indicator_enabled, y_ts)
@@ -3069,7 +3069,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                     acc = int(n.get('acc', 0) or 0)
                 except Exception:
                     acc = 0
-                if acc != 0 and Note.is_valid_accidental(n):
+                if acc != 0 and Note.is_valid_accidental(n) and bool(layout.get('accidental_visible', True)):
                     derived_pitch = int(p + acc)
                     x_target = _key_to_x(derived_pitch)
                     note_h = float(semitone_mm * 2.0)
@@ -3241,7 +3241,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                     and op_time.eq(float(m.get('time', 0.0) or 0.0), n_t)
                     and not _is_line_continuation(m)
                 ]
-                if len(same_time) >= 2:
+                if len(same_time) >= 2 and bool(layout.get('chord_connect_visible', True)):
                     lowest = min(same_time, key=lambda m: int(m.get('pitch', 0) or 0))
                     highest = max(same_time, key=lambda m: int(m.get('pitch', 0) or 0))
                     if int(lowest.get('id', 0) or 0) == int(item.get('id', 0) or 0):
@@ -3435,7 +3435,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                 for hp in line_decrescendos:
                     _draw_hairpin(hp, False)
 
-            if line_dynamic_symbols:
+            if bool(layout.get('dynamic_symbol_visible', True)) and line_dynamic_symbols:
                 text_size_pt = float(layout.get('dynamic_symbol_font_size_pt', 12.0) or 12.0)
                 dynamic_bg_pad = float(
                     layout.get(
@@ -3488,6 +3488,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                         tags=['dynamic_symbol_text_top'],
                     )
 
+            '''Text drawing.'''
             if bool(layout.get('text_visible', True)) and line_texts:
                 default_font = layout.get('font_text', {}) or {}
                 pad_mm = float(layout.get('text_background_padding_mm', 0.0) or 0.0) * scale

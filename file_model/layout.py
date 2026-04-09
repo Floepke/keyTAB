@@ -37,6 +37,8 @@ class Layout:
     # Note appearance
     note_head_visible: bool = True
     note_stem_visible: bool = True
+    accidental_visible: bool = True
+    chord_connect_visible: bool = True
     note_stop_visible: bool = True
     note_stem_length_semitone: int = 6
     note_stem_thickness_mm: float = 1.25 # Thickness of the stem as well the notehead outline width
@@ -79,6 +81,7 @@ class Layout:
     hairpin_text_gap_mm: float = 0.5  # gap between hairpin and text in mm
     dynamic_symbol_font_size_pt: float = 12.0  # Font size for standalone dynamic symbols
     dynamic_symbol_background_padding_mm: float = 1.5
+    dynamic_symbol_visible: bool = True
 
     # Repeat markers
     repeat_start_visible: bool = True
@@ -108,6 +111,7 @@ class Layout:
     grid_band_start_phase: Literal['dark', 'light'] = 'dark'
 
     # Time signature indicator type (global)
+    time_signature_visible: bool = True
     time_signature_indicator_type: Literal['classical', 'klavarskribo', 'classical & klavarskribo'] = 'classical & klavarskribo'
     
     # Time signature indicator lane (left of stave)
@@ -183,7 +187,7 @@ LAYOUT_FLOAT_CONFIG: dict[str, dict[str, float]] = {
     'page_right_margin_mm': {'min': 0.0, 'max': 100.0, 'step': 0.05},
     'header_height_mm': {'min': 0.0, 'max': 100.0, 'step': 0.05},
     'footer_height_mm': {'min': 0.0, 'max': 100.0, 'step': 0.05},
-    'scale': {'min': 0.01, 'max': 1.0, 'step': 0.001},
+    'scale': {'min': 0.25, 'max': 1.0, 'step': 0.005},
     'note_stem_length_semitone': {'min': 1.0, 'max': 20.0, 'step': 1.0},
     'note_stem_thickness_mm': {'min': 0.05, 'max': 5.0, 'step': 0.05},
     'note_stopsign_thickness_mm': {'min': 0.05, 'max': 5.0, 'step': 0.05},

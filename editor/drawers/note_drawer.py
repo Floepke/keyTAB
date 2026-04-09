@@ -380,6 +380,8 @@ class NoteDrawerMixin:
         self = cast("Editor", self)
         # Connect notes in a chord (same start time, same hand)
         layout = self.current_score().layout
+        if not bool(getattr(layout, 'chord_connect_visible', True)):
+            return
         stem_w = self._editor_line_width_mm()
         hand = getattr(n, 'hand', 'l')
         t = float(n.time)
