@@ -815,52 +815,52 @@ andere bewerkingen op, Annuleren zet de oorspronkelijke toestand terug.</transla
     <message>
       <location filename="../ui/main_window.py" line="781" />
       <source>Move Earlier by Snap Band</source>
-      <translation>Naar voren verplaatsen per snap-band</translation>
+      <translation>Naar voren verplaatsen per magneet-band</translation>
     </message>
     <message>
       <location filename="../ui/main_window.py" line="782" />
       <source>Move Selection Earlier by One Snap Band.</source>
-      <translation>Verplaats selectie naar voren met een snap-band.</translation>
+      <translation>Verplaats selectie naar voren met een magneet-band.</translation>
     </message>
     <message>
       <location filename="../ui/main_window.py" line="786" />
       <source>Move Later by Snap Band</source>
-      <translation>Naar achteren verplaatsen per snap-band</translation>
+      <translation>Naar achteren verplaatsen per magneet-band</translation>
     </message>
     <message>
       <location filename="../ui/main_window.py" line="787" />
       <source>Move Selection Later by One Snap Band.</source>
-      <translation>Verplaats selectie naar achteren met een snap-band.</translation>
+      <translation>Verplaats selectie naar achteren met een magneet-band.</translation>
     </message>
     <message>
       <location filename="../ui/main_window.py" line="791" />
       <source>Quantize Starts and Ends on Snap Band</source>
-      <translation>Kwantiseer begin en einde op snap-band</translation>
+      <translation>Kwantiseer begin en einde op magneet-band</translation>
     </message>
     <message>
       <location filename="../ui/main_window.py" line="792" />
       <source>Quantize Selection Starts and Ends to the Current Snap Band.</source>
-      <translation>Kwantiseer begin en einde van selectie naar de huidige snap-band.</translation>
+      <translation>Kwantiseer begin en einde van selectie naar de huidige magneet-band.</translation>
     </message>
     <message>
       <location filename="../ui/main_window.py" line="795" />
       <source>Quantize Starts on Snap Band</source>
-      <translation>Kwantiseer begin op snap-band</translation>
+      <translation>Kwantiseer begin op magneet-band</translation>
     </message>
     <message>
       <location filename="../ui/main_window.py" line="796" />
       <source>Quantize Selection Starts to the Current Snap Band.</source>
-      <translation>Kwantiseer begin van selectie naar de huidige snap-band.</translation>
+      <translation>Kwantiseer begin van selectie naar de huidige magneet-band.</translation>
     </message>
     <message>
       <location filename="../ui/main_window.py" line="797" />
       <source>Quantize Ends on Snap Band</source>
-      <translation>Kwantiseer einde op snap-band</translation>
+      <translation>Kwantiseer einde op magneet-band</translation>
     </message>
     <message>
       <location filename="../ui/main_window.py" line="798" />
       <source>Quantize Selection Ends to the Current Snap Band.</source>
-      <translation>Kwantiseer einde van selectie naar de huidige snap-band.</translation>
+      <translation>Kwantiseer einde van selectie naar de huidige magneet-band.</translation>
     </message>
     <message>
       <location filename="../ui/main_window.py" line="812" />
