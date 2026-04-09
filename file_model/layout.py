@@ -38,7 +38,7 @@ class Layout:
     note_head_visible: bool = True
     note_stem_visible: bool = True
     note_stop_visible: bool = True
-    note_stem_length_semitone: int = 5
+    note_stem_length_semitone: int = 6
     note_stem_thickness_mm: float = 1.25 # Thickness of the stem as well the notehead outline width
     note_stopsign_thickness_mm: float = 1.25
     note_leftdot_visible: bool = False
@@ -124,7 +124,7 @@ class Layout:
         size_pt=25.0,
         bold=True,
     ))
-    grid_measure_numbering_guide_thickness_mm: float = 0.7
+    measure_numbering_guide_thickness_mm: float = 0.7
     # 'system': number at top of each system; 'barline': number at every barline
     measure_numbering_placement: Literal['system', 'barline'] = 'barline'
     measure_numbering_guide_visible: bool = True
@@ -205,7 +205,7 @@ LAYOUT_FLOAT_CONFIG: dict[str, dict[str, float]] = {
     'countline_thickness_mm': {'min': 0.05, 'max': 5.0, 'step': 0.05},
     'grid_barline_thickness_mm': {'min': 0.05, 'max': 5.0, 'step': 0.05},
     'grid_gridline_thickness_mm': {'min': 0.05, 'max': 5.0, 'step': 0.05},
-    'grid_measure_numbering_guide_thickness_mm': {'min': 0.05, 'max': 5.0, 'step': 0.05},
+    'measure_numbering_guide_thickness_mm': {'min': 0.05, 'max': 5.0, 'step': 0.05},
     'time_signature_indicator_lane_width_mm': {'min': 0.05, 'max': 100.0, 'step': 0.05},
     'time_signature_indicator_guide_thickness_mm': {'min': 0.05, 'max': 5.0, 'step': 0.05},
     'time_signature_indicator_divide_guide_thickness_mm': {'min': 0.05, 'max': 5.0, 'step': 0.05},

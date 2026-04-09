@@ -591,7 +591,7 @@ class StyleDialog(QtWidgets.QDialog):
             'time_signature_indicator_divide_guide_thickness_mm': self.tr('Time signature divider thickness (mm)'),
             'time_signature_indicator_classic_font': self.tr('Time signature classic font'),
             'time_signature_indicator_klavarskribo_font': self.tr('Time signature Klavarskribo font'),
-            'grid_measure_numbering_guide_thickness_mm': self.tr('Measure numbering guide thickness (mm)'),
+            'measure_numbering_guide_thickness_mm': self.tr('Measure numbering guide thickness (mm)'),
             'measure_numbering_placement': self.tr('Measure numbering placement'),
             'measure_numbering_guide_visible': self.tr('Measure numbering guide visible'),
             'measure_numbers_visible': self.tr('Measure numbers visible'),
@@ -828,7 +828,7 @@ class StyleDialog(QtWidgets.QDialog):
             'time_signature_indicator_classic_font': 'Time signature',
             'time_signature_indicator_klavarskribo_font': 'Time signature',
             # Measure Numbering
-            'grid_measure_numbering_guide_thickness_mm': 'Measure Numbering',
+            'measure_numbering_guide_thickness_mm': 'Measure Numbering',
             'measure_numbering_placement': 'Measure Numbering',
             'measure_numbering_font': 'Measure Numbering',
             # Visibility

@@ -19,9 +19,10 @@ class SlurTool(BaseTool):
         self._pressed_existing: bool = False
 
     def toolbar_spec(self) -> list[dict]:
+        hand = str(getattr(self._editor, 'hand_cursor', self._hand) or self._hand) if self._editor is not None else self._hand
         return [
-            {'name': 'slur_hand_left', 'icon': 'mirror:slur', 'tooltip': 'Slur direction: left hand'},
-            {'name': 'slur_hand_right', 'icon': 'slur', 'tooltip': 'Slur direction: right hand'},
+            {'name': 'slur_hand_left', 'icon': 'mirror:slur', 'active': hand == 'l', 'tooltip': 'Slur direction: left hand'},
+            {'name': 'slur_hand_right', 'icon': 'slur', 'active': hand == 'r', 'tooltip': 'Slur direction: right hand'},
         ]
 
     # ---- Helpers ----

@@ -2367,7 +2367,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
             measure_symbol_default_right_x = float(grid_right + measure_pad * 2.0)
             measure_guide_width_mm = max(
                 0.05,
-                float(layout.get('grid_measure_numbering_guide_thickness_mm', 1.0) or 1.0) * scale,
+                float(layout.get('measure_numbering_guide_thickness_mm', 1.0) or 1.0) * scale,
             )
             # Shared guide dash pattern for measure numbers and repeat symbols in mm (pre-scale).
             # Tweak this list to fine-tune both at once.
@@ -2514,17 +2514,42 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                     return float(x_num + w_num + symbol_gap)
                 return float(measure_symbol_default_right_x + symbol_gap)
 
+            # Set of barline times (measure starts) for detecting non-barline repeat positions.
+            _barline_time_set: set[float] = {
+                round(float(mw.get('start', 0.0)), 6) for mw in measure_windows
+            }
+
             def _draw_repeat_symbol(rep_t: float, ev_id: int, kind: str) -> None:
                 if op_time.lt(rep_t, float(line['time_start'])) or op_time.gt(rep_t, float(line['time_end'])):
                     return
                 y_rep = float(_time_to_y(rep_t))
-                x_left = _symbol_left_x(rep_t)
+                is_on_barline = round(float(rep_t), 6) in _barline_time_set
+                if is_on_barline:
+                    x_left = _symbol_left_x(rep_t)
+                else:
+                    # Beam/note-aware positioning for mid-measure repeats.
+                    t0 = rep_t
+                    t1 = min(float(line['time_end']), rep_t + (symbol_width * tick_per_mm))
+                    base_right = grid_right + measure_pad
+                    beam_right_val = _beam_right_at_y(y_rep)
+                    needed_right = _right_extent(t0, t1) + measure_pad
+                    if beam_right_val is not None:
+                        needed_right = max(needed_right, float(beam_right_val) + measure_pad)
+                    x_left = max(base_right, needed_right)
+                    xl, xr = x_left, x_left + symbol_width
+                    _step = symbol_width + measure_pad
+                    _tries = 0
+                    while _collides(xl, xr, t0, t1) and _tries < 16:
+                        x_left += _step
+                        xl = x_left
+                        xr = x_left + symbol_width
+                        _tries += 1
                 x_right = x_left + symbol_width
                 dot_x1 = x_left + (symbol_width * 0.25)
                 dot_x2 = x_left + (symbol_width * 0.75)
                 line_end_ticks = float(line.get('time_end', 0.0) or 0.0)
                 is_prev_system_duplicate = op_time.eq(rep_t, line_end_ticks) and op_time.gt(rep_t, first_system_start)
-                if is_prev_system_duplicate:
+                if is_prev_system_duplicate or not is_on_barline:
                     du.add_line(
                         grid_right,
                         y_rep,
