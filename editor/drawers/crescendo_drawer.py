@@ -121,7 +121,7 @@ class CrescendoDrawerMixin:
 
         style_scale = float(getattr(layout, 'scale', 1.0) or 1.0) if layout is not None else 1.0
         lw = float(getattr(layout, 'hairpin_line_width_mm', 0.5) or 0.5) * style_scale
-        spread = float(getattr(layout, 'hairpin_spread_mm', 5.0) or 5.0) * style_scale
+        spread = float(getattr(layout, 'hairpin_width_mm', 5.0) or 5.0) * style_scale
 
         top_mm = float(getattr(self, '_view_y_mm_offset', 0.0) or 0.0)
         vp_h_mm = float(getattr(self, '_viewport_h_mm', 0.0) or 0.0)

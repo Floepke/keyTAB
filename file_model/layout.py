@@ -42,7 +42,8 @@ class Layout:
     note_stem_thickness_mm: float = 1.25 # Thickness of the stem as well the notehead outline width
     note_stopsign_thickness_mm: float = 1.25
     note_leftdot_visible: bool = False
-    note_continuation_dot_size_mm: float = 2.15
+    note_continuation_dot_visible: bool = True
+    note_continuation_dot_size_mm: float = 2.10
     note_midinote_visible: bool = False
     note_midinote_left_color: str = '#ccc'
     note_midinote_right_color: str = '#ccc'
@@ -50,7 +51,8 @@ class Layout:
 
     # Beam appearance
     beam_visible: bool = True
-    beam_thickness_mm: float = 2.0
+    beam_thickness_mm: float = 2.5
+    beam_corner_radius_mm: float = 0.75
 
     # Grace note appearance
     grace_note_visible: bool = True
@@ -73,10 +75,10 @@ class Layout:
     # Hairpin (crescendo / decrescendo) appearance
     hairpin_visible: bool = True
     hairpin_line_width_mm: float = 1.0
-    hairpin_spread_mm: float = 10.0  # width of the open end of the hairpin in mm
-    hairpin_text_gap_mm: float = 0.0  # gap between hairpin and text in mm
+    hairpin_width_mm: float = 10.0  # width of the open end of the hairpin in mm
+    hairpin_text_gap_mm: float = 0.5  # gap between hairpin and text in mm
     dynamic_symbol_font_size_pt: float = 12.0  # Font size for standalone dynamic symbols
-    dynamic_symbol_background_padding_mm: float = 2.5
+    dynamic_symbol_background_padding_mm: float = 1.5
 
     # Repeat markers
     repeat_start_visible: bool = True
@@ -96,6 +98,7 @@ class Layout:
     barline_visible: bool = True
     grid_line_visible: bool = True
     grid_band_visible: bool = True
+    
     # Grid Band track (Grid 2). Single track for alternating bands.
     grid_band_track: list[GridBand] = field(default_factory=list)
     grid_barline_thickness_mm: float = 1.25
@@ -103,13 +106,12 @@ class Layout:
     grid_gridline_dash_pattern_mm: list[float] = field(default_factory=lambda: [2.5, 4.0])
     grid_band_color: str = '#ccc'
     grid_band_start_phase: Literal['dark', 'light'] = 'dark'
-    
 
     # Time signature indicator type (global)
     time_signature_indicator_type: Literal['classical', 'klavarskribo', 'both'] = 'both'
     
     # Time signature indicator lane (left of stave)
-    time_signature_indicator_lane_width_mm: float = 10.0
+    time_signature_indicator_lane_width_mm: float = 30.0
     time_signature_indicator_guide_thickness_mm: float = 0.5
     time_signature_indicator_divide_guide_thickness_mm: float = 1.0
     time_signature_indicator_classic_font: LayoutFont = field(default_factory=lambda: LayoutFont(
@@ -173,8 +175,8 @@ class Layout:
     stave_clef_line_dash_pattern_mm: list[float] = field(default_factory=lambda: [3.0])  # Dash pattern for clef lines (e.g., [dash_length, gap_length])
 
 LAYOUT_FLOAT_CONFIG: dict[str, dict[str, float]] = {
-    'page_width_mm': {'min': 50.0, 'max': 10000.0, 'step': 0.5},
-    'page_height_mm': {'min': 50.0, 'max': 100000.0, 'step': 0.5},
+    'page_width_mm': {'min': 50.0, 'max': 5_000.0, 'step': 0.5},
+    'page_height_mm': {'min': 50.0, 'max': 10_000.0, 'step': 0.5},
     'page_top_margin_mm': {'min': 0.0, 'max': 100.0, 'step': 0.05},
     'page_bottom_margin_mm': {'min': 0.0, 'max': 100.0, 'step': 0.05},
     'page_left_margin_mm': {'min': 0.0, 'max': 100.0, 'step': 0.05},
@@ -188,12 +190,13 @@ LAYOUT_FLOAT_CONFIG: dict[str, dict[str, float]] = {
     'note_continuation_dot_size_mm': {'min': 0.05, 'max': 10.0, 'step': 0.05},
     'note_width_scaling': {'min': 0.05, 'max': 2.0, 'step': 0.01},
     'beam_thickness_mm': {'min': 0.05, 'max': 5.0, 'step': 0.05},
+    'beam_corner_radius_mm': {'min': 0.0, 'max': 5.0, 'step': 0.05},
     'grace_note_outline_width_mm': {'min': 0.05, 'max': 5.0, 'step': 0.05},
     'grace_note_scale': {'min': 0.05, 'max': 1.0, 'step': 0.05},
     'pedal_lane_width_mm': {'min': 0.05, 'max': 20.0, 'step': 0.05},
     'text_background_padding_mm': {'min': 0.0, 'max': 20.0, 'step': 0.05},
     'hairpin_line_width_mm': {'min': 0.05, 'max': 5.0, 'step': 0.05},
-    'hairpin_spread_mm': {'min': 0.05, 'max': 20.0, 'step': 0.05},
+    'hairpin_width_mm': {'min': 0.05, 'max': 20.0, 'step': 0.05},
     'hairpin_font_size_pt': {'min': 4.0, 'max': 48.0, 'step': 0.5},
     'hairpin_text_gap_mm': {'min': 0.0, 'max': 20.0, 'step': 0.05},
     'dynamic_symbol_background_padding_mm': {'min': 0.0, 'max': 20.0, 'step': 0.05},

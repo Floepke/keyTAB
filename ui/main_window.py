@@ -75,6 +75,12 @@ class MainWindow(QtWidgets.QMainWindow):
         self._autosave_timer.timeout.connect(lambda: self.file_manager.autosave_all())
         self._apply_autosave_preferences()
 
+        # Debounced app-state persistence (scroll position, page index, dialog tab, etc.)
+        self._app_state_save_timer = QtCore.QTimer(self)
+        self._app_state_save_timer.setSingleShot(True)
+        self._app_state_save_timer.setInterval(500)
+        self._app_state_save_timer.timeout.connect(self._flush_app_state_save)
+
         self._create_menus()
 
         self.splitter = ToolbarSplitter(QtCore.Qt.Orientation.Horizontal)
@@ -2249,6 +2255,8 @@ class MainWindow(QtWidgets.QMainWindow):
         self.editor_canvas.set_scroll_logical_px(value)
         app_state = self._current_app_state()
         app_state.editor_scroll_pos = int(value)
+        # Persist scroll state for all scroll sources (wheel, scrollbar drag, keyboard).
+        self._schedule_app_state_save()
 
     def _editor_scroll_step_from_metrics(self, px_per_mm: float, dpr: float) -> int:
         sc = self.file_manager.current()
@@ -3058,11 +3066,13 @@ class MainWindow(QtWidgets.QMainWindow):
         app_state = self._current_app_state()
         app_state.snap_base = int(base)
         app_state.snap_divide = int(divide)
+        self._schedule_app_state_save()
 
     def _on_tool_selected(self, name: str) -> None:
         # Persist selected tool to app state; the editor will read from app state on each redraw to determine which tool is active.
         app_state = self._current_app_state()
         app_state.selected_tool = str(name)
+        self._schedule_app_state_save()
         if str(name) != 'note':
             # Leave velocity mode state untouched; it is restored when returning to note tool
             pass

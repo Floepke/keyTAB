@@ -5,6 +5,7 @@ from utils.operator import Operator
 from utils.CONSTANT import QUARTER_NOTE_UNIT
 from file_model.base_grid import resolve_grid_layer_offsets
 import bisect
+import math
 
 if TYPE_CHECKING:
     from editor.editor import Editor
@@ -15,6 +16,126 @@ class BeamDrawerMixin:
 
     def _editor_line_width_mm(self) -> float:
         return max(0.1, float(getattr(self, 'editor_line_width_global', .5) or .5))
+
+    @staticmethod
+    def _rounded_polygon(points: list[tuple[float, float]], radius: float, steps: int = 16) -> list[tuple[float, float]]:
+        if len(points) < 3 or radius <= 1e-6:
+            return points
+
+        def _sub(a: tuple[float, float], b: tuple[float, float]) -> tuple[float, float]:
+            return (float(a[0] - b[0]), float(a[1] - b[1]))
+
+        def _add(a: tuple[float, float], b: tuple[float, float]) -> tuple[float, float]:
+            return (float(a[0] + b[0]), float(a[1] + b[1]))
+
+        def _mul(v: tuple[float, float], s: float) -> tuple[float, float]:
+            return (float(v[0] * s), float(v[1] * s))
+
+        def _len(v: tuple[float, float]) -> float:
+            return float(math.hypot(v[0], v[1]))
+
+        def _norm(v: tuple[float, float]) -> tuple[float, float]:
+            lv = _len(v)
+            if lv <= 1e-9:
+                return (0.0, 0.0)
+            return (float(v[0] / lv), float(v[1] / lv))
+
+        area = 0.0
+        for i in range(len(points)):
+            x1, y1 = points[i]
+            x2, y2 = points[(i + 1) % len(points)]
+            area += float(x1 * y2 - x2 * y1)
+        ccw = area >= 0.0
+
+        out: list[tuple[float, float]] = []
+        n = len(points)
+        for i in range(n):
+            p_prev = points[(i - 1) % n]
+            p = points[i]
+            p_next = points[(i + 1) % n]
+
+            v1 = _sub(p_prev, p)
+            v2 = _sub(p_next, p)
+            l1 = _len(v1)
+            l2 = _len(v2)
+            if l1 <= 1e-9 or l2 <= 1e-9:
+                out.append((float(p[0]), float(p[1])))
+                continue
+
+            u1 = _norm(v1)
+            u2 = _norm(v2)
+            dot = max(-1.0, min(1.0, float(u1[0] * u2[0] + u1[1] * u2[1])))
+            theta = float(math.acos(dot))
+            if theta <= 1e-4 or abs(float(math.pi - theta)) <= 1e-4:
+                out.append((float(p[0]), float(p[1])))
+                continue
+
+            tan_half = float(math.tan(theta * 0.5))
+            if abs(tan_half) <= 1e-9:
+                out.append((float(p[0]), float(p[1])))
+                continue
+
+            cut = min(float(radius / tan_half), l1 * 0.49, l2 * 0.49)
+            p1 = _add(p, _mul(u1, cut))
+            p2 = _add(p, _mul(u2, cut))
+
+            bis = _norm(_add(u1, u2))
+            sin_half = float(math.sin(theta * 0.5))
+            if _len(bis) <= 1e-9 or abs(sin_half) <= 1e-9:
+                out.append((float(p1[0]), float(p1[1])))
+                out.append((float(p2[0]), float(p2[1])))
+                continue
+
+            center = _add(p, _mul(bis, float(radius / sin_half)))
+            a1 = float(math.atan2(float(p1[1] - center[1]), float(p1[0] - center[0])))
+            a2 = float(math.atan2(float(p2[1] - center[1]), float(p2[0] - center[0])))
+
+            two_pi = float(2.0 * math.pi)
+            if ccw:
+                delta = float((a2 - a1) % two_pi)
+            else:
+                delta = -float((a1 - a2) % two_pi)
+
+            out.append((float(p1[0]), float(p1[1])))
+            s_count = max(1, int(steps))
+            for s in range(1, s_count):
+                t = float(s) / float(s_count)
+                a = float(a1 + delta * t)
+                out.append((float(center[0] + radius * math.cos(a)), float(center[1] + radius * math.sin(a))))
+            out.append((float(p2[0]), float(p2[1])))
+
+        return out
+
+    def _draw_beam(self, du: DrawUtil, x1: float, y1: float, x2: float, y2: float, tags: list[str]) -> None:
+        """Draw a sharp-corner beam polygon from a center baseline.
+
+        Baseline endpoints are preserved from the simple-line logic, with Y endpoint
+        offsets applied to align with stem outer edges.
+        """
+        half = max(0.01, float(getattr(self, 'editor_line_width_global', 0.5) or 0.5) * 0.5)
+        y_start = float(y1) - half
+        y_end = float(y2) + half
+        beam_poly = [
+            (float(x1 - half*2), y_start),
+            (float(x2 - half*2), y_end),
+            (float(x2 + half*2), y_end),
+            (float(x1 + half*2), y_start),
+        ]
+
+        score = self.current_score()
+        layout = getattr(score, 'layout', None) if score is not None else None
+        style_scale = float(getattr(layout, 'scale', 1.0) or 1.0)
+        corner_r = float(getattr(layout, 'beam_corner_radius_mm', 0.2) or 0.2) * style_scale
+        if corner_r > 1e-6:
+            beam_poly = self._rounded_polygon(beam_poly, radius=corner_r, steps=16)
+
+        du.add_polygon(
+            beam_poly,
+            stroke_color=None,
+            fill_color=self.notation_color,
+            id=0,
+            tags=tags,
+        )
 
     def draw_beam(self, du: DrawUtil) -> None:
         self = cast("Editor", self)
@@ -310,7 +431,6 @@ class BeamDrawerMixin:
         # X positions: start at the highest pitch's stem tip (pitch_x + stem_len),
         # and end at x1 + semitone_dist to give a gentle diagonal.
         stem_len = float(layout.note_stem_length_semitone or 3) * float(self.semitone_dist or 0.5)
-        beam_w = self._editor_line_width_mm() * 2.0
         stem_w = self._editor_line_width_mm()
 
         # Iterate windows in lockstep with groups for right hand
@@ -339,16 +459,7 @@ class BeamDrawerMixin:
             x2 = x1 + float(self.semitone_dist or 0.0)
             y1 = float(self.time_to_mm(t_first))
             y2 = float(self.time_to_mm(t_last))
-            du.add_line(
-                x1,
-                y1,
-                x2,
-                y2,
-                color=self.notation_color,
-                width_mm=max(0.2, beam_w),
-                id=0,
-                tags=["beam_line_right"],
-            )
+            self._draw_beam(du, x1, y1, x2, y2, tags=["beam_line_right"])
             # Connect each note's stem tip to the beam line at that note's time
             for m in grp:
                 mt = float(getattr(m, 'time', t_first))
@@ -401,16 +512,7 @@ class BeamDrawerMixin:
             x2 = x1 - float(self.semitone_dist or 0.0)
             y1 = float(self.time_to_mm(t_first))
             y2 = float(self.time_to_mm(t_last))
-            du.add_line(
-                x1,
-                y1,
-                x2,
-                y2,
-                color=self.notation_color,
-                width_mm=max(0.2, beam_w),
-                id=0,
-                tags=["beam_line_left"],
-            )
+            self._draw_beam(du, x1, y1, x2, y2, tags=["beam_line_left"])
             # Connect each note's stem tip to the beam line at that note's time
             for m in grp:
                 mt = float(getattr(m, 'time', t_first))

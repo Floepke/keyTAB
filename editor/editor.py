@@ -164,7 +164,7 @@ class Editor(QtCore.QObject,
 
         # Global editor-only stroke width override (mm) for selected symbol lines.
         # This does not affect engraving/print output.
-        self.editor_line_width_global: float = .5
+        self.editor_line_width_global: float = 0.5
 
         # Cache for key x-positions (index by piano key number 1..88)
         self._x_positions: Optional[list[float]] = None

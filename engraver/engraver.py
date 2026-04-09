@@ -2598,6 +2598,120 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                 line_start = float(line.get('time_start', 0.0) or 0.0)
                 line_end = float(line.get('time_end', 0.0) or 0.0)
 
+                beam_half = max(0.1, float(beam_w) * 0.5)
+                stem_half = max(0.05, float(stem_w) * 0.5)
+                beam_corner_r = max(0.0, float(layout.get('beam_corner_radius_mm', 0.2) or 0.2) * scale)
+
+                def _rounded_polygon(points: list[tuple[float, float]], radius: float, steps: int = 12) -> list[tuple[float, float]]:
+                    if len(points) < 3 or radius <= 1e-6:
+                        return points
+
+                    def _sub(a: tuple[float, float], b: tuple[float, float]) -> tuple[float, float]:
+                        return (float(a[0] - b[0]), float(a[1] - b[1]))
+
+                    def _add(a: tuple[float, float], b: tuple[float, float]) -> tuple[float, float]:
+                        return (float(a[0] + b[0]), float(a[1] + b[1]))
+
+                    def _mul(v: tuple[float, float], s: float) -> tuple[float, float]:
+                        return (float(v[0] * s), float(v[1] * s))
+
+                    def _len(v: tuple[float, float]) -> float:
+                        return float(math.hypot(v[0], v[1]))
+
+                    def _norm(v: tuple[float, float]) -> tuple[float, float]:
+                        lv = _len(v)
+                        if lv <= 1e-9:
+                            return (0.0, 0.0)
+                        return (float(v[0] / lv), float(v[1] / lv))
+
+                    area = 0.0
+                    for i in range(len(points)):
+                        x1a, y1a = points[i]
+                        x2a, y2a = points[(i + 1) % len(points)]
+                        area += float(x1a * y2a - x2a * y1a)
+                    ccw = area >= 0.0
+
+                    out: list[tuple[float, float]] = []
+                    n = len(points)
+                    for i in range(n):
+                        p_prev = points[(i - 1) % n]
+                        p = points[i]
+                        p_next = points[(i + 1) % n]
+
+                        v1 = _sub(p_prev, p)
+                        v2 = _sub(p_next, p)
+                        l1 = _len(v1)
+                        l2 = _len(v2)
+                        if l1 <= 1e-9 or l2 <= 1e-9:
+                            out.append((float(p[0]), float(p[1])))
+                            continue
+
+                        u1 = _norm(v1)
+                        u2 = _norm(v2)
+                        dot = max(-1.0, min(1.0, float(u1[0] * u2[0] + u1[1] * u2[1])))
+                        theta = float(math.acos(dot))
+                        if theta <= 1e-4 or abs(float(math.pi - theta)) <= 1e-4:
+                            out.append((float(p[0]), float(p[1])))
+                            continue
+
+                        tan_half = float(math.tan(theta * 0.5))
+                        if abs(tan_half) <= 1e-9:
+                            out.append((float(p[0]), float(p[1])))
+                            continue
+
+                        # Clamp cut distance so tiny beams do not self-overlap.
+                        cut = min(float(radius / tan_half), l1 * 0.49, l2 * 0.49)
+                        p1 = _add(p, _mul(u1, cut))
+                        p2 = _add(p, _mul(u2, cut))
+
+                        bis = _norm(_add(u1, u2))
+                        sin_half = float(math.sin(theta * 0.5))
+                        if _len(bis) <= 1e-9 or abs(sin_half) <= 1e-9:
+                            out.append((float(p1[0]), float(p1[1])))
+                            out.append((float(p2[0]), float(p2[1])))
+                            continue
+
+                        center = _add(p, _mul(bis, float(radius / sin_half)))
+                        a1 = float(math.atan2(float(p1[1] - center[1]), float(p1[0] - center[0])))
+                        a2 = float(math.atan2(float(p2[1] - center[1]), float(p2[0] - center[0])))
+
+                        two_pi = float(2.0 * math.pi)
+                        if ccw:
+                            delta = float((a2 - a1) % two_pi)
+                        else:
+                            delta = -float((a1 - a2) % two_pi)
+
+                        out.append((float(p1[0]), float(p1[1])))
+                        s_count = max(1, int(steps))
+                        for s in range(1, s_count):
+                            t = float(s) / float(s_count)
+                            a = float(a1 + delta * t)
+                            out.append((float(center[0] + radius * math.cos(a)), float(center[1] + radius * math.sin(a))))
+                        out.append((float(p2[0]), float(p2[1])))
+
+                    return out
+
+                def _draw_beam(x1b: float, y1b: float, x2b: float, y2b: float) -> None:
+                    # Baseline (x1b,y1b)->(x2b,y2b) stays exactly the same as the legacy line path.
+                    # Build a polygon around that baseline, then optionally round corners.
+                    y_start = float(y1b) - stem_half
+                    y_end = float(y2b) + stem_half
+                    poly = [
+                        (float(x1b - beam_half), y_start),
+                        (float(x2b - beam_half), y_end),
+                        (float(x2b + beam_half), y_end),
+                        (float(x1b + beam_half), y_start),
+                    ]
+                    if beam_corner_r > 1e-6:
+                        poly = _rounded_polygon(poly, beam_corner_r, steps=16)
+                    du.add_polygon(
+                        poly,
+                        stroke_color=None,
+                        fill_color=notation_color,
+                        id=0,
+                        tags=['beam'],
+                    )
+
                 for hand_norm in ('r', 'l'):
                     notes_for_hand = notes_by_hand_line.get(hand_norm, [])
                     markers_for_hand = beam_by_hand.get(hand_norm, [])
@@ -2624,16 +2738,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                             x2 = x1 - float(semitone_mm)
                         yb1 = _time_to_y(float(t_first))
                         yb2 = _time_to_y(float(t_last))
-                        du.add_line(
-                            x1,
-                            yb1,
-                            x2,
-                            yb2,
-                            color=notation_color,
-                            width_mm=max(0.2, beam_w),
-                            id=0,
-                            tags=['beam'],
-                        )
+                        _draw_beam(float(x1), float(yb1), float(x2), float(yb2))
                         for n in grp:
                             mt = float(n.get('time', t_first) or t_first)
                             if not (op_time.ge(mt, float(t0)) and op_time.lt(mt, float(t1))):
@@ -2925,7 +3030,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                         dot_times.append(bt)
                 if continues_from_prev_line:
                     dot_times.append(float(line_start))
-                if dot_times:
+                if dot_times and bool(layout.get('note_continuation_dot_visible', True)):
                     dot_d = float(layout.get('note_continuation_dot_size_mm', 0.0) or 0.0)
                     if dot_d > 0.0:
                         dot_d *= scale
@@ -3030,7 +3135,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
 
             if bool(layout.get('hairpin_visible', True)) and (line_crescendos or line_decrescendos):
                 hairpin_w = float(layout.get('hairpin_line_width_mm', 0.5) or 0.5) * scale
-                hairpin_spread = float(layout.get('hairpin_spread_mm', 5.0) or 5.0) * scale
+                hairpin_spread = float(layout.get('hairpin_width_mm', 5.0) or 5.0) * scale
                 _hg = layout.get('hairpin_text_gap_mm')
                 hairpin_gap = float(_hg if _hg is not None else 5.0)
                 dynamic_symbol_font_size_pt = float(layout.get('dynamic_symbol_font_size_pt', 12.0) or 12.0)
