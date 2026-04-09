@@ -124,7 +124,7 @@ class Layout:
         size_pt=25.0,
         bold=True,
     ))
-    grid_measure_numbering_guide_thickness_mm: float = 1.0
+    grid_measure_numbering_guide_thickness_mm: float = 0.7
     # 'system': number at top of each system; 'barline': number at every barline
     measure_numbering_placement: Literal['system', 'barline'] = 'barline'
     measure_numbering_guide_visible: bool = True
