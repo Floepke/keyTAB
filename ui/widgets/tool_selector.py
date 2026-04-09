@@ -87,7 +87,7 @@ class ToolSelectorWidget(QtWidgets.QListWidget):
             'grace_note':     self.tr("Grace Note"),
             'count_line':     self.tr("Count Line"),
             'dynamic':        self.tr("Dynamics"),
-            'beam':           self.tr("Beam Grouping"),
+            'beam':           self.tr("Note Grouping"),
             'line_break':     self.tr("Line/Page Break Marker"),
             'time_signature': self.tr("Time Signature"),
             'grid_band':      self.tr("Grid Band"),
@@ -102,7 +102,7 @@ class ToolSelectorWidget(QtWidgets.QListWidget):
             'grace_note':     self.tr("Grace Note tool. Enter small ornamental notes without normal rhythmic duration. Use this for trills, mordents, and similar decorations. Click in empty space to add. Drag on existing grace note to edit time+pitch. Right click to delete."),
             'count_line':     self.tr("Count Line tool. Draw guide lines to highlight rhythmic grid subdivisions. Left click on empty space to add. Drag on a handle to edit. Right click on a handle to delete."),
             'dynamic':        self.tr("Dynamics tool. Insert crescendo (<) and decrescendo (>) hairpins, or choose dynamic mode to place standalone dynamic symbols."),
-            'beam':           self.tr("Beam Grouping tool. Overwrite the default time signature beam grouping by placing beam markers. Click/drag to the left/right of the clef to add/edit for left/right hand. Right click left/right of the clef in a marker time range to delete."),
+            'beam':           self.tr("Note Grouping tool. Overwrite the default time signature beam grouping by placing beam markers. Click/drag to the left/right of the clef to add/edit for left/right hand. Right click left/right of the clef in a marker time range to delete."),
             'line_break':     self.tr("Line/Page Break marker tool. Insert line/page breaks. Click to insert a marker. Right-click to remove a marker. Click an existing marker to switch between a Line (L) and Page (P) marker."),
             'time_signature': self.tr("Time Signature tool. Configure meter and base grid subdivision."),
             'grid_band':      self.tr("Grid Band tool. Add and edit grid band markers. Click below pitch 39 for left hand, above 45 for right hand, or between 39-45 for both. Drag a marker to set its length; snapping keeps ends on the current snap size. Drag back to its start for zero duration (renders a red line). Right click deletes markers only."),
@@ -231,17 +231,14 @@ class ToolSelectorDock(QtWidgets.QDockWidget):
         self._update_title()
 
     def _update_title(self) -> None:
-        try:
-            # Reflect current selection in the title bar
-            items = self.selector.selectedItems()
-            if items:
-                name = items[0].data(QtCore.Qt.ItemDataRole.UserRole)
-                label = str(items[0].text())
-                self.setWindowTitle(f"Tool: {label}")
-            else:
-                self.setWindowTitle("Tool: (none)")
-        except Exception:
-            pass
+        # Reflect current selection in the title bar
+        items = self.selector.selectedItems()
+        if items:
+            name = items[0].data(QtCore.Qt.ItemDataRole.UserRole)
+            label = str(items[0].text())
+            self.setWindowTitle(f"{self.tr('Tool')}: {label}")
+        else:
+            self.setWindowTitle(f"{self.tr('Tool')}: (none)")
 
     def set_tooltip_text(self, text: str) -> None:
         self.tooltip_label.setText(str(text or ""))

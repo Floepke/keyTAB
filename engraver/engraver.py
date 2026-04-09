@@ -1097,6 +1097,8 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
             line['pattern'] = ' '.join(patterns)
         
         # Problem solved: avoid clipping A#0 ledger by forcing left edge to key 2.
+        natural_bound_left = int(bound_left)  # stave left before any override
+        natural_bound_right = int(bound_right)  # stave right before any override
         low_key_present = bool(bound_left <= 2 or line['stave_range'] != 'auto' and int(requested_lo) <= 2)
         for item in norm_notes:
             n_t = float(item.get('time', 0.0) or 0.0)
@@ -1107,14 +1109,64 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
             if p in (1, 2, 3):
                 low_key_present = True
                 break
-        if low_key_present:
-            bound_left = min(2, bound_left)
+        # Ledger mode: notes exist in keys 1-3 but the natural stave range
+        # didn't reach down to key 2, so draw short stubs instead of a full line.
+        a0_ledger_mode = bool(low_key_present and int(natural_bound_left) > 2)
+
+        # For manual ranges: notes outside the visible stave groups will get ledger
+        # stubs. Compute the ledger-extended bounds separately for layout width;
+        # the natural stave bounds are kept for origin / barline / grid_left.
+        ledger_bound_left = int(natural_bound_left)
+        ledger_bound_right = int(natural_bound_right)
+        if a0_ledger_mode:
+            ledger_bound_left = min(2, ledger_bound_left)
+        if isinstance(line.get('stave_range'), list):
+            _manual_bound_group_low = _group_index_for_key(int(natural_bound_left))
+            _manual_bound_group_high = _group_index_for_key(int(natural_bound_right))
+            for item in norm_notes:
+                n_t = float(item.get('time', 0.0) or 0.0)
+                n_end = float(item.get('end', 0.0) or 0.0)
+                p = int(item.get('pitch', 0) or 0)
+                if op_time.ge(n_t, float(line['time_end'])) or op_time.le(n_end, float(line['time_start'])):
+                    continue
+                if p < 1 or p > PIANO_KEY_AMOUNT:
+                    continue
+                g = _group_index_for_key(p)
+                if g < _manual_bound_group_low:
+                    for grp in line_groups[g:_manual_bound_group_low]:
+                        for k in grp.get('keys', []):
+                            if int(k) < ledger_bound_left:
+                                ledger_bound_left = int(k)
+                elif g > _manual_bound_group_high:
+                    for grp in line_groups[_manual_bound_group_high + 1:g + 1]:
+                        for k in grp.get('keys', []):
+                            if int(k) > ledger_bound_right:
+                                ledger_bound_right = int(k)
+
+        # bound_left/bound_right stay at the natural stave range for origin and
+        # barline purposes. Ledger extents are tracked separately.
         line['low_key_left'] = bool(low_key_present)
+        line['a0_ledger_mode'] = bool(a0_ledger_mode)
+        line['natural_bound_left'] = int(natural_bound_left)
+        line['natural_bound_right'] = int(natural_bound_right)
+        line['ledger_bound_left'] = int(ledger_bound_left)
+        line['ledger_bound_right'] = int(ledger_bound_right)
         line['range'] = [int(bound_left), int(bound_right)]
+        # stave_width = natural stave span (used for barlines, origin, grid_left/right).
+        # stave_plus_ledger_width = full visual span including ledger stubs (used for pagination).
+        # ledger_left_overhang = how far ledger stubs extend to the LEFT of the natural stave start.
+        # In the drawing pass line_x_start is shifted right by this amount so ledger stubs
+        # land inside the allocated column width rather than spilling to the right.
         min_pos = key_positions.get(bound_left, 0.0)
         max_pos = key_positions.get(bound_right, min_pos)
         stave_width = max(0.0, max_pos - min_pos)
+        ledger_min_pos = key_positions.get(ledger_bound_left, min_pos)
+        ledger_max_pos = key_positions.get(ledger_bound_right, max_pos)
+        ledger_left_overhang = max(0.0, float(min_pos) - float(ledger_min_pos))
+        stave_plus_ledger_width = max(stave_width, ledger_max_pos - ledger_min_pos)
         line['stave_width'] = float(stave_width)
+        line['stave_plus_ledger_width'] = float(stave_plus_ledger_width)
+        line['ledger_left_overhang'] = float(ledger_left_overhang)
         base_margin_left = float(line.get('margin_left', 0.0) or 0.0)
         ts_lane_width = 0.0
         ts_lane_right_offset = 0.0
@@ -1159,7 +1211,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
         line['ts_lane_width'] = ts_lane_width
         line['ts_lane_right_offset'] = ts_lane_right_offset
         line['ts_lane_padding_mm'] = ts_lane_padding_mm
-        line['total_width'] = float(line['margin_left'] + stave_width + line['margin_right'])
+        line['total_width'] = float(line['margin_left'] + stave_plus_ledger_width + line['margin_right'])
         line['bound_left'] = int(bound_left)
         line['bound_right'] = int(bound_right)
 
@@ -1310,7 +1362,10 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
         gap = leftover / float(len(page) + 1)
         x_cursor = page_left + gap
         for line in page:
-            line_x_start = x_cursor + float(line['margin_left'])
+            # Shift line_x_start right by the left ledger overhang so left-side
+            # ledger stubs land inside the allocated column width.
+            _ledger_left_overhang = float(line.get('ledger_left_overhang', 0.0) or 0.0)
+            line_x_start = x_cursor + float(line['margin_left']) + _ledger_left_overhang
             line_x_end = line_x_start + float(line['stave_width'])
             header_offset = 0.0
             if page_index == 0:
@@ -1324,10 +1379,14 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
 
             bound_left = int(line.get('bound_left', line['range'][0]))
             bound_right = int(line.get('bound_right', line['range'][1]))
+            # Natural stave bounds (before any ledger expansion) for origin and barline spans.
+            natural_bound_left = int(line.get('natural_bound_left', bound_left))
+            natural_bound_right = int(line.get('natural_bound_right', bound_right))
             origin = float(key_positions.get(bound_left, 0.0))
             manual_range = isinstance(line.get('stave_range'), list) and len(line.get('stave_range')) >= 2
-            bound_group_low = _group_index_for_key(bound_left) if manual_range else None
-            bound_group_high = _group_index_for_key(bound_right) if manual_range else None
+            # Use natural stave bounds for ledger group comparisons.
+            bound_group_low = _group_index_for_key(natural_bound_left) if manual_range else None
+            bound_group_high = _group_index_for_key(natural_bound_right) if manual_range else None
             ledger_drawn: set[tuple[int, int]] = set()
 
             def _key_to_x(key: int) -> float:
@@ -1663,8 +1722,10 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                     )
 
             # Problem solved: draw barlines and beat lines from the base grid.
-            grid_left = line_x_start
-            grid_right = line_x_start + float(line['stave_width'])
+            # grid_left/grid_right always span the natural stave range only.
+            # Ledger stubs extend beyond this but are drawn per-note.
+            grid_left = _key_to_x(natural_bound_left)
+            grid_right = _key_to_x(natural_bound_right)
 
             line_avg_split_pitch = 43.0
             line_pitches: list[int] = []
@@ -2541,10 +2602,13 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                 if not visible_keys:
                     visible_keys = [k for k in range(int(line['range'][0]), int(line['range'][1]) + 1) if k in line_keys]
                 # Special-case low register: draw A#0 (key 2) line when keys 1-3 appear.
+                # In ledger mode (manual range that excludes key 2) the full line is
+                # suppressed; short ledger stubs are drawn per note instead.
                 low_key_present = bool(line.get('low_key_left', False))
-                if low_key_present:
+                a0_ledger_mode = bool(line.get('a0_ledger_mode', False))
+                if low_key_present and not a0_ledger_mode:
                     x_pos = _key_to_x(2)
-                    width_mm = max(stave_three_w, semitone_mm / 3.0)
+                    width_mm = stave_three_w
                     du.add_line(
                         x_pos,
                         y1,
@@ -2563,13 +2627,13 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                     is_clef_line = key in (41, 43)
                     is_three_line = key in key_class_filter('FGA')
                     if is_clef_line:
-                        width_mm = max(stave_clef_w, semitone_mm / 6.0)
+                        width_mm = stave_clef_w
                         dash = clef_dash
                     elif is_three_line:
-                        width_mm = max(stave_three_w, semitone_mm / 3.0)
+                        width_mm = stave_three_w
                         dash = None
                     else:
-                        width_mm = max(stave_two_w, semitone_mm / 10.0)
+                        width_mm = stave_two_w
                         dash = None
                     du.add_line(
                         x_pos,
@@ -2957,15 +3021,38 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                     )
 
                 def _draw_manual_ledgers_for_pitch_at_y(pitch_value: int, y_center: float) -> None:
+                    if not bool(layout.get('stave_visible', True)):
+                        return
+                    # A#0 (key 2) sits outside all stave groups; draw its short ledger
+                    # stub whenever the note is in the low-register (keys 1-3) and the
+                    # natural stave range starts above key 2.
+                    if int(pitch_value) in (1, 2, 3) and bool(line.get('a0_ledger_mode', False)):
+                        key_sig_a0 = (2, int(round(float(y_center) * 1000)))
+                        if key_sig_a0 not in ledger_drawn:
+                            ledger_drawn.add(key_sig_a0)
+                            y_s1 = float(y_center) - w
+                            y_s2 = y_s1 + max(0.0, stave_ledger_len)
+                            du.add_line(
+                                _key_to_x(2),
+                                y_s1 - semitone_mm * 2.0,
+                                _key_to_x(2),
+                                y_s2 - semitone_mm * 2.0,
+                                color=notation_color,
+                                width_mm=stave_three_w,
+                                dash_pattern=None,
+                                id=0,
+                                tags=['stave'],
+                            )
+                        # Fall through: also draw any normal ledger groups below the stave.
                     if not (manual_range and bool(layout.get('stave_visible', True))):
                         return
                     ledger_groups: list[dict] = []
-                    if pitch_value < bound_left:
+                    if pitch_value < natural_bound_left:
                         g_start = _group_index_for_key(pitch_value)
                         g_end = int(bound_group_low or 0) - 1
                         if g_start <= g_end:
                             ledger_groups = line_groups[g_start:g_end + 1]
-                    elif pitch_value > bound_right:
+                    elif pitch_value > natural_bound_right:
                         g_start = int(bound_group_high or 0) + 1
                         g_end = _group_index_for_key(pitch_value)
                         if g_start <= g_end:
@@ -2980,13 +3067,13 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                             is_clef_line = int(key) in (41, 43)
                             is_three_line = int(key) in key_class_filter('FGA')
                             if is_clef_line:
-                                width_mm = max(stave_clef_w, semitone_mm / 6.0)
+                                width_mm = stave_clef_w
                                 dash = clef_dash
                             elif is_three_line:
-                                width_mm = max(stave_three_w, semitone_mm / 3.0)
+                                width_mm = stave_three_w
                                 dash = None
                             else:
-                                width_mm = max(stave_two_w, semitone_mm / 10.0)
+                                width_mm = stave_two_w
                                 dash = None
                             key_sig = (int(key), int(round(float(y_center) * 1000)))
                             if key_sig in ledger_drawn:
@@ -2994,9 +3081,9 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                             ledger_drawn.add(key_sig)
                             du.add_line(
                                 x_pos,
-                                y_seg1,
+                                y_seg1 - semitone_mm * 2.0,
                                 x_pos,
-                                y_seg2,
+                                y_seg2 - semitone_mm * 2.0,
                                 color=notation_color,
                                 width_mm=width_mm,
                                 dash_pattern=dash,

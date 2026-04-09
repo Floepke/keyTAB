@@ -72,7 +72,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
         # Periodic autosave (session + project) to reduce per-action latency
         self._autosave_timer = QtCore.QTimer(self)
-        self._autosave_timer.timeout.connect(lambda: self.file_manager.autosave_all())
+        self._autosave_timer.timeout.connect(self._on_autosave_timer)
         self._apply_autosave_preferences()
 
         # Debounced app-state persistence (scroll position, page index, dialog tab, etc.)
@@ -1129,21 +1129,41 @@ class MainWindow(QtWidgets.QMainWindow):
             sc.app_state = AppState()
         return sc.app_state
 
-    def _resolve_app_state_defaults(self) -> AppState:
-        """Return app state; if not present in file, seed from appdata defaults."""
+    def _sync_ui_to_app_state(self) -> None:
+        """Copy current UI/session values into SCORE.app_state before persisting."""
         app_state = self._current_app_state()
-        sc = self.file_manager.current()
-        if bool(getattr(sc, '_app_state_from_file', False)):
-            return app_state
-        adm = get_appdata_manager()
-        app_state.zoom_mm_per_quarter = float(adm.get("zoom_mm_per_quarter", app_state.zoom_mm_per_quarter) or app_state.zoom_mm_per_quarter)
-        app_state.print_view_page_index = int(adm.get("print_view_page_index", app_state.print_view_page_index) or app_state.print_view_page_index)
-        app_state.editor_scroll_pos = int(adm.get("editor_scroll_pos", app_state.editor_scroll_pos) or app_state.editor_scroll_pos)
-        app_state.snap_base = int(adm.get("snap_base", app_state.snap_base) or app_state.snap_base)
-        app_state.snap_divide = int(adm.get("snap_divide", app_state.snap_divide) or app_state.snap_divide)
-        app_state.selected_tool = str(adm.get("selected_tool", app_state.selected_tool) or app_state.selected_tool)
-        app_state.note_velocity_mode = bool(adm.get("note_velocity_mode", getattr(app_state, 'note_velocity_mode', False)))
-        return app_state
+        try:
+            app_state.print_view_page_index = max(0, int(getattr(self, '_page_counter', 0) or 0))
+        except Exception:
+            pass
+        try:
+            app_state.editor_scroll_pos = int(self.editor_vscroll.value())
+        except Exception:
+            pass
+        try:
+            if hasattr(self, 'snap_dock') and hasattr(self.snap_dock, 'selector'):
+                app_state.snap_base = int(self.snap_dock.selector.get_snap_base() or app_state.snap_base)
+                app_state.snap_divide = int(self.snap_dock.selector.get_snap_divide() or app_state.snap_divide)
+        except Exception:
+            pass
+        try:
+            if hasattr(self, 'tool_dock') and hasattr(self.tool_dock, 'selector'):
+                items = self.tool_dock.selector.selectedItems()
+                if items:
+                    selected = items[0].data(QtCore.Qt.ItemDataRole.UserRole)
+                    if isinstance(selected, str) and selected:
+                        app_state.selected_tool = selected
+        except Exception:
+            pass
+
+    def _resolve_app_state_defaults(self) -> AppState:
+        """Return app state from the currently loaded SCORE only."""
+        return self._current_app_state()
+
+    def _on_autosave_timer(self) -> None:
+        """Autosave tick: sync UI state into SCORE first, then persist."""
+        self._sync_ui_to_app_state()
+        self.file_manager.autosave_all()
 
     def _restore_app_state_from_score(self) -> None:
         self._is_restoring_app_state = True
@@ -1200,6 +1220,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def _flush_app_state_save(self) -> None:
         """Persist app state to session and optionally autosave project."""
+        self._sync_ui_to_app_state()
         auto_save_enabled, _ = self._read_autosave_preferences()
         if not auto_save_enabled:
             return
@@ -1843,6 +1864,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self._show_file_action_status(self.tr("Opened"))
 
     def _file_save(self) -> None:
+        self._sync_ui_to_app_state()
         if self.file_manager.save():
             if self.file_manager.path() is not None:
                 self._session_restore_mode = False
@@ -1851,6 +1873,7 @@ class MainWindow(QtWidgets.QMainWindow):
             self._show_file_action_status(self.tr("Saved"))
 
     def _file_save_as(self) -> None:
+        self._sync_ui_to_app_state()
         if self.file_manager.save_as():
             if self.file_manager.path() is not None:
                 self._session_restore_mode = False
@@ -3296,6 +3319,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def closeEvent(self, ev: QtGui.QCloseEvent) -> None:
         # Unified close handling: save session and close without prompting.
+        self._sync_ui_to_app_state()
         self.file_manager.autosave_current()
         pm = get_preferences_manager()
         save_on_exit = bool(pm.get("save_on_exit", True))

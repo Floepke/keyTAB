@@ -105,6 +105,35 @@ class BarlineTool(BaseTool):
         else:
             score.new_double_bar(time=float(t))
 
+    def _resolve_click_time(self, t_click: float) -> Optional[float]:
+        """Return the snapped time for a click: grid-snapped for repeat symbols,
+        barline-snapped for double bar."""
+        if self._mode in (self._MODE_START, self._MODE_END):
+            return float(self._editor.snap_time(t_click))
+        return self._nearest_barline_time(t_click)
+
+    def _nearest_event_time(self, t: float) -> Optional[float]:
+        """Find the time of the nearest placed barline event (any type) to t."""
+        score = self._editor.current_score()
+        all_times: list[float] = []
+        for ev_list in [
+            getattr(score.events, "start_repeat", []) or [],
+            getattr(score.events, "end_repeat", []) or [],
+            getattr(score.events, "double_bar", []) or [],
+        ]:
+            for ev in ev_list:
+                all_times.append(float(getattr(ev, "time", 0.0) or 0.0))
+        if not all_times:
+            return None
+        best = all_times[0]
+        best_dt = abs(float(t) - best)
+        for ev_t in all_times[1:]:
+            dt = abs(float(t) - float(ev_t))
+            if dt < best_dt:
+                best = ev_t
+                best_dt = dt
+        return float(best)
+
     def _has_mode_event_at_barline(self, score, t_bar: float, op: Operator) -> bool:
         # Block duplicates of the currently selected symbol type.
         # Cross-type combos at one barline (e.g. end+start) stay allowed.
@@ -118,7 +147,7 @@ class BarlineTool(BaseTool):
             return
         score = self._editor.current_score()
         t_click = float(self._editor.y_to_time(y))
-        t_bar = self._nearest_barline_time(t_click)
+        t_bar = self._resolve_click_time(t_click)
         if t_bar is None:
             return
         op = Operator(SHORTEST_DURATION)
@@ -136,7 +165,7 @@ class BarlineTool(BaseTool):
             return
         score = self._editor.current_score()
         t_click = float(self._editor.y_to_time(y))
-        t_bar = self._nearest_barline_time(t_click)
+        t_bar = self._nearest_event_time(t_click)
         if t_bar is None:
             return
         op = Operator(SHORTEST_DURATION)

@@ -43,7 +43,7 @@ class Layout:
     note_stopsign_thickness_mm: float = 1.25
     note_leftdot_visible: bool = False
     note_continuation_dot_visible: bool = True
-    note_continuation_dot_size_mm: float = 2.10
+    note_continuation_dot_size_mm: float = 2.5
     note_midinote_visible: bool = False
     note_midinote_left_color: str = '#ccc'
     note_midinote_right_color: str = '#ccc'
@@ -171,7 +171,7 @@ class Layout:
     stave_two_line_thickness_mm: float = 0.5
     stave_three_line_thickness_mm: float = 1.1
     stave_clef_line_thickness_mm: float = 0.5
-    stave_ledger_line_length_mm: float = 10.0
+    stave_ledger_line_length_mm: float = 13.0
     stave_clef_line_dash_pattern_mm: list[float] = field(default_factory=lambda: [3.0])  # Dash pattern for clef lines (e.g., [dash_length, gap_length])
 
 LAYOUT_FLOAT_CONFIG: dict[str, dict[str, float]] = {
