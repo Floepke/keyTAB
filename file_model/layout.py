@@ -108,7 +108,7 @@ class Layout:
     grid_band_start_phase: Literal['dark', 'light'] = 'dark'
 
     # Time signature indicator type (global)
-    time_signature_indicator_type: Literal['classical', 'klavarskribo', 'both'] = 'both'
+    time_signature_indicator_type: Literal['classical', 'klavarskribo', 'classical & klavarskribo'] = 'classical & klavarskribo'
     
     # Time signature indicator lane (left of stave)
     time_signature_indicator_lane_width_mm: float = 30.0

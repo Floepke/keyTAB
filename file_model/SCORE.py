@@ -104,6 +104,8 @@ def _apply_legacy_conversion(data: dict) -> dict:
 	if isinstance(data, dict):
 		layout = data.get('layout', None)
 		if isinstance(layout, dict):
+			if layout.get('time_signature_indicator_type') == 'both':
+				layout['time_signature_indicator_type'] = 'classical & klavarskribo'
 			if 'hairpin_font_size_pt' not in layout and 'hairpin_text_size_pt' in layout:
 				layout['hairpin_font_size_pt'] = layout.get('hairpin_text_size_pt')
 			if 'dynamic_symbol_background_padding_mm' not in layout:

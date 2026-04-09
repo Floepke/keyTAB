@@ -25,7 +25,7 @@ class TimeSignatureDialog(QtWidgets.QDialog):
         self.setWindowModality(QtCore.Qt.WindowModality.NonModal)
 
         self._editor_widget = editor_widget
-        self._indicator_type = str(indicator_type or 'both')
+        self._indicator_type = str(indicator_type or 'classical & klavarskribo')
         self._numer = int(initial_numer or 4)
         self._denom = int(initial_denom or 4)
         if self._denom not in VALID_DENOMS:
