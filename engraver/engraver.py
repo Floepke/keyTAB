@@ -2106,17 +2106,35 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                     min_seg = max(0.05, end_thin_w * 0.5)
                     for c0, c1 in stop_cuts:
                         if c0 - seg_x > min_seg:
-                            du.add_line(seg_x, y_thin, c0, y_thin, color=grid_color, width_mm=end_thin_w, id=0, tags=['grid_line', 'final_barline_thin'], dash_pattern=None)
+                            du.add_line(
+                                seg_x, 
+                                y_thin - semitone_mm * .5, 
+                                c0, 
+                                y_thin - semitone_mm * .5, 
+                                color=grid_color, 
+                                width_mm=end_thin_w * 1.5, 
+                                id=0, 
+                                tags=['grid_line', 'final_barline_thin'], 
+                                dash_pattern=None)
                         seg_x = max(seg_x, c1)
                     if float(grid_right) - seg_x > min_seg:
-                        du.add_line(seg_x, y_thin, grid_right, y_thin, color=grid_color, width_mm=end_thin_w, id=0, tags=['grid_line', 'final_barline_thin'], dash_pattern=None)
+                        du.add_line(
+                            seg_x, 
+                            y_thin - semitone_mm * .5, 
+                            grid_right, 
+                            y_thin - semitone_mm * .5, 
+                            color=grid_color, 
+                            width_mm=end_thin_w * 1.5, 
+                            id=0, 
+                            tags=['grid_line', 'final_barline_thin'], 
+                            dash_pattern=None)
                 du.add_line(
                     grid_left, 
                     y_end, 
                     grid_right, 
                     y_end, 
                     color=grid_color, 
-                    width_mm=end_thick_w, 
+                    width_mm=end_thick_w * 1.5, 
                     id=0, 
                     tags=['grid_line', 'final_barline_thick'], 
                     dash_pattern=None
