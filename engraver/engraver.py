@@ -1001,22 +1001,6 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
             patterns.append(str(grp.get('pattern', '')))
         return groups, keys, int(keys[0]), int(keys[-1]), False, ' '.join(patterns)
 
-    def _notes_in_window_stats(t0: float, t1: float) -> tuple[int, int | None, int | None]:
-        """Return note count and pitch bounds overlapping a time window."""
-        count = 0
-        lo = None
-        hi = None
-        for n in notes:
-            n_t = float(n.get('time', 0.0) or 0.0)
-            n_d = float(n.get('duration', 0.0) or 0.0)
-            n_end = n_t + n_d
-            p = int(n.get('pitch', 0) or 0)
-            if op_time.lt(n_t, t1) and op_time.gt(n_end, t0) and 1 <= p <= PIANO_KEY_AMOUNT:
-                count += 1
-                lo = p if lo is None else min(lo, p)
-                hi = p if hi is None else max(hi, p)
-        return count, lo, hi
-
     def _build_key_positions(start_key: int, end_key: int, semitone_mm: float) -> dict[int, float]:
         """Build x positions for keys, adding extra spacing after B/E.
 
@@ -1333,28 +1317,6 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                 id=0,
                 tags=['copyright'],
             )
-            if not pageno:
-                credit_size = max(1.0, float(footer_size))
-                ts_xb, _, ts_w_mm, _ = du._get_text_extents_mm(
-                    'keyTAB',
-                    footer_family,
-                    credit_size,
-                    False,
-                    True,
-                )
-                ts_x = (page_w - page_right) - (ts_xb + ts_w_mm)
-                du.add_text(
-                    ts_x,
-                    footer_baseline_y,
-                    'keyTAB',
-                    family=footer_family,
-                    size_pt=credit_size,
-                    bold=True,
-                    italic=False,
-                    color=notation_color,
-                    id=0,
-                    tags=['copyright'],
-                )
         if not page:
             continue
         used_width = sum(float(l['total_width']) for l in page)
@@ -1910,6 +1872,24 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                             min(x_note, x_stem_tip) - stem_collision_pad - barline_symbol_gap_mm,
                             max(x_note, x_stem_tip) + stem_collision_pad + barline_symbol_gap_mm,
                         ))
+
+                # Chord connector lines span from lowest to highest pitch in same-hand chords.
+                # Without this, the connector line between note heads can cross a barline gap.
+                if bool(layout.get('chord_connect_visible', True)):
+                    for chord_hand_key in ('l', 'r'):
+                        chord_notes_at_tick = [
+                            it for it in line_notes_for_barlines
+                            if op_time.eq(float(it.get('time', 0.0) or 0.0), float(ticks))
+                            and str(it.get('hand', 'l') or 'l') == chord_hand_key
+                        ]
+                        if len(chord_notes_at_tick) >= 2:
+                            pitches_at_tick = [int(n.get('pitch', 0) or 0) for n in chord_notes_at_tick]
+                            x_lo = _key_to_x(min(pitches_at_tick))
+                            x_hi = _key_to_x(max(pitches_at_tick))
+                            intervals.append((
+                                x_lo - stem_collision_pad - barline_symbol_gap_mm,
+                                x_hi + stem_collision_pad + barline_symbol_gap_mm,
+                            ))
 
                 for seg in beam_segments_for_barlines:
                     t0 = float(seg.get('t_start', 0.0) or 0.0)

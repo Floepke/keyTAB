@@ -290,6 +290,24 @@ class GridDrawerMixin:
                         min(x_note, x_stem_tip) - stem_collision_pad - barline_symbol_gap_mm,
                         max(x_note, x_stem_tip) + stem_collision_pad + barline_symbol_gap_mm,
                     ))
+            # Chord connector lines span from lowest to highest pitch in same-hand chords.
+            # Without this, the connector line between note heads can cross a barline gap.
+            chord_connect_visible = bool(getattr(layout, 'chord_connect_visible', True)) if layout is not None else True
+            if chord_connect_visible:
+                for chord_hand_key in ('l', 'r'):
+                    chord_notes_at_tick = [
+                        n for n in notes_view
+                        if _barline_time_eq(float(getattr(n, 'time', 0.0) or 0.0), float(ticks))
+                        and str(getattr(n, 'hand', 'l') or 'l') == chord_hand_key
+                    ]
+                    if len(chord_notes_at_tick) >= 2:
+                        pitches_at_tick = [int(getattr(n, 'pitch', 0) or 0) for n in chord_notes_at_tick]
+                        x_lo = float(self.pitch_to_x(min(pitches_at_tick)))
+                        x_hi = float(self.pitch_to_x(max(pitches_at_tick)))
+                        intervals.append((
+                            x_lo - stem_collision_pad - barline_symbol_gap_mm,
+                            x_hi + stem_collision_pad + barline_symbol_gap_mm,
+                        ))
             for seg in beam_segments:
                 t0 = float(seg.get('t_start', 0.0) or 0.0)
                 t1 = float(seg.get('t_end', 0.0) or 0.0)
