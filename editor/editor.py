@@ -589,6 +589,13 @@ class Editor(QtCore.QObject,
             snap = self._ctlz.undo()
         if snap is not None:
             self._file_manager.replace_current(snap)
+            # The SCORE instance was replaced; clear caches that may hold old object references.
+            self._draw_cache = None
+            self._reuse_draw_cache_once = False
+            self._note_time_cache_key = None
+            self._note_time_cache_values = None
+            self._grid_time_cache_key = None
+            self._grid_time_cache_values = None
             self._file_manager.mark_dirty()
             self.score_changed.emit()
 
@@ -600,6 +607,13 @@ class Editor(QtCore.QObject,
             snap = self._ctlz.redo()
         if snap is not None:
             self._file_manager.replace_current(snap)
+            # The SCORE instance was replaced; clear caches that may hold old object references.
+            self._draw_cache = None
+            self._reuse_draw_cache_once = False
+            self._note_time_cache_key = None
+            self._note_time_cache_values = None
+            self._grid_time_cache_key = None
+            self._grid_time_cache_values = None
             self._file_manager.mark_dirty()
             self.score_changed.emit()
 
@@ -1623,6 +1637,26 @@ class Editor(QtCore.QObject,
         self._sel_max_pitch = 88
         self._selection_active = True
 
+    def _selected_notes_from_model(self) -> list:
+        """Return selected notes resolved from the live SCORE model."""
+        score: SCORE | None = self.current_score()
+        if score is None or not self._selection_active:
+            return []
+        a = float(min(self._sel_start_units, self._sel_end_units))
+        b = float(max(self._sel_start_units, self._sel_end_units)) - 0.1
+        min_p = max(1, min(88, int(getattr(self, '_sel_min_pitch', 1))))
+        max_p = max(1, min(88, int(getattr(self, '_sel_max_pitch', 88))))
+        out = []
+        for n in list(getattr(score.events, 'note', []) or []):
+            try:
+                t0 = float(getattr(n, 'time', 0.0) or 0.0)
+                p0 = int(getattr(n, 'pitch', 0) or 0)
+            except Exception:
+                continue
+            if a <= t0 <= b and min_p <= p0 <= max_p:
+                out.append(n)
+        return out
+
     def transpose_selected_notes(self, delta_semitones: int) -> bool:
         """Move selected notes by semitone steps and shift selection range.
 
@@ -1634,26 +1668,7 @@ class Editor(QtCore.QObject,
         delta = int(delta_semitones)
         if delta == 0:
             return False
-        # Prefer cached viewport notes when selection is fully within cache range
-        a = float(min(self._sel_start_units, self._sel_end_units))
-        b = float(max(self._sel_start_units, self._sel_end_units - 0.1))
-        min_p = max(1, min(88, int(getattr(self, '_sel_min_pitch', 1))))
-        max_p = max(1, min(88, int(getattr(self, '_sel_max_pitch', 88))))
-        notes = []
-        used_cache = False
-        cache = getattr(self, '_draw_cache', None) or {}
-        t_begin = float(cache.get('time_begin', float('inf')))
-        t_end = float(cache.get('time_end', float('-inf')))
-        if a >= t_begin and b <= t_end:
-            for n in list(cache.get('notes_view') or []):
-                t0 = float(getattr(n, 'time', 0.0) or 0.0)
-                p = int(getattr(n, 'pitch', 0) or 0)
-                if a <= t0 <= b and min_p <= p <= max_p:
-                    notes.append(n)
-            used_cache = True
-        if not notes:
-            sel = self.detect_events_from_time_window(self._sel_start_units, self._sel_end_units - 0.1)
-            notes = sel.get('note', []) if isinstance(sel, dict) else []
+        notes = self._selected_notes_from_model()
         if not notes:
             return False
         updated = False
@@ -1670,8 +1685,6 @@ class Editor(QtCore.QObject,
         self._sel_min_pitch = max(1, min(88, int(self._sel_min_pitch) + delta))
         self._sel_max_pitch = max(1, min(88, int(self._sel_max_pitch) + delta))
         self._sel_anchor_pitch = max(1, min(88, int(self._sel_anchor_pitch) + delta))
-        if used_cache:
-            self._reuse_draw_cache_once = True
         # Lightweight redraw now; snapshot is debounced to avoid lag on key repeat
         w = getattr(self, 'widget', None)
         if w is not None and hasattr(w, 'force_full_redraw'):
@@ -1706,8 +1719,7 @@ class Editor(QtCore.QObject,
                 return max(0.0, float(nearest_i - 1) * units)
             return max(0.0, float(math.floor(q)) * units)
 
-        sel = self.detect_events_from_time_window(self._sel_start_units, self._sel_end_units - 0.1)
-        notes = sel.get('note', []) if isinstance(sel, dict) else []
+        notes = self._selected_notes_from_model()
         if not notes:
             return False
 
@@ -1751,8 +1763,7 @@ class Editor(QtCore.QObject,
         if mode not in ('start/end', 'start', 'end'):
             mode = 'start/end'
         units = float(max(1e-6, getattr(self, 'snap_size_units', 0.0) or 0.0))
-        sel = self.detect_events_from_time_window(self._sel_start_units, self._sel_end_units - 0.1)
-        notes = sel.get('note', []) if isinstance(sel, dict) else []
+        notes = self._selected_notes_from_model()
         if not notes:
             return False
 
@@ -1795,8 +1806,7 @@ class Editor(QtCore.QObject,
         h = str(hand)
         if h not in ('l', 'r'):
             return False
-        sel = self.detect_events_from_time_window(self._sel_start_units, self._sel_end_units - 0.1)
-        notes = sel.get('note', []) if isinstance(sel, dict) else []
+        notes = self._selected_notes_from_model()
         if not notes:
             return False
         updated = False
