@@ -19,6 +19,8 @@ class TextDialog(QtWidgets.QDialog):
 
     def __init__(self, ev, default_font: LayoutFont | None, parent=None) -> None:
         super().__init__(parent)
+        self.setWindowFlag(QtCore.Qt.WindowType.WindowMinMaxButtonsHint, True)
+        self.setSizeGripEnabled(True)
         self.setWindowTitle(self.tr("Edit Text"))
         self._default_font = deepcopy(default_font or LayoutFont())
 

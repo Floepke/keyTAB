@@ -130,6 +130,31 @@ def has_system_font(family: str) -> bool:
     return normalized not in _EMBEDDED_FONT_NAMES
 
 
+def has_installed_embedded_font_file(name: str) -> bool:
+    """Return True if the embedded font file is present in the user font directory.
+
+    This is a pragmatic persistence check used by startup install prompts.
+    On Windows, newly added per-user fonts are not always immediately visible
+    via QFontDatabase in a fresh process.
+    """
+    data = _decoded_font_bytes(name)
+    if not data:
+        return False
+    dest_dir = _user_font_dir()
+    if not dest_dir.exists():
+        return False
+
+    ext = _guess_font_extension(data)
+    primary = dest_dir / f"{name}{ext}"
+    if primary.exists():
+        return True
+
+    for candidate_ext in _FONT_EXTS:
+        if (dest_dir / f"{name}{candidate_ext}").exists():
+            return True
+    return False
+
+
 def install_embedded_font_to_system(name: str) -> tuple[bool, str]:
     data = _decoded_font_bytes(name)
     if not data:
@@ -142,6 +167,13 @@ def install_embedded_font_to_system(name: str) -> tuple[bool, str]:
     ext = _guess_font_extension(data)
     target = dest_dir / f"{name}{ext}"
     try:
+        if target.exists():
+            try:
+                if target.read_bytes() == data:
+                    _refresh_system_font_cache(target)
+                    return True, str(target)
+            except Exception:
+                pass
         target.write_bytes(data)
     except Exception as exc:
         return False, f"Failed to write font: {exc}"

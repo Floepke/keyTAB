@@ -26,6 +26,8 @@ class ScriptDialog(QtWidgets.QDialog):
         parent=None,
     ) -> None:
         super().__init__(parent)
+        self.setWindowFlag(QtCore.Qt.WindowType.WindowMinMaxButtonsHint, True)
+        self.setSizeGripEnabled(True)
         self._spec = spec
         self._on_preview = on_preview
         self._on_apply = on_apply

@@ -15,6 +15,8 @@ class FluidSynthReverbConfigDialog(QtWidgets.QDialog):
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
         tr = self.tr
+        self.setWindowFlag(QtCore.Qt.WindowType.WindowMinMaxButtonsHint, True)
+        self.setSizeGripEnabled(True)
         self.setWindowTitle(tr("FluidSynth Reverb Configuration"))
         # Make dialog non-modal (modeless) so it doesn't block the main window
         self.setModal(False)

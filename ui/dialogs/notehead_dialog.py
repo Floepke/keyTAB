@@ -88,6 +88,8 @@ class NoteheadDialog(QtWidgets.QDialog):
         parent: Optional[QtWidgets.QWidget] = None,
     ) -> None:
         super().__init__(parent)
+        self.setWindowFlag(QtCore.Qt.WindowType.WindowMinMaxButtonsHint, True)
+        self.setSizeGripEnabled(True)
         self.setWindowTitle(self.tr("Notehead Override"))
         self.setModal(False)
         self.setWindowModality(QtCore.Qt.WindowModality.NonModal)

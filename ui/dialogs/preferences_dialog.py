@@ -14,6 +14,8 @@ class PreferencesDialog(QtWidgets.QDialog):
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
         tr = self.tr
+        self.setWindowFlag(QtCore.Qt.WindowType.WindowMinMaxButtonsHint, True)
+        self.setSizeGripEnabled(True)
         self.setWindowFlags(self.windowFlags())
         self.setWindowTitle(tr("Preferences"))
         self.setModal(False)

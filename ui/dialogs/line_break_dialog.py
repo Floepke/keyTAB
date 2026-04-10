@@ -13,6 +13,8 @@ class BulkKeyRangeDialog(QtWidgets.QDialog):
     
     def __init__(self, parent=None, default_low: int = 1, default_high: int = 88) -> None:
         super().__init__(parent)
+        self.setWindowFlag(QtCore.Qt.WindowType.WindowMinMaxButtonsHint, True)
+        self.setSizeGripEnabled(True)
         self.setWindowTitle(self.tr("Set All Key Ranges"))
         self.setModal(False)
         self.setWindowModality(QtCore.Qt.NonModal)
@@ -133,6 +135,8 @@ class LineBreakDialog(QtWidgets.QDialog):
                  measure_resolver: Optional[Callable[[float], int]] = None,
                  on_change: Optional[Callable[[], None]] = None) -> None:
         super().__init__(parent)
+        self.setWindowFlag(QtCore.Qt.WindowType.WindowMinMaxButtonsHint, True)
+        self.setSizeGripEnabled(True)
         self.setWindowTitle(self.tr("Line/Page Break"))
         self.setModal(False)
         self.setWindowModality(QtCore.Qt.NonModal)
@@ -668,6 +672,8 @@ class LineBreakDialog(QtWidgets.QDialog):
 
     def _prompt_margin_value(self, title: str, label: str, initial_value: float) -> Optional[float]:
         dlg = QtWidgets.QDialog(self)
+        dlg.setWindowFlag(QtCore.Qt.WindowType.WindowMinMaxButtonsHint, True)
+        dlg.setSizeGripEnabled(True)
         dlg.setWindowTitle(title)
         dlg.setModal(True)
         layout = QtWidgets.QVBoxLayout(dlg)

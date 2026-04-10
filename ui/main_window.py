@@ -3109,8 +3109,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def _maybe_prompt_fonts_install(self) -> None:
         adm = get_appdata_manager()
-        if bool(adm.get("fonts_install_ok", False)):
-            return
+        fonts_install_ok = bool(adm.get("fonts_install_ok", False))
 
         fonts = [
             {
@@ -3144,17 +3143,24 @@ class MainWindow(QtWidgets.QMainWindow):
                 "desc": "LelandText for dynamic symbols (f/mp/p etc...).",
             },
         ]
-        from fonts import has_system_font, install_embedded_font_to_system
+        from fonts import (
+            has_system_font,
+            has_installed_embedded_font_file,
+            install_embedded_font_to_system,
+        )
         missing: list[dict] = []
         for f in fonts:
             check_name = str(f.get("check_name", f["family"]))
-            if not has_system_font(check_name):
+            if not has_system_font(check_name) and not has_installed_embedded_font_file(str(f.get("key", ""))):
                 missing.append(f)
         if not missing:
-            adm.set("fonts_install_ok", True)
-            adm.save()
+            if not fonts_install_ok:
+                adm.set("fonts_install_ok", True)
+                adm.save()
             return
-        adm.set("fonts_install_ok", False)
+        if fonts_install_ok:
+            adm.set("fonts_install_ok", False)
+            adm.save()
         msg = QtWidgets.QMessageBox(self)
         msg.setIcon(QtWidgets.QMessageBox.Icon.Information)
         msg.setWindowTitle(self.tr("Install required fonts"))
@@ -3180,7 +3186,12 @@ class MainWindow(QtWidgets.QMainWindow):
             else:
                 failures.append((family, detail))
 
-        still_missing = [f for f in fonts if not has_system_font(str(f.get("check_name", f["family"])))]
+        still_missing = [
+            f
+            for f in fonts
+            if not has_system_font(str(f.get("check_name", f["family"])))
+            and not has_installed_embedded_font_file(str(f.get("key", "")))
+        ]
         adm.set("fonts_install_ok", len(still_missing) == 0)
         adm.save()
 

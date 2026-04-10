@@ -38,15 +38,21 @@ def _atomic_write_text(path: Path, content: str, encoding: str = "utf-8") -> Non
             os.fsync(f.fileno())
         os.replace(temp_path, str(path))
         temp_path = None
-        flags = getattr(os, "O_DIRECTORY", 0)
-        dfd = os.open(str(parent), flags)
-        try:
-            os.fsync(dfd)
-        finally:
-            os.close(dfd)
+        # Directory fsync is Unix-specific. On Windows this may fail with
+        # PermissionError because opening a directory fd is not supported.
+        if os.name != "nt":
+            flags = getattr(os, "O_DIRECTORY", 0)
+            dfd = os.open(str(parent), flags)
+            try:
+                os.fsync(dfd)
+            finally:
+                os.close(dfd)
     finally:
         if temp_path is not None:
-            os.remove(temp_path)
+            try:
+                os.remove(temp_path)
+            except FileNotFoundError:
+                pass
 
 
 @dataclass

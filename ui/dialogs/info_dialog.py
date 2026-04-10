@@ -11,6 +11,8 @@ from file_model.SCORE import SCORE, MetaData
 class InfoDialog(QtWidgets.QDialog):
     def __init__(self, score: SCORE, parent=None) -> None:
         super().__init__(parent)
+        self.setWindowFlag(QtCore.Qt.WindowType.WindowMinMaxButtonsHint, True)
+        self.setSizeGripEnabled(True)
         self.setWindowFlags(self.windowFlags())
         self.setWindowTitle(self.tr("Titles, info & analysis"))
         self.setModal(False)

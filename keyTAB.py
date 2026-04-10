@@ -11,7 +11,12 @@ from ui.style import Style
 from settings_manager import get_preferences
 from appdata_manager import get_appdata_manager
 from icons.icons import get_qicon
-from fonts import install_default_ui_font
+from fonts import (
+    has_installed_embedded_font_file,
+    install_default_ui_font,
+    install_embedded_font_to_system,
+    register_font_from_bytes,
+)
 from utils.file_associations import extract_document_paths
 
 APP_NAME = "keyTAB"
@@ -304,6 +309,15 @@ def main(argv: list[str] | None = None):
     # Create QApplication with argv to ensure proper initialization paths on macOS
     app = KeyTabApplication([sys.argv[0], *qt_args])
     _install_ui_translator(app, preferences)
+
+    # Always register embedded engraving fonts for in-process use.
+    # On Windows, Cairo can require the user font store to see the font.
+    try:
+        register_font_from_bytes("Edwin")
+        if sys.platform.startswith("win") and not has_installed_embedded_font_file("Edwin"):
+            install_embedded_font_to_system("Edwin")
+    except Exception:
+        pass
 
     # Suppress unhelpful Qt platform warning about grabMouse on non-popup windows.
     # grabMouse() is used to track mouse releases outside the widget; this warning

@@ -654,6 +654,8 @@ class StyleDialog(QtWidgets.QDialog):
 
     def __init__(self, parent=None, layout: Layout | None = None, score: SCORE | None = None) -> None:
         super().__init__(parent)
+        self.setWindowFlag(QtCore.Qt.WindowType.WindowMinMaxButtonsHint, True)
+        self.setSizeGripEnabled(True)
         self.setWindowTitle(self.tr("Style"))
         self.setModal(False)
         self.setWindowModality(QtCore.Qt.NonModal)

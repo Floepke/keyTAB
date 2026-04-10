@@ -20,6 +20,8 @@ class TimeSignatureDialog(QtWidgets.QDialog):
         editor_widget: Optional[QtWidgets.QWidget] = None,
     ):
         super().__init__(parent)
+        self.setWindowFlag(QtCore.Qt.WindowType.WindowMinMaxButtonsHint, True)
+        self.setSizeGripEnabled(True)
         self.setWindowTitle(self.tr("Set Time Signature"))
         self.setModal(False)
         self.setWindowModality(QtCore.Qt.WindowModality.NonModal)

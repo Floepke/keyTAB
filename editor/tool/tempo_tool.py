@@ -74,6 +74,8 @@ class TempoTool(BaseTool):
             parent_w = None
             parent_w = QtWidgets.QApplication.activeWindow()
             dlg = QtWidgets.QDialog(parent_w)
+            dlg.setWindowFlag(QtCore.Qt.WindowType.WindowMinMaxButtonsHint, True)
+            dlg.setSizeGripEnabled(True)
             dlg.setWindowTitle(QtCore.QCoreApplication.translate("TempoTool", "Edit Tempo"))
             dlg.setModal(True)
             dlg.setWindowModality(QtCore.Qt.NonModal)
