@@ -41,11 +41,11 @@ class Layout:
     chord_connect_visible: bool = True
     note_stop_visible: bool = True
     note_stem_length_semitone: int = 6
-    note_stem_thickness_mm: float = 1.25 # Thickness of the stem as well the notehead outline width
+    note_stem_thickness_mm: float = 1.1 # Thickness of the stem as well the notehead outline width
     note_stopsign_thickness_mm: float = 1.25
     note_leftdot_visible: bool = False
     note_continuation_dot_visible: bool = True
-    note_continuation_dot_size_mm: float = 2.5
+    note_continuation_dot_size_mm: float = 2.4
     note_midinote_visible: bool = False
     note_midinote_left_color: str = '#ccc'
     note_midinote_right_color: str = '#ccc'
@@ -71,7 +71,7 @@ class Layout:
 
     # Slur appearance
     slur_visible: bool = True
-    slur_width_sides_mm: float = 0.3
+    slur_width_sides_mm: float = 0.5
     slur_width_middle_mm: float = 1.5
 
     # Hairpin (crescendo / decrescendo) appearance
@@ -101,9 +101,7 @@ class Layout:
     barline_visible: bool = True
     grid_line_visible: bool = True
     grid_band_visible: bool = True
-    
-    # Grid Band track (Grid 2). Single track for alternating bands.
-    grid_band_track: list[GridBand] = field(default_factory=list)
+    grid_band_track: list[GridBand] = field(default_factory=list) # Grid Band track. Single track for alternating bands.
     grid_barline_thickness_mm: float = 1.25
     grid_gridline_thickness_mm: float = 0.5
     grid_gridline_dash_pattern_mm: list[float] = field(default_factory=lambda: [2.5, 4.0])
@@ -142,9 +140,9 @@ class Layout:
 
     font_text: LayoutFont = field(default_factory=lambda: LayoutFont(
         family="Edwin",
-        size_pt=15.0,
-        bold=True,
-        italic=False,
+        size_pt=12.0,
+        bold=False,
+        italic=True,
     ))
 
     # Info fonts
