@@ -35,7 +35,10 @@ DEFAULT_ICON = PROJECT_ROOT / "icons" / "keyTAB.png"
 DEFAULT_OUTPUT = Path.home() / "Desktop"
 DEFAULT_NAME = "keyTAB"
 DEFAULT_INSTALLER_NAME = "keyTAB-setup"
-DEFAULT_APP_VERSION = "1.0"
+
+sys.path.insert(0, str(PROJECT_ROOT))
+from version import __version__ as _app_version  # noqa: E402
+DEFAULT_APP_VERSION = _app_version
 
 
 def parse_args() -> argparse.Namespace:

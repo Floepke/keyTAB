@@ -6,6 +6,7 @@ import os
 from pathlib import Path
 
 from utils.tiny_tool import key_class_filter
+from version import __version__
 
 # Directory in the user's home used for autosaves and error backups
 # Expanded once and reused across the app for any non-user-initiated saves.
@@ -144,7 +145,7 @@ SHORTEST_DURATION: float = 1.0  # shortest note duration in time units (128th) (
 # Defaults to SHORTEST_DURATION so one edit can adjust both behaviors.
 GRACENOTE_THRESHOLD: float = 16.0  # (32th) Default threshold for interpreting very short notes as grace notes on load/import.
 
-ENGRAVER_VERSION: str = '1.0'
+ENGRAVER_VERSION: str = __version__
 
 ENGRAVER_FRACTIONAL_TEXT_SCALING_CORRECTION: float = 0.675
 

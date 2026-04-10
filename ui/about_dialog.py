@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from PySide6 import QtCore, QtGui, QtWidgets
 from icons.icons import get_qicon
+from version import __version__
 
 
 class AboutDialog(QtWidgets.QDialog):
@@ -26,12 +27,12 @@ class AboutDialog(QtWidgets.QDialog):
         header_layout.setSpacing(8)
 
         header = QtWidgets.QLabel(
-            "<h2 style='margin-bottom: 10px;'>keyTAB</h2>"
-            f"<div style='margin-bottom: 10px;font-size: 10px;'>{self.tr('keyTAB is a long-running passion project. With modern tooling I can focus on the hard part: shaping a clearer way to read and engrave Klavarskribo music.')}</div>"
-            f"<div style='margin-bottom: 10px;font-size: 10px;'>{self.tr('Built on Klavarskribo notation, keyTAB turns MIDI into readable plots. Music flows top-to-bottom on a vertical timeline over a customizable, time-signature-aware grid.')}</div>"
-            f"<div style='margin-bottom: 10px;font-size: 10px;'>{self.tr('Stave lines map directly to the black piano keys: black noteheads sit on black key lines, white noteheads land between lines. Pitch reads like the piano keyboard\u2014no key signatures, sharps/flats, clef changes, or other detours.')}</div>"
-            f"<div style='margin-bottom: 10px;font-size: 10px;'>{self.tr('I hope keyTAB helps musicians, composers, and curious listeners visualize and refine this MIDI style notation with clarity. Feedback is always welcome.')}</div>"
-            f"<div style='margin-bottom: 10px;font-size: 10px;'>{self.tr('Have fun exploring your MIDI with keyTAB!')}</div>"
+            f"<h2 style='margin-bottom: 10px;'>keyTAB <span style='font-size:12px;font-weight:normal;color:#000;'>v{__version__}</span></h2>"
+            f"<div style='margin-bottom: 10px;font-size: 12px;'>{self.tr('keyTAB is a long-running passion project. With modern tooling I can focus on the hard part: shaping a clearer way to read and engrave Klavarskribo music.')}</div>"
+            f"<div style='margin-bottom: 10px;font-size: 12px;'>{self.tr('Built on Klavarskribo notation, keyTAB turns MIDI into readable plots. Music flows top-to-bottom on a vertical timeline over a customizable, time-signature-aware grid.')}</div>"
+            f"<div style='margin-bottom: 10px;font-size: 12px;'>{self.tr('Stave lines map directly to the black piano keys: black noteheads sit on black key lines, white noteheads land between lines. Pitch reads like the piano keyboard\u2014no key signatures, sharps/flats or clef changes that change the meaning of the stave completely.')}</div>"
+            f"<div style='margin-bottom: 10px;font-size: 12px;'>{self.tr('I hope keyTAB helps musicians, composers, and curious listeners visualize and refine this MIDI style notation with clarity. Feedback is always welcome.')}</div>"
+            f"<div style='margin-bottom: 10px;font-size: 12px;'>{self.tr('Have fun exploring your MIDI with keyTAB!')}</div>"
             "<div style='margin-bottom: 0; font-size: 12px;'>Philip Bergwerf</div>"
         )
         header.setTextFormat(QtCore.Qt.TextFormat.RichText)
@@ -39,14 +40,11 @@ class AboutDialog(QtWidgets.QDialog):
         header.setAlignment(QtCore.Qt.AlignmentFlag.AlignLeft | QtCore.Qt.AlignmentFlag.AlignTop)
 
         logo_lbl = QtWidgets.QLabel(self)
-        try:
-            icon = get_qicon('keyTAB', size=(256, 256))
-            if icon is not None:
-                pm = icon.pixmap(256, 256)
-                if not pm.isNull():
-                    logo_lbl.setPixmap(pm)
-        except Exception:
-            pass
+        icon = get_qicon('keyTAB', size=(256, 256))
+        if icon is not None:
+            pm = icon.pixmap(256, 256)
+            if not pm.isNull():
+                logo_lbl.setPixmap(pm)
         logo_lbl.setAlignment(QtCore.Qt.AlignmentFlag.AlignRight | QtCore.Qt.AlignmentFlag.AlignTop)
 
         header_layout.addWidget(header, 1)
@@ -67,13 +65,13 @@ class AboutDialog(QtWidgets.QDialog):
 
     def _credits_html(self) -> str:
         return (
-            f'<p><b style="font-size: 10px;">{self.tr("Project license:")} </b>MIT License.</p>'
-            f'<p><b style="font-size: 10px;">{self.tr("Credits and third-party components:")}</b></p>'
-            '<ul style="margin-top: 4px;font-size: 10px;">'
-            f'<li>{self.tr("User-provided SoundFont (.sf2/.sf3).")}</li>'
+            f'<p><b style="font-size: 12px;">{self.tr("Project license:")} </b>MIT License.</p>'
+            f'<p><b style="font-size: 12px;">{self.tr("Credits and third-party components:")}</b></p>'
+            '<ul style="margin-top: 4px;font-size: 12px;">'
+            f'<li>{self.tr("Cairo / pycairo \u2014 LGPL-2.1 (drawing engine).")}</li>'
             f'<li>{self.tr("FluidSynth \u2014 LGPL-2.1-or-later.")}</li>'
             f'<li>{self.tr("PySide6 / Qt \u2014 LGPL-3.0.")}</li>'
             f'<li>{self.tr("pretty_midi, mido, python-rtmidi, numpy \u2014 permissive licenses.")}</li>'
             '</ul>'
-            '<p style="margin-top: 0px;font-size: 10px;"> </p>'
+            '<p style="margin-top: 0px;font-size: 12px;"> </p>'
         )
