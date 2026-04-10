@@ -2,23 +2,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Literal
 from file_model.events.grid_band import GridBand
-
-
-@dataclass
-class LayoutFont:
-    family: str = "Edwin"
-    size_pt: float = 12.0
-    bold: bool = False
-    italic: bool = False
-    x_offset: float = 0.0
-    y_offset: float = 0.0
-
-    def resolve_family(self) -> str:
-        try:
-            from fonts import resolve_font_family
-            return resolve_font_family(self.family)
-        except Exception:
-            return self.family
+from file_model.font import Font
 
 @dataclass
 class Layout:
@@ -49,7 +33,7 @@ class Layout:
     note_midinote_visible: bool = False
     note_midinote_left_color: str = '#ccc'
     note_midinote_right_color: str = '#ccc'
-    note_width_scaling: float = .9 # Scaling factor for black noteheads when it sits under the stem while a white note sits next to it (0.05 to 1.0)
+    note_width_scaling: float = 1.1 # Scaling factor for the horizontal size of the noteheads, to make them wider or narrower.
 
     # Beam appearance
     beam_visible: bool = True
@@ -116,12 +100,12 @@ class Layout:
     time_signature_indicator_lane_width_mm: float = 30.0
     time_signature_indicator_guide_thickness_mm: float = 0.5
     time_signature_indicator_divide_guide_thickness_mm: float = 1.0
-    time_signature_indicator_classic_font: LayoutFont = field(default_factory=lambda: LayoutFont(
+    time_signature_indicator_classic_font: Font = field(default_factory=lambda: Font(
         family="Edwin",
         size_pt=40.0,
         bold=True,
     ))
-    time_signature_indicator_klavarskribo_font: LayoutFont = field(default_factory=lambda: LayoutFont(
+    time_signature_indicator_klavarskribo_font: Font = field(default_factory=lambda: Font(
         family="Edwin",
         size_pt=25.0,
         bold=True,
@@ -131,14 +115,14 @@ class Layout:
     measure_numbering_placement: Literal['system', 'barline'] = 'barline'
     measure_numbering_guide_visible: bool = True
     measure_numbers_visible: bool = True
-    measure_numbering_font: LayoutFont = field(default_factory=lambda: LayoutFont(
+    measure_numbering_font: Font = field(default_factory=lambda: Font(
         family="Edwin",
         size_pt=25.0,
         bold=True,
         italic=True,
     ))
 
-    font_text: LayoutFont = field(default_factory=lambda: LayoutFont(
+    font_text: Font = field(default_factory=lambda: Font(
         family="Edwin",
         size_pt=12.0,
         bold=False,
@@ -146,25 +130,25 @@ class Layout:
     ))
 
     # Info fonts
-    font_title: LayoutFont = field(default_factory=lambda: LayoutFont(
+    font_title: Font = field(default_factory=lambda: Font(
         family="Edwin",
         size_pt=25.0,
         bold=True,
     ))
-    font_composer: LayoutFont = field(default_factory=lambda: LayoutFont(
+    font_composer: Font = field(default_factory=lambda: Font(
         family="Edwin",
         size_pt=15.0,
-    ))
-    font_copyright: LayoutFont = field(default_factory=lambda: LayoutFont(
-        family="Edwin",
-        size_pt=12.0,
         italic=True,
     ))
-    font_arranger: LayoutFont = field(default_factory=lambda: LayoutFont(
+    font_copyright: Font = field(default_factory=lambda: Font(
         family="Edwin",
         size_pt=12.0,
     ))
-    font_lyricist: LayoutFont = field(default_factory=lambda: LayoutFont(
+    font_arranger: Font = field(default_factory=lambda: Font(
+        family="Edwin",
+        size_pt=12.0,
+    ))
+    font_lyricist: Font = field(default_factory=lambda: Font(
         family="Edwin",
         size_pt=12.0,
     ))

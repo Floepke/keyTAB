@@ -589,7 +589,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
         from fonts import resolve_font_family
         return str(resolve_font_family(family))
 
-    def _layout_font(key: str, fallback_family: str, fallback_size: float) -> tuple[str, float, bool, bool]:
+    def _layout_font(key: str, fallback_family: str, fallback_size: float) -> tuple[str, float, bool, bool, bool]:
         """Fetch a layout font entry from the layout dict with fallback values."""
         raw = layout.get(key, {}) if isinstance(layout, dict) else {}
         if not isinstance(raw, dict):
@@ -604,7 +604,8 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
         size_pt = float(raw.get('size_pt', fallback_size) or fallback_size)
         bold = bool(raw.get('bold', False))
         italic = bool(raw.get('italic', False))
-        return family, size_pt, bold, italic
+        underline = bool(raw.get('underline', False))
+        return family, size_pt, bold, italic, underline
 
     def _info_text(key: str, fallback: str) -> str:
         """Fetch info text with a fallback, always returning a string."""
@@ -616,15 +617,15 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
             raw = raw.get('text', fallback)
         return str(raw) if raw is not None else str(fallback)
 
-    def _info_font(key: str, fallback_family: str, fallback_size: float) -> tuple[str, float, bool, bool, float, float]:
+    def _info_font(key: str, fallback_family: str, fallback_size: float) -> tuple[str, float, bool, bool, bool, float, float]:
         """Fetch info font settings from layout (family, size, style, offsets)."""
-        family, size_pt, bold, italic = _layout_font(key, fallback_family, fallback_size)
+        family, size_pt, bold, italic, underline = _layout_font(key, fallback_family, fallback_size)
         raw_font = layout.get(key, {}) if isinstance(layout, dict) else {}
         if not isinstance(raw_font, dict):
             raw_font = {}
         x_off = float(raw_font.get('x_offset', 0.0) or 0.0)
         y_off = float(raw_font.get('y_offset', 0.0) or 0.0)
-        return family, size_pt, bold, italic, x_off, y_off
+        return family, size_pt, bold, italic, underline, x_off, y_off
 
     def _assign_groups(notes_sorted: list[dict], windows: list[tuple[float, float]]) -> list[list[dict]]:
         """Assign notes to time windows by overlap and preserve start-time order.
@@ -1255,12 +1256,12 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
         if page_index == 0:
             title_text = _info_text('title', 'title')
             composer_text = _info_text('composer', 'composer')
-            title_family, title_size, title_bold, title_italic, title_x_off, title_y_off = _info_font(
+            title_family, title_size, title_bold, title_italic, title_underline, title_x_off, title_y_off = _info_font(
                 'font_title',
                 'Courier',
                 12.0,
             )
-            composer_family, composer_size, composer_bold, composer_italic, composer_x_off, composer_y_off = _info_font(
+            composer_family, composer_size, composer_bold, composer_italic, composer_underline, composer_x_off, composer_y_off = _info_font(
                 'font_composer',
                 'Courier',
                 10.0,
@@ -1278,6 +1279,12 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                 tags=['title'],
                 anchor='nw',
             )
+            if title_underline and title_text:
+                _xb, _yb, _w, _ = du._get_text_extents_mm(title_text, title_family, title_size, title_italic, title_bold)
+                _bx = (page_left + title_x_off) - _xb
+                _by = (page_top + title_y_off) - _yb
+                du.add_line(_bx, _by + max(0.2, title_size * 0.025), _bx + _w, _by + max(0.2, title_size * 0.025),
+                            color=notation_color, width_mm=max(0.2, title_size * (0.04 if title_bold else 0.02)), tags=['title'])
             du.add_text(
                 (page_w - page_right) + composer_x_off,
                 page_top + composer_y_off,
@@ -1291,6 +1298,12 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                 tags=['composer'],
                 anchor='ne',
             )
+            if composer_underline and composer_text:
+                _xb, _yb, _w, _ = du._get_text_extents_mm(composer_text, composer_family, composer_size, composer_italic, composer_bold)
+                _bx = ((page_w - page_right) + composer_x_off) - _w - _xb
+                _by = (page_top + composer_y_off) - _yb
+                du.add_line(_bx, _by + max(0.2, composer_size * 0.025), _bx + _w, _by + max(0.2, composer_size * 0.025),
+                            color=notation_color, width_mm=max(0.2, composer_size * (0.04 if composer_bold else 0.02)), tags=['composer'])
         if footer_height > 0.0:
             document_title = _info_text('title', 'title').strip()
             if not document_title:
@@ -1299,16 +1312,17 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
             footer_text = _info_text('copyright', default_copyright).strip()
             if not footer_text:
                 footer_text = default_copyright
-            footer_family, footer_size, footer_bold, footer_italic, footer_x_off, footer_y_off = _info_font(
+            footer_family, footer_size, footer_bold, footer_italic, footer_underline, footer_x_off, footer_y_off = _info_font(
                 'font_copyright',
                 'Courier',
                 8.0,
             )
             footer_baseline_y = (page_h - page_bottom) + footer_y_off
+            _footer_text_full = f"Page {page_index + 1} of {len(pages)} • {document_title} • {footer_text}"
             du.add_text(
                 page_left + footer_x_off,
                 footer_baseline_y,
-                f"Page {page_index + 1} of {len(pages)} • {document_title} • {footer_text}",
+                _footer_text_full,
                 family=footer_family,
                 size_pt=footer_size,
                 bold=footer_bold,
@@ -1317,6 +1331,12 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                 id=0,
                 tags=['copyright'],
             )
+            if footer_underline and _footer_text_full:
+                _xb, _yb, _w, _ = du._get_text_extents_mm(_footer_text_full, footer_family, footer_size, footer_italic, footer_bold)
+                _bx = (page_left + footer_x_off)
+                _by = footer_baseline_y
+                du.add_line(_bx + _xb, _by + max(0.2, footer_size * 0.025), _bx + _xb + _w, _by + max(0.2, footer_size * 0.025),
+                            color=notation_color, width_mm=max(0.2, footer_size * (0.04 if footer_bold else 0.02)), tags=['copyright'])
         if not page:
             continue
         used_width = sum(float(l['total_width']) for l in page)
@@ -1486,12 +1506,12 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
             mm_per_quarter = float(QUARTER_NOTE_UNIT) / max(1e-6, tick_per_mm)
 
             indicator_type = str(layout.get('time_signature_indicator_type', 'classical') or 'classical')
-            classic_family, classic_size, classic_bold, classic_italic = _layout_font(
+            classic_family, classic_size, classic_bold, classic_italic, _classic_ul = _layout_font(
                 'time_signature_indicator_classic_font',
                 'Edwin',
                 35.0,
             )
-            klav_family, klav_size, klav_bold, klav_italic = _layout_font(
+            klav_family, klav_size, klav_bold, klav_italic, _klav_ul = _layout_font(
                 'time_signature_indicator_klavarskribo_font',
                 'Edwin',
                 25.0,
@@ -2399,7 +2419,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
             _record_beam_line_bounds()
 
             # Problem solved: measure numbers must avoid colliding with notes/beams.
-            mn_family, mn_size, mn_bold, mn_italic = _layout_font('measure_numbering_font', 'Edwin', 10.0)
+            mn_family, mn_size, mn_bold, mn_italic, _mn_ul = _layout_font('measure_numbering_font', 'Edwin', 10.0)
             size_pt = mn_size * scale
             mm_per_pt = 25.4 / 72.0
             text_h_mm = size_pt * mm_per_pt

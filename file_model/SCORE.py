@@ -25,7 +25,8 @@ from file_model.events.arpeggio import Arpeggio
 from file_model.events.crescendo import Crescendo
 from file_model.events.decrescendo import Decrescendo
 from file_model.events.dynamic import DynamicSymbol
-from file_model.layout import Layout, LayoutFont
+from file_model.layout import Layout
+from file_model.font import Font
 from file_model.info import Info
 from file_model.analysis import Analysis
 from utils.CONSTANT import GRACENOTE_THRESHOLD, QUARTER_NOTE_UNIT
@@ -227,7 +228,7 @@ class SCORE:
 	def new_text(self, **kwargs) -> Text:
 		# Text anchor is center; store x as semitone offset and rotation in degrees.
 		# Default font clones the score's layout font_text to avoid shared mutation.
-		default_font = deepcopy(getattr(self.layout, 'font_text', LayoutFont()))
+		default_font = deepcopy(getattr(self.layout, 'font_text', Font()))
 		base = {
 			'text': 'Text',
 			'time': 0.0,

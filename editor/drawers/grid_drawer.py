@@ -42,11 +42,9 @@ class GridDrawerMixin:
         else:
             family = getattr(title_font, 'family', 'Courier New') if title_font is not None else 'Courier New'
         size_pt = 12
-        x_off = 0.0
-        y_off = 0.0
         du.add_text(
-            1 + x_off,
-            1 + y_off,
+            1,
+            1,
             f"'{title_text}' by composer: {composer_text}",
             size_pt=size_pt,
             color=self.notation_color,

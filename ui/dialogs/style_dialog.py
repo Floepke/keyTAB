@@ -6,7 +6,8 @@ from typing import Any, get_args, get_origin, get_type_hints, Literal, TYPE_CHEC
 
 from PySide6 import QtCore, QtGui, QtWidgets
 
-from file_model.layout import LAYOUT_FLOAT_CONFIG, LayoutFont
+from file_model.layout import LAYOUT_FLOAT_CONFIG
+from file_model.font import Font
 from file_model.layout import Layout
 from file_model.SCORE import SCORE
 
@@ -386,10 +387,10 @@ class FlexibleDoubleSpinBox(QtWidgets.QDoubleSpinBox):
 class FontPicker(QtWidgets.QWidget):
     valueChanged = QtCore.Signal()
 
-    def __init__(self, value: LayoutFont | dict[str, Any], parent=None, show_offsets: bool = False) -> None:
+    def __init__(self, value: Font | dict[str, Any], parent=None, show_offsets: bool = False) -> None:
         super().__init__(parent)
         coerced = self._coerce_font_value(value)
-        self._font_cls = type(coerced) if isinstance(coerced, LayoutFont) else LayoutFont
+        self._font_cls = type(coerced) if isinstance(coerced, Font) else Font
         self._show_offsets = bool(show_offsets)
         self._combo = QtWidgets.QFontComboBox(self)
         self._size = QtWidgets.QSpinBox(self)
@@ -401,6 +402,7 @@ class FontPicker(QtWidgets.QWidget):
             pass
         self._bold = QtWidgets.QCheckBox(self.tr("Bold"), self)
         self._italic = QtWidgets.QCheckBox(self.tr("Italic"), self)
+        self._underline = QtWidgets.QCheckBox(self.tr("Underline"), self)
         self._x_offset: FlexibleDoubleSpinBox | None = None
         self._y_offset: FlexibleDoubleSpinBox | None = None
         if self._show_offsets:
@@ -421,6 +423,7 @@ class FontPicker(QtWidgets.QWidget):
         layout.addWidget(self._size, 0)
         layout.addWidget(self._bold, 0)
         layout.addWidget(self._italic, 0)
+        layout.addWidget(self._underline, 0)
         if self._show_offsets and self._x_offset and self._y_offset:
             layout.addWidget(self._x_offset, 0)
             layout.addWidget(self._y_offset, 0)
@@ -434,21 +437,22 @@ class FontPicker(QtWidgets.QWidget):
             pass
         self._bold.stateChanged.connect(lambda _v: self.valueChanged.emit())
         self._italic.stateChanged.connect(lambda _v: self.valueChanged.emit())
+        self._underline.stateChanged.connect(lambda _v: self.valueChanged.emit())
         if self._show_offsets and self._x_offset and self._y_offset:
             self._x_offset.valueChanged.connect(lambda _v: self.valueChanged.emit())
             self._y_offset.valueChanged.connect(lambda _v: self.valueChanged.emit())
 
-    def _coerce_font_value(self, value: LayoutFont | dict[str, Any]) -> LayoutFont:
-        if isinstance(value, LayoutFont):
+    def _coerce_font_value(self, value: Font | dict[str, Any]) -> Font:
+        if isinstance(value, Font):
             return value
         if isinstance(value, dict):
             try:
-                return LayoutFont(**value)
+                return Font(**value)
             except Exception:
                 pass
-        return LayoutFont()
+        return Font()
 
-    def set_value(self, value: LayoutFont | dict[str, Any]) -> None:
+    def set_value(self, value: Font | dict[str, Any]) -> None:
         value = self._coerce_font_value(value)
         try:
             self._combo.setCurrentFont(QtGui.QFont(str(value.family)))
@@ -460,6 +464,7 @@ class FontPicker(QtWidgets.QWidget):
             self._size.setValue(10)
         self._bold.setChecked(bool(value.bold))
         self._italic.setChecked(bool(value.italic))
+        self._underline.setChecked(bool(getattr(value, 'underline', False)))
         if self._show_offsets and self._x_offset and self._y_offset:
             try:
                 self._x_offset.setValue(float(getattr(value, 'x_offset', 0.0) or 0.0))
@@ -471,8 +476,8 @@ class FontPicker(QtWidgets.QWidget):
     def set_family(self, family: str) -> None:
         self._combo.setCurrentFont(QtGui.QFont(str(family)))
 
-    def value(self) -> LayoutFont:
-        font_cls = self._font_cls if isinstance(self._font_cls, type) and issubclass(self._font_cls, LayoutFont) else LayoutFont
+    def value(self) -> Font:
+        font_cls = self._font_cls if isinstance(self._font_cls, type) and issubclass(self._font_cls, Font) else Font
         x_off = float(self._x_offset.value()) if self._x_offset is not None else 0.0
         y_off = float(self._y_offset.value()) if self._y_offset is not None else 0.0
         return font_cls(
@@ -480,6 +485,7 @@ class FontPicker(QtWidgets.QWidget):
             size_pt=float(self._size.value()),
             bold=bool(self._bold.isChecked()),
             italic=bool(self._italic.isChecked()),
+            underline=bool(self._underline.isChecked()),
             x_offset=x_off,
             y_offset=y_off,
         )
@@ -626,12 +632,12 @@ class StyleDialog(QtWidgets.QDialog):
             for f in fields(Layout):
                 name = f.name
                 hint = hints.get(name, f.type)
-                if hint is not LayoutFont:
+                if hint is not Font:
                     continue
                 val = getattr(layout_obj, name, getattr(defaults, name))
                 if isinstance(val, dict):
                     try:
-                        val = LayoutFont(**val)
+                        val = Font(**val)
                     except Exception:
                         val = getattr(defaults, name)
                     try:
@@ -1004,9 +1010,9 @@ class StyleDialog(QtWidgets.QDialog):
             name = f.name
             val = data.get(name, getattr(defaults, name))
             hint = self._type_hints.get(name, f.type)
-            if hint is LayoutFont and isinstance(val, dict):
+            if hint is Font and isinstance(val, dict):
                 try:
-                    val = LayoutFont(**val)
+                    val = Font(**val)
                 except Exception:
                     val = getattr(defaults, name)
             fixed[name] = val
@@ -1015,7 +1021,7 @@ class StyleDialog(QtWidgets.QDialog):
             try:
                 fam = str(data.get("text_font_family", "Edwin"))
                 size = float(data.get("text_font_size_pt", 12.0))
-                fixed["font_text"] = LayoutFont(family=fam, size_pt=size)
+                fixed["font_text"] = Font(family=fam, size_pt=size)
             except Exception:
                 pass
         # Legacy migration: merge left/right grid band tracks into the unified track
@@ -1122,12 +1128,12 @@ class StyleDialog(QtWidgets.QDialog):
             le.setText(str(value) if value is not None else "")
             return le
 
-        if field_type is LayoutFont:
+        if field_type is Font:
             if isinstance(value, dict):
                 try:
-                    value = LayoutFont(**value)
+                    value = Font(**value)
                 except Exception:
-                    value = LayoutFont()
+                    value = Font()
             show_offsets = field_name in FONT_OFFSET_FIELDS
             return FontPicker(value, self, show_offsets=show_offsets)
 
@@ -1165,7 +1171,7 @@ class StyleDialog(QtWidgets.QDialog):
             return
         combo = QtWidgets.QFontComboBox(self)
         self._all_fonts_combo = combo
-        font_title = getattr(self._layout, 'font_title', LayoutFont())
+        font_title = getattr(self._layout, 'font_title', Font())
         combo.setCurrentFont(QtGui.QFont(self._font_family_from_value(font_title)))
         combo.currentFontChanged.connect(lambda f: self._set_all_font_families(f.family()))
         box = QtWidgets.QGroupBox(self.tr("Apply family to all fonts"), self)
@@ -1198,7 +1204,7 @@ class StyleDialog(QtWidgets.QDialog):
         elif isinstance(editor, FontPicker):
             # Convert dict payloads to LayoutFont when loading from appdata
             if isinstance(value, dict):
-                value = LayoutFont(**value)
+                value = Font(**value)
             editor.set_value(value)
         elif isinstance(editor, ColorPickerEdit):
             editor.set_value(str(value or ''))
@@ -1321,7 +1327,7 @@ class StyleDialog(QtWidgets.QDialog):
         if self._all_fonts_combo is not None:
             try:
                 self._all_fonts_combo.blockSignals(True)
-                font_title = getattr(layout_obj, 'font_title', LayoutFont())
+                font_title = getattr(layout_obj, 'font_title', Font())
                 self._all_fonts_combo.setCurrentFont(QtGui.QFont(self._font_family_from_value(font_title)))
             finally:
                 self._all_fonts_combo.blockSignals(False)

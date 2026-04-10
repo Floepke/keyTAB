@@ -3,7 +3,7 @@ import math
 from typing import TYPE_CHECKING, cast, Tuple
 from ui.widgets.draw_util import DrawUtil
 from ui.style import Style
-from file_model.layout import LayoutFont
+from file_model.font import Font
 
 if TYPE_CHECKING:
     from editor.editor import Editor
@@ -88,18 +88,19 @@ class TextDrawerMixin:
             return
 
         def _coerce_font(value, default_font):
-            if isinstance(value, LayoutFont):
+            if isinstance(value, Font):
                 return value
             if isinstance(value, dict):
-                return LayoutFont(
+                return Font(
                     family=value.get('family', getattr(default_font, 'family', 'Courier New')),
                     size_pt=float(value.get('size_pt', getattr(default_font, 'size_pt', 12.0) or 12.0)),
                     bold=bool(value.get('bold', getattr(default_font, 'bold', False))),
                     italic=bool(value.get('italic', getattr(default_font, 'italic', False))),
+                    underline=bool(value.get('underline', getattr(default_font, 'underline', False))),
                     x_offset=float(value.get('x_offset', getattr(default_font, 'x_offset', 0.0) or 0.0)),
                     y_offset=float(value.get('y_offset', getattr(default_font, 'y_offset', 0.0) or 0.0)),
                 )
-            return default_font if isinstance(default_font, LayoutFont) else LayoutFont()
+            return default_font if isinstance(default_font, Font) else Font()
 
         events = list(getattr(score.events, 'text', []) or [])
         if not events:
@@ -128,6 +129,7 @@ class TextDrawerMixin:
             size_pt = float(getattr(font, 'size_pt', 12.0) or 12.0)
             italic = bool(getattr(font, 'italic', False))
             bold = bool(getattr(font, 'bold', False))
+            underline = bool(getattr(font, 'underline', False))
             pad_mm = float(getattr(score.layout, 'text_background_padding_mm', 0.0) or 0.0)
             width_offset_mm = float(getattr(ev, 'text_background_width_offset_mm', 0.0) or 0.0)
             x_off = float(getattr(ev, 'x_offset_mm', 0.0) or 0.0)
@@ -173,6 +175,25 @@ class TextDrawerMixin:
                 id=int(getattr(ev, '_id', 0) or 0),
                 tags=["text"],
             )
+            if underline:
+                xb_mm, yb_mm, ink_w_mm, ink_h_mm = du._get_text_extents_mm(display_txt, family, size_pt, italic, bold)
+                # ul_y_local: y offset from text center (cy) to underline, in unrotated space
+                ul_y_local = -ink_h_mm / 2.0 - yb_mm + max(0.2, size_pt * 0.025)
+                half_w = ink_w_mm / 2.0
+                ang_rad = math.radians(angle)
+                cos_a = math.cos(ang_rad)
+                sin_a = math.sin(ang_rad)
+                ul_x1 = x_mm + (-half_w) * cos_a - ul_y_local * sin_a
+                ul_y1 = cy + (-half_w) * sin_a + ul_y_local * cos_a
+                ul_x2 = x_mm + half_w * cos_a - ul_y_local * sin_a
+                ul_y2 = cy + half_w * sin_a + ul_y_local * cos_a
+                du.add_line(
+                    ul_x1, ul_y1, ul_x2, ul_y2,
+                    color=self.notation_color,
+                    width_mm=max(0.2, size_pt * (0.04 if bold else 0.02)),
+                    tags=["text_underline"],
+                    id=int(getattr(ev, '_id', 0) or 0),
+                )
             self.register_hit_rect('text', int(getattr(ev, '_id', 0) or 0), min_x, min_y, max_x, max_y, kind='body')
 
             if show_handles:

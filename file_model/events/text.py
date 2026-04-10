@@ -1,7 +1,7 @@
 from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Literal
-from file_model.layout import LayoutFont
+from file_model.font import Font
 
 @dataclass
 class Text:
@@ -18,7 +18,7 @@ class Text:
     y_offset_mm: float = 0.0
     
     # font settings
-    font: LayoutFont = field(default_factory=lambda: LayoutFont(
+    font: Font = field(default_factory=lambda: Font(
         family="Edwin",
         size_pt=12.0,
         bold=False,

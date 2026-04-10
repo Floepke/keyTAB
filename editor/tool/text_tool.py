@@ -9,7 +9,7 @@ from ui.dialogs.text_dialog import TextDialog
 
 from editor.tool.base_tool import BaseTool
 from file_model.SCORE import SCORE
-from file_model.layout import LayoutFont
+from file_model.font import Font
 
 
 class TextTool(BaseTool):
@@ -315,11 +315,11 @@ class TextTool(BaseTool):
         return None
 
     # ---- Dialog ----
-    def _coerce_font(self, value, default_font: LayoutFont | None) -> LayoutFont:
-        if isinstance(value, LayoutFont):
+    def _coerce_font(self, value, default_font: Font | None) -> Font:
+        if isinstance(value, Font):
             return deepcopy(value)
         if isinstance(value, dict):
-            return LayoutFont(
+            return Font(
                 family=value.get('family', getattr(default_font, 'family', 'Courier New')),
                 size_pt=float(value.get('size_pt', getattr(default_font, 'size_pt', 12.0) or 12.0)),
                 bold=bool(value.get('bold', getattr(default_font, 'bold', False))),
@@ -327,7 +327,7 @@ class TextTool(BaseTool):
                 x_offset=float(value.get('x_offset', getattr(default_font, 'x_offset', 0.0) or 0.0)),
                 y_offset=float(value.get('y_offset', getattr(default_font, 'y_offset', 0.0) or 0.0)),
             )
-        return deepcopy(default_font or LayoutFont())
+        return deepcopy(default_font or Font())
 
     def _open_text_dialog(self, ev) -> None:
         if self._editor is None or ev is None:
@@ -384,7 +384,7 @@ class TextTool(BaseTool):
             t_raw = float(self._editor.y_to_time(y))
             t_snap = float(self._editor.snap_time(t_raw))
             rp = self.x_mm_to_relative_x(x_mm)
-            df = deepcopy(getattr(score.layout, 'font_text', LayoutFont()))
+            df = deepcopy(getattr(score.layout, 'font_text', Font()))
             tx = score.new_text(time=t_snap, x_rpitch=rp, rotation=0.0, text='', font=df)
             self._active_text = tx
             self._active_mode = 'move'
