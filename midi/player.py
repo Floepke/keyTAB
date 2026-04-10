@@ -64,14 +64,26 @@ def list_midi_output_ports() -> List[str]:
     return filtered
 
 
+def _try_load_cdll(path: str) -> ctypes.CDLL:
+    """Load a shared library via ctypes, raising OSError with path info on failure."""
+    try:
+        return ctypes.CDLL(path)
+    except OSError as exc:
+        raise OSError(f"ctypes.CDLL({path!r}) failed: {exc}") from exc
+
+
 def _ensure_fluidsynth_lib() -> None:
+    load_errors: list[str] = []
+
     env_lib = str(os.environ.get("PYFLUIDSYNTH_LIB", "") or "").strip()
     if env_lib:
         try:
-            ctypes.CDLL(env_lib)
+            _try_load_cdll(env_lib)
+            sys.stderr.write(f"[midi] Loaded libfluidsynth from PYFLUIDSYNTH_LIB={env_lib!r}\n")
             return
-        except Exception:
-            pass
+        except OSError as exc:
+            load_errors.append(str(exc))
+            sys.stderr.write(f"[midi] PYFLUIDSYNTH_LIB set but load failed: {exc}\n")
 
     appdir = str(os.environ.get("APPDIR", "") or "").strip()
     app_candidates: list[Path] = []
@@ -94,57 +106,68 @@ def _ensure_fluidsynth_lib() -> None:
         if not path.exists():
             continue
         try:
-            ctypes.CDLL(str(path))
-            # Hint pyfluidsynth to use this exact file so ctypes.find_library is bypassed.
+            _try_load_cdll(str(path))
+            sys.stderr.write(f"[midi] Loaded libfluidsynth from candidate: {path}\n")
             os.environ.setdefault("PYFLUIDSYNTH_LIB", str(path))
             return
-        except Exception:
-            continue
+        except OSError as exc:
+            load_errors.append(str(exc))
+            sys.stderr.write(f"[midi] Candidate {path} exists but load failed: {exc}\n")
 
     found = ctypes.util.find_library("fluidsynth")
     if found:
+        sys.stderr.write(f"[midi] ctypes.util.find_library('fluidsynth') returned: {found!r}\n")
         try:
-            # find_library returns soname only; try loading it directly first
-            lib = ctypes.CDLL(str(found))
+            _try_load_cdll(str(found))
             os.environ.setdefault("PYFLUIDSYNTH_LIB", str(found))
             return
-        except Exception:
-            # If direct load fails, search common paths for the actual file
+        except OSError as exc:
+            load_errors.append(str(exc))
+            sys.stderr.write(f"[midi] find_library result {found!r} failed to load: {exc}\n")
+            # find_library may return just the soname; search common dirs for the actual file
             for search_dir in ["/usr/lib/x86_64-linux-gnu", "/lib/x86_64-linux-gnu", "/usr/lib", "/lib", "/usr/local/lib"]:
                 full_path = Path(search_dir) / found
                 if full_path.exists():
                     try:
-                        ctypes.CDLL(str(full_path))
+                        _try_load_cdll(str(full_path))
+                        sys.stderr.write(f"[midi] Loaded libfluidsynth from full path: {full_path}\n")
                         os.environ.setdefault("PYFLUIDSYNTH_LIB", str(full_path))
                         return
-                    except Exception:
-                        pass
+                    except OSError as exc2:
+                        load_errors.append(str(exc2))
+                        sys.stderr.write(f"[midi] Full path {full_path} failed to load: {exc2}\n")
+    else:
+        sys.stderr.write("[midi] ctypes.util.find_library('fluidsynth') returned nothing\n")
 
+    error_detail = "\n  ".join(load_errors) if load_errors else "no candidates found"
     raise ImportError(
-        "FluidSynth native library not available. Install it with 'sudo apt-get install fluidsynth libfluidsynth3' (or equivalent) "
-        "and install the Python binding with 'python3 -m pip install pyfluidsynth'."
+        "FluidSynth native library could not be loaded. "
+        "Install it with 'sudo apt-get install fluidsynth libfluidsynth3' (or equivalent).\n"
+        f"Load attempts:\n  {error_detail}"
     )
 
 
 if sys.platform.startswith("linux"):
+    _fluidsynth_init_error: Exception | None = None
     try:
         _ensure_fluidsynth_lib()
-        import fluidsynth as _fluidsynth  # type: ignore
+    except Exception as exc:
+        _fluidsynth_init_error = exc
+        sys.stderr.write(f"[midi] _ensure_fluidsynth_lib failed: {exc}\n")
 
-        fluidsynth = _fluidsynth
-        _FLUIDSYNTH_AVAILABLE = True
-        _FLUIDSYNTH_IMPORT_ERROR = ""
-    except Exception as exc:  # pragma: no cover - environment specific
-        _FLUIDSYNTH_AVAILABLE = False
-        _FLUIDSYNTH_IMPORT_ERROR = (
-            "FluidSynth not available. Install the native library with "
-            "'sudo apt-get install fluidsynth libfluidsynth3' (or the equivalent for your distro) "
-            "and install the Python binding with 'python3 -m pip install pyfluidsynth'."
-        )
+    if _fluidsynth_init_error is None:
         try:
-            sys.stderr.write(f"[midi] {_FLUIDSYNTH_IMPORT_ERROR} ({exc})\n")
-        except Exception:
-            pass
+            import fluidsynth as _fluidsynth  # type: ignore
+            fluidsynth = _fluidsynth
+            _FLUIDSYNTH_AVAILABLE = True
+            _FLUIDSYNTH_IMPORT_ERROR = ""
+        except Exception as exc:
+            _FLUIDSYNTH_AVAILABLE = False
+            _FLUIDSYNTH_IMPORT_ERROR = f"pyfluidsynth import failed: {exc}"
+            sys.stderr.write(f"[midi] {_FLUIDSYNTH_IMPORT_ERROR}\n")
+    else:
+        _FLUIDSYNTH_AVAILABLE = False
+        _FLUIDSYNTH_IMPORT_ERROR = str(_fluidsynth_init_error)
 
 
 def fluidsynth_available() -> bool:

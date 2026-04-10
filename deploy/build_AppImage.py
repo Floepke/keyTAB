@@ -561,10 +561,38 @@ def main() -> int:
     copy_bundled_assets(project_root, lib_app_dir, appdir, exe_name)
     copy_qt_licenses(appdir, exe_name)
 
-    # Bundle a small set of audio deps often missing on minimal systems, including FluidSynth.
+    # Bundle FluidSynth and all of its transitive shared-library dependencies that
+    # are typically absent on a minimal/fresh Linux install.  The list covers every
+    # library reachable via `ldd libfluidsynth.so.3` that is NOT part of glibc/libm/
+    # libpthread/libdl (those are always present and must NOT be bundled).
     copy_shared_libs(
         appdir,
-        ["libpulse", "libsndfile", "libglib-2.0", "libfluidsynth"],
+        [
+            # FluidSynth itself
+            "libfluidsynth",
+            # FluidSynth direct deps
+            "libinstpatch-1.0",   # instrument-patch support – most common missing dep
+            "libsoxr",            # sample-rate conversion
+            "libopus",            # Opus codec
+            "libvorbis",          # Vorbis codec (libvorbis + libvorbisenc + libvorbisfile)
+            "libvorbisenc",
+            "libvorbisfile",
+            "libogg",             # Ogg container (dep of Vorbis)
+            "libFLAC",            # FLAC codec
+            "libsndfile",         # unified audio I/O
+            "libglib-2.0",        # GLib (FluidSynth threading / event loop)
+            "libgobject-2.0",     # GObject (dep of GLib / instpatch)
+            "libgmodule-2.0",
+            "libgio-2.0",
+            # Audio backends
+            "libpulse",           # PulseAudio client
+            "libpulse-simple",
+            "libasound",          # ALSA
+            # instpatch deps
+            "libxml2",            # XML parsing used by instpatch
+            "liblzma",            # dep of libxml2
+            "libz",               # zlib – dep of libxml2 / libsndfile
+        ],
         extra_targets=[],
     )
 
