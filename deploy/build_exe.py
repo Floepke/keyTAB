@@ -158,7 +158,7 @@ def generate_iss_script(
     installer_output_dir.mkdir(parents=True, exist_ok=True)
     windows_version = normalize_windows_version(app_version)
     script = f"""[Setup]
-AppId={{{app_name}}}
+AppId={app_name}
 AppName={app_name}
 AppVersion={app_version}
 AppVerName={app_name} {app_version}
