@@ -88,7 +88,7 @@ class Layout:
     grid_band_track: list[GridBand] = field(default_factory=list) # Grid Band track. Single track for alternating bands.
     grid_barline_thickness_mm: float = 1.25
     grid_gridline_thickness_mm: float = 0.5
-    grid_gridline_dash_pattern_mm: list[float] = field(default_factory=lambda: [2.5, 4.0])
+    grid_gridline_dash_pattern_mm: list[float] = field(default_factory=lambda: [1.5, 3.0])
     grid_band_color: str = '#ccc'
     grid_band_start_phase: Literal['dark', 'light'] = 'dark'
 

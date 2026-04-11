@@ -7,5 +7,16 @@ Bump policy (Semantic Versioning):
   PATCH – bug fixes only
 """
 
-__version__ = "1.0.0"
+__version__ = "1.0.1"
 APP_NAME    = "keyTAB"
+
+change_log = '''
+1.0.0 (2024-06-01)
+- initial release
+
+1.0.1 (2024-06-30)
+- repeat symbols and measure numbers in engraver fix when ledger lines are present
+
+1.0.2 (2024-07-15)
+- ...
+'''

@@ -134,6 +134,28 @@ def determine_unused_qt_modules(project_root: Path) -> list[str]:
     return [module for module in EXCLUDABLE_QT_MODULES if module not in used_modules]
 
 
+def read_project_version() -> str:
+    """Read __version__ from version.py; return 'unknown' if unavailable."""
+    version_file = PROJECT_ROOT / "version.py"
+    if not version_file.exists():
+        return "unknown"
+
+    try:
+        source = version_file.read_text(encoding="utf-8")
+        tree = ast.parse(source, filename=str(version_file))
+    except (OSError, UnicodeDecodeError, SyntaxError):
+        return "unknown"
+
+    for node in tree.body:
+        if isinstance(node, ast.Assign):
+            for target in node.targets:
+                if isinstance(target, ast.Name) and target.id == "__version__":
+                    value = node.value
+                    if isinstance(value, ast.Constant) and isinstance(value.value, str):
+                        return value.value
+    return "unknown"
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Build a macOS .app bundle with PyInstaller.")
     parser.add_argument(
@@ -389,7 +411,12 @@ def update_info_plist(app_path: Path, name: str, doc_icon_file: str | None = Non
         plistlib.dump(info, handle)
 
 
-def build_installer_dmg(app_path: Path, work_dir: Path, icon_hint: Path | None = None) -> Path:
+def build_installer_dmg(
+    app_path: Path,
+    work_dir: Path,
+    icon_hint: Path | None = None,
+    version: str | None = None,
+) -> Path:
     """Create a drag-and-drop DMG containing the .app and Applications link."""
     hdiutil = ensure_command("hdiutil")
 
@@ -424,7 +451,8 @@ def build_installer_dmg(app_path: Path, work_dir: Path, icon_hint: Path | None =
     if temp_icon is not None and temp_icon.exists():
         temp_icon.unlink()
 
-    dmg_path = work_dir / f"{app_path.stem}.dmg"
+    dmg_base_name = app_path.stem if not version else f"{app_path.stem}-{version}"
+    dmg_path = work_dir / f"{dmg_base_name}.dmg"
     if dmg_path.exists():
         dmg_path.unlink()
 
@@ -453,6 +481,7 @@ def main() -> None:
     args = parse_args()
     output_dir = args.output_dir.resolve()
     build_dir = output_dir / "keyTAB_build"
+    app_version = read_project_version()
 
     if build_dir.exists():
         shutil.rmtree(build_dir, ignore_errors=True)
@@ -482,7 +511,7 @@ def main() -> None:
         update_info_plist(result_path, args.name, doc_icon_file)
         print(f"App bundle created at: {result_path}")
         try:
-            dmg_path = build_installer_dmg(result_path, build_dir, args.icon)
+            dmg_path = build_installer_dmg(result_path, build_dir, args.icon, app_version)
             print(f"Installer DMG created at: {dmg_path}")
         except Exception as exc:
             print(f"Warning: Failed to produce DMG: {exc}", file=sys.stderr)

@@ -2430,17 +2430,18 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                 0.05,
                 float(layout.get('measure_numbering_guide_thickness_mm', 1.0) or 1.0) * scale,
             )
-            # Shared guide dash pattern for measure numbers and repeat symbols in mm (pre-scale).
-            # Tweak this list to fine-tune both at once.
-            measure_guide_dash_pattern_mm = [1.0, 2.5]  # 1mm dash, 2mm gap
-            measure_guide_dash_pattern = [
-                float(v) * scale for v in measure_guide_dash_pattern_mm
-            ] if measure_guide_dash_pattern_mm else None
+            # Keep guide dashes aligned with the global grid line dash pattern.
+            measure_guide_dash_pattern = _scaled_dash_pattern_with_default(
+                layout.get('grid_gridline_dash_pattern_mm', default_grid_dash_mm),
+                default_grid_dash_mm,
+                scale,
+            )
 
             mn_placement = str(layout.get('measure_numbering_placement', 'system') or 'system')
             mn_guide_visible = layout.get('measure_numbering_guide_visible', True) is not False
             mn_numbers_visible = layout.get('measure_numbers_visible', True) is not False
             line_time_start = float(line.get('time_start', 0.0) or 0.0)
+            black_rule = str(layout.get('black_note_rule', 'below_stem') or 'below_stem')
 
             def _note_x_range(it: dict, include_stem: bool) -> tuple[float, float]:
                 p = int(it.get('pitch', 0) or 0)
@@ -2469,6 +2470,146 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                         max_x = x1
                 return max_x
 
+            def _y_to_time_unclamped(y_mm: float) -> float:
+                return float(line['time_start']) + ((float(y_mm) - float(y1)) * float(tick_per_mm))
+
+            ledger_collision_segments: list[dict[str, float]] = []
+
+            def _collect_ledger_collision_segments() -> None:
+                if not bool(layout.get('stave_visible', True)):
+                    return
+
+                def _append_segment_right_edge(x_right: float, t_start: float, t_end: float) -> None:
+                    if float(x_right) <= float(grid_right):
+                        return
+                    s = min(float(t_start), float(t_end))
+                    e = max(float(t_start), float(t_end))
+                    ledger_collision_segments.append({'x_right': float(x_right), 't_start': s, 't_end': e})
+
+                def _ledger_line_width_for_key(key_i: int) -> float:
+                    if key_i in (41, 43):
+                        return float(stave_clef_w)
+                    if key_i in key_class_filter('FGA'):
+                        return float(stave_three_w)
+                    return float(stave_two_w)
+
+                def _append_manual_ledger_collision_for_pitch_at_y(pitch_value: int, y_center: float) -> None:
+                    y_seg1 = float(y_center) - float(semitone_mm)
+                    y_draw_start = y_seg1 - float(semitone_mm) * 2.0
+                    y_draw_end = y_draw_start + max(0.0, float(stave_ledger_len))
+                    t_start = _y_to_time_unclamped(y_draw_start)
+                    t_end = _y_to_time_unclamped(y_draw_end)
+
+                    right_edge: float | None = None
+
+                    if int(pitch_value) in (1, 2, 3) and bool(line.get('a0_ledger_mode', False)):
+                        x_right = float(_key_to_x(2)) + (_ledger_line_width_for_key(2) * 0.5)
+                        right_edge = x_right if right_edge is None else max(float(right_edge), x_right)
+
+                    if manual_range:
+                        ledger_groups: list[dict] = []
+                        if int(pitch_value) < natural_bound_left:
+                            g_start = _group_index_for_key(int(pitch_value))
+                            g_end = int(bound_group_low or 0) - 1
+                            if g_start <= g_end:
+                                ledger_groups = line_groups[g_start:g_end + 1]
+                        elif int(pitch_value) > natural_bound_right:
+                            g_start = int(bound_group_high or 0) + 1
+                            g_end = _group_index_for_key(int(pitch_value))
+                            if g_start <= g_end:
+                                ledger_groups = line_groups[g_start:g_end + 1]
+
+                        for grp in ledger_groups:
+                            for key in grp.get('keys', []):
+                                key_i = int(key)
+                                x_right = float(_key_to_x(key_i)) + (_ledger_line_width_for_key(key_i) * 0.5)
+                                right_edge = x_right if right_edge is None else max(float(right_edge), x_right)
+
+                    if right_edge is not None:
+                        _append_segment_right_edge(float(right_edge), t_start, t_end)
+
+                for item in line_notes:
+                    p = int(item.get('pitch', 0) or 0)
+                    n_t = float(item.get('time', 0.0) or 0.0)
+                    n_end = float(item.get('end', 0.0) or 0.0)
+                    hand_key = str(item.get('hand', 'l') or 'l')
+
+                    y_start = _time_to_y(n_t)
+                    default_black_above = p in BLACK_KEYS and _black_note_above_stem(item, black_rule, line_notes, op_time)
+                    spec = resolve_notehead_spec(item.get('raw', {}) or {}, default_black_above=default_black_above)
+                    note_y = y_start
+                    if bool(getattr(spec, 'is_up', False)):
+                        note_y = y_start - (semitone_mm * 2.0)
+
+                    _append_manual_ledger_collision_for_pitch_at_y(int(p), float(note_y + semitone_mm))
+
+                    if not bool(layout.get('note_continuation_dot_visible', True)):
+                        continue
+
+                    dot_times: list[float] = []
+                    for other in line_notes:
+                        if int(other.get('idx', -1) or -1) == int(item.get('idx', -2) or -2):
+                            continue
+                        if str(other.get('hand', 'l') or 'l') != hand_key:
+                            continue
+                        s = float(other.get('time', 0.0) or 0.0)
+                        e = float(other.get('end', 0.0) or 0.0)
+                        if op_time.gt(s, n_t) and op_time.lt(s, n_end):
+                            dot_times.append(s)
+                        if op_time.gt(e, n_t) and op_time.lt(e, n_end):
+                            dot_times.append(e)
+                    for bt in barline_positions:
+                        bt = float(bt)
+                        if op_time.eq(bt, float(line_start)) or op_time.eq(bt, float(line_end)):
+                            continue
+                        if op_time.gt(bt, n_t) and op_time.lt(bt, n_end):
+                            dot_times.append(bt)
+                    if _is_line_continuation(item):
+                        dot_times.append(float(line_start))
+
+                    if not dot_times:
+                        continue
+
+                    for t in sorted(set(dot_times)):
+                        y_center = _time_to_y(float(t)) + float(semitone_mm)
+
+                        has_adjacent_start = False
+                        for other in line_notes:
+                            if int(other.get('idx', -1) or -1) == int(item.get('idx', -2) or -2):
+                                continue
+                            if _is_line_continuation(other):
+                                continue
+                            if not op_time.eq(float(other.get('time', 0.0) or 0.0), float(t)):
+                                continue
+                            other_pitch = int(other.get('pitch', 0) or 0)
+                            if abs(other_pitch - int(p)) == 1:
+                                other_black_above = (
+                                    other_pitch in BLACK_KEYS
+                                    and _black_note_above_stem(other, black_rule, line_notes, op_time)
+                                )
+                                if other_black_above:
+                                    continue
+                                has_adjacent_start = True
+                                break
+                        if has_adjacent_start:
+                            y_center += float(semitone_mm) * 2.0
+
+                        _append_manual_ledger_collision_for_pitch_at_y(int(p), float(y_center))
+
+            def _ledger_right_extent(t0: float, t1: float) -> float:
+                max_x = grid_right
+                for seg in ledger_collision_segments:
+                    ls = float(seg.get('t_start', 0.0) or 0.0)
+                    le = float(seg.get('t_end', 0.0) or 0.0)
+                    if op_time.ge(ls, float(t1)) or op_time.le(le, float(t0)):
+                        continue
+                    xr = float(seg.get('x_right', grid_right) or grid_right)
+                    if xr > max_x:
+                        max_x = xr
+                return max_x
+
+            _collect_ledger_collision_segments()
+
             def _collides(x0: float, x1: float, t0: float, t1: float) -> bool:
                 for it in line_notes:
                     nt = float(it.get('time', 0.0) or 0.0)
@@ -2478,6 +2619,14 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                     near_start = op_time.lt(nt, float(t1)) and op_time.ge(nt, float(t0))
                     nx0, nx1 = _note_x_range(it, include_stem=near_start)
                     if (nx1 >= x0) and (nx0 <= x1):
+                        return True
+                for seg in ledger_collision_segments:
+                    ls = float(seg.get('t_start', 0.0) or 0.0)
+                    le = float(seg.get('t_end', 0.0) or 0.0)
+                    if op_time.ge(ls, float(t1)) or op_time.le(le, float(t0)):
+                        continue
+                    xr = float(seg.get('x_right', grid_right) or grid_right)
+                    if xr >= x0:
                         return True
                 return False
 
@@ -2507,6 +2656,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                 ]
                 beam_right = max(beam_right_candidates) if beam_right_candidates else None
                 needed_right = _right_extent(t0, t1) + measure_pad
+                needed_right = max(needed_right, _ledger_right_extent(t0, t1) + measure_pad)
                 if beam_right is not None:
                     needed_right = max(needed_right, float(beam_right) + measure_pad)
                 x_pos = max(base_right, needed_right)
@@ -2594,6 +2744,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                     base_right = grid_right + measure_pad
                     beam_right_val = _beam_right_at_y(y_rep)
                     needed_right = _right_extent(t0, t1) + measure_pad
+                    needed_right = max(needed_right, _ledger_right_extent(t0, t1) + measure_pad)
                     if beam_right_val is not None:
                         needed_right = max(needed_right, float(beam_right_val) + measure_pad)
                     x_left = max(base_right, needed_right)
@@ -2916,7 +3067,6 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
 
             line_start = float(line.get('time_start', 0.0) or 0.0)
             line_end = float(line.get('time_end', 0.0) or 0.0)
-            black_rule = str(layout.get('black_note_rule', 'below_stem') or 'below_stem')
 
             def _clip_poly_y(poly: list[tuple[float, float]], y_min: float, y_max: float) -> list[tuple[float, float]]:
                 if not poly:
