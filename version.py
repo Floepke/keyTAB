@@ -7,7 +7,7 @@ Bump policy (Semantic Versioning):
   PATCH – bug fixes only
 """
 
-__version__ = "1.0.2"
+__version__ = "1.0.1"
 APP_NAME    = "keyTAB"
 
 change_log = '''
