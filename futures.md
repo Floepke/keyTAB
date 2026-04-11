@@ -16,10 +16,10 @@ Note:
 - [ ] Improve playback consistency with score semantics (repeats, tempo mapping, marker behavior).
 - [ ] Continue translation/i18n coverage and polish (Dutch and update tooling).
 - [ ] Keep performance tuning for large scores (editor drawing, hit testing, engraver throughput).
+- [ ] Add stronger import/export reliability and compatibility (MusicXML + MIDI roundtrip quality).
 
 ## Medium-confidence futures
 
-- [ ] Add stronger import/export reliability and compatibility (MusicXML + MIDI roundtrip quality).
 - [ ] Improve style system UX: safer presets, clearer defaults, and better migration of style fields.
 - [ ] Extend notehead/accent/accidental and articulation behavior where rendering and editing still diverge.
 - [ ] Add more robust diagnostics/reporting for engraver/runtime errors with actionable UI feedback.
@@ -48,14 +48,3 @@ Note:
 - [ ] Improve MusicXML import fidelity.
 - [ ] Improve playback correctness for repeats/tempo markers.
 - [ ] Streamline line-break/style editing workflow.
-
-## Quick triage labels (optional)
-
-- `future:engraver`
-- `future:editor`
-- `future:playback`
-- `future:import-export`
-- `future:packaging`
-- `future:i18n`
-- `future:performance`
-- `future:tooling`
