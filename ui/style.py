@@ -276,8 +276,12 @@ class Style:
         app = QApplication.instance()
         if app is None:
             return
+        
         # Use Fusion style across all platforms for consistent look
+        # Set it explicitly before applying palette to avoid system theme interference
+        available_styles = QApplication.style().objectName() if hasattr(QApplication, 'style') else ""
         QApplication.setStyle('Fusion')
+        
         base_style = app.style()
         Style._APP_STYLE_PROXY = _InstantTooltipStyle(base_style)
         app.setStyle(Style._APP_STYLE_PROXY)

@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import argparse
 import importlib.util
+import re
 import shlex
 import shutil
 import subprocess
@@ -133,6 +134,17 @@ def ensure_inno_setup_available() -> Path:
     return iscc
 
 
+def normalize_windows_version(version: str) -> str:
+    """Convert a semantic-like version to a 4-part numeric Windows version."""
+    numeric_parts = [p for p in re.split(r"[^0-9]+", version) if p]
+    if not numeric_parts:
+        return "0.0.0.0"
+    parts = [str(int(p)) for p in numeric_parts[:4]]
+    while len(parts) < 4:
+        parts.append("0")
+    return ".".join(parts)
+
+
 def generate_iss_script(
     app_name: str,
     app_version: str,
@@ -144,15 +156,20 @@ def generate_iss_script(
 ) -> None:
     """Write an Inno Setup script that packages the onedir build into an installer."""
     installer_output_dir.mkdir(parents=True, exist_ok=True)
+    windows_version = normalize_windows_version(app_version)
     script = f"""[Setup]
+AppId={{{app_name}}}
 AppName={app_name}
 AppVersion={app_version}
+AppVerName={app_name} {app_version}
 AppPublisher=Philip Bergwerf
 DefaultDirName={{autopf}}\\{app_name}
 DefaultGroupName={app_name}
 OutputDir={installer_output_dir}
 OutputBaseFilename={installer_name}
 SetupIconFile={ico_path}
+VersionInfoVersion={windows_version}
+VersionInfoTextVersion={app_version}
 Compression=lzma
 SolidCompression=yes
 WizardStyle=modern
@@ -306,7 +323,7 @@ def main() -> None:
 
     workspace_dir = output_dir / f"{name}_build"
     installer_output_dir = workspace_dir / "installer_out"
-    installer_name = DEFAULT_INSTALLER_NAME
+    installer_name = f"{DEFAULT_INSTALLER_NAME}-{app_version}"
     final_installer = output_dir / f"{installer_name}.exe"
 
     cleanup_path(workspace_dir)

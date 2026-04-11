@@ -306,6 +306,12 @@ def main(argv: list[str] | None = None):
         # from shell/launchd environment overrides.
         os.environ["QT_STYLE_OVERRIDE"] = "Fusion"
         os.environ.pop("QT_QPA_PLATFORMTHEME", None)
+    else:
+        # On Windows/Linux, disable system platform theme that may override our palette
+        # This is especially important for bundled apps where system theme can cause
+        # unreadable menus or broken colors
+        os.environ["QT_STYLE_OVERRIDE"] = "Fusion"
+        os.environ["QT_QPA_PLATFORMTHEME"] = ""
     # Create QApplication with argv to ensure proper initialization paths on macOS
     app = KeyTabApplication([sys.argv[0], *qt_args])
     _install_ui_translator(app, preferences)
