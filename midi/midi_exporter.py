@@ -1,22 +1,107 @@
 from __future__ import annotations
 
+import io
+import struct
 from pathlib import Path
-
-import mido
+from typing import List, Tuple
 
 from file_model.SCORE import SCORE
 from utils.CONSTANT import QUARTER_NOTE_UNIT
 
+# ---------------------------------------------------------------------------
+# Pure-Python MIDI writer (SMF format 1, no external dependencies)
+# ---------------------------------------------------------------------------
 
-def _units_to_ticks(units: float, ticks_per_beat: int) -> int:
-    return int(round((float(units) / float(QUARTER_NOTE_UNIT)) * float(ticks_per_beat)))
+_TPB = 480  # ticks per beat (quarter note)
 
 
-def _tempo_marker_to_quarter_bpm(tp) -> float:
+# -- Low-level encoding helpers --------------------------------------------
+
+def _vlq(value: int) -> bytes:
+    """Encode a non-negative integer as a MIDI variable-length quantity."""
+    value = max(0, int(value))
+    buf = bytearray()
+    buf.append(value & 0x7F)
+    value >>= 7
+    while value:
+        buf.append((value & 0x7F) | 0x80)
+        value >>= 7
+    buf.reverse()
+    return bytes(buf)
+
+
+def _u16be(v: int) -> bytes:
+    return struct.pack(">H", max(0, min(0xFFFF, int(v))))
+
+
+def _u32be(v: int) -> bytes:
+    return struct.pack(">I", max(0, min(0xFFFFFFFF, int(v))))
+
+
+# -- Track builder ---------------------------------------------------------
+
+def _make_track(events: List[Tuple[int, bytes]]) -> bytes:
+    """Build a complete MTrk chunk from a list of (abs_tick, raw_message_bytes)."""
+    events_sorted = sorted(events, key=lambda e: e[0])
+    buf = io.BytesIO()
+    last_tick = 0
+    for abs_tick, msg_bytes in events_sorted:
+        delta = max(0, int(abs_tick) - last_tick)
+        buf.write(_vlq(delta))
+        buf.write(msg_bytes)
+        last_tick = int(abs_tick)
+    # End-of-track meta message
+    buf.write(_vlq(0))
+    buf.write(b'\xFF\x2F\x00')
+    payload = buf.getvalue()
+    return b'MTrk' + _u32be(len(payload)) + payload
+
+
+# -- Meta messages ---------------------------------------------------------
+
+def _meta_set_tempo(tempo_us: int) -> bytes:
+    us = max(1, min(0xFFFFFF, int(tempo_us)))
+    data = bytes([(us >> 16) & 0xFF, (us >> 8) & 0xFF, us & 0xFF])
+    return b'\xFF\x51' + _vlq(len(data)) + data
+
+
+def _meta_time_signature(numer: int, denom: int) -> bytes:
+    # denom must be a power of 2; encode as its log2
+    denom = max(1, int(denom))
+    denom_pw = 0
+    d = denom
+    while d > 1:
+        denom_pw += 1
+        d >>= 1
+    data = bytes([max(1, int(numer)), denom_pw, 24, 8])  # 24 clocks/click, 8 32nds/quarter
+    return b'\xFF\x58' + _vlq(len(data)) + data
+
+
+# -- Channel messages ------------------------------------------------------
+
+def _note_on(channel: int, pitch: int, velocity: int) -> bytes:
+    return bytes([0x90 | (channel & 0x0F), pitch & 0x7F, velocity & 0x7F])
+
+
+def _note_off(channel: int, pitch: int) -> bytes:
+    return bytes([0x80 | (channel & 0x0F), pitch & 0x7F, 0x00])
+
+
+# -- Unit conversion -------------------------------------------------------
+
+def _units_to_ticks(units: float) -> int:
+    return max(0, int(round((float(units) / float(QUARTER_NOTE_UNIT)) * float(_TPB))))
+
+
+def _bpm_to_tempo_us(bpm: float) -> int:
+    return max(1, int(round(60_000_000.0 / max(1.0, float(bpm)))))
+
+
+def _tempo_marker_to_bpm(tp) -> float:
     marker_tempo = max(1.0, float(getattr(tp, "tempo", 120.0) or 120.0))
-    marker_duration = float(getattr(tp, "duration", float(QUARTER_NOTE_UNIT)) or float(QUARTER_NOTE_UNIT))
-    marker_duration = max(1e-6, marker_duration)
-    return marker_tempo * (marker_duration / float(QUARTER_NOTE_UNIT))
+    marker_dur   = float(getattr(tp, "duration", float(QUARTER_NOTE_UNIT)) or float(QUARTER_NOTE_UNIT))
+    marker_dur   = max(1e-6, marker_dur)
+    return marker_tempo * (marker_dur / float(QUARTER_NOTE_UNIT))
 
 
 def _closest_note_velocity(score: SCORE, t_units: float) -> int:
@@ -24,89 +109,95 @@ def _closest_note_velocity(score: SCORE, t_units: float) -> int:
     if not notes:
         return 64
     closest = min(notes, key=lambda n: abs(float(getattr(n, "time", 0.0) or 0.0) - float(t_units)))
-    v = int(getattr(closest, "velocity", 64) or 64)
-    return max(0, min(127, v))
+    return max(0, min(127, int(getattr(closest, "velocity", 64) or 64)))
 
+
+# -- Public API ------------------------------------------------------------
 
 def export_score_to_midi(score: SCORE, path: str | Path) -> None:
-    ticks_per_beat = 480
-    mid = mido.MidiFile(ticks_per_beat=ticks_per_beat)
+    """Export a SCORE to a Standard MIDI File (format 1, two tracks)."""
 
-    tempo_track = mido.MidiTrack()
-    note_track = mido.MidiTrack()
-    mid.tracks.append(tempo_track)
-    mid.tracks.append(note_track)
-
+    # ---- Tempo track (track 0) ----------------------------------------
     tempos = sorted(
         list(getattr(getattr(score, "events", None), "tempo", []) or []),
         key=lambda t: float(getattr(t, "time", 0.0) or 0.0),
     )
-    if tempos:
-        if float(getattr(tempos[0], "time", 0.0) or 0.0) > 0.0:
-            first_qpm = _tempo_marker_to_quarter_bpm(tempos[0])
-            tempos = [
-                type(
-                    "_TmpTempo",
-                    (),
-                    {"time": 0.0, "tempo": first_qpm, "duration": float(QUARTER_NOTE_UNIT)},
-                )()
-            ] + tempos
-    else:
-        tempos = [
-            type(
-                "_TmpTempo",
-                (),
-                {"time": 0.0, "tempo": 120.0, "duration": float(QUARTER_NOTE_UNIT)},
-            )()
-        ]
+    if not tempos or float(getattr(tempos[0], "time", 0.0) or 0.0) > 0.0:
+        first_bpm = _tempo_marker_to_bpm(tempos[0]) if tempos else 120.0
 
-    tempo_events = []
+        class _FakeTempo:
+            time = 0.0
+            tempo = first_bpm
+            duration = float(QUARTER_NOTE_UNIT)
+
+        tempos = [_FakeTempo()] + list(tempos)
+
+    tempo_events: List[Tuple[int, bytes]] = []
+    seen_ticks: set = set()
     for tp in tempos:
-        t_units = float(getattr(tp, "time", 0.0) or 0.0)
-        quarter_bpm = max(1.0, _tempo_marker_to_quarter_bpm(tp))
-        tempo_events.append((_units_to_ticks(t_units, ticks_per_beat), float(quarter_bpm)))
+        tick = _units_to_ticks(float(getattr(tp, "time", 0.0) or 0.0))
+        if tick in seen_ticks:
+            continue
+        seen_ticks.add(tick)
+        bpm = max(1.0, _tempo_marker_to_bpm(tp))
+        tempo_events.append((tick, _meta_set_tempo(_bpm_to_tempo_us(bpm))))
 
-    deduped_tempos = {}
-    for tick, bpm in tempo_events:
-        deduped_tempos[int(max(0, tick))] = float(bpm)
-    sorted_tempos = sorted(deduped_tempos.items(), key=lambda x: x[0])
+    # Time signature from the first base_grid entry (if present)
+    base_grid = list(getattr(score, "base_grid", []) or [])
+    if base_grid:
+        bg = base_grid[0]
+        numer = max(1, int(getattr(bg, "numerator",  4) or 4))
+        denom = max(1, int(getattr(bg, "denominator", 4) or 4))
+        tempo_events.append((0, _meta_time_signature(numer, denom)))
 
-    last_tick = 0
-    for tick, bpm in sorted_tempos:
-        delta = max(0, int(tick) - int(last_tick))
-        tempo_track.append(mido.MetaMessage("set_tempo", tempo=mido.bpm2tempo(float(max(1.0, bpm))), time=delta))
-        last_tick = int(tick)
-    tempo_track.append(mido.MetaMessage("end_of_track", time=0))
+    tempo_track = _make_track(tempo_events)
 
-    note_events = []
-    for n in list(getattr(score.events, "note", []) or []):
-        start_u = float(getattr(n, "time", 0.0) or 0.0)
-        dur_u = float(getattr(n, "duration", 0.0) or 0.0)
-        end_u = max(start_u, start_u + max(0.0, dur_u))
-        start_tick = max(0, _units_to_ticks(start_u, ticks_per_beat))
-        end_tick = max(start_tick + 1, _units_to_ticks(end_u, ticks_per_beat))
-        pitch = max(0, min(127, int(getattr(n, "pitch", 40) or 40) + 20))
-        vel = max(0, min(127, int(getattr(n, "velocity", 64) or 64)))
-        note_events.append((start_tick, 0, mido.Message("note_on", note=pitch, velocity=vel, time=0)))
-        note_events.append((end_tick, 1, mido.Message("note_off", note=pitch, velocity=0, time=0)))
+    # ---- Note tracks --------------------------------------------------
+    # Track 1 = left hand (channel 0), Track 2 = right hand (channel 1)
+    right_events: List[Tuple[int, bytes]] = []
+    left_events:  List[Tuple[int, bytes]] = []
 
     grace_dur_u = float(QUARTER_NOTE_UNIT) / 8.0
-    for g in list(getattr(score.events, "grace_note", []) or []):
-        start_u = float(getattr(g, "time", 0.0) or 0.0)
-        end_u = start_u + grace_dur_u
-        start_tick = max(0, _units_to_ticks(start_u, ticks_per_beat))
-        end_tick = max(start_tick + 1, _units_to_ticks(end_u, ticks_per_beat))
-        pitch = max(0, min(127, int(getattr(g, "pitch", 40) or 40) + 20))
-        vel = _closest_note_velocity(score, start_u)
-        note_events.append((start_tick, 0, mido.Message("note_on", note=pitch, velocity=vel, time=0)))
-        note_events.append((end_tick, 1, mido.Message("note_off", note=pitch, velocity=0, time=0)))
 
-    note_events.sort(key=lambda e: (int(e[0]), int(e[1])))
-    last_tick = 0
-    for tick, _prio, msg in note_events:
-        msg.time = max(0, int(tick) - int(last_tick))
-        note_track.append(msg)
-        last_tick = int(tick)
-    note_track.append(mido.MetaMessage("end_of_track", time=0))
+    for n in list(getattr(getattr(score, "events", None), "note", []) or []):
+        start_u  = float(getattr(n, "time",     0.0) or 0.0)
+        dur_u    = float(getattr(n, "duration", 0.0) or 0.0)
+        end_u    = max(start_u, start_u + max(0.0, dur_u))
+        on_tick  = _units_to_ticks(start_u)
+        off_tick = max(on_tick + 1, _units_to_ticks(end_u))
+        pitch    = max(0, min(127, int(getattr(n, "pitch", 40) or 40) + 20))
+        vel      = max(1, min(127, int(getattr(n, "velocity", 64) or 64)))
+        hand     = str(getattr(n, "hand", "r") or "r").strip().lower()
+        if hand == "l":
+            left_events.append((on_tick,  _note_on(0, pitch, vel)))
+            left_events.append((off_tick, _note_off(0, pitch)))
+        else:
+            right_events.append((on_tick,  _note_on(1, pitch, vel)))
+            right_events.append((off_tick, _note_off(1, pitch)))
 
-    mid.save(str(Path(path)))
+    for g in list(getattr(getattr(score, "events", None), "grace_note", []) or []):
+        start_u  = float(getattr(g, "time", 0.0) or 0.0)
+        end_u    = start_u + grace_dur_u
+        on_tick  = _units_to_ticks(start_u)
+        off_tick = max(on_tick + 1, _units_to_ticks(end_u))
+        pitch    = max(0, min(127, int(getattr(g, "pitch", 40) or 40) + 20))
+        vel      = _closest_note_velocity(score, start_u)
+        hand     = str(getattr(g, "hand", "r") or "r").strip().lower()
+        if hand == "l":
+            left_events.append((on_tick,  _note_on(0, pitch, vel)))
+            left_events.append((off_tick, _note_off(0, pitch)))
+        else:
+            right_events.append((on_tick,  _note_on(1, pitch, vel)))
+            right_events.append((off_tick, _note_off(1, pitch)))
+
+    right_track = _make_track(right_events)
+    left_track  = _make_track(left_events)
+
+    # ---- Assemble SMF format-1 file -----------------------------------
+    # Track 0: tempo/time-sig, Track 1: right hand, Track 2: left hand
+    num_tracks = 3
+    header = b'MThd' + _u32be(6) + _u16be(1) + _u16be(num_tracks) + _u16be(_TPB)
+
+    out = Path(path)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_bytes(header + tempo_track + right_track + left_track)

@@ -162,7 +162,7 @@ class FileManager:
                 if hasattr(self._current, '_normalize_events_after_load'):
                     self._current._normalize_events_after_load()
             except Exception as exc:
-                raise RuntimeError(f"Failed to load MIDI: {exc}")
+                raise RuntimeError(f"Failed to load MIDI: {exc}") from exc
             self._path = None
             self._last_dir = Path(fname).parent
             adm = get_appdata_manager()
@@ -225,10 +225,13 @@ class FileManager:
         """
         suffix = Path(path).suffix.lower()
         if suffix in (".mid", ".midi"):
-            from midi.midi_loader import midi_load
-            self._current = midi_load(path)
-            if hasattr(self._current, '_normalize_events_after_load'):
-                self._current._normalize_events_after_load()
+            try:
+                from midi.midi_loader import midi_load
+                self._current = midi_load(path)
+                if hasattr(self._current, '_normalize_events_after_load'):
+                    self._current._normalize_events_after_load()
+            except Exception as exc:
+                raise RuntimeError(f"Failed to load MIDI: {exc}") from exc
             self._path = None
             self._last_dir = Path(path).parent
             self._dirty = True

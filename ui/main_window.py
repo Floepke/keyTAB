@@ -1804,7 +1804,16 @@ class MainWindow(QtWidgets.QMainWindow):
         # If there are unsaved changes, confirm save before opening another project
         if not self.file_manager.confirm_save_for_action("opening another project", force_prompt=True):
             return
-        sc = self.file_manager.load()
+        try:
+            sc = self.file_manager.load()
+        except Exception as e:
+            self._show_error_dialog(
+                self.tr("MIDI Import failed"),
+                str(e),
+                details=self._format_exception_details(e),
+                informative_text=self.tr("Use 'Copy Error Log' and keep the copied traceback for debugging."),
+            )
+            return
         if sc:
             self._after_project_loaded()
 
@@ -1818,7 +1827,16 @@ class MainWindow(QtWidgets.QMainWindow):
             return
         opened_any = False
         for candidate in candidates:
-            sc = self.file_manager.open_path(candidate)
+            try:
+                sc = self.file_manager.open_path(candidate)
+            except Exception as e:
+                self._show_error_dialog(
+                    self.tr("MIDI Import failed"),
+                    str(e),
+                    details=self._format_exception_details(e),
+                    informative_text=self.tr("Use 'Copy Error Log' and keep the copied traceback for debugging."),
+                )
+                continue
             if sc:
                 opened_any = True
                 self._after_project_loaded()
