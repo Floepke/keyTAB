@@ -574,8 +574,7 @@ class SCORE:
 		self.meta_data.creation_timestamp = _timestamp_now()
 		self.info = Info()
 		self.analysis = Analysis()
-		year = datetime.now().year
-		self.info.copyright = f"keyTAB all copyrights reserved {year}"
+		self.info.copyright = f"© keyTAB {datetime.now().year}"
 		self.base_grid = [BaseGrid()]
 		self.events = Events()
 		self.layout = Layout()

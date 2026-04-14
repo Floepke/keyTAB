@@ -7,7 +7,7 @@ Bump policy (Semantic Versioning):
   PATCH – bug fixes only
 """
 
-__version__ = "1.0.2"
+__version__ = "1.0.3"
 APP_NAME    = "keyTAB"
 
 change_log = '''
@@ -20,4 +20,7 @@ change_log = '''
 1.0.2 (2024-07-15)
 - midi export and import is now dependency free (no more mido or pretty_midi)
 - fix: midi import can open older Klavarscript midi files without errors.
+
+1.0.3 (2024-08-01)
+- copyright default value changed to "© keyTAB {datetime.now().year}"
 '''
