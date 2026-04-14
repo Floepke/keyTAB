@@ -468,6 +468,12 @@ def copy_shared_libs(appdir: Path, lib_names: list[str], extra_targets: list[Pat
 def main() -> int:
     args = parse_args()
     project_root = Path(__file__).resolve().parents[1]
+
+    version_spec = importlib.util.spec_from_file_location("version", project_root / "version.py")
+    version_mod = importlib.util.module_from_spec(version_spec)
+    version_spec.loader.exec_module(version_mod)  # type: ignore[union-attr]
+    app_version: str = getattr(version_mod, "__version__", "")
+
     entry_script = project_root / args.entry
     if not entry_script.exists():
         raise SystemExit(f"Entry script not found: {entry_script}")
@@ -613,7 +619,7 @@ def main() -> int:
     linuxdeploy = ensure_appimage_tools(tools_dir)
     env = os.environ.copy()
     env["PATH"] = f"{tools_dir}:{env.get('PATH', '')}"
-    env.setdefault("LINUXDEPLOY_OUTPUT_VERSION", "dev")
+    env["LINUXDEPLOY_OUTPUT_VERSION"] = app_version or "dev"
     # Avoid FUSE mount requirement when running AppImage tools.
     env.setdefault("APPIMAGE_EXTRACT_AND_RUN", "1")
     # We bundle project/Qt licenses explicitly; disable linuxdeploy's dpkg-query
@@ -641,7 +647,8 @@ def main() -> int:
     produced = sorted(build_root.glob("*.AppImage"), key=lambda p: p.stat().st_mtime, reverse=True)
     if not produced:
         raise SystemExit("AppImage build finished but no AppImage was produced.")
-    final_appimage = out_dir / f"{exe_name}.AppImage"
+    version_suffix = f"-{app_version}" if app_version else ""
+    final_appimage = out_dir / f"{exe_name}{version_suffix}.AppImage"
     if final_appimage.exists():
         try:
             final_appimage.unlink()

@@ -497,6 +497,7 @@ def main() -> None:
 
     result_path: Path | None = None
     dmg_path: Path | None = None
+    final_app_path: Path | None = None
     success = False
     try:
         result_path = run_pyinstaller(
@@ -516,7 +517,8 @@ def main() -> None:
         except Exception as exc:
             print(f"Warning: Failed to produce DMG: {exc}", file=sys.stderr)
 
-        final_app_path = output_dir / f"{args.name}.app"
+        version_suffix = f"-{app_version}" if app_version and app_version != "unknown" else ""
+        final_app_path = output_dir / f"{args.name}{version_suffix}.app"
         if final_app_path.exists():
             shutil.rmtree(final_app_path, ignore_errors=True)
         shutil.move(str(result_path), final_app_path)
@@ -536,7 +538,7 @@ def main() -> None:
         else:
             print(f"Build failed or incomplete; leaving artifacts in {build_dir} for inspection.")
 
-    if result_path is None or not (output_dir / f"{args.name}.app").exists():
+    if result_path is None or final_app_path is None or not final_app_path.exists():
         raise SystemExit("Build failed: .app bundle missing after cleanup.")
     if dmg_path is None:
         print("Installer DMG unavailable; .app bundle still produced.", file=sys.stderr)
