@@ -3,7 +3,7 @@
 <plist version="1.0">
 <dict>
 	<key>AAAA_CurrentOSVersion</key>
-	<string>macOS Tahoe: 4302.000000</string>
+	<string>macOS Tahoe: 4424.100000</string>
 	<key>AAAA_DKDDocumentVersion</key>
 	<string>9.0.0 : Mobile Friendly</string>
 	<key>AAAA_EazyDrawVersion</key>
@@ -15,10 +15,10 @@
 	<key>AAA_DKDQuicklookData</key>
 	<data>
 	JVBERi0xLjMKJcTl8uXrp/Og0MTGCjMgMCBvYmoKPDwgL0ZpbHRlciAvRmxhdGVEZWNv
-	ZGUgL0xlbmd0aCAxNDYgPj4Kc3RyZWFtCngBjY89DgIhEEb7PcV3gUWGn1mp6ew2FB6A
-	aDQBk5XC64uQoNHGTDPz5svLzIYVG2QtyyyccvRu7icccYMUjCt2vhBiAaHEz3Qe+WkY
-	0mA1mZo94YIztMSjGg4vm4IPbSURfL2B2jATZjIkFq00FrkXzGSmmMFOdqid7k0GWffF
-	EkJ76F+ZYfsjG6zL1icOCzxkCmVuZHN0cmVhbQplbmRvYmoKMSAwIG9iago8PCAvVHlw
+	ZGUgL0xlbmd0aCAxNDYgPj4Kc3RyZWFtCngBjY9BDgIhDEX3c4p/gUEKTHHW7NxNWHgA
+	otEETEYWXl8ExYkr0037+vPSrliwQpaamMWsZvo29xOOuEEKxhU7lwkhg5DDNp16fuiG
+	2FlJxmqPuOAMLfEohsPLpuB8XUl4V26gOoyEkQwJq5WGlXvBTGYICWxVg0a+mwSy9odF
+	+PrQ37KJm2Er+7AmW54G4TxSCmVuZHN0cmVhbQplbmRvYmoKMSAwIG9iago8PCAvVHlw
 	ZSAvUGFnZSAvUGFyZW50IDIgMCBSIC9SZXNvdXJjZXMgNCAwIFIgL0NvbnRlbnRzIDMg
 	MCBSIC9NZWRpYUJveCBbMCAwIDU2Ni45MjkxIDU2Ni45MjkxXQo+PgplbmRvYmoKNCAw
 	IG9iago8PCAvUHJvY1NldCBbIC9QREYgXSAvQ29sb3JTcGFjZSA8PCAvQ3MxIDUgMCBS
@@ -104,17 +104,17 @@
 	L1R5cGUgL1BhZ2VzIC9NZWRpYUJveCBbMCAwIDU2Ni45MjkxIDU2Ni45MjkxXSAvQ291
 	bnQgMSAvS2lkcyBbIDEgMCBSIF0KPj4KZW5kb2JqCjkgMCBvYmoKPDwgL1R5cGUgL0Nh
 	dGFsb2cgL1BhZ2VzIDIgMCBSID4+CmVuZG9iagoxMCAwIG9iago8PCAvQ3JlYXRpb25E
-	YXRlIChEOjIwMjYwMzI3MDkxOTQ1WjAwJzAwJykgL1Byb2R1Y2VyIChtYWNPUyBWZXJz
-	aW9uIDI2LjMuMSBcKEJ1aWxkIDI1RDIxMjhcKSBRdWFydHogUERGQ29udGV4dCkKL01v
-	ZERhdGUgKEQ6MjAyNjAzMjcwOTE5NDVaMDAnMDAnKSA+PgplbmRvYmoKeHJlZgowIDEx
-	CjAwMDAwMDAwMDAgNjU1MzUgZiAKMDAwMDAwMDI0MCAwMDAwMCBuIAowMDAwMDA0NDI2
-	IDAwMDAwIG4gCjAwMDAwMDAwMjIgMDAwMDAgbiAKMDAwMDAwMDM1NCAwMDAwMCBuIAow
-	MDAwMDAzOTE5IDAwMDAwIG4gCjAwMDAwMDQzOTEgMDAwMDAgbiAKMDAwMDAwMDQzMyAw
-	MDAwMCBuIAowMDAwMDAzOTU0IDAwMDAwIG4gCjAwMDAwMDQ1MTkgMDAwMDAgbiAKMDAw
-	MDAwNDU2OCAwMDAwMCBuIAp0cmFpbGVyCjw8IC9TaXplIDExIC9Sb290IDkgMCBSIC9J
-	bmZvIDEwIDAgUiAvSUQgWyA8NGYxMDkyZTUyNWZmMTI1MDQyNjMzMDBjNzQ5NGVjN2Y+
-	Cjw0ZjEwOTJlNTI1ZmYxMjUwNDI2MzMwMGM3NDk0ZWM3Zj4gXSA+PgpzdGFydHhyZWYK
-	NDczNAolJUVPRgo=
+	YXRlIChEOjIwMjYwNDE0MTgxMzA1WjAwJzAwJykgL1Byb2R1Y2VyIChtYWNPUyBWZXJz
+	aW9uIDI2LjQuMSBcKEJ1aWxkIDI1RTI1M1wpIFF1YXJ0eiBQREZDb250ZXh0KQovTW9k
+	RGF0ZSAoRDoyMDI2MDQxNDE4MTMwNVowMCcwMCcpID4+CmVuZG9iagp4cmVmCjAgMTEK
+	MDAwMDAwMDAwMCA2NTUzNSBmIAowMDAwMDAwMjQwIDAwMDAwIG4gCjAwMDAwMDQ0MjYg
+	MDAwMDAgbiAKMDAwMDAwMDAyMiAwMDAwMCBuIAowMDAwMDAwMzU0IDAwMDAwIG4gCjAw
+	MDAwMDM5MTkgMDAwMDAgbiAKMDAwMDAwNDM5MSAwMDAwMCBuIAowMDAwMDAwNDMzIDAw
+	MDAwIG4gCjAwMDAwMDM5NTQgMDAwMDAgbiAKMDAwMDAwNDUxOSAwMDAwMCBuIAowMDAw
+	MDA0NTY4IDAwMDAwIG4gCnRyYWlsZXIKPDwgL1NpemUgMTEgL1Jvb3QgOSAwIFIgL0lu
+	Zm8gMTAgMCBSIC9JRCBbIDwwMTllMWYzYjg5MjdlOTVmYmMzMjFiM2EwMGJmNzg3ND4K
+	PDAxOWUxZjNiODkyN2U5NWZiYzMyMWIzYTAwYmY3ODc0PiBdID4+CnN0YXJ0eHJlZgo0
+	NzMzCiUlRU9GCg==
 	</data>
 	<key>ArchiveMatchStore</key>
 	<dict>
@@ -170,7 +170,7 @@
 		</array>
 	</dict>
 	<key>DKDChangeTimeStamp</key>
-	<string>2026-03-27 15:19:43 +0600</string>
+	<string>2026-04-15 00:12:49 +0600</string>
 	<key>DKDCreateTimeStamp</key>
 	<string>2024-03-09 18:06:40 +0600</string>
 	<key>DKDDisplayGraphicDetails</key>
@@ -499,7 +499,7 @@
 					<key>GraphicStyle</key>
 					<string>8</string>
 					<key>SVGPath</key>
-					<string>M690.73228,393.73228 L159.73228,393.73228</string>
+					<string>M672.73228,402.73228 L177.73228,402.73228</string>
 				</dict>
 				<dict>
 					<key>Class</key>
@@ -509,7 +509,7 @@
 					<key>GraphicStyle</key>
 					<string>8</string>
 					<key>SVGPath</key>
-					<string>M690.73228,465.73228 L159.73228,465.73228</string>
+					<string>M672.73228,456.73228 L177.73228,456.73228</string>
 				</dict>
 			</array>
 			<key>HideDimensions</key>
@@ -701,7 +701,7 @@
 		<string>YES</string>
 	</dict>
 	<key>DKDSaveTimeStamp</key>
-	<string>2026-03-27 15:19:45 +0600</string>
+	<string>2026-04-15 00:13:05 +0600</string>
 	<key>DKDTablet</key>
 	<dict>
 		<key>BrushDynamic</key>
