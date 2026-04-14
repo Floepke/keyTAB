@@ -23,4 +23,5 @@ change_log = '''
 
 1.0.3 (2024-08-01)
 - copyright default value changed to "© keyTAB {datetime.now().year}"
+- physical undo/redo implemented as buttons in the toolbar, in addition to keyboard shortcuts ctrl+z and ctrl+shift+z
 '''

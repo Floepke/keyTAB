@@ -64,6 +64,30 @@ class ToolbarHandle(QtWidgets.QSplitterHandle):
         layout.addWidget(self.prev_btn)
         self.prev_btn.clicked.connect(parent.previousRequested.emit)
 
+        '''this button undoes the last editing action.'''
+        self.undo_btn = QtWidgets.QToolButton(self)
+        self.undo_btn.setFocusPolicy(QtCore.Qt.FocusPolicy.NoFocus)
+        ic_undo = get_qicon('undo', size=(64, 64))
+        if ic_undo:
+            self.undo_btn.setIcon(ic_undo)
+        self.undo_btn.setIconSize(QtCore.QSize(self._button_size - 6, self._button_size - 6))
+        self.undo_btn.setFixedSize(self._button_size, self._button_size)
+        self.undo_btn.setToolTip(self.tr("Undo the last editing action. Shortcut: Ctrl+Z."))
+        layout.addWidget(self.undo_btn)
+        self.undo_btn.clicked.connect(parent.undoRequested.emit)
+
+        '''this button redoes the last undone editing action.'''
+        self.redo_btn = QtWidgets.QToolButton(self)
+        self.redo_btn.setFocusPolicy(QtCore.Qt.FocusPolicy.NoFocus)
+        ic_redo = get_qicon('redo', size=(64, 64))
+        if ic_redo:
+            self.redo_btn.setIcon(ic_redo)
+        self.redo_btn.setIconSize(QtCore.QSize(self._button_size - 6, self._button_size - 6))
+        self.redo_btn.setFixedSize(self._button_size, self._button_size)
+        self.redo_btn.setToolTip(self.tr("Redo the last undone editing action. Shortcut: Ctrl+Shift+Z."))
+        layout.addWidget(self.redo_btn)
+        self.redo_btn.clicked.connect(parent.redoRequested.emit)
+
         '''this button plays the music.'''
         self.play_btn = QtWidgets.QToolButton(self)
         self.play_btn.setFocusPolicy(QtCore.Qt.FocusPolicy.NoFocus)
@@ -222,6 +246,8 @@ class ToolbarSplitter(QtWidgets.QSplitter):
     # Default toolbar actions
     nextRequested = QtCore.Signal()
     previousRequested = QtCore.Signal()
+    undoRequested = QtCore.Signal()
+    redoRequested = QtCore.Signal()
     engraveRequested = QtCore.Signal()
     playRequested = QtCore.Signal()
     stopRequested = QtCore.Signal()
