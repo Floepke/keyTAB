@@ -1085,7 +1085,19 @@ class StyleDialog(QtWidgets.QDialog):
         args = get_args(field_type)
 
         if origin is Literal and args:
-            options = [(str(a).replace('_', ' ').capitalize(), str(a)) for a in args]
+            literal_labels = {
+                'above_stem': self.tr('Above stem (Klavarskribo)'),
+                'below_stem': self.tr('Below stem'),
+                'above_stem_if_collision': self.tr('Above stem if collision'),
+                'above_stem_if_chord_and_white_note': self.tr('Above stem if chord and white note'),
+                'above_stem_if_chord_and_white_note_same_hand': self.tr('Above stem if chord and white note same hand'),
+                'dark': self.tr('Dark'),
+                'light': self.tr('Light'),
+                'classical': self.tr('Classical'),
+                'klavarskribo': self.tr('Klavarskribo'),
+                'classical & klavarskribo': self.tr('Classical & Klavarskribo'),
+            }
+            options = [(literal_labels.get(str(a), str(a).replace('_', ' ').capitalize()), str(a)) for a in args]
             return RadioGroupWidget(options, str(value) if value is not None else str(args[0]), self)
 
         if field_type is bool:
@@ -1405,3 +1417,98 @@ class StyleDialog(QtWidgets.QDialog):
             except Exception:
                 continue
         return values
+
+
+# Utility functions for managing the default style
+def _get_default_style_dir() -> Path:
+    """Get the directory where default style is stored."""
+    root = Path.home() / ".keyTAB" / "pstyle"
+    root.mkdir(parents=True, exist_ok=True)
+    return root
+
+
+def _serialize_layout_dict(layout_obj: Layout) -> dict:
+    """Serialize a Layout object to a dictionary."""
+    try:
+        return asdict(layout_obj)
+    except Exception:
+        return layout_obj.__dict__
+
+
+def _layout_from_dict(data: dict) -> Layout:
+    """Load a Layout object from a dictionary."""
+    if not isinstance(data, dict):
+        raise ValueError("Invalid style payload")
+    data = dict(data)
+    if 'dynamic_symbol_background_padding_mm' not in data:
+        if 'dynamic_symbol_background_padding' in data:
+            data['dynamic_symbol_background_padding_mm'] = data.get('dynamic_symbol_background_padding')
+        elif 'dynamic_background_padding' in data:
+            data['dynamic_symbol_background_padding_mm'] = data.get('dynamic_background_padding')
+    # Coerce known LayoutFont fields back to dataclasses to keep typing consistent
+    fixed: dict[str, Any] = {}
+    defaults = Layout()
+    type_hints = get_type_hints(Layout)
+    for f in fields(Layout):
+        name = f.name
+        val = data.get(name, getattr(defaults, name))
+        hint = type_hints.get(name, f.type)
+        if hint is Font and isinstance(val, dict):
+            try:
+                val = Font(**val)
+            except Exception:
+                val = getattr(defaults, name)
+        fixed[name] = val
+    # Backwards compatibility: migrate legacy text_font_family/size into font_text if missing
+    if "font_text" not in data and ("text_font_family" in data or "text_font_size_pt" in data):
+        try:
+            fam = str(data.get("text_font_family", "Edwin"))
+            size = float(data.get("text_font_size_pt", 12.0))
+            fixed["font_text"] = Font(family=fam, size_pt=size)
+        except Exception:
+            pass
+    # Legacy migration: merge left/right grid band tracks into the unified track
+    if not fixed.get("grid_band_track"):
+        legacy_left = data.get("grid_band_left_track", []) or []
+        legacy_right = data.get("grid_band_right_track", []) or []
+        if legacy_left or legacy_right:
+            fixed["grid_band_track"] = list(legacy_left) + list(legacy_right)
+    return Layout(**fixed)
+
+
+def save_default_style(layout: Layout) -> None:
+    """Save the current layout as the default style."""
+    pstyle_dir = _get_default_style_dir()
+    path = pstyle_dir / "__default__.pstyle"
+    try:
+        payload = _serialize_layout_dict(layout)
+        with path.open("w", encoding="utf-8") as fh:
+            json.dump(payload, fh, indent=2, ensure_ascii=True)
+    except Exception as e:
+        print(f"Failed to save default style: {e}")
+
+
+def load_default_style() -> Layout | None:
+    """Load the default style if it exists, otherwise return None."""
+    pstyle_dir = _get_default_style_dir()
+    path = pstyle_dir / "__default__.pstyle"
+    if not path.is_file():
+        return None
+    try:
+        with path.open("r", encoding="utf-8") as fh:
+            data = json.load(fh)
+        return _layout_from_dict(data)
+    except Exception as e:
+        print(f"Failed to load default style: {e}")
+        return None
+
+
+def reset_default_style() -> None:
+    """Remove the default style file."""
+    pstyle_dir = _get_default_style_dir()
+    path = pstyle_dir / "__default__.pstyle"
+    try:
+        if path.is_file():
+            path.unlink()
+    except Exception as e:
+        print(f"Failed to reset default style: {e}")

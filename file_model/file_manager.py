@@ -74,6 +74,8 @@ class FileManager:
         template = adm.get("score_template", {})
         if isinstance(template, dict) and template:
             self._apply_score_template(template)
+        # Load default style if it exists
+        self._apply_default_style()
         self._path = None
         self._dirty = False
         # Snapshot a fresh session immediately so restore works even before edits.
@@ -131,6 +133,17 @@ class FileManager:
         base_grid = data.get('base_grid')
         if isinstance(base_grid, list):
             score.base_grid = [BaseGrid(**bg) if isinstance(bg, dict) else BaseGrid() for bg in base_grid]
+
+    def _apply_default_style(self) -> None:
+        """Load and apply the default style to the current score if it exists."""
+        try:
+            from ui.dialogs.style_dialog import load_default_style
+            default_layout = load_default_style()
+            if default_layout is not None:
+                self._current.layout = default_layout
+        except Exception:
+            # If loading default style fails, just use the template/default layout
+            pass
 
     def replace_current(self, new_score: SCORE) -> None:
         """Replace the current SCORE instance (used by undo/redo)."""

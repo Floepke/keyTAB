@@ -621,6 +621,17 @@ class MainWindow(QtWidgets.QMainWindow):
         self._refresh_rename_file_action()
         file_menu.addSeparator()
 
+        set_default_style_act = QtGui.QAction(tr("Set current style as default"), self)
+        set_default_style_act.setToolTip(tr("Save the current style as the default for new projects."))
+        set_default_style_act.triggered.connect(self._set_default_style)
+        file_menu.addAction(set_default_style_act)
+
+        reset_default_style_act = QtGui.QAction(tr("Reset default style"), self)
+        reset_default_style_act.setToolTip(tr("Remove the custom default style and use the built-in defaults."))
+        reset_default_style_act.triggered.connect(self._reset_default_style)
+        file_menu.addAction(reset_default_style_act)
+        file_menu.addSeparator()
+
         style_act = QtGui.QAction(tr("Style..."), self)
         style_act.setToolTip(tr("Open appearance settings for the score."))
         style_act.setShortcut(QtGui.QKeySequence("S"))
@@ -2245,6 +2256,41 @@ class MainWindow(QtWidgets.QMainWindow):
             self._update_title()
             self._show_status_default(force=True)
             self._show_file_action_status(self.tr("Renamed"))
+
+    def _set_default_style(self) -> None:
+        """Save the current layout as the default style for new projects."""
+        try:
+            from ui.dialogs.style_dialog import save_default_style
+            current_layout = self.file_manager.current().layout
+            save_default_style(current_layout)
+            QtWidgets.QMessageBox.information(
+                self,
+                self.tr("Default Style Saved"),
+                self.tr("The current style has been set as the default for new projects.")
+            )
+        except Exception as e:
+            QtWidgets.QMessageBox.warning(
+                self,
+                self.tr("Failed to Save Default Style"),
+                self.tr("An error occurred while saving the default style: {error}").format(error=str(e))
+            )
+
+    def _reset_default_style(self) -> None:
+        """Reset to the built-in default style."""
+        try:
+            from ui.dialogs.style_dialog import reset_default_style
+            reset_default_style()
+            QtWidgets.QMessageBox.information(
+                self,
+                self.tr("Default Style Reset"),
+                self.tr("The default style has been reset to the built-in defaults.")
+            )
+        except Exception as e:
+            QtWidgets.QMessageBox.warning(
+                self,
+                self.tr("Failed to Reset Default Style"),
+                self.tr("An error occurred while resetting the default style: {error}").format(error=str(e))
+            )
 
     def _open_recent_file(self, path: str) -> None:
         if not self.file_manager.confirm_save_for_action("opening another project", force_prompt=True):
