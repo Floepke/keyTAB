@@ -69,7 +69,10 @@ def _try_load_cdll(path: str) -> ctypes.CDLL:
     try:
         return ctypes.CDLL(path)
     except OSError as exc:
-        raise OSError(f"ctypes.CDLL({path!r}) failed: {exc}") from exc
+        # PyInstaller wraps the real dlopen error with a generic message.
+        # Extract the original cause for better diagnostics.
+        real = exc.__cause__ if exc.__cause__ is not None else exc
+        raise OSError(f"ctypes.CDLL({path!r}) failed: {real}") from exc
 
 
 def _ensure_fluidsynth_lib() -> None:
@@ -723,6 +726,7 @@ class Player:
         self._start_units: float = 0.0
         self._last_event_count: int = 0
         self._playhead_timeline: Optional[List[Tuple[float, float, float, float]]] = None
+        self._playhead_sync_delay_ms: int = 0
         self._off_epsilon_sec: float = 0.003  # ~3 ms safety gap before offs
         self._min_duration_units: float = 4.0
         self._grace_duration_units: float = 32.0  # Default grace note length (32nd note)
@@ -735,6 +739,13 @@ class Player:
         # Load and apply reverb settings for FluidSynth backend
         if self._backend_kind == "fluidsynth" and isinstance(self._backend, _FluidsynthBackend):
             self._load_reverb_settings_from_appdata()
+
+    def set_playhead_sync_delay_ms(self, delay_ms: int) -> None:
+        """Set a playhead delay offset so visuals align with audible output latency."""
+        try:
+            self._playhead_sync_delay_ms = int(delay_ms)
+        except Exception:
+            self._playhead_sync_delay_ms = 0
 
     def set_soundfont(self, path: str) -> None:
         if self._backend_kind != "fluidsynth":
@@ -768,12 +779,14 @@ class Player:
                 damp = float(adm.get("fluidsynth_reverb_damp", 0.4))
                 width = float(adm.get("fluidsynth_reverb_width", 3.0))
                 level = float(adm.get("fluidsynth_reverb_level", 0.9))
+                sync_delay_ms = int(adm.get("fluidsynth_playhead_sync_delay_ms", 0))
 
                 self._backend.set_reverb_enabled(enabled)
                 self._backend.set_reverb_room_size(room_size)
                 self._backend.set_reverb_damp(damp)
                 self._backend.set_reverb_width(width)
                 self._backend.set_reverb_level(level)
+                self.set_playhead_sync_delay_ms(sync_delay_ms)
         except Exception:
             # Silently ignore if unable to load settings
             pass
@@ -1230,7 +1243,8 @@ class Player:
         if not bool(self._running):
             return None
         try:
-            elapsed = max(0.0, time.time() - float(self._t0))
+            delay_sec = max(0.0, float(self._playhead_sync_delay_ms) / 1000.0)
+            elapsed = max(0.0, time.time() - float(self._t0) - delay_sec)
             if score is None:
                 s_per_unit = float(self._bpm) if self._bpm > 0 else (60.0 / (120.0 * float(QUARTER_NOTE_UNIT)))
                 units = float(self._start_units) + float(elapsed) / float(s_per_unit)
@@ -1261,6 +1275,7 @@ class Player:
             'soundfont': str(sf or ''),
             'output': str(self._output_name),
             'gain': float(self._gain),
+            'playhead_sync_delay_ms': int(self._playhead_sync_delay_ms),
         }
 
     @staticmethod

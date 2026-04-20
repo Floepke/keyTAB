@@ -1,4 +1,4 @@
-"""FluidSynth Reverb Configuration Dialog."""
+"""FluidSynth settings dialog."""
 from __future__ import annotations
 
 from PySide6 import QtCore, QtWidgets
@@ -7,7 +7,7 @@ from appdata_manager import get_appdata_manager
 
 
 class FluidSynthReverbConfigDialog(QtWidgets.QDialog):
-    """Dialog for configuring FluidSynth reverb settings."""
+    """Dialog for configuring FluidSynth settings."""
 
     # Signal emitted when settings are applied
     reverb_settings_changed = QtCore.Signal(dict)
@@ -17,10 +17,10 @@ class FluidSynthReverbConfigDialog(QtWidgets.QDialog):
         tr = self.tr
         self.setWindowFlag(QtCore.Qt.WindowType.WindowMinMaxButtonsHint, True)
         self.setSizeGripEnabled(True)
-        self.setWindowTitle(tr("FluidSynth Reverb Configuration"))
+        self.setWindowTitle(tr("FluidSynth settings"))
         # Make dialog non-modal (modeless) so it doesn't block the main window
         self.setModal(False)
-        self.resize(500, 400)
+        self.resize(500, 460)
 
         self._adm = get_appdata_manager()
         self._load_settings()
@@ -87,6 +87,20 @@ class FluidSynthReverbConfigDialog(QtWidgets.QDialog):
 
         layout.addWidget(reverb_group)
 
+        # Group box for FluidSynth-specific playback settings
+        fluidsynth_group = QtWidgets.QGroupBox(tr("Fluidsynth settings"), self)
+        fluidsynth_layout = QtWidgets.QFormLayout(fluidsynth_group)
+        fluidsynth_layout.setSpacing(12)
+
+        self._playhead_sync_delay_ms_spin = QtWidgets.QSpinBox(self)
+        self._playhead_sync_delay_ms_spin.setRange(-2000, 2000)
+        self._playhead_sync_delay_ms_spin.setSingleStep(10)
+        self._playhead_sync_delay_ms_spin.setSuffix(tr(" ms"))
+        self._playhead_sync_delay_ms_spin.setValue(int(self._playhead_sync_delay_ms))
+        fluidsynth_layout.addRow(tr("Playhead Sync Delay"), self._playhead_sync_delay_ms_spin)
+
+        layout.addWidget(fluidsynth_group)
+
         # Reset button
         reset_button = QtWidgets.QPushButton(tr("Reset to Defaults"), self)
         reset_button.clicked.connect(self._reset_to_defaults)
@@ -133,6 +147,7 @@ class FluidSynthReverbConfigDialog(QtWidgets.QDialog):
         self._damp_slider.setValue(40)  # 0.4
         self._width_slider.setValue(3)  # 3.0
         self._level_slider.setValue(90)  # 0.9
+        self._playhead_sync_delay_ms_spin.setValue(0)
 
     def _load_settings(self) -> None:
         """Load reverb settings from appdata manager."""
@@ -141,6 +156,7 @@ class FluidSynthReverbConfigDialog(QtWidgets.QDialog):
         self._reverb_damp = float(self._adm.get("fluidsynth_reverb_damp", 0.4))
         self._reverb_width = float(self._adm.get("fluidsynth_reverb_width", 3.0))
         self._reverb_level = float(self._adm.get("fluidsynth_reverb_level", 0.9))
+        self._playhead_sync_delay_ms = int(self._adm.get("fluidsynth_playhead_sync_delay_ms", 0))
 
     def _save_settings(self) -> None:
         """Save reverb settings to appdata manager."""
@@ -149,12 +165,14 @@ class FluidSynthReverbConfigDialog(QtWidgets.QDialog):
         self._adm.set("fluidsynth_reverb_damp", self._reverb_damp)
         self._adm.set("fluidsynth_reverb_width", self._reverb_width)
         self._adm.set("fluidsynth_reverb_level", self._reverb_level)
+        self._adm.set("fluidsynth_playhead_sync_delay_ms", int(self._playhead_sync_delay_ms))
         self._adm.save()
 
     def _on_apply(self) -> None:
         """Apply settings but keep dialog open so user can hear the changes."""
         # Update from UI
         self._reverb_enabled = self._enabled_cb.isChecked()
+        self._playhead_sync_delay_ms = int(self._playhead_sync_delay_ms_spin.value())
 
         # Save to appdata
         self._save_settings()
@@ -166,6 +184,7 @@ class FluidSynthReverbConfigDialog(QtWidgets.QDialog):
             'damp': self._reverb_damp,
             'width': self._reverb_width,
             'level': self._reverb_level,
+            'playhead_sync_delay_ms': int(self._playhead_sync_delay_ms),
         }
         self.reverb_settings_changed.emit(settings)
 
@@ -177,4 +196,5 @@ class FluidSynthReverbConfigDialog(QtWidgets.QDialog):
             'damp': self._reverb_damp,
             'width': self._reverb_width,
             'level': self._reverb_level,
+            'playhead_sync_delay_ms': int(self._playhead_sync_delay_ms),
         }

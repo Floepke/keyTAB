@@ -709,8 +709,8 @@ class MainWindow(QtWidgets.QMainWindow):
             unset_sf_act.triggered.connect(self._unset_soundfont)
             playback_menu.addAction(unset_sf_act)
 
-            reverb_config_act = QtGui.QAction(tr("FluidSynth Reverb Settings"), self)
-            reverb_config_act.setToolTip(tr("Configure FluidSynth reverb parameters."))
+            reverb_config_act = QtGui.QAction(tr("FluidSynth Settings"), self)
+            reverb_config_act.setToolTip(tr("Configure FluidSynth playback and reverb parameters."))
             reverb_config_act.triggered.connect(self._open_reverb_config_dialog)
             playback_menu.addAction(reverb_config_act)
 
@@ -1415,13 +1415,13 @@ class MainWindow(QtWidgets.QMainWindow):
         return existing if existing else None
 
     def _open_reverb_config_dialog(self) -> None:
-        """Open the FluidSynth reverb configuration dialog (non-blocking)."""
+        """Open the FluidSynth settings dialog (non-blocking)."""
         dlg = FluidSynthReverbConfigDialog(self)
         dlg.reverb_settings_changed.connect(self._apply_reverb_settings)
         dlg.show()
 
     def _apply_reverb_settings(self, settings: dict) -> None:
-        """Apply reverb settings to the current player."""
+        """Apply FluidSynth settings to the current player."""
         try:
             if hasattr(self, 'player') and self.player is not None:
                 from midi.player import _FluidsynthBackend
@@ -1432,9 +1432,10 @@ class MainWindow(QtWidgets.QMainWindow):
                     backend.set_reverb_damp(settings.get('damp', 0.4))
                     backend.set_reverb_width(settings.get('width', 3.0))
                     backend.set_reverb_level(settings.get('level', 0.9))
-                    self._status("Reverb settings applied", 2000)
+                    self.player.set_playhead_sync_delay_ms(settings.get('playhead_sync_delay_ms', 0))
+                    self._status("FluidSynth settings applied", 2000)
         except Exception as exc:
-            self._status("Failed to apply reverb settings", 2000)
+            self._status("Failed to apply FluidSynth settings", 2000)
 
     def _ensure_player_with_soundfont(self) -> None:
         mode = self._get_playback_mode_from_appdata()

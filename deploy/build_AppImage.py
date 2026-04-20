@@ -332,6 +332,35 @@ def remove_qt_plugins_for_portability(app_bundle: Path) -> None:
             pass
 
 
+def remove_glibc_incompatible_libs(app_bundle: Path) -> None:
+    """Remove bundled system libraries whose glibc requirement exceeds the target.
+
+    PyInstaller copies every transitive shared-library dependency of the
+    Python interpreter into ``_internal/``.  Libraries like ``libtinfo.so.6``
+    (ncurses) are present on every Linux system and MUST match the system glibc.
+    When the build machine has a newer glibc than the target, these bundled
+    copies cause 'version GLIBC_X.XX not found' errors at runtime.
+
+    Removing them forces the dynamic linker to use the target system's copies,
+    which always match the installed glibc.
+    """
+    internal = app_bundle / "_internal"
+    if not internal.is_dir():
+        return
+    # System libraries that are universally present and must NOT be bundled
+    # because they are tightly coupled to the system's glibc version.
+    remove_patterns = [
+        "libtinfo.so*",      # ncurses – always present
+    ]
+    for pattern in remove_patterns:
+        for lib in internal.glob(pattern):
+            try:
+                lib.unlink()
+                print(f"Removed glibc-incompatible bundled lib: {lib.name}")
+            except Exception as exc:
+                print(f"Warning: could not remove {lib.name}: {exc}")
+
+
 def _copy_file_if_exists(src: Path, dest: Path) -> None:
     if not src.exists():
         return
@@ -409,6 +438,65 @@ def copy_bundled_assets(project_root: Path, lib_app_dir: Path, appdir: Path, exe
         pass
 
 
+def create_stub_shared_libs(appdir: Path) -> None:
+    """Create minimal stub .so files for audio backends FluidSynth doesn't need at runtime.
+
+    The build system's libfluidsynth may be compiled with SDL3, JACK, and PipeWire
+    as hard DT_NEEDED dependencies (with versioned symbols).  We only use the
+    PulseAudio + ALSA backends.  Rather than patching the ELF binary (unreliable
+    across patchelf versions), we bundle tiny stub shared libraries that satisfy
+    the dynamic linker without shipping the real backends.  FluidSynth never calls
+    into them because it uses PulseAudio/ALSA; RTLD_LAZY defers symbol resolution.
+    """
+    lib_dir = appdir / "usr" / "lib"
+    lib_dir.mkdir(parents=True, exist_ok=True)
+
+    gcc = shutil.which("gcc")
+    if not gcc:
+        print("Warning: gcc not found; cannot create stub shared libraries for unused FluidSynth backends.")
+        return
+
+    # Map: soname → version script content (or None for unversioned).
+    # SDL3 needs a version node because libfluidsynth has VERNEED entries for SDL3_0.0.0.
+    stubs: dict[str, str | None] = {
+        "libSDL3.so.0": "SDL3_0.0.0 { local: *; };",
+        "libjack.so.0": None,
+        "libpipewire-0.3.so.0": None,
+        # FluidSynth links readline for its interactive CLI which we never use.
+        # Stubbing it prevents linuxdeploy from deploying the build system's
+        # libreadline → libtinfo chain (libtinfo may require a newer glibc than
+        # the target system).
+        "libreadline.so.8": None,
+    }
+
+    import tempfile
+    for soname, ver_script in stubs.items():
+        dest = lib_dir / soname
+        if dest.exists():
+            # Already bundled (real library or previous stub) — skip.
+            continue
+        try:
+            cmd = [
+                gcc, "-shared", "-nostdlib",
+                "-o", str(dest),
+                "-Wl,-soname," + soname,
+                "-x", "c", "/dev/null",
+            ]
+            if ver_script:
+                ver_file = Path(tempfile.mktemp(suffix=".ver"))
+                ver_file.write_text(ver_script)
+                cmd.extend(["-Wl,--version-script," + str(ver_file)])
+            result = subprocess.run(cmd, capture_output=True, text=True)
+            if ver_script:
+                ver_file.unlink(missing_ok=True)
+            if result.returncode == 0:
+                print(f"Created stub shared library: {soname}")
+            else:
+                print(f"Warning: failed to create stub {soname}: {result.stderr.strip()}")
+        except Exception as exc:
+            print(f"Warning: failed to create stub {soname}: {exc}")
+
+
 def copy_shared_libs(appdir: Path, lib_names: list[str], extra_targets: list[Path] | None = None) -> None:
     lib_dst = appdir / "usr" / "lib"
     lib_dst.mkdir(parents=True, exist_ok=True)
@@ -422,6 +510,7 @@ def copy_shared_libs(appdir: Path, lib_names: list[str], extra_targets: list[Pat
         "/usr/local/lib/x86_64-linux-gnu",
         "/lib",
         "/lib/x86_64-linux-gnu",
+        "/usr/lib/x86_64-linux-gnu/pulseaudio",
     ]
     for name in lib_names:
         found = None
@@ -491,7 +580,7 @@ def main() -> int:
     if platform.machine().lower() not in ("x86_64", "amd64"):
         raise SystemExit("AppImage build currently supports x86_64 only.")
 
-    ensure_system_packages(["patchelf", "desktop-file-utils", "file", "libfuse2"])
+    ensure_system_packages(["desktop-file-utils", "file", "libfuse2"])
     ensure_system_package_alternatives(["libtiff5", "libtiff6"])
     ensure_system_package_alternatives(["libfluidsynth3", "libfluidsynth2", "libfluidsynth1"])
     ensure_pip_requirements(project_root)
@@ -558,6 +647,7 @@ def main() -> int:
         shutil.rmtree(lib_app_dir, ignore_errors=True)
     shutil.copytree(app_bundle, lib_app_dir)
     remove_qt_plugins_for_portability(lib_app_dir)
+    remove_glibc_incompatible_libs(lib_app_dir)
     launcher = bin_dir / exe_name
     if launcher.exists():
         launcher.unlink()
@@ -593,7 +683,9 @@ def main() -> int:
             # Audio backends
             "libpulse",           # PulseAudio client
             "libpulse-simple",
+            "libpulsecommon",     # PulseAudio internal (version-pinned, non-standard path)
             "libasound",          # ALSA
+            "libgomp",            # OpenMP runtime (FluidSynth uses it)
             # instpatch deps
             "libxml2",            # XML parsing used by instpatch
             "liblzma",            # dep of libxml2
@@ -601,6 +693,7 @@ def main() -> int:
         ],
         extra_targets=[],
     )
+    create_stub_shared_libs(appdir)
 
     icon_dir = appdir / "usr" / "share" / "icons" / "hicolor" / "256x256" / "apps"
     icon_dir.mkdir(parents=True, exist_ok=True)
@@ -636,6 +729,9 @@ def main() -> int:
         str(desktop_file),
         "--icon-file",
         str(icon_path),
+        # Prevent linuxdeploy from deploying system libs that are tightly
+        # coupled to the build system's glibc version.
+        "--exclude-library", "libtinfo.so.6",
         "--output",
         "appimage",
     ]
