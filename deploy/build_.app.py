@@ -530,6 +530,9 @@ def main() -> None:
                 final_dmg_path.unlink()
             shutil.move(str(dmg_path), final_dmg_path)
             print(f"Copied DMG to: {final_dmg_path}")
+            if final_app_path and final_app_path.exists():
+                shutil.rmtree(final_app_path, ignore_errors=True)
+                print(f"Removed .app bundle: {final_app_path}")
         success = True
     finally:
         if success:
@@ -538,9 +541,11 @@ def main() -> None:
         else:
             print(f"Build failed or incomplete; leaving artifacts in {build_dir} for inspection.")
 
-    if result_path is None or final_app_path is None or not final_app_path.exists():
-        raise SystemExit("Build failed: .app bundle missing after cleanup.")
+    if result_path is None or final_app_path is None:
+        raise SystemExit("Build failed: .app bundle was never produced.")
     if dmg_path is None:
+        if not final_app_path.exists():
+            raise SystemExit("Build failed: .app bundle missing after cleanup.")
         print("Installer DMG unavailable; .app bundle still produced.", file=sys.stderr)
 
 
