@@ -61,7 +61,7 @@
     <message>
       <location filename="../ui/about_dialog.py" line="73" />
       <source>mido, python-rtmidi, numpy — permissive licenses.</source>
-      <translation type="unfinished" />
+      <translation>mido, python-rtmidi, numpy — permissieve licenties.</translation>
     </message>
   </context>
   <context>
