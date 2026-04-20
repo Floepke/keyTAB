@@ -24,11 +24,22 @@ class BeamTool(BaseTool):
         except Exception:
             return None
 
-    def _current_hand(self) -> str:
+    def _hand_for_x(self, x: float) -> str:
+        try:
+            pitch = float(self._editor.x_to_pitch(x))
+        except Exception:
+            pitch = getattr(self._editor, 'pitch_cursor', None)
+        if pitch is None:
+            return self._hand
+        return 'l' if float(pitch) <= 40.0 else 'r'
+
+    def _current_hand(self, x: float | None = None) -> str:
+        if x is not None:
+            return self._hand_for_x(x)
         pitch = getattr(self._editor, 'pitch_cursor', None)
         if pitch is None:
             return self._hand
-        return 'l' if float(pitch) < 40.0 else 'r'
+        return 'l' if float(pitch) <= 40.0 else 'r'
 
     def _barlines(self) -> list[float]:
         score = self._score()
@@ -95,7 +106,7 @@ class BeamTool(BaseTool):
         score = self._score()
         if score is None:
             return
-        self._hand = self._current_hand()
+        self._hand = self._hand_for_x(x)
         t_raw = float(self._editor.y_to_time(y))
         t_snap = float(self._editor.snap_time(t_raw))
         markers = list(getattr(score.events, 'beam', []) or [])
@@ -172,7 +183,7 @@ class BeamTool(BaseTool):
         score = self._score()
         if score is None:
             return
-        hand = self._current_hand()
+        hand = self._hand_for_x(x)
         markers = list(getattr(score.events, 'beam', []) or [])
         # Use literal mm_cursor (unsnapped) for hit detection when available
         try:

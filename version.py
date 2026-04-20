@@ -28,5 +28,6 @@ change_log = '''
 - added "Reset Default Style" file menu item to reset the default style to the built-in defaults
 
 1.0.4 (2026-04-20)
-- fixed libfluidsytnh dependency issues on Linux AppImage build 
+- fixed libfluidsytnh dependency issues on Linux AppImage build
+- fixed beam tool sometimes not detecting the correct hand on click time
 '''

@@ -2558,7 +2558,7 @@ Try '{backend}' from the Playback menu.</source>
     <message>
       <location filename="../ui/widgets/toolbar_splitter.py" line="35" />
       <source>Fit the page to screen. If the page doesn't fit; this button fits the page. If the page already fits; this button hides the page. If the page is hidden; this button fits the page again. </source>
-      <translation>Pagina passend maken. Als de pagina niet past: deze knop laat hem passen. Als hij al past: verbergt de pagina. Als de pagina verborgen is: laat hem opnieuw passen. </translation>
+      <translation>Pagina passend maken. Als de pagina niet past; deze knop laat de pagina passen. Als de pagina al past; verbergt de pagina. Als de pagina verborgen is; laat de pagina opnieuw passen. </translation>
     </message>
     <message>
       <location filename="../ui/widgets/toolbar_splitter.py" line="51" />
