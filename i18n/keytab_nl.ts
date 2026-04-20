@@ -4,64 +4,64 @@
   <context>
     <name>AboutDialog</name>
     <message>
-      <location filename="../ui/about_dialog.py" line="16" />
+      <location filename="../ui/about_dialog.py" line="15" />
       <source>About keyTAB</source>
       <translation>Over keyTAB</translation>
     </message>
     <message>
-      <location filename="../ui/about_dialog.py" line="31" />
-      <source>keyTAB is a long-running passion project. With modern tooling I can focus on the hard part: shaping a clearer way to read and engrave Klavarskribo music.</source>
-      <translation>keyTAB is een langlopend passieproject. Met moderne gereedschappen kan ik me concentreren op het moeilijke deel: een helderdere manier om Klavarskribo-muziek te lezen en te graveren.</translation>
+      <location filename="../ui/about_dialog.py" line="30" />
+      <source>keyTAB is a long-running passion project. I hope to shape a clear way to read and engrave Klavarskribo music.</source>
+      <translation>keyTAB is een lang-lopend passie project. Ik hoop een duidelijke manier te creëren om Klavarskribo-muziek te lezen en te noteren.</translation>
     </message>
     <message>
-      <location filename="../ui/about_dialog.py" line="32" />
+      <location filename="../ui/about_dialog.py" line="31" />
       <source>Built on Klavarskribo notation, keyTAB turns MIDI into readable plots. Music flows top-to-bottom on a vertical timeline over a customizable, time-signature-aware grid.</source>
       <translation>Gebaseerd op de Klavarskribo-notatie zet keyTAB MIDI om in leesbare partituren. Muziek stroomt van boven naar beneden op een verticale tijdlijn over een aanpasbaar, maatsoort bewust tijdraster.</translation>
     </message>
     <message>
-      <location filename="../ui/about_dialog.py" line="33" />
+      <location filename="../ui/about_dialog.py" line="32" />
       <source>Stave lines map directly to the black piano keys: black noteheads sit on black key lines, white noteheads land between lines. Pitch reads like the piano keyboard—no key signatures, sharps/flats or clef changes that change the meaning of the stave completely.</source>
       <translation>De notenbalklijnen komen direct overeen met de zwarte pianotoetsen: zwarte notenhoofden zitten op de zwarte toetslijnen, witte notenhoofden landen tussen de lijnen. Toonhoogte wordt gelezen precies zoals het pianoklavier er uit ziet. Geen voortekens, kruizen/mol of sleutelveranderingen die de betekenis van de notenbalk volledig veranderen.</translation>
     </message>
     <message>
-      <location filename="../ui/about_dialog.py" line="34" />
+      <location filename="../ui/about_dialog.py" line="33" />
       <source>I hope keyTAB helps musicians, composers, and curious listeners visualize and refine this MIDI style notation with clarity. Feedback is always welcome.</source>
       <translation>Ik hoop dat keyTAB muzikanten, componisten en nieuwsgierige luisteraars helpt om deze MIDI-stijlnotatie helder te visualiseren en te verfijnen. Feedback is altijd welkom.</translation>
     </message>
     <message>
-      <location filename="../ui/about_dialog.py" line="35" />
+      <location filename="../ui/about_dialog.py" line="34" />
       <source>Have fun exploring your MIDI with keyTAB!</source>
       <translation>Veel plezier met het verkennen van je MIDI met keyTAB!</translation>
     </message>
     <message>
-      <location filename="../ui/about_dialog.py" line="68" />
+      <location filename="../ui/about_dialog.py" line="67" />
       <source>Project license:</source>
       <translation>Projectlicentie:</translation>
     </message>
     <message>
-      <location filename="../ui/about_dialog.py" line="69" />
+      <location filename="../ui/about_dialog.py" line="68" />
       <source>Credits and third-party components:</source>
       <translation>Credits en componenten van derden:</translation>
     </message>
     <message>
-      <location filename="../ui/about_dialog.py" line="71" />
+      <location filename="../ui/about_dialog.py" line="70" />
       <source>Cairo / pycairo — LGPL-2.1 (drawing engine).</source>
       <translation>Cairo / pycairo — LGPL-2.1 (teken-engine).</translation>
     </message>
     <message>
-      <location filename="../ui/about_dialog.py" line="72" />
+      <location filename="../ui/about_dialog.py" line="71" />
       <source>FluidSynth — LGPL-2.1-or-later.</source>
       <translation>FluidSynth — LGPL-2.1-of-later.</translation>
     </message>
     <message>
-      <location filename="../ui/about_dialog.py" line="73" />
+      <location filename="../ui/about_dialog.py" line="72" />
       <source>PySide6 / Qt — LGPL-3.0.</source>
       <translation>PySide6 / Qt — LGPL-3.0.</translation>
     </message>
     <message>
-      <location filename="../ui/about_dialog.py" line="74" />
-      <source>pretty_midi, mido, python-rtmidi, numpy — permissive licenses.</source>
-      <translation>pretty_midi, mido, python-rtmidi, numpy — vrije licenties.</translation>
+      <location filename="../ui/about_dialog.py" line="73" />
+      <source>mido, python-rtmidi, numpy — permissive licenses.</source>
+      <translation type="unfinished" />
     </message>
   </context>
   <context>
