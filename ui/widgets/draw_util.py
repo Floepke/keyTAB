@@ -2,6 +2,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Callable, Iterable, List, Optional, Sequence, Tuple
 import os, math
+import multiprocessing as mp
 from functools import lru_cache
 import cairo
 from PySide6 import QtGui
@@ -129,6 +130,14 @@ def _resolve_cairo_family(family: str) -> str:
 
     compact = requested.lower().replace(" ", "")
     if compact != "lelandtext":
+        return requested
+
+    # The engraver runs in a spawned worker process on Windows. Avoid touching
+    # Qt font registration/database APIs there because that can terminate the
+    # worker process before it returns a Python exception.
+    if mp.current_process().name != "MainProcess":
+        if requested == "LelandText":
+            return "Leland Text"
         return requested
 
     # Ensure LelandText is registered in Qt and resolve the effective family name

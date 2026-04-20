@@ -33,4 +33,5 @@ change_log = '''
 - fixed Windows Cairo rendering issue where dynamic symbols (LelandText) could display as missing glyphs in editor/engraver while still appearing correctly in the Qt menu
 - startup now ensures LelandText is registered/installed on Windows similarly to Edwin so Cairo can resolve the font reliably
 - Windows Inno Setup installer now installs both Edwin and LelandText automatically
+- fixed Windows engraver worker crash caused by LelandText font resolution touching Qt font registry APIs inside the spawned worker process
 '''
