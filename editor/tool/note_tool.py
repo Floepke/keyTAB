@@ -1,5 +1,4 @@
 from typing import Optional
-from appdata_manager import get_appdata_manager
 from editor.tool.base_tool import BaseTool
 from file_model.SCORE import SCORE
 from utils.operator import Operator
@@ -385,36 +384,17 @@ class NoteTool(BaseTool):
         self._velocity_display_x_mm = x_mm
         self._apply_velocity_value(new_vel)
 
-    def _persist_velocity_mode(self) -> None:
-        try:
-            score = self._editor.current_score()
-            if score is not None and getattr(score, 'app_state', None) is not None:
-                score.app_state.note_velocity_mode = bool(self._velocity_mode)
-        except Exception:
-            pass
-        try:
-            adm = get_appdata_manager()
-            adm.set("note_velocity_mode", bool(self._velocity_mode))
-            adm.save()
-        except Exception:
-            pass
-
     def on_activate(self) -> None:
         super().on_activate()
         self._acc_toggle = 0
-        try:
-            score = self._editor.current_score()
-            if score is not None and getattr(score, 'app_state', None) is not None:
-                self._velocity_mode = bool(getattr(score.app_state, 'note_velocity_mode', False))
-        except Exception:
-            pass
+        self._velocity_mode = False
         self._velocity_dragging = False
         self._velocity_target = None
         self._velocity_targets = []
         self._velocity_display_value = None
         self._velocity_display_x_mm = None
         self._velocity_display_y_mm = None
-        # Refresh overlay to show saved velocity sliders state
+        # Refresh overlay to hide velocity sliders on activation
         if hasattr(self._editor, 'widget') and getattr(self._editor, 'widget', None) is not None:
             w = getattr(self._editor, 'widget')
             if hasattr(w, 'request_overlay_refresh'):
@@ -1045,7 +1025,6 @@ class NoteTool(BaseTool):
             self._velocity_display_value = None
             self._velocity_display_x_mm = None
             self._velocity_display_y_mm = None
-            self._persist_velocity_mode()
             # Refresh overlay to show or hide velocity sliders immediately
             if hasattr(self._editor, 'widget') and getattr(self._editor, 'widget', None) is not None:
                 w = getattr(self._editor, 'widget')

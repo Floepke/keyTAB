@@ -35,4 +35,5 @@ change_log = '''
 - Windows Inno Setup installer now installs both Edwin and LelandText automatically
 - fixed Windows engraver worker crash caused by LelandText font resolution touching Qt font registry APIs inside the spawned worker process
 - changed preferences UI to use radio buttons instead of dropdowns
+- changed the behavior of the velocity editing mode: it now doesn't remember the toggle state as it was unhandy in practical usage
 '''

@@ -14,4 +14,3 @@ class AppState:
     snap_divide: int = 1
     selected_tool: str = "note"
     style_dialog_tab_index: int = 0
-    note_velocity_mode: bool = False
