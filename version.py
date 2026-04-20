@@ -7,7 +7,7 @@ Bump policy (Semantic Versioning):
   PATCH - bug fixes only
 """
 
-__version__ = "1.0.4"
+__version__ = "1.0.5"
 APP_NAME    = "keyTAB"
 
 change_log = '''
@@ -30,4 +30,9 @@ change_log = '''
 1.0.4 (2026-04-20)
 - fixed libfluidsytnh dependency issues on Linux AppImage build
 - fixed beam tool sometimes not detecting the correct hand on click time
+
+1.0.5 (2026-04-20)
+- fixed Windows Cairo rendering issue where dynamic symbols (LelandText) could display as missing glyphs in editor/engraver while still appearing correctly in the Qt menu
+- startup now ensures LelandText is registered/installed on Windows similarly to Edwin so Cairo can resolve the font reliably
+- Windows Inno Setup installer now installs both Edwin and LelandText automatically
 '''

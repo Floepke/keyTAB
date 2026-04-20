@@ -36,6 +36,8 @@ DEFAULT_ICON = PROJECT_ROOT / "icons" / "keyTAB.png"
 DEFAULT_OUTPUT = Path.home() / "Desktop"
 DEFAULT_NAME = "keyTAB"
 DEFAULT_INSTALLER_NAME = "keyTAB-setup"
+DEFAULT_ENGRAVING_FONT = PROJECT_ROOT / "fonts" / "Edwin.otf"
+DEFAULT_DYNAMIC_SYMBOL_FONT = PROJECT_ROOT / "fonts" / "LelandText.otf"
 
 sys.path.insert(0, str(PROJECT_ROOT))
 from version import __version__ as _app_version  # noqa: E402
@@ -149,6 +151,8 @@ def generate_iss_script(
     app_name: str,
     app_version: str,
     app_dir: Path,
+    engraving_font_path: Path,
+    dynamic_symbol_font_path: Path,
     ico_path: Path,
     installer_output_dir: Path,
     installer_name: str,
@@ -184,6 +188,8 @@ Name: "desktopicon"; Description: "{{cm:CreateDesktopIcon}}"; GroupDescription: 
 
 [Files]
 Source: "{app_dir}\\*"; DestDir: "{{app}}"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "{engraving_font_path}"; DestDir: "{{autofonts}}"; FontInstall: "Edwin"; Flags: onlyifdoesntexist uninsneveruninstall
+Source: "{dynamic_symbol_font_path}"; DestDir: "{{autofonts}}"; FontInstall: "LelandText"; Flags: onlyifdoesntexist uninsneveruninstall
 
 [Icons]
 Name: "{{group}}\\{app_name}"; Filename: "{{app}}\\{app_name}.exe"
@@ -331,6 +337,12 @@ def main() -> None:
     iscc = ensure_inno_setup_available()
     ensure_pyinstaller_available()
     ensure_requirements_installed(PROJECT_ROOT)
+    engraving_font_path = DEFAULT_ENGRAVING_FONT.resolve()
+    if not engraving_font_path.exists():
+        raise SystemExit(f"Required engraving font not found: {engraving_font_path}")
+    dynamic_symbol_font_path = DEFAULT_DYNAMIC_SYMBOL_FONT.resolve()
+    if not dynamic_symbol_font_path.exists():
+        raise SystemExit(f"Required dynamic symbol font not found: {dynamic_symbol_font_path}")
 
     try:
         # Step 1: Build app with PyInstaller (onedir — no runtime extraction).
@@ -356,6 +368,8 @@ def main() -> None:
             app_name=name,
             app_version=app_version,
             app_dir=onedir_folder,
+            engraving_font_path=engraving_font_path,
+            dynamic_symbol_font_path=dynamic_symbol_font_path,
             ico_path=ico_for_installer,
             installer_output_dir=installer_output_dir,
             installer_name=installer_name,

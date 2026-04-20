@@ -120,6 +120,34 @@ _SCRATCH_SURF: cairo.ImageSurface = cairo.ImageSurface(cairo.FORMAT_ARGB32, 1, 1
 _SCRATCH_CTX: cairo.Context = cairo.Context(_SCRATCH_SURF)
 
 
+@lru_cache(maxsize=64)
+def _resolve_cairo_family(family: str) -> str:
+    """Resolve family aliases that Cairo's toy text API may not map reliably."""
+    requested = str(family or "").strip()
+    if not requested:
+        return "Sans"
+
+    compact = requested.lower().replace(" ", "")
+    if compact != "lelandtext":
+        return requested
+
+    # Ensure LelandText is registered in Qt and resolve the effective family name
+    # (often "Leland Text" on Windows) so Cairo can select the right face.
+    try:
+        from fonts import register_font_from_bytes, resolve_font_family
+
+        register_font_from_bytes("LelandText")
+        resolved = resolve_font_family("LelandText", fallback_family="LelandText")
+        if resolved:
+            return str(resolved)
+    except Exception:
+        pass
+
+    if requested == "LelandText":
+        return "Leland Text"
+    return requested
+
+
 @lru_cache(maxsize=512)
 def _cached_text_extents_mm(text: str, family: str, size_pt: float,
                               italic: bool, bold: bool) -> Tuple[float, float, float, float]:
@@ -131,7 +159,7 @@ def _cached_text_extents_mm(text: str, family: str, size_pt: float,
     """
     slant = cairo.FONT_SLANT_ITALIC if italic else cairo.FONT_SLANT_NORMAL
     weight = cairo.FONT_WEIGHT_BOLD if bold else cairo.FONT_WEIGHT_NORMAL
-    _SCRATCH_CTX.select_font_face(family, slant, weight)
+    _SCRATCH_CTX.select_font_face(_resolve_cairo_family(family), slant, weight)
     _SCRATCH_CTX.set_font_size(size_pt)
     te = _SCRATCH_CTX.text_extents(text)
     x_bearing_mm = te.x_bearing / PT_PER_MM
@@ -967,7 +995,7 @@ class DrawUtil:
         if angle:
             ctx.rotate(angle * math.pi / 180.0)
         ctx.translate(-ax, -ay)
-        ctx.select_font_face(t.family, slant, weight)
+        ctx.select_font_face(_resolve_cairo_family(t.family), slant, weight)
         ctx.set_font_size(t.size_pt / PT_PER_MM)
         ctx.move_to(t.x_mm, t.y_mm)
         ctx.text_path(t.text)

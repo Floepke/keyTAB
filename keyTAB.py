@@ -319,9 +319,10 @@ def main(argv: list[str] | None = None):
     # Always register embedded engraving fonts for in-process use.
     # On Windows, Cairo can require the user font store to see the font.
     try:
-        register_font_from_bytes("Edwin")
-        if sys.platform.startswith("win") and not has_installed_embedded_font_file("Edwin"):
-            install_embedded_font_to_system("Edwin")
+        for font_name in ("Edwin", "LelandText"):
+            register_font_from_bytes(font_name)
+            if sys.platform.startswith("win") and not has_installed_embedded_font_file(font_name):
+                install_embedded_font_to_system(font_name)
     except Exception:
         pass
 
