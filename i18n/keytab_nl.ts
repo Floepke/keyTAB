@@ -1517,27 +1517,27 @@ Try '{backend}' from the Playback menu.</source>
       <translation>Toepassen en keyTAB herstarten</translation>
     </message>
     <message>
-      <location filename="../ui/dialogs/preferences_dialog.py" line="99" />
+      <location filename="../ui/dialogs/preferences_dialog.py" line="119" />
       <source>System</source>
       <translation>Systeem</translation>
     </message>
     <message>
-      <location filename="../ui/dialogs/preferences_dialog.py" line="100" />
+      <location filename="../ui/dialogs/preferences_dialog.py" line="120" />
       <source>English</source>
       <translation>Engels</translation>
     </message>
     <message>
-      <location filename="../ui/dialogs/preferences_dialog.py" line="101" />
+      <location filename="../ui/dialogs/preferences_dialog.py" line="121" />
       <source>Dutch</source>
       <translation>Nederlands</translation>
     </message>
     <message>
-      <location filename="../ui/dialogs/preferences_dialog.py" line="114" />
+      <location filename="../ui/dialogs/preferences_dialog.py" line="126" />
       <source>Light</source>
       <translation>Licht</translation>
     </message>
     <message>
-      <location filename="../ui/dialogs/preferences_dialog.py" line="115" />
+      <location filename="../ui/dialogs/preferences_dialog.py" line="127" />
       <source>Dark</source>
       <translation>Donker</translation>
     </message>
@@ -2186,7 +2186,7 @@ Try '{backend}' from the Playback menu.</source>
     </message>
     <message>
       <location filename="../ui/dialogs/style_dialog.py" line="1098" />
-      <source>Classical &amp; Klavarskribo</source>
+      <source>Classical and Klavarskribo</source>
       <translation>Klassiek en Klavarskribo</translation>
     </message>
     <message>

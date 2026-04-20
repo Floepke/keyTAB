@@ -91,37 +91,42 @@ class PreferencesDialog(QtWidgets.QDialog):
                 pretty_parts.append(p.capitalize())
         return " ".join(pretty_parts)
 
+    def _build_radio_group(self, options: list[tuple[str, str]], current_value: str) -> QtWidgets.QWidget:
+        container = QtWidgets.QWidget()
+        layout = QtWidgets.QHBoxLayout(container)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(12)
+        group = QtWidgets.QButtonGroup(container)
+        container._radio_group = group  # type: ignore[attr-defined]
+        container._radio_data: list[tuple[QtWidgets.QRadioButton, str]] = []  # type: ignore[attr-defined]
+        for label, stored in options:
+            btn = QtWidgets.QRadioButton(label)
+            group.addButton(btn)
+            container._radio_data.append((btn, stored))
+            layout.addWidget(btn)
+            if str(stored) == str(current_value):
+                btn.setChecked(True)
+        if not any(btn.isChecked() for btn, _ in container._radio_data):
+            if container._radio_data:
+                container._radio_data[0][0].setChecked(True)
+        layout.addStretch(1)
+        return container
+
     def _build_editor(self, key: str, pref) -> tuple[QtWidgets.QWidget, str]:
         value = self._pm.get(key, pref.default)
         if key == "ui_language":
-            combo = QtWidgets.QComboBox()
             options = [
                 (self.tr("System"), "system"),
                 (self.tr("English"), "en"),
                 (self.tr("Dutch"), "nl"),
             ]
-            for label, stored in options:
-                combo.addItem(label, stored)
-            try:
-                idx = combo.findData(str(value))
-                combo.setCurrentIndex(idx if idx >= 0 else 0)
-            except Exception:
-                combo.setCurrentIndex(0)
-            return combo, "ui_language"
+            return self._build_radio_group(options, str(value)), "ui_language"
         if key == "theme":
-            combo = QtWidgets.QComboBox()
             options = [
                 (self.tr("Light"), "light"),
                 (self.tr("Dark"), "dark"),
             ]
-            for label, stored in options:
-                combo.addItem(label, stored)
-            try:
-                idx = combo.findData(str(value))
-                combo.setCurrentIndex(idx if idx >= 0 else 0)
-            except Exception:
-                combo.setCurrentIndex(0)
-            return combo, "theme"
+            return self._build_radio_group(options, str(value)), "theme"
         if isinstance(pref.default, bool):
             checkbox = QtWidgets.QCheckBox()
             checkbox.setChecked(bool(value))
@@ -194,7 +199,10 @@ class PreferencesDialog(QtWidgets.QDialog):
         for key, (kind, widget) in self._fields.items():
             try:
                 if kind in ("theme", "ui_language"):
-                    value = str(widget.currentData())
+                    value = next(
+                        (stored for btn, stored in widget._radio_data if btn.isChecked()),
+                        widget._radio_data[0][1] if widget._radio_data else "",
+                    )
                 elif kind == "bool":
                     value = bool(widget.isChecked())
                 elif kind == "int":

@@ -1095,7 +1095,7 @@ class StyleDialog(QtWidgets.QDialog):
                 'light': self.tr('Light'),
                 'classical': self.tr('Classical'),
                 'klavarskribo': self.tr('Klavarskribo'),
-                'classical & klavarskribo': self.tr('Classical & Klavarskribo'),
+                'classical & klavarskribo': self.tr('Classical and Klavarskribo'),
             }
             options = [(literal_labels.get(str(a), str(a).replace('_', ' ').capitalize()), str(a)) for a in args]
             return RadioGroupWidget(options, str(value) if value is not None else str(args[0]), self)

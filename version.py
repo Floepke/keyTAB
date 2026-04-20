@@ -34,4 +34,5 @@ change_log = '''
 - startup now ensures LelandText is registered/installed on Windows similarly to Edwin so Cairo can resolve the font reliably
 - Windows Inno Setup installer now installs both Edwin and LelandText automatically
 - fixed Windows engraver worker crash caused by LelandText font resolution touching Qt font registry APIs inside the spawned worker process
+- changed preferences UI to use radio buttons instead of dropdowns
 '''
