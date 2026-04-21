@@ -3,7 +3,7 @@
 # my json structure design for *.piano files.
 from __future__ import annotations
 from dataclasses import dataclass, field, fields, MISSING, is_dataclass
-from typing import List, get_args, get_origin, get_type_hints, Literal
+from typing import Callable, List, Optional, get_args, get_origin, get_type_hints, Literal
 import json
 from datetime import datetime
 
@@ -182,6 +182,7 @@ class SCORE:
 	_next_id: int = 1
 	_app_state_from_file: bool = False
 	_last_load_checks_report: dict = field(default_factory=dict)
+	_before_save_hook: Optional[Callable[["SCORE"], None]] = None
 
 	# ---- Builders (ensure unique _id) ----
 	def _gen_id(self) -> int:
@@ -348,6 +349,9 @@ class SCORE:
 		return obj
 
 	# ---- Dict conversion ----
+	def set_before_save_hook(self, hook: Optional[Callable[["SCORE"], None]]) -> None:
+		self._before_save_hook = hook
+
 	def get_dict(self) -> dict:
 		def to_dict(obj):
 			if isinstance(obj, list):
@@ -365,6 +369,11 @@ class SCORE:
 
 	# ---- Persistence ----
 	def save(self, path: str) -> None:
+		try:
+			if callable(self._before_save_hook):
+				self._before_save_hook(self)
+		except Exception:
+			pass
 		# Update modification timestamp before writing
 		self.meta_data.modification_timestamp = _timestamp_now()
 		payload = self.get_dict()

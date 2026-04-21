@@ -38,5 +38,7 @@ change_log = '''
 - changed the behavior of the velocity editing mode: it now doesn't remember the toggle state as it was unhandy in practical usage
 - the restarting app path now is more stable and robust (on linux the second restart made the app crash)
 - fix: the preference save_on_exit now works properly + closeEvent is updated to show the correct info to the user
+- stripped double barline on end barline as it looked unnatural and is not the official Klavarskribo convention.
+- fix: the appstate is now properly saved in the score file and restored on loading a file
 
 '''

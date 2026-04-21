@@ -2100,54 +2100,9 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
             
             '''End-barline drawing'''
             if barline_visible and has_any_barlines and op_time.ge(total_ticks, float(line['time_start'])) and op_time.le(total_ticks, float(line['time_end'])):
-                # Traditional final barline: thin line + gap + thick line on end barline position.
-                end_thin_w = bar_width_mm * .75
+                # Single final barline (Klavarskribo convention).
                 end_thick_w = bar_width_mm * 1.5
-                inner_clear_gap_mm = max(.25, semitone_mm * 0.05)
-                end_gap_mm = max(end_thick_w, inner_clear_gap_mm + end_thick_w)
                 y_end = _time_to_y(float(total_ticks))
-                # Build stop-symbol cuts for the thin line only.
-                # A stop symbol appears at note end when end == total_ticks; it is
-                # 2*semitone_mm wide centered on the pitch, plus 1*semitone_mm gap each side.
-                stop_cut_half = semitone_mm + semitone_mm  # half stop width + gap
-                stop_cuts: list[tuple[float, float]] = []
-                for item in norm_notes:
-                    n_end = float(item.get('end', 0.0) or 0.0)
-                    if abs(n_end - float(total_ticks)) <= float(op_time.threshold) and _has_followed_rest(item):
-                        cx = _key_to_x(int(item.get('pitch', 0) or 0))
-                        stop_cuts.append((cx - stop_cut_half, cx + stop_cut_half))
-                stop_cuts = _merge_intervals(stop_cuts)
-                # Draw thin line in segments around stop-symbol gaps.
-                y_thin = y_end - end_gap_mm
-                if not stop_cuts:
-                    du.add_line(grid_left, y_thin, grid_right, y_thin, color=grid_color, width_mm=end_thin_w, id=0, tags=['grid_line', 'final_barline_thin'], dash_pattern=None)
-                else:
-                    seg_x = float(grid_left)
-                    min_seg = max(0.05, end_thin_w * 0.5)
-                    for c0, c1 in stop_cuts:
-                        if c0 - seg_x > min_seg:
-                            du.add_line(
-                                seg_x, 
-                                y_thin - semitone_mm * .5, 
-                                c0, 
-                                y_thin - semitone_mm * .5, 
-                                color=grid_color, 
-                                width_mm=end_thin_w * 1.5, 
-                                id=0, 
-                                tags=['grid_line', 'final_barline_thin'], 
-                                dash_pattern=None)
-                        seg_x = max(seg_x, c1)
-                    if float(grid_right) - seg_x > min_seg:
-                        du.add_line(
-                            seg_x, 
-                            y_thin - semitone_mm * .5, 
-                            grid_right, 
-                            y_thin - semitone_mm * .5, 
-                            color=grid_color, 
-                            width_mm=end_thin_w * 1.5, 
-                            id=0, 
-                            tags=['grid_line', 'final_barline_thin'], 
-                            dash_pattern=None)
                 du.add_line(
                     grid_left, 
                     y_end, 
@@ -2156,7 +2111,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                     color=grid_color, 
                     width_mm=end_thick_w * 1.5, 
                     id=0, 
-                    tags=['grid_line', 'final_barline_thick'], 
+                    tags=['grid_line', 'final_barline'], 
                     dash_pattern=None
                 )
 

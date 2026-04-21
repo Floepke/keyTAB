@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Optional, Tuple
+from typing import Callable, Optional, Tuple
 from dataclasses import fields
 import os
 import sys
@@ -53,6 +53,7 @@ class FileManager:
             self._last_dir: Path = Path.home()
         self._dirty: bool = False
         self._last_autosave_ts: datetime | None = None
+        self._before_save_hook: Callable[[SCORE], None] | None = None
         # Ensure the autosave directory exists on initialization
         os.makedirs(UTILS_SAVE_DIR, exist_ok=True)
 
@@ -65,6 +66,16 @@ class FileManager:
 
     def set_parent(self, parent: Optional[QWidget]) -> None:
         self._parent = parent
+
+    def set_before_save_hook(self, hook: Callable[[SCORE], None] | None) -> None:
+        self._before_save_hook = hook
+
+    def _apply_before_save_hook(self) -> None:
+        try:
+            if hasattr(self._current, 'set_before_save_hook'):
+                self._current.set_before_save_hook(self._before_save_hook)
+        except Exception:
+            pass
 
     # Core operations
     def new(self) -> SCORE:
@@ -248,7 +259,7 @@ class FileManager:
             self._path = None
             self._last_dir = Path(path).parent
             self._dirty = True
-            self.autosave_current()
+            self.autosave_current(apply_hook=False)
             adm = get_appdata_manager()
             adm.set("last_opened_file", str(path))
             adm.save()
@@ -263,7 +274,7 @@ class FileManager:
             self._path = None
             self._last_dir = Path(path).parent
             self._dirty = True
-            self.autosave_current()
+            self.autosave_current(apply_hook=False)
             adm = get_appdata_manager()
             adm.set("last_opened_file", str(path))
             adm.save()
@@ -275,7 +286,9 @@ class FileManager:
             self._path = Path(path)
             self._last_dir = self._path.parent
             self._dirty = False
-            self.autosave_current()
+            # Do NOT apply hook here: the UI hasn't restored yet so current
+            # scroll/page values would overwrite the freshly-loaded app_state.
+            self.autosave_current(apply_hook=False)
             adm = get_appdata_manager()
             adm.set("last_opened_file", str(self._path))
             adm.save()
@@ -288,6 +301,7 @@ class FileManager:
         if self._path is None:
             return self.save_as(allow_export=False)
         try:
+            self._apply_before_save_hook()
             self._refresh_analysis()
             suffix = str(self._path.suffix or '').lower()
             if suffix in ('.mid', '.midi'):
@@ -337,6 +351,7 @@ class FileManager:
             adm.save()
             return True
         else:
+            self._apply_before_save_hook()
             self._current.save(str(target))
         self._path = target
         self._last_dir = target.parent
@@ -435,9 +450,11 @@ class FileManager:
         self._show_info("Score checks applied", "\n".join(lines))
 
     # Autosave and error-backup utilities
-    def autosave_current(self) -> None:
+    def autosave_current(self, apply_hook: bool = True) -> None:
         """Save the current SCORE to the session file in session.piano (JSON)."""
         target = Path(UTILS_SAVE_DIR) / "session.piano"
+        if apply_hook:
+            self._apply_before_save_hook()
         self._refresh_analysis()
         self._current.save(str(target))
 
@@ -603,6 +620,8 @@ class FileManager:
         result = msg.exec()
 
         if result == QMessageBox.Yes:
+            # Snapshot session before attempting save to preserve UI state
+            self.autosave_current()
             success = self.save() if (self._path is not None) else self.save_as()
             return "saved" if bool(success) else "cancel"
         if result == QMessageBox.No:

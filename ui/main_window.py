@@ -57,6 +57,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
         # File management
         self.file_manager = FileManager(self)
+        self.file_manager.set_before_save_hook(self._collect_app_state_for_save)
 
         # View options
         try:
@@ -77,12 +78,6 @@ class MainWindow(QtWidgets.QMainWindow):
         self._autosave_timer = QtCore.QTimer(self)
         self._autosave_timer.timeout.connect(self._on_autosave_timer)
         self._apply_autosave_preferences()
-
-        # Debounced app-state persistence (scroll position, page index, dialog tab, etc.)
-        self._app_state_save_timer = QtCore.QTimer(self)
-        self._app_state_save_timer.setSingleShot(True)
-        self._app_state_save_timer.setInterval(500)
-        self._app_state_save_timer.timeout.connect(self._flush_app_state_save)
 
         self._create_menus()
 
@@ -373,8 +368,6 @@ class MainWindow(QtWidgets.QMainWindow):
             self.editor_vscroll.valueChanged.connect(self._on_editor_scroll_changed)
             # Keep external scrollbar in sync with wheel-driven scroll from the editor
             self.editor_canvas.scrollLogicalPxChanged.connect(self.editor_vscroll.setValue)
-            # Persist app state only on wheel scrolling inside the editor view
-            self.editor_canvas.scrollWheelUsed.connect(self._schedule_app_state_save)
         except Exception:
             pass
         # Restore last scroll position once viewport metrics are available
@@ -1147,15 +1140,25 @@ class MainWindow(QtWidgets.QMainWindow):
             sc.app_state = AppState()
         return sc.app_state
 
-    def _sync_ui_to_app_state(self) -> None:
-        """Copy current UI/session values into SCORE.app_state before persisting."""
-        app_state = self._current_app_state()
+    def _collect_app_state_for_save(self, score) -> None:
+        """Collect live UI values directly into SCORE.app_state at save time."""
+        if score is None:
+            return
+        try:
+            app_state = getattr(score, 'app_state', None)
+            if app_state is None:
+                app_state = AppState()
+                score.app_state = app_state
+        except Exception:
+            return
+
         try:
             app_state.print_view_page_index = max(0, int(getattr(self, '_page_counter', 0) or 0))
         except Exception:
             pass
         try:
-            app_state.editor_scroll_pos = int(self.editor_vscroll.value())
+            if hasattr(self, 'editor_vscroll') and self.editor_vscroll is not None:
+                app_state.editor_scroll_pos = int(self.editor_vscroll.value())
         except Exception:
             pass
         try:
@@ -1179,13 +1182,21 @@ class MainWindow(QtWidgets.QMainWindow):
         return self._current_app_state()
 
     def _on_autosave_timer(self) -> None:
-        """Autosave tick: sync UI state into SCORE first, then persist."""
-        self._sync_ui_to_app_state()
+        """Autosave tick: persist via FileManager (SCORE.save collects app_state)."""
         self.file_manager.autosave_all()
 
     def _restore_app_state_from_score(self) -> None:
         self._is_restoring_app_state = True
-        app_state = self._resolve_app_state_defaults()
+        try:
+            score = self.file_manager.current()
+        except Exception:
+            score = None
+        try:
+            app_state = getattr(score, 'app_state', None)
+        except Exception:
+            app_state = None
+        if app_state is None:
+            app_state = AppState()
         # Tool selection
         try:
             self.tool_dock.selector.set_selected_tool(str(app_state.selected_tool or "note"), emit=True)
@@ -1197,16 +1208,19 @@ class MainWindow(QtWidgets.QMainWindow):
         self.snap_dock.selector.set_snap(sb, sd, emit=True)
         # Scroll restore (used when metrics arrive)
         self._pending_scroll_restore = int(app_state.editor_scroll_pos or 0)
+        # Apply immediately on load; keep pending as a fallback if metrics update later.
+        try:
+            min_v = int(self.editor_vscroll.minimum())
+            max_v = int(self.editor_vscroll.maximum())
+            target = max(min_v, min(int(self._pending_scroll_restore), max_v))
+            self.editor_vscroll.setValue(target)
+            self.editor_canvas.set_scroll_logical_px(target)
+        except Exception:
+            pass
         # Print page restore
         self._page_counter = max(0, int(getattr(app_state, 'print_view_page_index', 0) or 0))
         self._set_page_index(self._page_counter)
         self._is_restoring_app_state = False
-
-    def _schedule_app_state_save(self) -> None:
-        if self._is_restoring_app_state:
-            return
-        if hasattr(self, '_app_state_save_timer') and self._app_state_save_timer is not None:
-            self._app_state_save_timer.start(500)
 
     def _read_autosave_preferences(self) -> tuple[bool, int]:
         enabled = True
@@ -1235,17 +1249,6 @@ class MainWindow(QtWidgets.QMainWindow):
             self.showFullScreen()
         if hasattr(self, '_full_screen_act') and self._full_screen_act is not None:
             self._full_screen_act.setChecked(self.isFullScreen())
-
-    def _flush_app_state_save(self) -> None:
-        """Persist app state to session and optionally autosave project."""
-        self._sync_ui_to_app_state()
-        auto_save_enabled, _ = self._read_autosave_preferences()
-        if not auto_save_enabled:
-            return
-        if hasattr(self.file_manager, 'autosave_current'):
-            self.file_manager.autosave_current()
-        if self.file_manager.path() is not None:
-            self.file_manager.save()
 
     def _playback_system_label(self) -> str:
         if sys.platform.startswith('linux'):
@@ -1877,23 +1880,18 @@ class MainWindow(QtWidgets.QMainWindow):
         except Exception:
             pass
         try:
-            app_state = self._resolve_app_state_defaults()
-            self._page_counter = max(0, int(getattr(app_state, 'print_view_page_index', 0) or 0))
-        except Exception:
-            self._page_counter = 0
-        self._refresh_views_from_score()
-        try:
             self.editor_controller.set_score(self.file_manager.current())
             self.editor_controller.reset_undo_stack()
         except Exception:
             pass
         try:
-            if hasattr(self.editor_controller, 'force_redraw_from_model'):
-                self.editor_controller.force_redraw_from_model()
+            self._restore_app_state_from_score()
         except Exception:
             pass
+        self._refresh_views_from_score()
         try:
-            self._restore_app_state_from_score()
+            if hasattr(self.editor_controller, 'force_redraw_from_model'):
+                self.editor_controller.force_redraw_from_model()
         except Exception:
             pass
         self._update_title()
@@ -1901,7 +1899,6 @@ class MainWindow(QtWidgets.QMainWindow):
         self._show_file_action_status(self.tr("Opened"))
 
     def _file_save(self) -> None:
-        self._sync_ui_to_app_state()
         if self.file_manager.save():
             if self.file_manager.path() is not None:
                 self._session_restore_mode = False
@@ -1910,7 +1907,6 @@ class MainWindow(QtWidgets.QMainWindow):
             self._show_file_action_status(self.tr("Saved"))
 
     def _file_save_as(self) -> None:
-        self._sync_ui_to_app_state()
         if self.file_manager.save_as():
             if self.file_manager.path() is not None:
                 self._session_restore_mode = False
@@ -2017,7 +2013,6 @@ class MainWindow(QtWidgets.QMainWindow):
 
         def _persist_tab_index() -> None:
             app_state.style_dialog_tab_index = int(dlg.current_tab_index())
-            self._flush_app_state_save()
             try:
                 adm = get_appdata_manager()
                 adm.set('style_dialog_width', int(dlg.width()))
@@ -2338,20 +2333,23 @@ class MainWindow(QtWidgets.QMainWindow):
             self.editor_vscroll.setValue(max_scroll)
         # Apply a pending restore once, after we know the range
         pending = int(getattr(self, '_pending_scroll_restore', 0) or 0)
-        if pending and max_scroll >= 0:
+        if pending > 0:
+            # During startup, metrics can report max_scroll=0 before the first
+            # full layout/engrave is available. Keep pending restore until the
+            # range is usable, otherwise non-zero startup positions are lost.
+            if max_scroll <= 0:
+                return
             target = max(0, min(pending, max_scroll))
             if int(self.editor_vscroll.value()) != target:
                 self.editor_vscroll.setValue(target)
+            self._pending_scroll_restore = 0
+        elif pending == 0:
             self._pending_scroll_restore = 0
 
     @QtCore.Slot(int)
     def _on_editor_scroll_changed(self, value: int) -> None:
         value = int(value)
         self.editor_canvas.set_scroll_logical_px(value)
-        app_state = self._current_app_state()
-        app_state.editor_scroll_pos = int(value)
-        # Persist scroll state for all scroll sources (wheel, scrollbar drag, keyboard).
-        self._schedule_app_state_save()
 
     def _editor_scroll_step_from_metrics(self, px_per_mm: float, dpr: float) -> int:
         sc = self.file_manager.current()
@@ -2697,15 +2695,6 @@ class MainWindow(QtWidgets.QMainWindow):
         except Exception:
             pass
         self._page_counter = idx
-        try:
-            app_state = self._current_app_state()
-            app_state.print_view_page_index = idx
-        except Exception:
-            pass
-        try:
-            self._schedule_app_state_save()
-        except Exception:
-            pass
 
     def _next_page(self) -> None:
         try:
@@ -3157,17 +3146,8 @@ class MainWindow(QtWidgets.QMainWindow):
         self.editor_vscroll.setSingleStep(int(self._editor_scroll_step_logical_px))
         self.editor_canvas.set_scroll_step_logical_px(int(self._editor_scroll_step_logical_px))
 
-        # Persist to app state
-        app_state = self._current_app_state()
-        app_state.snap_base = int(base)
-        app_state.snap_divide = int(divide)
-        self._schedule_app_state_save()
-
     def _on_tool_selected(self, name: str) -> None:
-        # Persist selected tool to app state; the editor will read from app state on each redraw to determine which tool is active.
-        app_state = self._current_app_state()
-        app_state.selected_tool = str(name)
-        self._schedule_app_state_save()
+        # Tool state is collected directly at save-time.
         if str(name) != 'note':
             # Leave velocity mode state untouched; it is restored when returning to note tool
             pass
@@ -3409,7 +3389,6 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def closeEvent(self, ev: QtGui.QCloseEvent) -> None:
         # Unified close handling with optional close confirmation.
-        self._sync_ui_to_app_state()
         pm = get_preferences_manager()
         save_on_exit = bool(pm.get("save_on_exit", True))
 
@@ -3439,7 +3418,7 @@ class MainWindow(QtWidgets.QMainWindow):
                 restore_saved = bool(self.file_manager.path() is not None)
                 restore_path = str(self.file_manager.path() or "")
         else:
-            # save_on_exit=True or controlled restart: keep current auto-save behavior.
+            # save_on_exit=True or controlled restart: persist via FileManager.
             self.file_manager.autosave_current()
             if self.file_manager.path() is not None:
                 did_save_project = bool(self.file_manager.save())
