@@ -5,6 +5,7 @@ import sys
 from PySide6 import QtCore, QtGui, QtWidgets
 
 from settings_manager import get_preferences_manager
+from utils.restart import restart_current_process
 
 
 class PreferencesDialog(QtWidgets.QDialog):
@@ -188,9 +189,7 @@ class PreferencesDialog(QtWidgets.QDialog):
         if app is None:
             return
         try:
-            args = list(sys.argv)
-            if args:
-                QtCore.QProcess.startDetached(sys.executable, args)
+            restart_current_process()
         except Exception:
             pass
         app.quit()

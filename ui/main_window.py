@@ -22,6 +22,7 @@ from ui.dialogs.fluidsynth_reverb_config_dialog import FluidSynthReverbConfigDia
 from settings_manager import open_preferences, get_preferences_manager
 from appdata_manager import get_appdata_manager
 from utils.CONSTANT import UTILS_SAVE_DIR, QUARTER_NOTE_UNIT
+from utils.restart import restart_current_process
 from engraver.engraver import Engraver
 from editor.tool_manager import ToolManager
 from editor.editor import Editor
@@ -3285,10 +3286,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def _request_app_restart(self) -> None:
         try:
-            exe = sys.executable
-            args = list(sys.argv)
-            if exe and args:
-                QtCore.QProcess.startDetached(exe, args)
+            restart_current_process()
         except Exception:
             pass
         try:
