@@ -7,7 +7,7 @@ Bump policy (Semantic Versioning):
   PATCH - bug fixes only
 """
 
-__version__ = "1.0.4"
+__version__ = "1.0.5"
 APP_NAME    = "keyTAB"
 
 change_log = '''
@@ -40,4 +40,8 @@ change_log = '''
 - fix: the preference save_on_exit now works properly + closeEvent is updated to show the correct info to the user
 - stripped double barline on end barline as it looked unnatural and is not the official Klavarskribo convention.
 - fix: the appstate is now properly saved in the score file and restored on loading a file
+
+1.0.5 (2026-04-21)
+- implemented in engraver: slurs that span line/page breaks are now splitted and continue accordingly on the next line/page
+- implemented in engraver: slurs that are connected do render a indication of then connected slur at line break points to indicate the connection
 '''

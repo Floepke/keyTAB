@@ -153,6 +153,17 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
     if norm_slurs:
         norm_slurs = sorted(norm_slurs, key=lambda m: float(m.get('y1_time', 0.0) or 0.0))
 
+    # Build endpoint map for connected-slur detection.
+    # Maps (x_rpitch, y_time_rounded_4dp) → list of slurs sharing that endpoint.
+    # A slur is "connected" at an endpoint when ≥2 slurs share the same (x, y) position.
+    _slur_ep_map: dict[tuple[int, float], list[dict]] = {}
+    for _sl in norm_slurs:
+        for _ep_x, _ep_t in (
+            (int(_sl['x1_rpitch']), round(float(_sl['y1_time']), 4)),
+            (int(_sl['x4_rpitch']), round(float(_sl['y4_time']), 4)),
+        ):
+            _slur_ep_map.setdefault((_ep_x, _ep_t), []).append(_sl)
+
     norm_texts: list[dict] = []
     for idx, t in enumerate(texts):
         if not isinstance(t, dict):
@@ -2240,14 +2251,35 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                 line_grace.append(item)
 
             line_slurs: list[dict] = []
+            line_slur_continuations: list[dict] = []   # started before, extend into this line
+            line_slur_end_indicators: list[dict] = []  # connected slurs starting at line_end
+            line_slur_start_indicators: list[dict] = [] # connected slurs ending at line_start
             if norm_slurs:
                 line_start = float(line.get('time_start', 0.0) or 0.0)
                 line_end = float(line.get('time_end', 0.0) or 0.0)
                 for sl in norm_slurs:
-                    anchor_t = float(sl.get('y1_time', 0.0) or 0.0)
-                    if op_time.lt(anchor_t, float(line_start)) or op_time.ge(anchor_t, float(line_end)):
+                    p1_t = float(sl.get('y1_time', 0.0) or 0.0)
+                    p4_t = float(sl.get('y4_time', 0.0) or 0.0)
+                    if op_time.ge(p1_t, line_start) and op_time.lt(p1_t, line_end):
+                        line_slurs.append(sl)
+                    elif op_time.lt(p1_t, line_start) and op_time.gt(p4_t, line_start):
+                        line_slur_continuations.append(sl)
+                # Connected-slur end-of-line indicators: connected slurs starting at line_end.
+                for sl in norm_slurs:
+                    p1_t = float(sl.get('y1_time', 0.0) or 0.0)
+                    if round(p1_t, 4) != round(line_end, 4):
                         continue
-                    line_slurs.append(sl)
+                    p1_ep = (int(sl.get('x1_rpitch', 0) or 0), round(p1_t, 4))
+                    if _slur_ep_map.get(p1_ep) and len(_slur_ep_map[p1_ep]) >= 2:
+                        line_slur_end_indicators.append(sl)
+                # Connected-slur start-of-line indicators: connected slurs ending at line_start.
+                for sl in norm_slurs:
+                    p4_t = float(sl.get('y4_time', 0.0) or 0.0)
+                    if round(p4_t, 4) != round(line_start, 4):
+                        continue
+                    p4_ep = (int(sl.get('x4_rpitch', 0) or 0), round(p4_t, 4))
+                    if _slur_ep_map.get(p4_ep) and len(_slur_ep_map[p4_ep]) >= 2:
+                        line_slur_start_indicators.append(sl)
 
             line_texts: list[dict] = []
             if norm_texts:
@@ -3668,7 +3700,9 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                         tags=['text'],
                     )
 
-            if bool(layout.get('slur_visible', True)) and line_slurs:
+            if bool(layout.get('slur_visible', True)) and (
+                    line_slurs or line_slur_continuations
+                    or line_slur_end_indicators or line_slur_start_indicators):
                 side_w = float(layout.get('slur_width_sides_mm', 0.1) or 0.1) * scale
                 mid_w = float(layout.get('slur_width_middle_mm', 1.5) or 1.5) * scale
                 n_seg = max(2, int(SLUR_SEGMENT_COUNT))
@@ -3697,60 +3731,86 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
 
                     return lerp(r0x, r1x, t), lerp(r0y, r1y, t)
 
-                for sl in line_slurs:
-                    x1 = rpitch_to_x(float(sl.get('x1_rpitch', 0) or 0))
-                    x2 = rpitch_to_x(float(sl.get('x2_rpitch', 0) or 0))
-                    x3 = rpitch_to_x(float(sl.get('x3_rpitch', 0) or 0))
-                    x4 = rpitch_to_x(float(sl.get('x4_rpitch', 0) or 0))
-                    t1 = float(sl.get('y1_time', 0.0) or 0.0)
-                    t2 = float(sl.get('y2_time', 0.0) or 0.0)
-                    t3 = float(sl.get('y3_time', 0.0) or 0.0)
-                    t4 = float(sl.get('y4_time', 0.0) or 0.0)
-                    y1_sl = _time_to_y(t1)
-                    y2_sl = _time_to_y(t2)
-                    y3_sl = _time_to_y(t3)
-                    y4_sl = _time_to_y(t4)
-                    p0 = (x1, y1_sl)
-                    p1 = (x2, y2_sl)
-                    p2 = (x3, y3_sl)
-                    p3 = (x4, y4_sl)
+                def _time_to_y_ext(ticks: float) -> float:
+                    # Linear (unclamped) time-to-y for indicator rendering outside line bounds.
+                    total = max(1e-6, float(line['time_end'] - line['time_start']))
+                    rel = (float(ticks) - float(line['time_start'])) / total
+                    return y1 + (y2 - y1) * rel
 
-                    pts: list[tuple[float, float]] = []
-                    for i in range(n_seg):
-                        if n_seg <= 1:
-                            t = 0.0
+                def _bezier_y_at_t(t_param: float, ctrl_y: tuple) -> float:
+                    # Evaluate the cubic Bezier time-coordinate at parameter t_param.
+                    cy0, cy1, cy2, cy3 = ctrl_y
+                    q0 = cy0 + (cy1 - cy0) * t_param
+                    q1 = cy1 + (cy2 - cy1) * t_param
+                    q2 = cy2 + (cy3 - cy2) * t_param
+                    r0 = q0 + (q1 - q0) * t_param
+                    r1 = q1 + (q2 - q1) * t_param
+                    return r0 + (r1 - r0) * t_param
+
+                def _find_t_for_time(ctrl_y: tuple, target_time: float) -> float:
+                    # Binary search: find t where cubic Bezier time-coord equals target.
+                    lo, hi = 0.0, 1.0
+                    for _ in range(64):
+                        mid = (lo + hi) * 0.5
+                        if _bezier_y_at_t(mid, ctrl_y) < target_time:
+                            lo = mid
                         else:
-                            t = i / float(n_seg - 1)
-                        bx, by = bezier_point(t, p0, p1, p2, p3)
-                        pts.append((bx, by))
+                            hi = mid
+                    return (lo + hi) * 0.5
 
-                    if len(pts) < 2:
-                        continue
+                def _casteljau_1d(a: float, b: float, c: float, d: float, t_sp: float):
+                    # Split cubic Bezier [a,b,c,d] at t_sp via de Casteljau algorithm.
+                    ab = a + (b - a) * t_sp
+                    bc = b + (c - b) * t_sp
+                    cd = c + (d - c) * t_sp
+                    abc = ab + (bc - ab) * t_sp
+                    bcd = bc + (cd - bc) * t_sp
+                    abcd = abc + (bcd - abc) * t_sp
+                    return (a, ab, abc, abcd), (abcd, bcd, cd, d)
 
+                def _split_slur(pxc: tuple, pyc: tuple, t_sp: float):
+                    # Split a slur's control points at t_sp; returns first and second halves.
+                    pxa, pxb = _casteljau_1d(float(pxc[0]), float(pxc[1]), float(pxc[2]), float(pxc[3]), t_sp)
+                    pya, pyb = _casteljau_1d(float(pyc[0]), float(pyc[1]), float(pyc[2]), float(pyc[3]), t_sp)
+                    return pxa, pya, pxb, pyb
+
+                def _pts_to_page(pxc: tuple, pyc: tuple, y_fn) -> tuple:
+                    # Convert 4 data-space control points to page-space.
+                    return (
+                        (rpitch_to_x(float(pxc[0])), y_fn(float(pyc[0]))),
+                        (rpitch_to_x(float(pxc[1])), y_fn(float(pyc[1]))),
+                        (rpitch_to_x(float(pxc[2])), y_fn(float(pyc[2]))),
+                        (rpitch_to_x(float(pxc[3])), y_fn(float(pyc[3]))),
+                    )
+
+                def _draw_slur_seg(pg0, pg1, pg2, pg3, t_gs: float, t_ge: float, sl_id: int, tags=None) -> None:
+                    # Draw a cubic Bezier slur segment with width profile scaled to original t range.
+                    pts_sg: list[tuple[float, float]] = []
+                    for i in range(n_seg):
+                        t_local = i / float(n_seg - 1) if n_seg > 1 else 0.0
+                        bx, by = bezier_point(t_local, pg0, pg1, pg2, pg3)
+                        pts_sg.append((bx, by))
+                    if len(pts_sg) < 2:
+                        return
                     left_edge: list[tuple[float, float]] = []
                     right_edge: list[tuple[float, float]] = []
                     last_nx, last_ny = 0.0, 1.0
-
-                    for i, (cx, cy) in enumerate(pts):
-                        if n_seg <= 1:
-                            t_cur = 0.0
-                        else:
-                            t_cur = i / float(n_seg - 1)
-                        w_slur = max(0.0, float(width_at(t_cur)))
+                    for i, (cx, cy) in enumerate(pts_sg):
+                        t_local = i / float(n_seg - 1) if n_seg > 1 else 0.0
+                        t_global = t_gs + t_local * (t_ge - t_gs)
+                        w_slur = max(0.0, float(width_at(t_global)))
                         half_w = 0.5 * w_slur
-
                         if i == 0:
-                            px, py = pts[i]
-                            nxp, nyp = pts[i + 1]
-                        elif i == len(pts) - 1:
-                            px, py = pts[i - 1]
-                            nxp, nyp = pts[i]
+                            fwd_x, fwd_y = pts_sg[i + 1]
+                            bwd_x, bwd_y = pts_sg[i]
+                        elif i == len(pts_sg) - 1:
+                            bwd_x, bwd_y = pts_sg[i - 1]
+                            fwd_x, fwd_y = pts_sg[i]
                         else:
-                            px, py = pts[i - 1]
-                            nxp, nyp = pts[i + 1]
-
-                        dx = float(nxp) - float(px)
-                        dy = float(nyp) - float(py)
+                            bwd_x, bwd_y = pts_sg[i - 1]
+                            fwd_x, fwd_y = pts_sg[i + 1]
+                        dx = float(fwd_x) - float(bwd_x)
+                        dy = float(fwd_y) - float(bwd_y)
                         dlen = math.hypot(dx, dy)
                         if dlen <= 1e-9:
                             nx, ny = last_nx, last_ny
@@ -3758,19 +3818,96 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                             nx = -dy / dlen
                             ny = dx / dlen
                             last_nx, last_ny = nx, ny
-
                         left_edge.append((float(cx) + nx * half_w, float(cy) + ny * half_w))
                         right_edge.append((float(cx) - nx * half_w, float(cy) - ny * half_w))
-
                     slur_poly = left_edge + list(reversed(right_edge))
                     if len(slur_poly) >= 3:
                         du.add_polygon(
                             slur_poly,
                             stroke_color=None,
                             fill_color=notation_color,
-                            id=int(sl.get('id', 0) or 0),
-                            tags=['slur'],
+                            id=int(sl_id),
+                            tags=tags if tags is not None else ['slur'],
                         )
+
+                _line_t_start = float(line.get('time_start', 0.0) or 0.0)
+                _line_t_end = float(line.get('time_end', 0.0) or 0.0)
+
+                # Draw slurs whose p1 starts on this line.
+                # If the slur extends past line_end, split exactly at the break.
+                for sl in line_slurs:
+                    _px = (float(sl.get('x1_rpitch', 0) or 0), float(sl.get('x2_rpitch', 0) or 0),
+                           float(sl.get('x3_rpitch', 0) or 0), float(sl.get('x4_rpitch', 0) or 0))
+                    _py = (float(sl.get('y1_time', 0.0) or 0.0), float(sl.get('y2_time', 0.0) or 0.0),
+                           float(sl.get('y3_time', 0.0) or 0.0), float(sl.get('y4_time', 0.0) or 0.0))
+                    _sl_id = int(sl.get('id', 0) or 0)
+                    if op_time.gt(_py[3], _line_t_end):
+                        # Slur crosses line break: draw only first half up to break.
+                        t_cut = _find_t_for_time(_py, _line_t_end)
+                        t_cut = max(0.001, min(0.999, t_cut))
+                        pxa, pya, _, _ = _split_slur(_px, _py, t_cut)
+                        _draw_slur_seg(*_pts_to_page(pxa, pya, _time_to_y), 0.0, t_cut, _sl_id)
+                    else:
+                        _draw_slur_seg(*_pts_to_page(_px, _py, _time_to_y), 0.0, 1.0, _sl_id)
+
+                # Draw continuation slurs: started on a previous line, extend into this one.
+                # Split at line_start; if still extending past line_end, split there too.
+                for sl in line_slur_continuations:
+                    _px = (float(sl.get('x1_rpitch', 0) or 0), float(sl.get('x2_rpitch', 0) or 0),
+                           float(sl.get('x3_rpitch', 0) or 0), float(sl.get('x4_rpitch', 0) or 0))
+                    _py = (float(sl.get('y1_time', 0.0) or 0.0), float(sl.get('y2_time', 0.0) or 0.0),
+                           float(sl.get('y3_time', 0.0) or 0.0), float(sl.get('y4_time', 0.0) or 0.0))
+                    _sl_id = int(sl.get('id', 0) or 0)
+                    t_s = _find_t_for_time(_py, _line_t_start)
+                    t_s = max(0.0, min(0.999, t_s))
+                    _, _, _pxb, _pyb = _split_slur(_px, _py, t_s)
+                    t_gs = t_s
+                    t_ge = 1.0
+                    _pxc, _pyc = _pxb, _pyb
+                    if op_time.gt(_pyb[3], _line_t_end):
+                        t_e_loc = _find_t_for_time(_pyb, _line_t_end)
+                        t_e_loc = max(0.001, min(0.999, t_e_loc))
+                        t_ge = t_s + t_e_loc * (1.0 - t_s)
+                        _pxc, _pyc, _, _ = _split_slur(_pxb, _pyb, t_e_loc)
+                    _draw_slur_seg(*_pts_to_page(_pxc, _pyc, _time_to_y), t_gs, t_ge, _sl_id)
+
+                # End-of-line connected-slur indicators.
+                # Show the first semitone_mm*2 of the connected next slur below y2
+                # (after the line break barline) so the connection is visible.
+                if line_slur_end_indicators:
+                    _dur = max(1e-6, _line_t_end - _line_t_start)
+                    _mm_pt = (y2 - y1) / _dur
+                    _ind_ticks = (semitone_mm * 4.0) / max(1e-9, _mm_pt)
+                    for sl in line_slur_end_indicators:
+                        _px = (float(sl.get('x1_rpitch', 0) or 0), float(sl.get('x2_rpitch', 0) or 0),
+                               float(sl.get('x3_rpitch', 0) or 0), float(sl.get('x4_rpitch', 0) or 0))
+                        _py = (float(sl.get('y1_time', 0.0) or 0.0), float(sl.get('y2_time', 0.0) or 0.0),
+                               float(sl.get('y3_time', 0.0) or 0.0), float(sl.get('y4_time', 0.0) or 0.0))
+                        _sl_id = int(sl.get('id', 0) or 0)
+                        t_cut = _find_t_for_time(_py, _line_t_end + _ind_ticks)
+                        t_cut = max(0.001, min(1.0, t_cut))
+                        pxa, pya, _, _ = _split_slur(_px, _py, t_cut)
+                        _draw_slur_seg(*_pts_to_page(pxa, pya, _time_to_y_ext),
+                                       0.0, t_cut, _sl_id, tags=['slur', 'slur_indicator'])
+
+                # Start-of-line connected-slur indicators.
+                # Show the last semitone_mm*2 of the connected previous slur above y1
+                # (before the line start) so the connection is visible.
+                if line_slur_start_indicators:
+                    _dur = max(1e-6, _line_t_end - _line_t_start)
+                    _mm_pt = (y2 - y1) / _dur
+                    _ind_ticks = (semitone_mm * 4.0) / max(1e-9, _mm_pt)
+                    for sl in line_slur_start_indicators:
+                        _px = (float(sl.get('x1_rpitch', 0) or 0), float(sl.get('x2_rpitch', 0) or 0),
+                               float(sl.get('x3_rpitch', 0) or 0), float(sl.get('x4_rpitch', 0) or 0))
+                        _py = (float(sl.get('y1_time', 0.0) or 0.0), float(sl.get('y2_time', 0.0) or 0.0),
+                               float(sl.get('y3_time', 0.0) or 0.0), float(sl.get('y4_time', 0.0) or 0.0))
+                        _sl_id = int(sl.get('id', 0) or 0)
+                        t_cut = _find_t_for_time(_py, _line_t_start - _ind_ticks)
+                        t_cut = max(0.0, min(0.999, t_cut))
+                        _, _, _pxb, _pyb = _split_slur(_px, _py, t_cut)
+                        _draw_slur_seg(*_pts_to_page(_pxb, _pyb, _time_to_y_ext),
+                                       t_cut, 1.0, _sl_id, tags=['slur', 'slur_indicator'])
 
             x_cursor = x_cursor + float(line['total_width']) + gap
 
