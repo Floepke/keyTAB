@@ -47,6 +47,8 @@ class MainWindow(QtWidgets.QMainWindow):
         except Exception:
             self._left_panel_width_pref_px = 220
         self._left_panel_width_last_saved_px = int(self._left_panel_width_pref_px)
+        self._close_restore_saved_override: bool | None = None
+        self._close_restore_path_override: str | None = None
         self._left_panel_width_save_timer = QtCore.QTimer(self)
         self._left_panel_width_save_timer.setSingleShot(True)
         self._left_panel_width_save_timer.setInterval(250)
@@ -3286,6 +3288,9 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def _request_app_restart(self) -> None:
         try:
+            app = QtWidgets.QApplication.instance()
+            if app is not None:
+                app.setProperty("keytab_restart_in_progress", True)
             restart_current_process()
         except Exception:
             pass
@@ -3341,10 +3346,13 @@ class MainWindow(QtWidgets.QMainWindow):
         if lw > 0:
             adm.set("left_panel_width_px", int(lw))
             self._left_panel_width_last_saved_px = int(lw)
-        # Persist whether the session is currently saved to a project file
+        # Persist whether the session should restore from saved path or session snapshot
         fm = getattr(self, 'file_manager', None)
-        if fm is not None:
-            # Session considered saved if we have a project path and it's not dirty
+        if self._close_restore_saved_override is not None:
+            adm.set("last_session_saved", bool(self._close_restore_saved_override))
+            adm.set("last_session_path", str(self._close_restore_path_override or ""))
+        elif fm is not None:
+            # Fallback for non-interactive exits: infer from dirty/path state.
             was_saved = bool(fm.path() is not None and not fm.is_dirty())
             adm.set("last_session_saved", was_saved)
             adm.set("last_session_path", str(fm.path() or ""))
@@ -3365,17 +3373,21 @@ class MainWindow(QtWidgets.QMainWindow):
         if hasattr(self, "engraver") and self.engraver is not None:
             self.engraver.shutdown()
 
-    def _run_close_progress(self, path_text: str) -> None:
+    def _run_close_progress(self, path_text: str, *, did_save_project: bool) -> None:
         """Show a short closing progress animation (~0.4s)."""
         dlg = QtWidgets.QDialog(self)
-        dlg.setWindowTitle(self.tr("Closing"))
+        dlg.setWindowTitle(self.tr("Exiting keyTAB..."))
         dlg.setModal(True)
         dlg.setFixedWidth(380)
         layout = QtWidgets.QVBoxLayout(dlg)
         layout.setContentsMargins(16, 16, 16, 16)
         layout.setSpacing(10)
 
-        label = QtWidgets.QLabel(self.tr("Saving...\n\n {path}").format(path=path_text))
+        if did_save_project:
+            label_text = self.tr("Saving...\n\n {path}").format(path=path_text)
+        else:
+            label_text = self.tr("Exiting in progress...")
+        label = QtWidgets.QLabel(label_text)
         label.setWordWrap(True)
         bar = QtWidgets.QProgressBar()
         bar.setRange(0, 100)
@@ -3396,22 +3408,57 @@ class MainWindow(QtWidgets.QMainWindow):
         dlg.accept()
 
     def closeEvent(self, ev: QtGui.QCloseEvent) -> None:
-        # Unified close handling: save session and close without prompting.
+        # Unified close handling with optional close confirmation.
         self._sync_ui_to_app_state()
-        self.file_manager.autosave_current()
         pm = get_preferences_manager()
         save_on_exit = bool(pm.get("save_on_exit", True))
-        if save_on_exit:
+
+        app = QtWidgets.QApplication.instance()
+        restarting = bool(app.property("keytab_restart_in_progress")) if app is not None else False
+
+        restore_saved = False
+        restore_path = str(self.file_manager.path() or "")
+        did_save_project = False
+        saved_progress_path = str(self.file_manager.path() or self.tr("unsaved session"))
+
+        if not restarting and not save_on_exit:
+            decision = self.file_manager.confirm_close_decision()
+            if decision == "cancel":
+                ev.ignore()
+                return
+            if decision == "saved":
+                restore_saved = bool(self.file_manager.path() is not None)
+                restore_path = str(self.file_manager.path() or "")
+                did_save_project = restore_saved
+                saved_progress_path = str(self.file_manager.path() or self.tr("unsaved session"))
+            elif decision == "discarded":
+                # User chose to discard edits: reopen the current file path on next startup.
+                restore_saved = bool(self.file_manager.path() is not None)
+                restore_path = str(self.file_manager.path() or "")
+            else:  # proceed (e.g. not dirty)
+                restore_saved = bool(self.file_manager.path() is not None)
+                restore_path = str(self.file_manager.path() or "")
+        else:
+            # save_on_exit=True or controlled restart: keep current auto-save behavior.
+            self.file_manager.autosave_current()
             if self.file_manager.path() is not None:
-                self.file_manager.save()
+                did_save_project = bool(self.file_manager.save())
+                restore_saved = bool(self.file_manager.path() is not None)
+                restore_path = str(self.file_manager.path() or "")
+                saved_progress_path = str(self.file_manager.path() or self.tr("unsaved session"))
+            else:
+                restore_saved = False
+                restore_path = ""
+
+        self._close_restore_saved_override = bool(restore_saved)
+        self._close_restore_path_override = str(restore_path)
+
         adm = get_appdata_manager()
-        was_saved = bool(self.file_manager.path() is not None and not self.file_manager.is_dirty())
-        adm.set("last_session_saved", was_saved)
-        adm.set("last_session_path", str(self.file_manager.path() or ""))
+        adm.set("last_session_saved", bool(self._close_restore_saved_override))
+        adm.set("last_session_path", str(self._close_restore_path_override or ""))
         adm.save()
         # Show short closing progress animation
-        path_text = str(self.file_manager.path() or self.tr("unsaved session"))
-        self._run_close_progress(path_text)
+        self._run_close_progress(saved_progress_path, did_save_project=did_save_project)
         # Persist sizes via prepare_close
         self.prepare_close()
         super().closeEvent(ev)

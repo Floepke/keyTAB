@@ -580,20 +580,19 @@ class FileManager:
         return True
 
     # ---- Close confirmation ----
-    def confirm_close(self) -> bool:
+    def confirm_close_decision(self) -> str:
         """Ask user to save before quitting with Yes/No/Cancel.
 
-        Returns True to proceed with closing the app, False to cancel.
-
-        - Yes: attempts to save (Save As if no path); proceeds only on success
-        - No: proceeds without saving
-        - Cancel: aborts closing
+        Returns one of:
+        - "saved": user chose Yes and save succeeded
+        - "discarded": user chose No
+        - "proceed": no prompt needed (e.g. not dirty or no GUI parent)
+        - "cancel": user canceled close or save failed
         """
-        # Always snapshot the session so state restores exactly on next startup
-        self.autosave_current()
-
+        if not self.is_dirty():
+            return "proceed"
         if self._parent is None:
-            return True
+            return "proceed"
 
         msg = QMessageBox(self._parent)
         msg.setIcon(QMessageBox.Question)
@@ -605,11 +604,14 @@ class FileManager:
 
         if result == QMessageBox.Yes:
             success = self.save() if (self._path is not None) else self.save_as()
-            return bool(success)
-        elif result == QMessageBox.No:
-            return True
-        else:
-            return False
+            return "saved" if bool(success) else "cancel"
+        if result == QMessageBox.No:
+            return "discarded"
+        return "cancel"
+
+    def confirm_close(self) -> bool:
+        """Backward-compatible bool API for close confirmation."""
+        return self.confirm_close_decision() != "cancel"
 
     # ---- Dirty tracking helpers ----
     def mark_dirty(self) -> None:

@@ -189,6 +189,7 @@ class PreferencesDialog(QtWidgets.QDialog):
         if app is None:
             return
         try:
+            app.setProperty("keytab_restart_in_progress", True)
             restart_current_process()
         except Exception:
             pass
