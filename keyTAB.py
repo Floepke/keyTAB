@@ -389,26 +389,7 @@ def main(argv: list[str] | None = None):
     # Ensure clean shutdown of background threads on app exit
     app.aboutToQuit.connect(win.prepare_close)
 
-    # Restore window geometry or start maximized based on appdata
-    try:
-        adm = get_appdata_manager()
-        start_max = bool(adm.get("window_maximized", True))
-        start_fullscreen = bool(adm.get("window_fullscreen", False))
-        if start_fullscreen:
-            win.showFullScreen()
-        elif not start_max:
-            geom_b64 = str(adm.get("window_geometry", ""))
-            if geom_b64:
-                win.restoreGeometry(QtCore.QByteArray.fromBase64(geom_b64.encode("ascii")))
-            win.show()
-        else:
-            win.showMaximized()
-        # Update checkbox state to match window state after showing
-        if hasattr(win, '_full_screen_act') and win._full_screen_act is not None:
-            win._full_screen_act.setChecked(win.isFullScreen())
-    except Exception:
-        # Fallback: show maximized
-        win.showMaximized()
+    win.restore_window_state_from_appdata()
 
     # PySide on macOS can crash in QApplication teardown when Python finalizes.
     # Force a fast, clean termination after the event loop exits to skip Qt/PySide

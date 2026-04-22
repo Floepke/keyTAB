@@ -11,7 +11,7 @@ class Note:
     time: float = 0.0
     duration: float = 100.0
     velocity: int = 64
-    hand: str = 'l'
+    hand: Literal['l', 'r'] = 'l'
     '''
         Notehead types:
         in default mode:

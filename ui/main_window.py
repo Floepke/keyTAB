@@ -490,6 +490,11 @@ class MainWindow(QtWidgets.QMainWindow):
             pass
         super().keyPressEvent(ev)
 
+    def changeEvent(self, ev: QtCore.QEvent) -> None:
+        super().changeEvent(ev)
+        if ev.type() == QtCore.QEvent.Type.WindowStateChange:
+            self._sync_full_screen_action_state()
+
     def _is_text_input_focus(self) -> bool:
         fw = QtWidgets.QApplication.focusWidget()
         return isinstance(
@@ -1249,6 +1254,9 @@ class MainWindow(QtWidgets.QMainWindow):
             self.showNormal()
         else:
             self.showFullScreen()
+        self._sync_full_screen_action_state()
+
+    def _sync_full_screen_action_state(self) -> None:
         if hasattr(self, '_full_screen_act') and self._full_screen_act is not None:
             self._full_screen_act.setChecked(self.isFullScreen())
 
@@ -3301,6 +3309,24 @@ class MainWindow(QtWidgets.QMainWindow):
             self.move(fg.topLeft())
         except Exception:
             pass
+
+    def restore_window_state_from_appdata(self) -> None:
+        try:
+            adm = get_appdata_manager()
+            start_max = bool(adm.get("window_maximized", True))
+            start_fullscreen = bool(adm.get("window_fullscreen", False))
+            if start_fullscreen:
+                self.showFullScreen()
+            elif not start_max:
+                geom_b64 = str(adm.get("window_geometry", ""))
+                if geom_b64:
+                    self.restoreGeometry(QtCore.QByteArray.fromBase64(geom_b64.encode("ascii")))
+                self.show()
+            else:
+                self.showMaximized()
+        except Exception:
+            self.showMaximized()
+        self._sync_full_screen_action_state()
 
     # Duplicate keyPressEvent removed; using the earlier implementation for Escape handling
 
