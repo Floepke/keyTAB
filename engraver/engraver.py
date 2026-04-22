@@ -349,12 +349,20 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
     header_height = max(0.0, float(layout.get('header_height_mm', 0.0) or 0.0))
     footer_height = max(0.0, float(layout.get('footer_height_mm', 0.0) or 0.0))
     if horizontal_read_direction:
-        # Horizontal mode: reserve footer on left and header on right of drawing-space.
-        line_axis_left_reserve = float(footer_height)
-        line_axis_right_reserve = float(header_height)
+        # Horizontal mode: reserve footer on the left on every page.
+        # Header reserve is applied only on page 1 where title/composer are drawn.
+        line_axis_left_reserve_default = float(footer_height)
+        line_axis_right_reserve_default = 0.0
     else:
-        line_axis_left_reserve = 0.0
-        line_axis_right_reserve = 0.0
+        line_axis_left_reserve_default = 0.0
+        line_axis_right_reserve_default = 0.0
+
+    def _line_axis_reserves_for_page(page_index: int) -> tuple[float, float]:
+        left_reserve = float(line_axis_left_reserve_default)
+        right_reserve = float(line_axis_right_reserve_default)
+        if horizontal_read_direction and page_index == 0:
+            right_reserve += float(header_height)
+        return left_reserve, right_reserve
     scale = float(layout.get('scale', 1.0) or 1.0)
     stave_two_w = float(layout.get('stave_two_line_thickness_mm', 0.5) or 0.5) * scale
     stave_three_w = float(layout.get('stave_three_line_thickness_mm', 0.5) or 0.5) * scale
@@ -1256,14 +1264,19 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
         line['bound_right'] = int(bound_right)
 
     # Problem solved: paginate lines to fit available width with explicit breaks.
-    available_width = max(
-        1e-6,
-        page_w - page_left - page_right - line_axis_left_reserve - line_axis_right_reserve,
-    )
+    def _available_width_for_page(page_index: int) -> float:
+        left_reserve, right_reserve = _line_axis_reserves_for_page(page_index)
+        return max(
+            1e-6,
+            page_w - page_left - page_right - left_reserve - right_reserve,
+        )
+
     pages: list[list[dict]] = []
     cur_page: list[dict] = []
     cur_width = 0.0
     for line in lines:
+        cur_page_index = len(pages)
+        cur_available_width = _available_width_for_page(cur_page_index)
         if line.get('page_break', False):
             if cur_page:
                 pages.append(cur_page)
@@ -1271,10 +1284,14 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                 pages.append([])
             cur_page = []
             cur_width = 0.0
-        if cur_page and (cur_width + float(line['total_width'])) > available_width:
+            cur_page_index = len(pages)
+            cur_available_width = _available_width_for_page(cur_page_index)
+        if cur_page and (cur_width + float(line['total_width'])) > cur_available_width:
             pages.append(cur_page)
             cur_page = []
             cur_width = 0.0
+            cur_page_index = len(pages)
+            cur_available_width = _available_width_for_page(cur_page_index)
         cur_page.append(line)
         cur_width += float(line['total_width'])
     if cur_page:
@@ -1433,6 +1450,8 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                             color=notation_color, width_mm=max(0.2, footer_size * (0.04 if footer_bold else 0.02)), tags=['copyright'])
         if not page:
             continue
+        line_axis_left_reserve, line_axis_right_reserve = _line_axis_reserves_for_page(page_index)
+        available_width = _available_width_for_page(page_index)
         page_lines = list(reversed(page)) if horizontal_read_direction else page
         used_width = sum(float(l['total_width']) for l in page_lines)
         leftover = max(0.0, available_width - used_width)

@@ -215,6 +215,7 @@ class _FluidsynthBackend(_Backend):
         self._sfid: Optional[int] = None
         self._channel: int = 0
         self._gain: float = 0.35
+        self._startup_mute_delay_sec: float = 0.15
         # Reverb settings (defaults match FluidSynth defaults)
         self._reverb_enabled: bool = True
         self._reverb_room_size: float = 0.6
@@ -245,7 +246,12 @@ class _FluidsynthBackend(_Backend):
                 self._fs.delete()
             except Exception:
                 pass
+        target_gain = self._gain
         self._fs = fluidsynth.Synth()
+        try:
+            self._fs.setting('synth.gain', 0.0)
+        except Exception:
+            pass
         started = False
         for drv in ("pulseaudio", None):
             try:
@@ -261,8 +267,27 @@ class _FluidsynthBackend(_Backend):
                 pass
         self._sfid = self._fs.sfload(self._soundfont_path)
         self._fs.program_select(self._channel, self._sfid, 0, 0)
-        self._fs.setting('synth.gain', self._gain)
         self._apply_reverb_settings()
+        self._fade_in_gain_after_startup(self._fs, target_gain)
+
+    def _fade_in_gain_after_startup(self, synth: _fluidsynth.Synth, target_gain: float) -> None:
+        def _worker() -> None:
+            try:
+                time.sleep(max(0.0, float(self._startup_mute_delay_sec)))
+                steps = 6
+                for step in range(1, steps + 1):
+                    if self._fs is not synth:
+                        return
+                    synth.setting('synth.gain', float(target_gain) * (step / steps))
+                    time.sleep(0.02)
+            except Exception:
+                try:
+                    if self._fs is synth:
+                        synth.setting('synth.gain', float(target_gain))
+                except Exception:
+                    pass
+
+        threading.Thread(target=_worker, name="fluidsynth-startup-unmute", daemon=True).start()
 
     def program_select(self) -> None:
         if self._fs is not None and self._sfid is not None:
