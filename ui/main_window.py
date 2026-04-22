@@ -849,6 +849,8 @@ class MainWindow(QtWidgets.QMainWindow):
         full_screen_act.setToolTip(tr("Toggle full screen mode."))
         full_screen_act.setShortcut(QtGui.QKeySequence("F11"))
         full_screen_act.setCheckable(True)
+        # Initialize checkbox state to match current window state
+        full_screen_act.setChecked(self.isFullScreen())
         view_menu.addAction(zoom_in_act)
         view_menu.addAction(zoom_out_act)
         view_menu.addSeparator()
@@ -3310,6 +3312,7 @@ class MainWindow(QtWidgets.QMainWindow):
         # Persist window state to appdata
         adm = get_appdata_manager()
         adm.set("window_maximized", bool(self.isMaximized()))
+        adm.set("window_fullscreen", bool(self.isFullScreen()))
         geom_b64 = bytes(self.saveGeometry().toBase64()).decode("ascii")
         adm.set("window_geometry", geom_b64)
         # Save current splitter sizes for next startup

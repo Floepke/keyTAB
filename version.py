@@ -45,4 +45,5 @@ change_log = '''
 - implemented in engraver: slurs that span line/page breaks are now splitted and continue accordingly on the next line/page
 - implemented in engraver: slurs that are connected do render a indication of then connected slur at line break points to indicate the connection
 - implemented horizontal read mode in engraver, this requires probably further finetuning
+- fix: the full screen toggle checkbox works correct now in the menu on app startup
 '''

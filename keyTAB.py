@@ -393,13 +393,19 @@ def main(argv: list[str] | None = None):
     try:
         adm = get_appdata_manager()
         start_max = bool(adm.get("window_maximized", True))
-        if not start_max:
+        start_fullscreen = bool(adm.get("window_fullscreen", False))
+        if start_fullscreen:
+            win.showFullScreen()
+        elif not start_max:
             geom_b64 = str(adm.get("window_geometry", ""))
             if geom_b64:
                 win.restoreGeometry(QtCore.QByteArray.fromBase64(geom_b64.encode("ascii")))
             win.show()
         else:
             win.showMaximized()
+        # Update checkbox state to match window state after showing
+        if hasattr(win, '_full_screen_act') and win._full_screen_act is not None:
+            win._full_screen_act.setChecked(win.isFullScreen())
     except Exception:
         # Fallback: show maximized
         win.showMaximized()

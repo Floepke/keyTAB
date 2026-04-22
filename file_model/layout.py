@@ -113,7 +113,7 @@ class Layout:
         bold=True,
     ))
     measure_numbering_guide_thickness_mm: float = 0.7
-    measure_numbering_guide_dash_pattern_mm: list[float] = field(default_factory=lambda: [1.5, 3.0])
+    measure_numbering_guide_dash_pattern_mm: list[float] = field(default_factory=lambda: [1.0, 2.0])
     # 'system': number at top of each system; 'barline': number at every barline
     measure_numbering_placement: Literal['system', 'barline'] = 'barline'
     measure_numbering_guide_visible: bool = True
