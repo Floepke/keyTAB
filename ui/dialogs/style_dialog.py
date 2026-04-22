@@ -535,6 +535,8 @@ class StyleDialog(QtWidgets.QDialog):
     def _style_field_labels(self) -> dict[str, str]:
         return {
             'scale': self.tr('Scale'),
+            'page_orientation': self.tr('Page orientation'),
+            'read_direction': self.tr('Read direction'),
             'page_width_mm': self.tr('Page width (mm)'),
             'page_height_mm': self.tr('Page height (mm)'),
             'page_top_margin_mm': self.tr('Top margin (mm)'),
@@ -602,6 +604,7 @@ class StyleDialog(QtWidgets.QDialog):
             'time_signature_indicator_classic_font': self.tr('Time signature classic font'),
             'time_signature_indicator_klavarskribo_font': self.tr('Time signature Klavarskribo font'),
             'measure_numbering_guide_thickness_mm': self.tr('Measure numbering guide thickness (mm)'),
+            'measure_numbering_guide_dash_pattern_mm': self.tr('Measure numbering guide dash pattern (mm)'),
             'measure_numbering_placement': self.tr('Measure numbering placement'),
             'measure_numbering_guide_visible': self.tr('Measure numbering guide visible'),
             'measure_numbers_visible': self.tr('Measure numbers visible'),
@@ -774,6 +777,8 @@ class StyleDialog(QtWidgets.QDialog):
 
         field_tabs: dict[str, str] = {
             # Page
+            'page_orientation': 'Page',
+            'read_direction': 'Page',
             'page_width_mm': 'Page',
             'page_height_mm': 'Page',
             'page_top_margin_mm': 'Page',
@@ -843,6 +848,7 @@ class StyleDialog(QtWidgets.QDialog):
             'time_signature_indicator_klavarskribo_font': 'Time signature',
             # Measure Numbering
             'measure_numbering_guide_thickness_mm': 'Measure Numbering',
+            'measure_numbering_guide_dash_pattern_mm': 'Measure Numbering',
             'measure_numbering_placement': 'Measure Numbering',
             'measure_numbering_font': 'Measure Numbering',
             # Visibility
@@ -1086,6 +1092,10 @@ class StyleDialog(QtWidgets.QDialog):
 
         if origin is Literal and args:
             literal_labels = {
+                'portrait': self.tr('Portrait'),
+                'landscape': self.tr('Landscape'),
+                'vertical': self.tr('Vertical'),
+                'horizontal': self.tr('Horizontal'),
                 'above_stem': self.tr('Above stem (Klavarskribo)'),
                 'below_stem': self.tr('Below stem'),
                 'above_stem_if_collision': self.tr('Above stem if collision'),

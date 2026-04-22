@@ -7,7 +7,7 @@ Bump policy (Semantic Versioning):
   PATCH - bug fixes only
 """
 
-__version__ = "1.0.5a"
+__version__ = "1.0.5beta"
 APP_NAME    = "keyTAB"
 
 change_log = '''
@@ -44,4 +44,5 @@ change_log = '''
 1.0.5 (2026-04-21)
 - implemented in engraver: slurs that span line/page breaks are now splitted and continue accordingly on the next line/page
 - implemented in engraver: slurs that are connected do render a indication of then connected slur at line break points to indicate the connection
+- implemented horizontal read mode in engraver, this requires probably further finetuning
 '''

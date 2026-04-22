@@ -7,6 +7,8 @@ from file_model.font import Font
 @dataclass
 class Layout:
     scale: float = 0.35
+    page_orientation: Literal['landscape', 'portrait'] = 'portrait'
+    read_direction: Literal['horizontal', 'vertical'] = 'vertical'
     page_width_mm: float = 210.0
     page_height_mm: float = 297.0
     page_top_margin_mm: float = 7.5
@@ -111,6 +113,7 @@ class Layout:
         bold=True,
     ))
     measure_numbering_guide_thickness_mm: float = 0.7
+    measure_numbering_guide_dash_pattern_mm: list[float] = field(default_factory=lambda: [1.5, 3.0])
     # 'system': number at top of each system; 'barline': number at every barline
     measure_numbering_placement: Literal['system', 'barline'] = 'barline'
     measure_numbering_guide_visible: bool = True

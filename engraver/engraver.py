@@ -305,12 +305,56 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                 pedal_down_id = 0
 
     # Problem solved: materialize layout values early to keep math predictable.
-    page_w = float(layout.get('page_width_mm', 210.0) or 210.0)
-    page_h = float(layout.get('page_height_mm', 297.0) or 297.0)
-    page_left = float(layout.get('page_left_margin_mm', 5.0) or 5.0)
-    page_right = float(layout.get('page_right_margin_mm', 5.0) or 5.0)
-    page_top = float(layout.get('page_top_margin_mm', 10.0) or 10.0)
-    page_bottom = float(layout.get('page_bottom_margin_mm', 10.0) or 10.0)
+    page_orientation = str(layout.get('page_orientation', 'portrait') or 'portrait').strip().lower()
+    # Backward compatibility with earlier horizontal/vertical orientation values.
+    if page_orientation == 'vertical':
+        page_orientation = 'portrait'
+    elif page_orientation == 'horizontal':
+        page_orientation = 'landscape'
+
+    read_direction = str(layout.get('read_direction', 'vertical') or 'vertical').strip().lower()
+    horizontal_read_direction = read_direction == 'horizontal'
+
+    landscape_page_orientation = page_orientation == 'landscape'
+    raw_page_w = float(layout.get('page_width_mm', 210.0) or 210.0)
+    raw_page_h = float(layout.get('page_height_mm', 297.0) or 297.0)
+    # In horizontal read mode the page is rotated for presentation, so the
+    # drawing-space swap must be inverted to keep final portrait/landscape
+    # output matching the selected page orientation.
+    swap_page_axes = landscape_page_orientation != horizontal_read_direction
+    if swap_page_axes:
+        page_w = raw_page_h
+        page_h = raw_page_w
+    else:
+        page_w = raw_page_w
+        page_h = raw_page_h
+    user_page_left = float(layout.get('page_left_margin_mm', 5.0) or 5.0)
+    user_page_right = float(layout.get('page_right_margin_mm', 5.0) or 5.0)
+    user_page_top = float(layout.get('page_top_margin_mm', 10.0) or 10.0)
+    user_page_bottom = float(layout.get('page_bottom_margin_mm', 10.0) or 10.0)
+
+    # In horizontal read mode the page is rotated after drawing.
+    # Remap user-facing margins to drawing-space so final output margins match user settings.
+    if horizontal_read_direction:
+        page_left = user_page_bottom
+        page_right = user_page_top
+        page_top = user_page_left
+        page_bottom = user_page_right
+    else:
+        page_left = user_page_left
+        page_right = user_page_right
+        page_top = user_page_top
+        page_bottom = user_page_bottom
+
+    header_height = max(0.0, float(layout.get('header_height_mm', 0.0) or 0.0))
+    footer_height = max(0.0, float(layout.get('footer_height_mm', 0.0) or 0.0))
+    if horizontal_read_direction:
+        # Horizontal mode: reserve footer on left and header on right of drawing-space.
+        line_axis_left_reserve = float(footer_height)
+        line_axis_right_reserve = float(header_height)
+    else:
+        line_axis_left_reserve = 0.0
+        line_axis_right_reserve = 0.0
     scale = float(layout.get('scale', 1.0) or 1.0)
     stave_two_w = float(layout.get('stave_two_line_thickness_mm', 0.5) or 0.5) * scale
     stave_three_w = float(layout.get('stave_three_line_thickness_mm', 0.5) or 0.5) * scale
@@ -1212,7 +1256,10 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
         line['bound_right'] = int(bound_right)
 
     # Problem solved: paginate lines to fit available width with explicit breaks.
-    available_width = max(1e-6, page_w - page_left - page_right)
+    available_width = max(
+        1e-6,
+        page_w - page_left - page_right - line_axis_left_reserve - line_axis_right_reserve,
+    )
     pages: list[list[dict]] = []
     cur_page: list[dict] = []
     cur_width = 0.0
@@ -1250,6 +1297,19 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
 
     for page_index, page in enumerate(pages):
         du.new_page(page_w, page_h)
+        if horizontal_read_direction:
+            du.set_current_page_rotation_deg(-90.0)
+
+        output_page_w = float(page_h) if horizontal_read_direction else float(page_w)
+        output_page_h = float(page_w) if horizontal_read_direction else float(page_h)
+
+        def _map_output_to_drawing(x_out: float, y_out: float) -> tuple[float, float]:
+            if not horizontal_read_direction:
+                return (float(x_out), float(y_out))
+            # DrawUtil applies -90° page rotation in horizontal mode.
+            return (float(page_w) - float(y_out), float(x_out))
+
+        info_text_angle = 90.0 if horizontal_read_direction else 0.0
         du.add_rectangle(
             0.0,
             0.0,
@@ -1262,8 +1322,6 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
         )
         if not pdf_export and page_index != target_page_index:
             continue
-        footer_height = float(layout.get('footer_height_mm', 0.0) or 0.0)
-        footer_height = max(0.0, footer_height)
         if page_index == 0:
             title_text = _info_text('title', 'title')
             composer_text = _info_text('composer', 'composer')
@@ -1277,42 +1335,52 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                 'Courier',
                 10.0,
             )
+            title_x, title_y = _map_output_to_drawing(
+                user_page_left + title_x_off,
+                user_page_top + title_y_off,
+            )
             du.add_text(
-                page_left + title_x_off,
-                page_top + title_y_off,
+                title_x,
+                title_y,
                 title_text,
                 family=title_family,
                 size_pt=title_size,
                 bold=title_bold,
                 italic=title_italic,
+                angle_deg=info_text_angle,
                 color=notation_color,
                 id=0,
                 tags=['title'],
                 anchor='nw',
             )
-            if title_underline and title_text:
+            if title_underline and title_text and not horizontal_read_direction:
                 _xb, _yb, _w, _ = du._get_text_extents_mm(title_text, title_family, title_size, title_italic, title_bold)
-                _bx = (page_left + title_x_off) - _xb
-                _by = (page_top + title_y_off) - _yb
+                _bx = title_x - _xb
+                _by = title_y - _yb
                 du.add_line(_bx, _by + max(0.2, title_size * 0.025), _bx + _w, _by + max(0.2, title_size * 0.025),
                             color=notation_color, width_mm=max(0.2, title_size * (0.04 if title_bold else 0.02)), tags=['title'])
+            composer_x, composer_y = _map_output_to_drawing(
+                (output_page_w - user_page_right) + composer_x_off,
+                user_page_top + composer_y_off,
+            )
             du.add_text(
-                (page_w - page_right) + composer_x_off,
-                page_top + composer_y_off,
+                composer_x,
+                composer_y,
                 composer_text,
                 family=composer_family,
                 size_pt=composer_size,
                 bold=composer_bold,
                 italic=composer_italic,
+                angle_deg=info_text_angle,
                 color=notation_color,
                 id=0,
                 tags=['composer'],
                 anchor='ne',
             )
-            if composer_underline and composer_text:
+            if composer_underline and composer_text and not horizontal_read_direction:
                 _xb, _yb, _w, _ = du._get_text_extents_mm(composer_text, composer_family, composer_size, composer_italic, composer_bold)
-                _bx = ((page_w - page_right) + composer_x_off) - _w - _xb
-                _by = (page_top + composer_y_off) - _yb
+                _bx = composer_x - _w - _xb
+                _by = composer_y - _yb
                 du.add_line(_bx, _by + max(0.2, composer_size * 0.025), _bx + _w, _by + max(0.2, composer_size * 0.025),
                             color=notation_color, width_mm=max(0.2, composer_size * (0.04 if composer_bold else 0.02)), tags=['composer'])
         if footer_height > 0.0:
@@ -1328,43 +1396,63 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                 'Courier',
                 8.0,
             )
-            footer_baseline_y = (page_h - page_bottom) + footer_y_off
+            if horizontal_read_direction:
+                # Keep drawing-space placement near top-left, but derive it from
+                # output bottom-left so final result honors user bottom margin.
+                footer_x, footer_y = _map_output_to_drawing(
+                    user_page_left + footer_x_off,
+                    (output_page_h - user_page_bottom) + footer_y_off,
+                )
+                footer_anchor = 'sw'
+            else:
+                footer_x, footer_y = _map_output_to_drawing(
+                    user_page_left + footer_x_off,
+                    (output_page_h - user_page_bottom) + footer_y_off,
+                )
+                footer_anchor = None
             _footer_text_full = f"Page {page_index + 1} of {len(pages)} • {document_title} • {footer_text}"
             du.add_text(
-                page_left + footer_x_off,
-                footer_baseline_y,
+                footer_x,
+                footer_y,
                 _footer_text_full,
                 family=footer_family,
                 size_pt=footer_size,
                 bold=footer_bold,
                 italic=footer_italic,
+                angle_deg=info_text_angle,
                 color=notation_color,
                 id=0,
                 tags=['copyright'],
+                anchor=footer_anchor,
             )
-            if footer_underline and _footer_text_full:
+            if footer_underline and _footer_text_full and not horizontal_read_direction:
                 _xb, _yb, _w, _ = du._get_text_extents_mm(_footer_text_full, footer_family, footer_size, footer_italic, footer_bold)
-                _bx = (page_left + footer_x_off)
-                _by = footer_baseline_y
+                _bx = footer_x
+                _by = footer_y
                 du.add_line(_bx + _xb, _by + max(0.2, footer_size * 0.025), _bx + _xb + _w, _by + max(0.2, footer_size * 0.025),
                             color=notation_color, width_mm=max(0.2, footer_size * (0.04 if footer_bold else 0.02)), tags=['copyright'])
         if not page:
             continue
-        used_width = sum(float(l['total_width']) for l in page)
+        page_lines = list(reversed(page)) if horizontal_read_direction else page
+        used_width = sum(float(l['total_width']) for l in page_lines)
         leftover = max(0.0, available_width - used_width)
-        gap = leftover / float(len(page) + 1)
-        x_cursor = page_left + gap
-        for line in page:
+        gap = leftover / float(len(page_lines) + 1)
+        x_cursor = page_left + line_axis_left_reserve + gap
+        for line in page_lines:
             # Shift line_x_start right by the left ledger overhang so left-side
             # ledger stubs land inside the allocated column width.
             _ledger_left_overhang = float(line.get('ledger_left_overhang', 0.0) or 0.0)
             line_x_start = x_cursor + float(line['margin_left']) + _ledger_left_overhang
             line_x_end = line_x_start + float(line['stave_width'])
-            header_offset = 0.0
-            if page_index == 0:
-                header_offset = float(layout.get('header_height_mm', 0.0) or 0.0)
-            y1 = page_top + header_offset
-            y2 = float(page_h - page_bottom - footer_height)
+            if horizontal_read_direction:
+                y1 = page_top
+                y2 = float(page_h - page_bottom)
+            else:
+                header_offset = 0.0
+                if page_index == 0:
+                    header_offset = float(header_height)
+                y1 = page_top + header_offset
+                y2 = float(page_h - page_bottom - footer_height)
             if y2 <= y1:
                 y2 = y1 + 1.0
             line['y_top'] = y1
@@ -2417,10 +2505,15 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                 0.05,
                 float(layout.get('measure_numbering_guide_thickness_mm', 1.0) or 1.0) * scale,
             )
-            # Keep guide dashes aligned with the global grid line dash pattern.
+            # Allow an explicit measure-numbering guide dash style, with
+            # fallback to the global grid line pattern for backward compatibility.
+            default_measure_guide_dash_mm = list(
+                getattr(Layout(), 'measure_numbering_guide_dash_pattern_mm', default_grid_dash_mm)
+                or default_grid_dash_mm
+            )
             measure_guide_dash_pattern = _scaled_dash_pattern_with_default(
-                layout.get('grid_gridline_dash_pattern_mm', default_grid_dash_mm),
-                default_grid_dash_mm,
+                layout.get('measure_numbering_guide_dash_pattern_mm', default_measure_guide_dash_mm),
+                default_measure_guide_dash_mm,
                 scale,
             )
 
@@ -2429,6 +2522,16 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
             mn_numbers_visible = layout.get('measure_numbers_visible', True) is not False
             line_time_start = float(line.get('time_start', 0.0) or 0.0)
             black_rule = str(layout.get('black_note_rule', 'below_stem') or 'below_stem')
+
+            def _measure_text_metrics_mm(txt: str) -> tuple[float, float, float, float]:
+                # Returns (raw_w, raw_h, effective_w_for_x_collision, effective_h_for_y_time_span)
+                _xb, _yb, raw_w, raw_h = du._get_text_extents_mm(txt, mn_family, size_pt, mn_italic, mn_bold)
+                raw_w = max(1.0, float(raw_w))
+                raw_h = max(0.5, float(raw_h), float(text_h_mm))
+                if horizontal_read_direction:
+                    # Text is rotated +90 to compensate page rotation in horizontal mode.
+                    return raw_w, raw_h, max(1.0, raw_h), max(0.5, raw_w)
+                return raw_w, raw_h, raw_w, raw_h
 
             def _note_x_range(it: dict, include_stem: bool) -> tuple[float, float]:
                 p = int(it.get('pitch', 0) or 0)
@@ -2630,9 +2733,9 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                 num_txt = str(int(mw.get('number', 0) or 0))
                 if not num_txt:
                     continue
-                text_w_mm = max(1.0, text_h_mm * 0.6 * len(num_txt))
+                _raw_w, _raw_h, text_w_mm, text_h_eff_mm = _measure_text_metrics_mm(num_txt)
                 t0 = m_start
-                t1 = min(float(line['time_end']), m_start + (text_h_mm * tick_per_mm))
+                t1 = min(float(line['time_end']), m_start + (text_h_eff_mm * tick_per_mm))
                 y_text = _time_to_y(t0) + 1.0
 
                 # Default outside-right; only move further right on collision
@@ -2646,7 +2749,14 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                 needed_right = max(needed_right, _ledger_right_extent(t0, t1) + measure_pad)
                 if beam_right is not None:
                     needed_right = max(needed_right, float(beam_right) + measure_pad)
-                x_pos = max(base_right, needed_right)
+                x_pos_guide = max(base_right, needed_right)
+                x_pos = x_pos_guide
+                if horizontal_read_direction:
+                    # Horizontal read mode: after +90° text rotation, the
+                    # effective bbox height maps to drawing-space X progression.
+                    # Shift right by one rotated text-height to match intended
+                    # final-page placement.
+                    x_pos += float(text_h_eff_mm)
                 x0 = x_pos
                 x1 = x_pos + text_w_mm
                 step = text_w_mm + measure_pad
@@ -2661,7 +2771,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                     du.add_line(
                         grid_right,
                         guide_y,
-                        x_pos + text_w_mm,
+                        x_pos_guide + text_w_mm,
                         guide_y,
                         color=notation_color,
                         width_mm=measure_guide_width_mm,
@@ -2682,6 +2792,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                         family=mn_family,
                         bold=mn_bold,
                         italic=mn_italic,
+                        angle_deg=90.0 if horizontal_read_direction else 0.0,
                     )
                 measure_symbol_anchor[round(float(m_start), 6)] = (
                     float(x_pos),

@@ -86,6 +86,7 @@ class Polyline:
 class Page:
     width_mm: float
     height_mm: float
+    rotation_deg: float = 0.0
     items: List[object] = field(default_factory=list)
 
 
@@ -227,6 +228,11 @@ class DrawUtil:
         self._pages.append(Page(width_mm, height_mm))
         self._current_index = len(self._pages) - 1
 
+    def set_current_page_rotation_deg(self, rotation_deg: float) -> None:
+        if self._current_index < 0:
+            raise RuntimeError("No page: call new_page(width_mm, height_mm) first")
+        self._pages[self._current_index].rotation_deg = float(rotation_deg)
+
     def set_current_page(self, index: int) -> None:
         if not (0 <= index < len(self._pages)):
             raise IndexError("Page index out of range")
@@ -242,7 +248,7 @@ class DrawUtil:
         if self._current_index < 0:
             return (0.0, 0.0)
         p = self._pages[self._current_index]
-        return (p.width_mm, p.height_mm)
+        return self._page_output_size_mm(p)
 
     def set_current_page_size_mm(self, width_mm: float, height_mm: float) -> None:
         """Update the current page dimensions (mm) without altering items.
@@ -257,6 +263,22 @@ class DrawUtil:
         p = self._pages[self._current_index]
         p.width_mm = width_mm or p.width_mm
         p.height_mm = height_mm or p.height_mm
+
+    def _page_output_size_mm(self, page: Page) -> Tuple[float, float]:
+        rotation = int(round(float(page.rotation_deg or 0.0))) % 360
+        if rotation in (90, 270):
+            return (page.height_mm, page.width_mm)
+        return (page.width_mm, page.height_mm)
+
+    def _map_output_point_to_page_mm(self, page: Page, x_mm: float, y_mm: float) -> Tuple[float, float]:
+        rotation = int(round(float(page.rotation_deg or 0.0))) % 360
+        if rotation == 270:
+            return (float(page.width_mm) - float(y_mm), float(x_mm))
+        if rotation == 90:
+            return (float(y_mm), float(page.height_mm) - float(x_mm))
+        if rotation == 180:
+            return (float(page.width_mm) - float(x_mm), float(page.height_mm) - float(y_mm))
+        return (float(x_mm), float(y_mm))
 
     def add_line(self, x1_mm: float, y1_mm: float, x2_mm: float, y2_mm: float,
                  color: Color = (0, 0, 0, 1), width_mm: float = 0.3,
@@ -544,14 +566,25 @@ class DrawUtil:
         # Prefer highest quality to keep text and thin lines smooth across scales
         ctx.set_antialias(cairo.ANTIALIAS_BEST)
         ctx.scale(px_per_mm, px_per_mm)
+        rotation = int(round(float(page.rotation_deg or 0.0))) % 360
+        if rotation == 270:
+            ctx.translate(0.0, float(page.width_mm))
+            ctx.rotate(-math.pi / 2.0)
+        elif rotation == 90:
+            ctx.translate(float(page.height_mm), 0.0)
+            ctx.rotate(math.pi / 2.0)
+        elif rotation == 180:
+            ctx.translate(float(page.width_mm), float(page.height_mm))
+            ctx.rotate(math.pi)
         # Static viewport: translate to the clip origin only; do not apply Cairo clipping.
         # Determine viewport origin and size in mm and translate to anchor at (0,0)
         x_o = 0.0
         y_o = 0.0
         vp_w_mm = page.width_mm
         vp_h_mm = page.height_mm
-        if clip_rect_mm is not None:
-            clip_x, clip_y, w, h = clip_rect_mm
+        effective_clip_rect_mm = clip_rect_mm if rotation == 0 else None
+        if effective_clip_rect_mm is not None:
+            clip_x, clip_y, w, h = effective_clip_rect_mm
             # Translate to the viewport origin; shapes are drawn as-is.
             ctx.translate(-clip_x, -clip_y)
             # Logical viewport dimensions
@@ -563,7 +596,7 @@ class DrawUtil:
         # (e.g., explicit rectangle item or widget painter).
 
         layering_list = list(layering) if layering is not None else list(EDITOR_LAYERING)
-        for item in self._iter_items_in_editor_order(page, clip_rect_mm, layering_list):
+        for item in self._iter_items_in_editor_order(page, effective_clip_rect_mm, layering_list):
             if isinstance(item, Line):
                 # Draw lines without trimming; rely on culling by hit-rect only.
                 self._draw_line(ctx, item)
@@ -698,6 +731,7 @@ class DrawUtil:
         if page_index < 0 or page_index >= len(self._pages):
             return None
         page = self._pages[page_index]
+        x_mm, y_mm = self._map_output_point_to_page_mm(page, x_mm, y_mm)
         candidates = []
         for item in page.items:
             rect = getattr(item, "hit_rect_mm", None)
@@ -719,6 +753,7 @@ class DrawUtil:
         if page_index < 0 or page_index >= len(self._pages):
             return []
         page = self._pages[page_index]
+        x_mm, y_mm = self._map_output_point_to_page_mm(page, x_mm, y_mm)
         out = []
         for item in page.items:
             rect = getattr(item, "hit_rect_mm", None)
@@ -743,8 +778,9 @@ class DrawUtil:
         ctx: Optional[cairo.Context] = None
         total_pages = len(self._pages)
         for i, page in enumerate(self._pages):
-            width_pt = page.width_mm * PT_PER_MM
-            height_pt = page.height_mm * PT_PER_MM
+            page_w_mm, page_h_mm = self._page_output_size_mm(page)
+            width_pt = page_w_mm * PT_PER_MM
+            height_pt = page_h_mm * PT_PER_MM
             if i == 0:
                 surface = cairo.PDFSurface(path, width_pt, height_pt)
             else:
@@ -753,20 +789,9 @@ class DrawUtil:
             ctx.save()
             ctx.scale(PT_PER_MM, PT_PER_MM)
             ctx.set_source_rgb(1, 1, 1)
-            ctx.rectangle(0, 0, page.width_mm, page.height_mm)
+            ctx.rectangle(0, 0, page_w_mm, page_h_mm)
             ctx.fill()
-            layering_list = list(layering) if layering is not None else list(EDITOR_LAYERING)
-            for item in self._iter_items_in_editor_order(page, None, layering_list):
-                if isinstance(item, Line):
-                    self._draw_line(ctx, item)
-                elif isinstance(item, Rect):
-                    self._draw_rect(ctx, item)
-                elif isinstance(item, Oval):
-                    self._draw_oval(ctx, item)
-                elif isinstance(item, Polyline):
-                    self._draw_polyline(ctx, item)
-                elif isinstance(item, Text):
-                    self._draw_text(ctx, item)
+            self.render_to_cairo(ctx, i, 1.0, layering=layering)
             ctx.restore()
             if progress_cb is not None:
                 try:
@@ -796,10 +821,11 @@ class DrawUtil:
         total_pages = len(self._pages)
         layering_list = list(layering) if layering is not None else list(EDITOR_LAYERING)
         for i, page in enumerate(self._pages):
-            width_pt = page.width_mm * PT_PER_MM
-            height_pt = page.height_mm * PT_PER_MM
-            width_px = max(1, int(round(page.width_mm * px_per_mm)))
-            height_px = max(1, int(round(page.height_mm * px_per_mm)))
+            page_w_mm, page_h_mm = self._page_output_size_mm(page)
+            width_pt = page_w_mm * PT_PER_MM
+            height_pt = page_h_mm * PT_PER_MM
+            width_px = max(1, int(round(page_w_mm * px_per_mm)))
+            height_px = max(1, int(round(page_h_mm * px_per_mm)))
 
             # Render page content to an ARGB image surface at target DPI.
             img_surface = cairo.ImageSurface(cairo.FORMAT_ARGB32, width_px, height_px)
