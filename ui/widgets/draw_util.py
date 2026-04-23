@@ -1037,43 +1037,6 @@ class DrawUtil:
         ctx.set_source_rgba(*t.color)
         ctx.fill()
         ctx.restore()
-        # Optional debug: draw text bounds and anchor point
-        if os.getenv('PIANOSCRIPT_DEBUG_TEXT_BOUNDS', '0') in ('1', 'true', 'True'):
-            rect = getattr(t, 'hit_rect_mm', None)
-            if rect is not None:
-                rx, ry, rw, rh = rect
-                ctx.save()
-                ctx.set_source_rgba(1.0, 0.2, 0.2, 0.8)
-                ctx.set_line_width(0.2)
-                ctx.rectangle(rx, ry, rw, rh)
-                ctx.stroke()
-                # Anchor marker
-                ax = rx + rw / 2.0
-                ay = ry + rh / 2.0
-                if t.anchor == 'w':
-                    ax = rx
-                elif t.anchor == 'e':
-                    ax = rx + rw
-                elif t.anchor == 'n':
-                    ay = ry
-                elif t.anchor == 's':
-                    ay = ry + rh
-                elif t.anchor == 'nw':
-                    ax = rx; ay = ry
-                elif t.anchor == 'ne':
-                    ax = rx + rw; ay = ry
-                elif t.anchor == 'sw':
-                    ax = rx; ay = ry + rh
-                elif t.anchor == 'se':
-                    ax = rx + rw; ay = ry + rh
-                # draw cross
-                ctx.set_source_rgba(0.2, 0.8, 0.2, 0.9)
-                ctx.move_to(ax - 1.5, ay)
-                ctx.line_to(ax + 1.5, ay)
-                ctx.move_to(ax, ay - 1.5)
-                ctx.line_to(ax, ay + 1.5)
-                ctx.stroke()
-                ctx.restore()
 
     def _compute_text_hit_rect_mm(self, x_mm: float, y_mm: float, text: str,
                                   family: str, size_pt: float,
