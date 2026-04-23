@@ -3178,25 +3178,13 @@ class MainWindow(QtWidgets.QMainWindow):
                 "key": "Edwin",
                 "family": "Edwin",
                 "check_name": "Edwin",
-                "desc": "Edwin font for headers and engraving.",
+                "desc": "Edwin font family for headers and engraving.",
             },
             {
                 "key": "FiraCode-SemiBold",
                 "family": "Fira Code",
                 "check_name": "FiraCode-SemiBold",
                 "desc": "Fira Code SemiBold for UI consistency.",
-            },
-            {
-                "key": "lmroman10-regular",
-                "family": "Latin Modern Roman",
-                "check_name": "Latin Modern Roman",
-                "desc": "Latin Modern Roman for engraving text and titles.",
-            },
-            {
-                "key": "lmromancaps10-regular",
-                "family": "Latin Modern Roman Caps",
-                "check_name": "Latin Modern Roman Caps",
-                "desc": "Latin Modern Roman Caps for engraving text and titles.",
             },
             {
                 "key": "LelandText",

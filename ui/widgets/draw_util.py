@@ -429,14 +429,6 @@ class DrawUtil:
         rw = abs(xb - xa)
         rh = abs(yb - ya)
         
-        # # possible to inset the oval to account for stroke width
-        # if stroke is not None:
-        #     inset = float(stroke.width_mm) / 4.0 #TODO: check if this is needed.
-        #     rx += inset
-        #     ry += inset
-        #     rw = max(0.0, rw - (2.0 * inset))
-        #     rh = max(0.0, rh - (2.0 * inset))
-        
         if hit_rect_mm is None:
             hit_rect_mm = (rx, ry, rw, rh)
         self._pages[self._current_index].items.append(Oval(rx, ry, rw, rh, stroke, fill, id, tags, hit_rect_mm))

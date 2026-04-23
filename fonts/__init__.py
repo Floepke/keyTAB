@@ -19,14 +19,54 @@ except Exception:
 
 # Lazy import of generated base64 mapping
 try:
-    from .fonts_byte64 import FONTS  # type: ignore
+    from .fonts_byte64 import FONTS, FONT_ALIASES, FONT_GROUPS  # type: ignore
 except Exception:
     FONTS = {}
+    FONT_ALIASES = {}
+    FONT_GROUPS = {}
 
 
 _EMBEDDED_FONT_NAMES: set[str] = set()
 _REGISTERED_FONT_CACHE: dict[str, Optional[str]] = {}
 _FONT_EXTS = ('.ttf', '.otf', '.ttc', '.otc')
+
+
+def _font_members(name: str) -> list[str]:
+    group = FONT_GROUPS.get(name)
+    if group:
+        return [str(member) for member in group]
+    alias = FONT_ALIASES.get(name)
+    if alias:
+        return [str(alias)]
+    return [str(name)]
+
+
+def _font_file_targets(name: str) -> list[str]:
+    targets: list[str] = []
+    seen: set[str] = set()
+    for candidate in [name, *_font_members(name)]:
+        text = str(candidate)
+        if text and text not in seen:
+            seen.add(text)
+            targets.append(text)
+    return targets
+
+
+def _check_system_font_family(family: str) -> bool:
+    normalized = _normalize_font_name(family)
+    if not normalized:
+        return False
+    if _font_file_exists(family):
+        return True
+    if QFontDatabase is None:
+        return False
+    try:
+        families = set(QFontDatabase.families())
+    except Exception:
+        return False
+    if family not in families:
+        return False
+    return normalized not in _EMBEDDED_FONT_NAMES
 
 
 def _normalize_font_name(name: str) -> str:
@@ -79,9 +119,11 @@ def _candidate_font_dirs() -> list[Path]:
 
 
 def _font_file_exists(family: str) -> bool:
-    normalized = _normalize_font_name(family)
-    title_case = normalized.title() if normalized else family.title()
-    targets = {family, normalized, title_case}
+    targets: set[str] = set()
+    for target_name in _font_file_targets(family):
+        normalized = _normalize_font_name(target_name)
+        title_case = normalized.title() if normalized else target_name.title()
+        targets.update({target_name, normalized, title_case})
     for directory in _candidate_font_dirs():
         for target in list(targets):
             if not target:
@@ -114,20 +156,10 @@ def _refresh_system_font_cache(installed_path: Path) -> None:
 
 
 def has_system_font(family: str) -> bool:
-    normalized = _normalize_font_name(family)
-    if not normalized:
-        return False
-    if _font_file_exists(family):
-        return True
-    if QFontDatabase is None:
-        return False
-    try:
-        families = set(QFontDatabase.families())
-    except Exception:
-        return False
-    if family not in families:
-        return False
-    return normalized not in _EMBEDDED_FONT_NAMES
+    names = _font_file_targets(family)
+    if len(names) > 1:
+        return all(_check_system_font_family(name) for name in names)
+    return _check_system_font_family(str(family))
 
 
 def has_installed_embedded_font_file(name: str) -> bool:
@@ -137,48 +169,57 @@ def has_installed_embedded_font_file(name: str) -> bool:
     On Windows, newly added per-user fonts are not always immediately visible
     via QFontDatabase in a fresh process.
     """
-    data = _decoded_font_bytes(name)
-    if not data:
-        return False
     dest_dir = _user_font_dir()
     if not dest_dir.exists():
         return False
 
-    ext = _guess_font_extension(data)
-    primary = dest_dir / f"{name}{ext}"
-    if primary.exists():
-        return True
-
-    for candidate_ext in _FONT_EXTS:
-        if (dest_dir / f"{name}{candidate_ext}").exists():
-            return True
-    return False
+    members = _font_members(name)
+    for member in members:
+        data = _decoded_font_bytes(member)
+        if not data:
+            return False
+        ext = _guess_font_extension(data)
+        primary = dest_dir / f"{member}{ext}"
+        if primary.exists():
+            continue
+        found = False
+        for candidate_ext in _FONT_EXTS:
+            if (dest_dir / f"{member}{candidate_ext}").exists():
+                found = True
+                break
+        if not found:
+            return False
+    return True
 
 
 def install_embedded_font_to_system(name: str) -> tuple[bool, str]:
-    data = _decoded_font_bytes(name)
-    if not data:
-        return False, f"No embedded font named {name}."
     dest_dir = _user_font_dir()
     try:
         dest_dir.mkdir(parents=True, exist_ok=True)
     except Exception as exc:
         return False, f"Cannot create font dir: {exc}"
-    ext = _guess_font_extension(data)
-    target = dest_dir / f"{name}{ext}"
-    try:
-        if target.exists():
-            try:
-                if target.read_bytes() == data:
-                    _refresh_system_font_cache(target)
-                    return True, str(target)
-            except Exception:
-                pass
-        target.write_bytes(data)
-    except Exception as exc:
-        return False, f"Failed to write font: {exc}"
-    _refresh_system_font_cache(target)
-    return True, str(target)
+    installed_paths: list[str] = []
+    for member in _font_members(name):
+        data = _decoded_font_bytes(member)
+        if not data:
+            return False, f"No embedded font named {member}."
+        ext = _guess_font_extension(data)
+        target = dest_dir / f"{member}{ext}"
+        try:
+            if target.exists():
+                try:
+                    if target.read_bytes() == data:
+                        _refresh_system_font_cache(target)
+                        installed_paths.append(str(target))
+                        continue
+                except Exception:
+                    pass
+            target.write_bytes(data)
+        except Exception as exc:
+            return False, f"Failed to write font {member}: {exc}"
+        _refresh_system_font_cache(target)
+        installed_paths.append(str(target))
+    return True, ', '.join(installed_paths)
 
 
 def register_font_from_bytes(name: str) -> Optional[str]:
@@ -192,25 +233,29 @@ def register_font_from_bytes(name: str) -> Optional[str]:
     if cache_key in _REGISTERED_FONT_CACHE:
         return _REGISTERED_FONT_CACHE[cache_key]
     try:
-        raw = _decoded_font_bytes(name)
-        if raw is None:
+        resolved: Optional[str] = None
+        members = _font_members(name)
+        for member in members:
+            raw = _decoded_font_bytes(member)
+            if raw is None:
+                continue
+            if QByteArray is not None:
+                data = QByteArray(raw)
+            else:
+                data = raw
+            fid = QFontDatabase.addApplicationFontFromData(data)
+            if fid < 0:
+                continue
+            fams = [str(f) for f in QFontDatabase.applicationFontFamilies(fid)]
+            _EMBEDDED_FONT_NAMES.add(_normalize_font_name(member))
+            for fam in fams:
+                _EMBEDDED_FONT_NAMES.add(_normalize_font_name(fam))
+            if resolved is None and fams:
+                resolved = fams[0]
+        if resolved is None:
             _REGISTERED_FONT_CACHE[cache_key] = None
             return None
-        if QByteArray is not None:
-            data = QByteArray(raw)
-        else:
-            data = raw
-        fid = QFontDatabase.addApplicationFontFromData(data)
-        if fid < 0:
-            _REGISTERED_FONT_CACHE[cache_key] = None
-            return None
-        fams = QFontDatabase.applicationFontFamilies(fid)
-        fams = [str(f) for f in fams]
-        normalized = _normalize_font_name(name)
-        _EMBEDDED_FONT_NAMES.add(normalized)
-        for fam in fams:
-            _EMBEDDED_FONT_NAMES.add(_normalize_font_name(fam))
-        resolved = fams[0] if fams else name
+        _EMBEDDED_FONT_NAMES.add(cache_key)
         _REGISTERED_FONT_CACHE[cache_key] = resolved
         return resolved
     except Exception:

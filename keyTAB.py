@@ -323,6 +323,8 @@ def main(argv: list[str] | None = None):
             register_font_from_bytes(font_name)
             if sys.platform.startswith("win") and not has_installed_embedded_font_file(font_name):
                 install_embedded_font_to_system(font_name)
+        if sys.platform.startswith("win") and not has_installed_embedded_font_file("FiraCode-SemiBold"):
+            install_embedded_font_to_system("FiraCode-SemiBold")
     except Exception:
         pass
 
