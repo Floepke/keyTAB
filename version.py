@@ -46,4 +46,5 @@ change_log = '''
 - implemented in engraver: slurs that are connected do render a indication of then connected slur at line break points to indicate the connection
 - implemented horizontal read mode in engraver, this requires probably further finetuning
 - fix: the full screen toggle checkbox works correct now in the menu on app startup
+- fit button works now as splitter handle too, allowing to drag it to resize the editor and print-preview areas. The tooltip is updated to reflect this new behavior.
 '''

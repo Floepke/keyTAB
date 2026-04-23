@@ -3,6 +3,79 @@ from icons.icons import get_qicon
 from ui.style import Style
 
 
+class DraggableToolButton(QtWidgets.QToolButton):
+    """A QToolButton that also acts as a splitter handle drag area when dragged.
+    Click behaviour is preserved; dragging is forwarded to the parent QSplitterHandle.
+    """
+    _DRAG_THRESHOLD = 5  # Manhattan-length pixels before a move is treated as a drag
+
+    def __init__(self, handle: QtWidgets.QSplitterHandle, parent=None):
+        super().__init__(parent)
+        self._splitter_handle = handle
+        self._press_pos: QtCore.QPoint | None = None
+        self._dragging = False
+
+    def mousePressEvent(self, event: QtGui.QMouseEvent) -> None:
+        if event.button() == QtCore.Qt.MouseButton.LeftButton:
+            self._press_pos = event.position().toPoint()
+            self._dragging = False
+            super().mousePressEvent(event)  # Register press visually and internally
+        else:
+            super().mousePressEvent(event)
+
+    def mouseMoveEvent(self, event: QtGui.QMouseEvent) -> None:
+        if self._press_pos is not None and not self._dragging:
+            delta = event.position().toPoint() - self._press_pos
+            if delta.manhattanLength() > self._DRAG_THRESHOLD:
+                self._dragging = True
+                # Synthesise a press on the handle at the original press position
+                hp = QtCore.QPointF(self.mapToParent(self._press_pos))
+                press_ev = QtGui.QMouseEvent(
+                    QtCore.QEvent.Type.MouseButtonPress,
+                    hp,
+                    self._splitter_handle.mapToGlobal(hp.toPoint()),
+                    QtCore.Qt.MouseButton.LeftButton,
+                    QtCore.Qt.MouseButton.LeftButton,
+                    event.modifiers(),
+                )
+                QtWidgets.QApplication.sendEvent(self._splitter_handle, press_ev)
+        if self._dragging:
+            hp = QtCore.QPointF(self.mapToParent(event.position().toPoint()))
+            move_ev = QtGui.QMouseEvent(
+                QtCore.QEvent.Type.MouseMove,
+                hp,
+                self._splitter_handle.mapToGlobal(hp.toPoint()),
+                QtCore.Qt.MouseButton.LeftButton,
+                QtCore.Qt.MouseButton.LeftButton,
+                event.modifiers(),
+            )
+            QtWidgets.QApplication.sendEvent(self._splitter_handle, move_ev)
+            event.accept()
+        else:
+            super().mouseMoveEvent(event)
+
+    def mouseReleaseEvent(self, event: QtGui.QMouseEvent) -> None:
+        if self._dragging:
+            hp = QtCore.QPointF(self.mapToParent(event.position().toPoint()))
+            release_ev = QtGui.QMouseEvent(
+                QtCore.QEvent.Type.MouseButtonRelease,
+                hp,
+                self._splitter_handle.mapToGlobal(hp.toPoint()),
+                QtCore.Qt.MouseButton.LeftButton,
+                QtCore.Qt.MouseButton.NoButton,
+                event.modifiers(),
+            )
+            QtWidgets.QApplication.sendEvent(self._splitter_handle, release_ev)
+            self._dragging = False
+            self._press_pos = None
+            # Cancel the button's pressed state without emitting clicked
+            self.setDown(False)
+            event.accept()
+        else:
+            self._press_pos = None
+            super().mouseReleaseEvent(event)
+
+
 class ToolbarHandle(QtWidgets.QSplitterHandle):
     def __init__(self, orientation, parent):
         super().__init__(orientation, parent)
@@ -23,20 +96,20 @@ class ToolbarHandle(QtWidgets.QSplitterHandle):
         
         '''this button fits the print view to fit the window.'''
         # Default toolbar (top to bottom): fit, next, previous, engrave, play, stop
-        self.fit_btn = QtWidgets.QToolButton(self)
+        self.fit_btn = DraggableToolButton(self, parent=self)
         self.fit_btn.setFocusPolicy(QtCore.Qt.FocusPolicy.NoFocus)
-        # Fit button: no icon, no text, half-height
-        self.fit_btn.setText("")
-        # Ensure no icon is displayed
         self.fit_btn.setIcon(QtGui.QIcon())
+        self.fit_btn.setText('...')
+        self.fit_btn.setToolButtonStyle(QtCore.Qt.ToolButtonStyle.ToolButtonTextOnly)
         # Keep width; reduce height to half
         self.fit_btn.setFixedWidth(self._button_size)
         self.fit_btn.setFixedHeight(max(1, self._button_size // 2))
         self.fit_btn.setToolTip(self.tr(
-            "Fit the page to screen. "
+            "Click to fit the page to the screen. "
             "If the page doesn't fit; this button fits the page. "
             "If the page already fits; this button hides the page. "
             "If the page is hidden; this button fits the page again. "
+            "Drag to move the splitter and resize the editor and print-preview. "
         ))
         layout.addWidget(self.fit_btn)
 
