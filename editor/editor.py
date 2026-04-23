@@ -47,6 +47,7 @@ from editor.drawers.decrescendo_drawer import DecrescendoDrawerMixin
 from editor.drawers.time_signature_drawer import TimeSignatureDrawerMixin
 from editor.drawers.arpeggio_drawer import ArpeggioDrawerMixin
 from utils.CONSTANT import PIANO_KEY_AMOUNT, BLACK_KEYS
+from utils.tiny_tool import key_class_filter
 from utils.operator import Operator
 
 if TYPE_CHECKING:
@@ -1657,8 +1658,45 @@ class Editor(QtCore.QObject,
                 out.append(n)
         return out
 
+    def _transpose_step_units_for_anchor_key(self, anchor_key: int, direction: int) -> int:
+        """Return editor X-step units for one semitone at `anchor_key`.
+
+        Notes use a widened horizontal step when crossing B->C / E->F gaps.
+        Slur/text x_rpitch is linear in semitone units, so we emulate that
+        widened step by adding an extra unit whenever a gap is crossed.
+        """
+        key_now = max(1, min(88, int(anchor_key)))
+        if direction == 0:
+            return 0
+        be_gap_keys = set(int(k) for k in key_class_filter('be'))
+        if direction > 0:
+            extra = 1 if key_now in be_gap_keys else 0
+            return 1 + extra
+        extra = 1 if (key_now - 1) in be_gap_keys else 0
+        return -(1 + extra)
+
+    def _shift_relative_pitch_with_gaps(self, rpitch: float, delta_semitones: int) -> float:
+        """Shift a C4-relative pitch offset while honoring stave gap crossings."""
+        delta = int(delta_semitones)
+        if delta == 0:
+            return float(rpitch)
+
+        rp_base = int(round(float(rpitch)))
+        rp_frac = float(rpitch) - float(rp_base)
+        anchor_key = max(1, min(88, 40 + rp_base))
+
+        units = 0
+        step_dir = 1 if delta > 0 else -1
+        steps = abs(delta)
+        key_cursor = int(anchor_key)
+        for _ in range(steps):
+            units += self._transpose_step_units_for_anchor_key(key_cursor, step_dir)
+            key_cursor = max(1, min(88, key_cursor + step_dir))
+
+        return float(rp_base + units) + rp_frac
+
     def transpose_selected_notes(self, delta_semitones: int) -> bool:
-        """Move selected notes by semitone steps and shift selection range.
+        """Move selected notes and selected slur/text X by semitone steps.
 
         Returns True if any notes were updated.
         """
@@ -1668,10 +1706,14 @@ class Editor(QtCore.QObject,
         delta = int(delta_semitones)
         if delta == 0:
             return False
+        sel = self.detect_events_from_time_window(
+            float(self._sel_start_units),
+            float(self._sel_end_units) - 0.1,
+        )
         notes = self._selected_notes_from_model()
-        if not notes:
-            return False
         updated = False
+
+        # Notes: regular semitone transpose in piano-key space.
         for n in notes:
             p = int(getattr(n, 'pitch', 0) or 0)
             if p <= 0:
@@ -1680,6 +1722,24 @@ class Editor(QtCore.QObject,
             if np != p:
                 setattr(n, 'pitch', int(np))
                 updated = True
+
+        # Slurs: shift all 4 rpitch handles with gap-aware horizontal stepping.
+        for sl in list(sel.get('slur', []) or []):
+            for attr in ('x1_rpitch', 'x2_rpitch', 'x3_rpitch', 'x4_rpitch'):
+                old_rp = float(getattr(sl, attr, 0) or 0)
+                new_rp = int(round(self._shift_relative_pitch_with_gaps(old_rp, delta)))
+                if new_rp != int(round(old_rp)):
+                    setattr(sl, attr, int(new_rp))
+                    updated = True
+
+        # Text: shift x_rpitch while preserving fractional part if present.
+        for tx in list(sel.get('text', []) or []):
+            old_rp = float(getattr(tx, 'x_rpitch', 0) or 0)
+            new_rp = self._shift_relative_pitch_with_gaps(old_rp, delta)
+            if not math.isclose(new_rp, old_rp, abs_tol=1e-9):
+                setattr(tx, 'x_rpitch', float(new_rp))
+                updated = True
+
         if not updated:
             return False
         self._sel_min_pitch = max(1, min(88, int(self._sel_min_pitch) + delta))
@@ -1693,7 +1753,7 @@ class Editor(QtCore.QObject,
         return True
 
     def shift_selected_notes_time(self, delta_units: float) -> bool:
-        """Move selected notes to the nearest snap band in the requested direction.
+        """Move selected notes/text/slurs to the nearest snap band in the requested direction.
 
         - Positive `delta_units`: move each note to the next snap band (later)
         - Negative `delta_units`: move each note to the previous snap band (earlier)
@@ -1719,8 +1779,14 @@ class Editor(QtCore.QObject,
                 return max(0.0, float(nearest_i - 1) * units)
             return max(0.0, float(math.floor(q)) * units)
 
+        sel = self.detect_events_from_time_window(
+            float(self._sel_start_units),
+            float(self._sel_end_units) - 0.1,
+        )
         notes = self._selected_notes_from_model()
-        if not notes:
+        texts = list(sel.get('text', []) or [])
+        slurs = list(sel.get('slur', []) or [])
+        if not notes and not texts and not slurs:
             return False
 
         updated = False
@@ -1730,6 +1796,27 @@ class Editor(QtCore.QObject,
             if not math.isclose(new_t, t):
                 setattr(n, 'time', new_t)
                 updated = True
+
+        for tx in texts:
+            t = float(getattr(tx, 'time', 0.0) or 0.0)
+            new_t = _move_to_directional_band(t)
+            if not math.isclose(new_t, t):
+                setattr(tx, 'time', float(new_t))
+                updated = True
+
+        # Keep slur shape intact by shifting all 4 handle times with one delta,
+        # derived from moving y1_time to the nearest directional snap band.
+        for sl in slurs:
+            y1 = float(getattr(sl, 'y1_time', 0.0) or 0.0)
+            y1_new = _move_to_directional_band(y1)
+            if math.isclose(y1_new, y1):
+                continue
+            dt = float(y1_new - y1)
+            for attr in ('y1_time', 'y2_time', 'y3_time', 'y4_time'):
+                old_t = float(getattr(sl, attr, 0.0) or 0.0)
+                setattr(sl, attr, max(0.0, float(old_t + dt)))
+            updated = True
+
         if not updated:
             return False
 
@@ -1948,7 +2035,9 @@ class Editor(QtCore.QObject,
             else:
                 lst = getattr(score.events, name, []) or []
             if name == 'slur':
-                # Special-case: slur uses 4 handles with relative pitch from C4 (key 40)
+                # Special-case: use a single deterministic slur endpoint for selection.
+                # Rule: only start/end points (1 or 4) are eligible; choose the one
+                # with the lower time value (tie -> start point).
                 for ev in lst:
                     rpitches = [
                         int(getattr(ev, 'x1_rpitch', 0) or 0),
@@ -1962,15 +2051,11 @@ class Editor(QtCore.QObject,
                         float(getattr(ev, 'y3_time', 0.0) or 0.0),
                         float(getattr(ev, 'y4_time', 0.0) or 0.0),
                     ]
-                    # Convert relative pitch to absolute key number around C4 (key 40)
-                    keys = [max(1, min(88, 40 + rp)) for rp in rpitches]
-                    # If any handle lies within both the time and pitch selection window, include the slur
-                    include = False
-                    for k, th in zip(keys, times_h):
-                        if (min_p <= k <= max_p) and (a <= th <= b):
-                            include = True
-                            break
-                    if include:
+                    endpoint_indices = (0, 3)
+                    anchor_idx = min(endpoint_indices, key=lambda i: (times_h[i], i))
+                    anchor_time = float(times_h[anchor_idx])
+                    anchor_key = max(1, min(88, 40 + int(rpitches[anchor_idx])))
+                    if (min_p <= anchor_key <= max_p) and (a <= anchor_time <= b):
                         out[name].append(ev)
             else:
                 for ev in lst:
