@@ -1638,6 +1638,9 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
             divider_thickness = float(layout.get('time_signature_indicator_divide_guide_thickness_mm', 1.0) or 1.0) * scale
             classic_size_pt = classic_size * scale
             klav_size_pt = klav_size * scale
+            # Shared half-span for classical divider width and klavarskribo guides,
+            # also used as vertical offset around the classical divider center.
+            ts_indicator_half_span = 3.0 * scale
 
             def _ts_color(enabled: bool) -> tuple[float, float, float, float]:
                 if enabled:
@@ -1653,47 +1656,69 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                 color = _ts_color(enabled)
                 x = ts_x_right
                 size_pt = classic_size_pt
+                classic_angle = 90.0 if horizontal_read_direction else 0.0
+                num_txt = f"{int(numerator)}"
+                den_txt = f"{int(denominator)}"
+                _, _, _, num_h = du._get_text_extents_mm(
+                    num_txt,
+                    classic_family,
+                    size_pt,
+                    classic_italic,
+                    classic_bold,
+                )
+                _, _, _, den_h = du._get_text_extents_mm(
+                    den_txt,
+                    classic_family,
+                    size_pt,
+                    classic_italic,
+                    classic_bold,
+                )
+                num_center_y = (y_mm - ts_indicator_half_span) - (max(0.0, float(num_h)) * 0.5)
+                den_center_y = (y_mm + ts_indicator_half_span) + (max(0.0, float(den_h)) * 0.5)
                 du.add_text(
                     x,
-                    y_mm - (3.0 * scale),
-                    f"{int(numerator)}",
+                    num_center_y,
+                    num_txt,
                     size_pt=size_pt,
                     color=color,
                     id=0,
-                    tags=["time_signature"],
-                    anchor='s',
+                    tags=["ts_classic"],
+                    anchor='center',
                     family=classic_family,
                     bold=classic_bold,
                     italic=classic_italic,
+                    angle_deg=classic_angle,
                 )
                 du.add_line(
-                    x - (3.0 * scale),
+                    x - ts_indicator_half_span,
                     y_mm,
-                    x + (3.0 * scale),
+                    x + ts_indicator_half_span,
                     y_mm,
                     color=color,
                     width_mm=divider_thickness,
                     id=0,
-                    tags=["time_signature_line"],
+                    tags=["ts_classic"],
                     dash_pattern=None,
                 )
                 du.add_text(
                     x,
-                    y_mm + (3.0 * scale),
-                    f"{int(denominator)}",
+                    den_center_y,
+                    den_txt,
                     size_pt=size_pt,
                     color=color,
                     id=0,
-                    tags=["time_signature"],
-                    anchor='n',
+                    tags=["ts_classic"],
+                    anchor='center',
                     family=classic_family,
                     bold=classic_bold,
                     italic=classic_italic,
+                    angle_deg=classic_angle,
                 )
 
-            def _draw_klavars_ts(numerator: int, denominator: int, enabled: bool, y_mm: float, grid_positions: list[int]) -> None:
+            def _draw_klavarskribo_ts(numerator: int, denominator: int, enabled: bool, y_mm: float, grid_positions: list[int]) -> None:
                 """Match editor time-signature Klavarskribo indicator (three columns)."""
                 color = _ts_color(enabled)
+                klav_text_angle = 90.0 if horizontal_read_direction else 0.0
                 quarters_per_measure = float(numerator) * (4.0 / max(1.0, float(denominator)))
                 measure_len_mm = quarters_per_measure * mm_per_quarter
                 beat_len_mm = measure_len_mm / max(1, int(numerator))
@@ -1749,7 +1774,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                         cur_mid += 1
                     mid_values.append(cur_mid)
 
-                guide_half_len = 3.0 * scale
+                guide_half_len = ts_indicator_half_span
                 guide_width_mm = guide_thickness
                 for k in range(1, int(numerator) + 1):
                     y = y_mm + (k - 1) * beat_len_mm
@@ -1761,7 +1786,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                         color=color,
                         width_mm=guide_width_mm,
                         id=0,
-                        tags=["ts_klavars_guide"],
+                        tags=["ts_klavarskribo"],
                         dash_pattern=None,
                     )
                 du.add_line(
@@ -1772,7 +1797,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                     color=color,
                     width_mm=guide_width_mm,
                     id=0,
-                    tags=["ts_klavars_guide"],
+                    tags=["ts_klavarskribo"],
                     dash_pattern=None,
                 )
 
@@ -1785,11 +1810,12 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                         size_pt=klav_size_pt,
                         color=color,
                         id=0,
-                        tags=["ts_klavars_mid"],
+                        tags=["ts_klavarskribo"],
                         anchor='w',
                         family=klav_family,
                         bold=klav_bold,
                         italic=klav_italic,
+                        angle_deg=klav_text_angle,
                     )
                 du.add_text(
                     x_mid,
@@ -1798,11 +1824,12 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                     size_pt=klav_size_pt,
                     color=color,
                     id=0,
-                    tags=["ts_klavars_mid"],
+                    tags=["ts_klavarskribo"],
                     anchor='w',
                     family=klav_family,
                     bold=klav_bold,
                     italic=klav_italic,
+                    angle_deg=klav_text_angle,
                 )
 
                 for gi, s in zip(group_values, group_starts):
@@ -1814,11 +1841,12 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                         size_pt=klav_size_pt,
                         color=color,
                         id=0,
-                        tags=["ts_klavars_left"],
+                        tags=["ts_klavarskribo"],
                         anchor='w',
                         family=klav_family,
                         bold=klav_bold,
                         italic=klav_italic,
+                        angle_deg=klav_text_angle,
                     )
 
             # Problem solved: draw barlines and beat lines from the base grid.
@@ -2151,10 +2179,10 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                     if indicator_type == 'classical':
                         _draw_classical_ts(numerator, denominator, indicator_enabled, y_ts)
                     elif indicator_type == 'klavarskribo':
-                        _draw_klavars_ts(numerator, denominator, indicator_enabled, y_ts, beat_grouping)
+                        _draw_klavarskribo_ts(numerator, denominator, indicator_enabled, y_ts, beat_grouping)
                     elif indicator_type == 'classical & klavarskribo':
                         _draw_classical_ts(numerator, denominator, indicator_enabled, y_ts)
-                        _draw_klavars_ts(numerator, denominator, indicator_enabled, y_ts, beat_grouping)
+                        _draw_klavarskribo_ts(numerator, denominator, indicator_enabled, y_ts, beat_grouping)
                 for _ in range(measure_amount):
                     if op_time.gt(time_cursor, float(line['time_end'])):
                         break

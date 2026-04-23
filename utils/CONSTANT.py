@@ -124,6 +124,8 @@ ENGRAVER_LAYERING = [
     'decrescendo_text',
     'dynamic_symbol_bg_top',
     'dynamic_symbol_text_top',
+    'ts_klavarskribo',
+    'ts_classic',
 ]
 
 # Keyboard constants
@@ -147,6 +149,7 @@ GRACENOTE_THRESHOLD: float = 16.0  # (32th) Default threshold for interpreting v
 
 ENGRAVER_VERSION: str = __version__
 
+# TODO: this correction i see now is a little silly and not correct in all cases.
 ENGRAVER_FRACTIONAL_TEXT_SCALING_CORRECTION: float = 0.675
 
 # Amount of line segments used to sample/draw cubic slurs.
