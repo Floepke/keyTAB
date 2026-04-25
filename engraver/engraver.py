@@ -3806,7 +3806,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                 default_font = layout.get('font_text', {}) or {}
                 pad_mm = float(layout.get('text_background_padding_mm', 0.0) or 0.0) * scale
 
-                def _resolve_font(tx: dict) -> tuple[str, float, bool, bool]:
+                def _resolve_font(tx: dict) -> tuple[str, float, bool, bool, bool]:
                     use_custom = bool(tx.get('use_custom_font', False))
                     fnt = tx.get('font', None) if use_custom else None
                     if not isinstance(fnt, dict):
@@ -3815,7 +3815,8 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                     size_pt = float(fnt.get('size_pt', default_font.get('size_pt', 12.0)) or 12.0)
                     italic = bool(fnt.get('italic', default_font.get('italic', False)))
                     bold = bool(fnt.get('bold', default_font.get('bold', False)))
-                    return family, size_pt, italic, bold
+                    underline = bool(fnt.get('underline', default_font.get('underline', False)))
+                    return family, size_pt, italic, bold, underline
 
                 for tx in line_texts:
                     t_time = float(tx.get('time', 0.0) or 0.0)
@@ -3825,7 +3826,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                     y_off = float(tx.get('y_offset_mm', 0.0) or 0.0)
                     txt_raw = str(tx.get('text', '') or '')
                     display_txt = txt_raw if txt_raw.strip() else "(no text set)"
-                    family, size_pt_raw, italic, bold = _resolve_font(tx)
+                    family, size_pt_raw, italic, bold, underline = _resolve_font(tx)
                     size_pt = float(size_pt_raw) * ENGRAVER_FRACTIONAL_TEXT_SCALING_CORRECTION * (scale / 0.3333333333333333)
                     width_off_mm = float(tx.get('text_background_width_offset_mm', 0.0) or 0.0)
                     y_mm = _time_to_y(t_time) + y_off
@@ -3857,6 +3858,27 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                         id=int(tx.get('id', 0) or 0),
                         tags=['text'],
                     )
+                    if underline:
+                        xb_mm, yb_mm, ink_w_mm, ink_h_mm = du._get_text_extents_mm(display_txt, family, size_pt, italic, bold)
+                        ul_y_local = -ink_h_mm / 2.0 - yb_mm + max(0.2, size_pt * 0.025)
+                        half_w = ink_w_mm / 2.0
+                        ang_rad = math.radians(angle)
+                        cos_a = math.cos(ang_rad)
+                        sin_a = math.sin(ang_rad)
+                        ul_x1 = x_mm + (-half_w) * cos_a - ul_y_local * sin_a
+                        ul_y1 = cy + (-half_w) * sin_a + ul_y_local * cos_a
+                        ul_x2 = x_mm + half_w * cos_a - ul_y_local * sin_a
+                        ul_y2 = cy + half_w * sin_a + ul_y_local * cos_a
+                        du.add_line(
+                            ul_x1,
+                            ul_y1,
+                            ul_x2,
+                            ul_y2,
+                            color=notation_color,
+                            width_mm=max(0.2, size_pt * (0.04 if bold else 0.02)),
+                            tags=['text_underline'],
+                            id=int(tx.get('id', 0) or 0),
+                        )
 
             if bool(layout.get('slur_visible', True)) and (
                     line_slurs or line_slur_continuations
