@@ -49,6 +49,7 @@ from editor.drawers.arpeggio_drawer import ArpeggioDrawerMixin
 from utils.CONSTANT import PIANO_KEY_AMOUNT, BLACK_KEYS
 from utils.tiny_tool import key_class_filter
 from utils.operator import Operator
+from editor.collision import CollisionMixin
 
 if TYPE_CHECKING:
     from editor.tool.base_tool import BaseTool
@@ -56,6 +57,7 @@ if TYPE_CHECKING:
 
 
 class Editor(QtCore.QObject,
+             CollisionMixin,
              StaveDrawerMixin,
              SnapDrawerMixin,
              GridBandDrawerMixin,
@@ -343,130 +345,6 @@ class Editor(QtCore.QObject,
     def _finalize_transpose_snapshot(self) -> None:
         label = getattr(self, '_pending_snapshot_label', 'transpose_notes')
         self._snapshot_if_changed(coalesce=True, label=str(label or 'transpose_notes'))
-
-    # ---- Hit rectangles ----
-    def register_hit_rect(self, type: str, _id: int, x1: float, y1: float, x2: float, y2: float, **extra) -> None:
-        """Register a clickable rectangle for hit detection.
-
-        type  — namespace string: 'note', 'text', 'tempo', 'velocity', 'arpeggio',
-                'hairpin', or 'dynamic_symbol'.
-        _id   — event id stored in the record.
-        x1/y1/x2/y2 — bounding box in absolute mm coordinates.
-        **extra — arbitrary extra fields stored alongside (e.g. kind, hand, htype, handle).
-        """
-        cx = (float(x1) + float(x2)) * 0.5
-        cy = (float(y1) + float(y2)) * 0.5
-        record: dict = {
-            'type': str(type),
-            '_id': int(_id),
-            'x1': float(x1),
-            'y1': float(y1),
-            'x2': float(x2),
-            'y2': float(y2),
-            'cx': cx,
-            'cy': cy,
-        }
-        record.update(extra)
-        self._hit_rects.append(record)
-
-    def hit_test_hit_rect(self, x_mm: float, y_mm: float, type: str) -> dict | None:
-        """Return the best-matching hit rect dict of the given type at (x_mm, y_mm).
-
-        For 'text': handle rects beat body rects; ties resolved by smallest area.
-        For all other types: closest center wins.
-        Returns None if no rect of that type contains the point.
-        """
-        x_mm = float(x_mm)
-        y_mm = float(y_mm)
-        if type == 'text':
-            candidates = []
-            for r in self._hit_rects:
-                if r.get('type') != 'text':
-                    continue
-                if float(r['x1']) <= x_mm <= float(r['x2']) and float(r['y1']) <= y_mm <= float(r['y2']):
-                    area = max(0.0, (float(r['x2']) - float(r['x1'])) * (float(r['y2']) - float(r['y1'])))
-                    priority = 0 if r.get('kind') == 'handle' else 1
-                    candidates.append((priority, area, r))
-            if not candidates:
-                return None
-            candidates.sort(key=lambda t: (t[0], t[1]))
-            return candidates[0][2]
-        else:
-            matches = []
-            for r in self._hit_rects:
-                if r.get('type') != type:
-                    continue
-                if float(r['x1']) <= x_mm <= float(r['x2']) and float(r['y1']) <= y_mm <= float(r['y2']):
-                    dx = x_mm - float(r['cx'])
-                    dy = y_mm - float(r['cy'])
-                    matches.append((dx * dx + dy * dy, r))
-            if not matches:
-                return None
-            matches.sort(key=lambda t: t[0])
-            return matches[0][1]
-
-    def _px_to_mm(self, x_px: float, y_px: float) -> tuple[float, float]:
-        """Convert logical (Qt) pixel coordinates to absolute mm."""
-        w_px_per_mm = float(getattr(self, '_widget_px_per_mm', 1.0) or 1.0)
-        if w_px_per_mm <= 0:
-            return 0.0, 0.0
-        x_mm = float(x_px) / w_px_per_mm
-        y_mm = float(y_px) / w_px_per_mm + float(getattr(self, '_view_y_mm_offset', 0.0) or 0.0)
-        return x_mm, y_mm
-
-    # ---- Hit rect backward-compatible wrappers ----
-    def hit_test_note_id(self, x_px: float, y_px: float) -> int | None:
-        x_mm, y_mm = self._px_to_mm(x_px, y_px)
-        r = self.hit_test_hit_rect(x_mm, y_mm, 'note')
-        return int(r['_id']) if r is not None else None
-
-    def hit_test_tempo(self, x_px: float, y_px: float) -> int | None:
-        x_mm, y_mm = self._px_to_mm(x_px, y_px)
-        r = self.hit_test_hit_rect(x_mm, y_mm, 'tempo')
-        return int(r['_id']) if r is not None else None
-
-    def hit_test_arpeggio_handle(self, x_px: float, y_px: float) -> int | None:
-        x_mm, y_mm = self._px_to_mm(x_px, y_px)
-        r = self.hit_test_hit_rect(x_mm, y_mm, 'arpeggio')
-        return int(r['_id']) if r is not None else None
-
-    def hit_test_text(self, x_px: float, y_px: float):
-        x_mm, y_mm = self._px_to_mm(x_px, y_px)
-        return self.hit_test_text_mm(x_mm, y_mm)
-
-    def hit_test_text_mm(self, x_mm: float, y_mm: float):
-        r = self.hit_test_hit_rect(float(x_mm), float(y_mm), 'text')
-        if r is None:
-            return (None, None, None)
-        return (int(r['_id']), r.get('kind') == 'handle', r)
-
-    def hit_test_hairpin_mm(self, x_mm: float, y_mm: float):
-        r = self.hit_test_hit_rect(float(x_mm), float(y_mm), 'hairpin')
-        if r is None:
-            return (None, None, None)
-        hp_id = int(r['_id'])
-        hp_type = str(r.get('htype', ''))
-        handle = str(r.get('handle', ''))
-        score = self.current_score()
-        if score is None:
-            return (None, None, None)
-        for ev in (getattr(score.events, hp_type, []) or []):
-            if int(getattr(ev, '_id', -1) or -1) == hp_id:
-                return (ev, hp_type, handle)
-        return (None, None, None)
-
-    def hit_test_dynamic_symbol_mm(self, x_mm: float, y_mm: float):
-        r = self.hit_test_hit_rect(float(x_mm), float(y_mm), 'dynamic_symbol')
-        if r is None:
-            return (None, None, None)
-        symbol_id = int(r['_id'])
-        score = self.current_score()
-        if score is None:
-            return (None, None, None)
-        for ev in (getattr(score.events, 'dynamic_symbol', []) or []):
-            if int(getattr(ev, '_id', -1) or -1) == symbol_id:
-                return (ev, 'dynamic_symbol', '')
-        return (None, None, None)
 
     def _calculate_layout(self, view_width_mm: float) -> None:
         """Compute editor-specific layout based on the current view width.

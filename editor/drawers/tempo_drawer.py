@@ -64,42 +64,6 @@ class TempoDrawerMixin:
             x_center = x_left + rect_w * 0.5
             y_center = (y0 + y1) * 0.5
 
-            # Measure rotated text using shared text helpers
-            try:
-                w_mm, h_mm, _offset_down, rot_corners, rot_poly = self._text_bbox(
-                    du,
-                    text,
-                    font_family,
-                    font_size_pt,
-                    font_italic,
-                    font_bold,
-                    angle_deg,
-                    text_padding_mm,
-                )
-            except Exception:
-                # Fallback to simple extents if helper fails
-                _xb, _yb, w_mm, h_mm = du._get_text_extents_mm(text, font_family, font_size_pt, font_italic, font_bold)
-                rot_poly = [(-w_mm * 0.5, -h_mm * 0.5), (w_mm * 0.5, -h_mm * 0.5), (w_mm * 0.5, h_mm * 0.5), (-w_mm * 0.5, h_mm * 0.5)]
-
-            # Rotated polygon bounds for grey underlay height
-            poly_abs = [(x_center + dx, y_center + dy) for (dx, dy) in rot_poly]
-            min_y = min(p[1] for p in poly_abs)
-            max_y = max(p[1] for p in poly_abs)
-            text_height_rot = max(0.0, max_y - min_y)
-
-            # Grey underlay sized to text height, fixed width lane
-            du.add_rectangle(
-                x_left,
-                y_center - text_height_rot * 0.5,
-                x_left + rect_w,
-                y_center + text_height_rot * 0.5,
-                stroke_color=None,
-                fill_color=(0.7, 0.7, 0.7, 1),
-                id=0,
-                tags=["tempo_under"],
-                dash_pattern=None,
-            )
-
             # Black duration bar sized by tempo duration
             du.add_rectangle(
                 x_left,

@@ -108,12 +108,13 @@ class TimeSignatureDrawerMixin:
             beat_len_ticks = measure_len_ticks / max(1.0, float(numerator))
             op = Operator(float(SHORTEST_DURATION))
 
-            # Column positions: left, middle, right (closest to stave)
-            base_x = stave_left_position - margin + 7.5
+            # Column positions: anchor right column to the classical divider line,
+            # then keep the same relative spacing for middle/left columns.
             col_gap = 5.0
-            x_right = base_x + 10.0         # right column (guides)
-            x_mid = base_x                  # middle column (beat numbers)
-            x_left = base_x - col_gap       # left column (group numbers)
+            mid_to_right_gap = 10.0
+            x_right = stave_left_position - 7.5  # same X as classic divider center
+            x_mid = x_right - mid_to_right_gap
+            x_left = x_mid - col_gap
 
             # Derive grid-1 reset positions (ticks) from beat_grouping.
             grid_bar_off, grid_off = resolve_grid_layer_offsets(

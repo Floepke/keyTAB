@@ -14,6 +14,7 @@ from file_model.info import Info
 from file_model.analysis import Analysis
 from ui.style import Style
 from symbol_design.noteheads import Notehead, resolve_notehead_spec
+from symbol_design.pedal import draw_pedal_symbol
 from file_model.events.note import Note
 
 _MP_CONTEXT = mp.get_context("spawn")
@@ -45,6 +46,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
     start_repeats = list(events.get('start_repeat', []) or [])
     end_repeats = list(events.get('end_repeat', []) or [])
     double_bars = list(events.get('double_bar', []) or [])
+    tempos = list(events.get('tempo', []) or [])
     pedals = list(events.get('pedal', []) or [])
 
     # Theme colors
@@ -267,6 +269,24 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
         })
     if norm_double_bars:
         norm_double_bars = sorted(norm_double_bars, key=lambda m: float(m.get('time', 0.0) or 0.0))
+
+    norm_tempos: list[dict] = []
+    for idx, ev in enumerate(tempos):
+        if not isinstance(ev, dict):
+            continue
+        t0 = float(ev.get('time', 0.0) or 0.0)
+        dur = float(ev.get('duration', 0.0) or 0.0)
+        tempo_val = int(ev.get('tempo', 60) or 60)
+        norm_tempos.append({
+            'time': t0,
+            'duration': dur,
+            'end': t0 + dur,
+            'tempo': tempo_val,
+            'id': int(ev.get('_id', 0) or 0),
+            'idx': int(idx),
+        })
+    if norm_tempos:
+        norm_tempos = sorted(norm_tempos, key=lambda m: float(m.get('time', 0.0) or 0.0))
 
     norm_pedals: list[dict] = []
     for idx, ev in enumerate(pedals):
@@ -2278,60 +2298,48 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                         int(ev.get('id', 0) or 0),
                     )
 
-            if bool(layout.get('pedal_lane_enabled', False)):
-                lane_offset = max(1.0 * scale, float(layout.get('pedal_lane_width_mm', 2.5) or 2.5) * scale)
-                x_lane = min(page_w - page_right, grid_right + lane_offset)
+            # Problem solved: draw pedal symbols using draw_pedal_symbol for keyboard-aware positioning
+            if pedals:
+                pedal_thickness_mm = float(layout.get('pedal_symbol_thickness_mm', 0.3) or 0.3) * scale
 
-                pedal_seg_w = max(0.25, lane_offset * 0.35)
-                for seg in pedal_segments:
-                    s0 = float(seg.get('start', 0.0) or 0.0)
-                    s1 = float(seg.get('end', 0.0) or 0.0)
-                    if op_time.ge(s0, float(line['time_end'])) or op_time.le(s1, float(line['time_start'])):
-                        continue
-                    y_a = _time_to_y(max(s0, float(line.get('time_start', 0.0) or 0.0)))
-                    y_b = _time_to_y(min(s1, float(line.get('time_end', 0.0) or 0.0)))
-                    if op_time.gt(y_a, y_b):
-                        y_a, y_b = y_b, y_a
-                    du.add_line(
-                        x_lane,
-                        y_a,
-                        x_lane,
-                        y_b,
-                        color=notation_color,
-                        width_mm=pedal_seg_w,
-                        id=int(seg.get('id', 0) or 0),
-                        tags=['pedal_hold'],
-                        dash_pattern=None,
-                    )
+                def _read_pedal_field(pedal_ev, name: str, default):
+                    if isinstance(pedal_ev, dict):
+                        return pedal_ev.get(name, default)
+                    return getattr(pedal_ev, name, default)
+                
+                def _pedal_time_to_y(time_val: float) -> float:
+                    """Convert time to Y coordinate for this line."""
+                    total = max(1e-6, float(line['time_end'] - line['time_start']))
+                    rel = (float(time_val) - float(line['time_start'])) / total
+                    rel = max(0.0, min(1.0, rel))
+                    return y1 + (y2 - y1) * rel
 
-                marker_w = max(0.5, 1.2 * scale)
-                marker_h = max(0.5, 1.2 * scale)
-                marker_stroke = max(0.18, 0.25 * scale)
-                for ev in norm_pedals:
-                    p_t = float(ev.get('time', 0.0) or 0.0)
+                def _pedal_rpitch_to_x(rpitch_val: int) -> float:
+                    """Convert C4-relative semitone offset to page X coordinate."""
+                    base_x_c4 = float(_key_to_x(40))
+                    return base_x_c4 + (float(rpitch_val) * float(semitone_mm))
+
+                for pedal_ev in pedals:
+                    p_t = float(_read_pedal_field(pedal_ev, 'time', 0.0) or 0.0)
                     if op_time.lt(p_t, float(line['time_start'])) or op_time.gt(p_t, float(line['time_end'])):
                         continue
-                    p_type = str(ev.get('type', 'v') or 'v')
-                    y_p = _time_to_y(p_t)
-                    if p_type == 'v':
-                        points = [
-                            (x_lane - marker_w, y_p - marker_h),
-                            (x_lane, y_p),
-                            (x_lane + marker_w, y_p - marker_h),
-                        ]
-                    else:
-                        points = [
-                            (x_lane - marker_w, y_p + marker_h),
-                            (x_lane, y_p),
-                            (x_lane + marker_w, y_p + marker_h),
-                        ]
-                    du.add_polyline(
-                        points,
-                        stroke_color=notation_color,
-                        stroke_width_mm=marker_stroke,
-                        id=int(ev.get('id', 0) or 0),
-                        tags=['pedal_marker'],
-                    )
+                    
+                    try:
+                        draw_pedal_symbol(
+                            du,
+                            pedal_ev,
+                            time_to_y_mm=_pedal_time_to_y,
+                            rpitch_to_x_mm=_pedal_rpitch_to_x,
+                            color=notation_color,
+                            background_color=paper_color,
+                            width_mm=pedal_thickness_mm,
+                            semitone_space_mm=semitone_mm,
+                            layout=layout,
+                            id=int(_read_pedal_field(pedal_ev, '_id', _read_pedal_field(pedal_ev, 'id', 0)) or 0),
+                            tags=['pedal_symbol'],
+                        )
+                    except Exception:
+                        pass
 
             # Problem solved: render count lines as lightweight guides.
             if bool(layout.get('countline_visible', True)) and count_lines:
@@ -2458,6 +2466,17 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                         continue
                     line_decrescendos.append(hp)
 
+            line_tempos: list[dict] = []
+            if norm_tempos:
+                line_start = float(line.get('time_start', 0.0) or 0.0)
+                line_end = float(line.get('time_end', 0.0) or 0.0)
+                for tp in norm_tempos:
+                    t_start = float(tp.get('time', 0.0) or 0.0)
+                    t_end = float(tp.get('end', t_start) or t_start)
+                    if op_time.ge(t_start, float(line_end)) or op_time.le(t_end, float(line_start)):
+                        continue
+                    line_tempos.append(tp)
+
             notes_by_hand_line: dict[str, list[dict]] = {'l': [], 'r': []}
             for item in line_notes:
                 hk = str(item.get('hand', 'l') or 'l')
@@ -2548,6 +2567,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
             measure_pad = 1.5
             measure_symbol_anchor: dict[float, tuple[float, float, float]] = {}
             measure_symbol_default_right_x = float(grid_right + measure_pad * 2.0)
+            tempo_gap_mm = 1.0
             measure_guide_width_mm = max(
                 0.05,
                 float(layout.get('measure_numbering_guide_thickness_mm', 1.0) or 1.0) * scale,
@@ -2567,6 +2587,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
             mn_placement = str(layout.get('measure_numbering_placement', 'system') or 'system')
             mn_guide_visible = layout.get('measure_numbering_guide_visible', True) is not False
             mn_numbers_visible = layout.get('measure_numbers_visible', True) is not False
+            tempo_indicator_visible = layout.get('tempo_indicator_visible', True) is not False
             line_time_start = float(line.get('time_start', 0.0) or 0.0)
             black_rule = str(layout.get('black_note_rule', 'below_stem') or 'below_stem')
 
@@ -2846,7 +2867,80 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                     float(text_w_mm),
                     float(y_text),
                 )
-                measure_symbol_default_right_x = float(x_pos + text_w_mm)
+                measure_symbol_default_right_x = max(
+                    float(measure_symbol_default_right_x),
+                    float(x_pos_guide + text_w_mm),
+                )
+
+            if tempo_indicator_visible and line_tempos:
+                try:
+                    tempo_font_family = _resolve_font_family('Edwin') or 'Edwin'
+                except Exception:
+                    tempo_font_family = 'Edwin'
+
+                tempo_font_size_pt = 24.0 * scale
+                tempo_rect_w = max(6.0, 12.0 * scale)
+
+                def _tempo_left_x(tp_time: float) -> float:
+                    key = round(float(tp_time), 6)
+                    anchored = measure_symbol_anchor.get(key)
+                    if anchored is not None:
+                        x_num, w_num, _y_num = anchored
+                        return float(x_num + w_num + tempo_gap_mm)
+                    # Mid-measure tempo changes: use the outer measure-number guide end.
+                    return float(measure_symbol_default_right_x + tempo_gap_mm)
+
+                for tp in line_tempos:
+                    try:
+                        t0 = float(tp.get('time', 0.0) or 0.0)
+                        t1 = float(tp.get('end', t0) or t0)
+                        tempo_val = int(tp.get('tempo', 60) or 60)
+                    except Exception:
+                        continue
+                    if op_time.le(t1, t0):
+                        continue
+
+                    seg_t0 = max(float(line['time_start']), t0)
+                    seg_t1 = min(float(line['time_end']), t1)
+                    if op_time.le(seg_t1, seg_t0):
+                        continue
+
+                    y0_tempo = _time_to_y(seg_t0)
+                    y1_tempo = _time_to_y(seg_t1)
+                    if op_time.gt(y0_tempo, y1_tempo):
+                        y0_tempo, y1_tempo = y1_tempo, y0_tempo
+
+                    tempo_x_left = _tempo_left_x(t0)
+
+                    du.add_rectangle(
+                        tempo_x_left,
+                        y0_tempo,
+                        tempo_x_left + tempo_rect_w,
+                        y1_tempo,
+                        stroke_color=None,
+                        fill_color=(0.5, 0.5, 0.5, 1),
+                        id=int(tp.get('id', 0) or 0),
+                        tags=['tempo_bg'],
+                        dash_pattern=None,
+                    )
+
+                    y_center_tempo = (y0_tempo + y1_tempo) * 0.5
+                    x_center_tempo = tempo_x_left + (tempo_rect_w * 0.5)
+                    du.add_text(
+                        x_center_tempo,
+                        y_center_tempo,
+                        str(tempo_val),
+                        family=tempo_font_family,
+                        size_pt=tempo_font_size_pt,
+                        italic=False,
+                        bold=True,
+                        color=(1, 1, 1, 1),
+                        anchor='center',
+                        id=int(tp.get('id', 0) or 0),
+                        tags=['tempo_text'],
+                        hit_rect_mm=None,
+                        angle_deg=90.0,
+                    )
 
             symbol_width = max(3.0, semitone_mm * 4.0)
             symbol_gap = max(0.6, semitone_mm * 0.35)

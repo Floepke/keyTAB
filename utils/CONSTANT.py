@@ -80,6 +80,10 @@ EDITOR_LAYERING = [
     'dynamic_symbol_text_top',
     'crescendo_handle',
     'decrescendo_handle',
+    'pedal_symbol_bg',
+    'pedal_symbol',
+    'tempo_bg',
+    'tempo_text',
 ]
 
 ENGRAVER_LAYERING = [
@@ -126,6 +130,10 @@ ENGRAVER_LAYERING = [
     'dynamic_symbol_text_top',
     'ts_klavarskribo',
     'ts_classic',
+    'pedal_symbol_bg',
+    'pedal_symbol',
+    'tempo_bg',
+    'tempo_text',
 ]
 
 # Keyboard constants

@@ -196,6 +196,9 @@ class _Backend:
     def note_off(self, midi_note: int) -> None:  # pragma: no cover - runtime side effects
         raise NotImplementedError
 
+    def control_change(self, control: int, value: int) -> None:  # pragma: no cover - runtime side effects
+        raise NotImplementedError
+
     def all_notes_off(self) -> None:  # pragma: no cover - runtime side effects
         raise NotImplementedError
 
@@ -349,6 +352,10 @@ class _FluidsynthBackend(_Backend):
     def note_off(self, midi_note: int) -> None:
         if self._fs is not None:
             self._fs.noteoff(self._channel, midi_note)
+
+    def control_change(self, control: int, value: int) -> None:
+        if self._fs is not None:
+            self._fs.cc(self._channel, int(max(0, min(127, control))), int(max(0, min(127, value))))
 
     def all_notes_off(self) -> None:
         if self._fs is not None:
@@ -523,6 +530,15 @@ class _MidiOutBackend(_Backend):
     def note_off(self, midi_note: int) -> None:
         self._port.send(mido.Message("note_off", note=int(midi_note), velocity=0))
 
+    def control_change(self, control: int, value: int) -> None:
+        self._port.send(
+            mido.Message(
+                "control_change",
+                control=int(max(0, min(127, control))),
+                value=int(max(0, min(127, value))),
+            )
+        )
+
     def all_notes_off(self) -> None:
         for n in range(128):
             self._port.send(mido.Message("note_off", note=n, velocity=0))
@@ -646,6 +662,9 @@ class _MacDLSSynthBackend(_Backend):
     def note_off(self, midi_note: int) -> None:
         self._midi(0x80 | self._channel, int(midi_note), 0)
 
+    def control_change(self, control: int, value: int) -> None:
+        self._midi(0xB0 | self._channel, int(control), int(value))
+
     def all_notes_off(self) -> None:
         self._midi(0xB0 | self._channel, 123, 0)
 
@@ -684,6 +703,9 @@ class _WinMMSynthBackend(_Backend):
 
     def note_off(self, midi_note: int) -> None:
         self._impl.note_off(midi_note)
+
+    def control_change(self, control: int, value: int) -> None:
+        self._impl.control_change(control, value)
 
     def all_notes_off(self) -> None:
         self._impl.all_notes_off()
@@ -925,6 +947,8 @@ class Player:
                 try:
                     if kind == 'on':
                         self._backend.note_on(int(midi_note), int(vel))
+                    elif kind == 'cc':
+                        self._backend.control_change(int(midi_note), int(vel))
                     else:
                         self._backend.note_off(int(midi_note))
                 except Exception:
@@ -994,6 +1018,26 @@ class Player:
 
         self._playhead_timeline = playhead_timeline
 
+        # Sustain pedal symbols are mapped to CC64 (0 = up, 127 = down).
+        pedal_points = self._collect_sustain_pedal_points(score)
+        if pedal_points:
+            prev_seg_end: Optional[float] = None
+            for seg_start, seg_end, seg_sec_start in timed_segments:
+                seg_start = float(seg_start)
+                seg_end = float(seg_end)
+                seg_sec_start = float(seg_sec_start)
+                if prev_seg_end is None or abs(seg_start - float(prev_seg_end)) > 1e-9:
+                    state_at_start = self._sustain_state_at(seg_start, pedal_points)
+                    events.append(('cc', seg_sec_start, 64, int(state_at_start)))
+
+                for p_time, p_val in pedal_points:
+                    if p_time < seg_start or p_time >= seg_end:
+                        continue
+                    cc_t = seg_sec_start + self._seconds_between(seg_start, float(p_time), segs)
+                    events.append(('cc', float(cc_t), 64, int(p_val)))
+
+                prev_seg_end = seg_end
+
         for note_start, note_end, midi_pitch, vel in playable:
             for seg_start, seg_end, seg_sec_start in timed_segments:
                 ov_start = max(note_start, seg_start)
@@ -1022,6 +1066,16 @@ class Player:
         except Exception:
             pass
         events: List[Tuple[str, float, int, int]] = []
+
+        pedal_points = self._collect_sustain_pedal_points(score)
+        if pedal_points:
+            state_at_start = self._sustain_state_at(su, pedal_points)
+            events.append(('cc', 0.0, 64, int(state_at_start)))
+            for p_time, p_val in pedal_points:
+                if p_time < su:
+                    continue
+                cc_t = self._seconds_between(su, float(p_time), segs)
+                events.append(('cc', float(cc_t), 64, int(p_val)))
         for n, dur_units in self._iter_playable_events(score):
             start = float(getattr(n, 'time', 0.0) or 0.0)
             end = float(start + dur_units)
@@ -1076,6 +1130,36 @@ class Player:
             if overlap_end is not None:
                 dur_units = max(dur_units, float(overlap_end - start_units))
             yield g, dur_units
+
+    def _collect_sustain_pedal_points(self, score) -> List[Tuple[float, int]]:
+        """Collect sustain pedal CC64 points from pedal symbols.
+
+        Returns sorted list of (time_units, cc_value) where cc_value is 127 (down)
+        or 0 (up). Only up/down symbols are considered.
+        """
+        out: List[Tuple[float, int]] = []
+        events_obj = getattr(score, 'events', None)
+        for ev in list(getattr(events_obj, 'pedal', []) or []):
+            p_time = float(getattr(ev, 'time', 0.0) or 0.0)
+            symbol = str(getattr(ev, 'symbol', '') or '').strip().lower()
+            
+            if symbol == 'down':
+                out.append((p_time, 127))
+            elif symbol == 'up':
+                out.append((p_time, 0))
+
+        out.sort(key=lambda m: float(m[0]))
+        return out
+
+    def _sustain_state_at(self, t_units: float, pedal_points: List[Tuple[float, int]]) -> int:
+        """Return sustain state (CC64 value) at source time, defaulting to off."""
+        state = 0
+        t = float(t_units)
+        for p_time, p_val in pedal_points:
+            if float(p_time) > t:
+                break
+            state = int(p_val)
+        return int(state)
 
     def _build_repeat_play_segments(self, score, score_end_units: float) -> List[Tuple[float, float]]:
         """Build source-time segments in playback order using start/end repeat symbols.
