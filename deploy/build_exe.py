@@ -44,6 +44,7 @@ DEFAULT_ENGRAVING_FONTS = [
 ]
 DEFAULT_DYNAMIC_SYMBOL_FONT = PROJECT_ROOT / "fonts" / "LelandText.otf"
 DEFAULT_UI_FONT = PROJECT_ROOT / "fonts" / "FiraCode-SemiBold.ttf"
+DEFAULT_LICENSE_FILE = PROJECT_ROOT / "LICENSE"
 
 sys.path.insert(0, str(PROJECT_ROOT))
 from version import __version__ as _app_version  # noqa: E402
@@ -79,6 +80,12 @@ def parse_args() -> argparse.Namespace:
         "--app-version",
         default=DEFAULT_APP_VERSION,
         help=f"Application version string used in the installer (default: {DEFAULT_APP_VERSION}).",
+    )
+    parser.add_argument(
+        "--license-file",
+        type=Path,
+        default=DEFAULT_LICENSE_FILE,
+        help="Path to installer license text the user must accept (default: LICENSE).",
     )
     parser.add_argument(
         "--extra-args",
@@ -160,6 +167,7 @@ def generate_iss_script(
     engraving_font_paths: list[Path],
     dynamic_symbol_font_path: Path,
     ui_font_path: Path,
+    license_file_path: Path,
     ico_path: Path,
     installer_output_dir: Path,
     installer_name: str,
@@ -186,6 +194,7 @@ SolidCompression=yes
 WizardStyle=modern
 PrivilegesRequired=lowest
 PrivilegesRequiredOverridesAllowed=dialog
+LicenseFile={license_file_path}
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"
@@ -195,7 +204,7 @@ Name: "desktopicon"; Description: "{{cm:CreateDesktopIcon}}"; GroupDescription: 
 
 [Files]
 Source: "{app_dir}\\*"; DestDir: "{{app}}"; Flags: ignoreversion recursesubdirs createallsubdirs
-
+"""
     for engraving_font_path in engraving_font_paths:
         script += f"Source: \"{engraving_font_path}\"; DestDir: \"{{autofonts}}\"; FontInstall: \"Edwin\"; Flags: onlyifdoesntexist uninsneveruninstall\n"
     script += f"Source: \"{dynamic_symbol_font_path}\"; DestDir: \"{{autofonts}}\"; FontInstall: \"LelandText\"; Flags: onlyifdoesntexist uninsneveruninstall\n"
@@ -346,12 +355,19 @@ def main() -> None:
     iscc = ensure_inno_setup_available()
     ensure_pyinstaller_available()
     ensure_requirements_installed(PROJECT_ROOT)
-    engraving_font_path = DEFAULT_ENGRAVING_FONT.resolve()
-    if not engraving_font_path.exists():
-        raise SystemExit(f"Required engraving font not found: {engraving_font_path}")
+    engraving_font_paths = [p.resolve() for p in DEFAULT_ENGRAVING_FONTS]
+    for engraving_font_path in engraving_font_paths:
+        if not engraving_font_path.exists():
+            raise SystemExit(f"Required engraving font not found: {engraving_font_path}")
     dynamic_symbol_font_path = DEFAULT_DYNAMIC_SYMBOL_FONT.resolve()
     if not dynamic_symbol_font_path.exists():
         raise SystemExit(f"Required dynamic symbol font not found: {dynamic_symbol_font_path}")
+    ui_font_path = DEFAULT_UI_FONT.resolve()
+    if not ui_font_path.exists():
+        raise SystemExit(f"Required UI font not found: {ui_font_path}")
+    license_file_path = args.license_file.expanduser().resolve()
+    if not license_file_path.exists():
+        raise SystemExit(f"License file not found: {license_file_path}")
 
     try:
         # Step 1: Build app with PyInstaller (onedir — no runtime extraction).
@@ -377,8 +393,10 @@ def main() -> None:
             app_name=name,
             app_version=app_version,
             app_dir=onedir_folder,
-            engraving_font_path=engraving_font_path,
+            engraving_font_paths=engraving_font_paths,
             dynamic_symbol_font_path=dynamic_symbol_font_path,
+            ui_font_path=ui_font_path,
+            license_file_path=license_file_path,
             ico_path=ico_for_installer,
             installer_output_dir=installer_output_dir,
             installer_name=installer_name,

@@ -186,7 +186,7 @@ class TimeSignatureDrawerMixin:
                 du.add_text(x_left - 2.0, y, str(gi), size_pt=klav_size, color=color, id=0, tags=["ts_klavars_left"], anchor='w', family=klav_family)
 
         # Iterate BaseGrid segments and draw based on indicator_type
-        # Classical is always shown; Klavarskribo only when the time-signature tool is active.
+        # Classical is always shown; Klavarskribo too.
         show_classic = True
         show_klavars = (indicator_type in ('klavarskribo', 'classical & klavarskribo'))
         for bg in list(getattr(score, 'base_grid', []) or []):

@@ -25,6 +25,10 @@ class TextTool(BaseTool):
         self._cached_center: Optional[Tuple[float, float]] = None
         self._rotation_steps: int = 16  # snap rotation to N steps per full turn
         self._preview_timer: QtCore.QTimer | None = None
+        self._move_anchor_cursor_time: Optional[float] = None
+        self._move_anchor_cursor_x_mm: Optional[float] = None
+        self._move_anchor_text_time: Optional[float] = None
+        self._move_anchor_text_rpitch: Optional[int] = None
 
     def on_activate(self) -> None:
         super().on_activate()
@@ -314,6 +318,20 @@ class TextTool(BaseTool):
             return None
         return None
 
+    def _capture_move_anchor(self, x_px: float, y_px: float, x_mm: float) -> None:
+        if self._editor is None or self._active_text is None or self._active_mode != 'move':
+            return
+        self._move_anchor_cursor_time = float(self._editor.y_to_time(y_px))
+        self._move_anchor_cursor_x_mm = float(x_mm)
+        self._move_anchor_text_time = float(getattr(self._active_text, 'time', 0.0) or 0.0)
+        self._move_anchor_text_rpitch = int(getattr(self._active_text, 'x_rpitch', 0) or 0)
+
+    def _clear_move_anchor(self) -> None:
+        self._move_anchor_cursor_time = None
+        self._move_anchor_cursor_x_mm = None
+        self._move_anchor_text_time = None
+        self._move_anchor_text_rpitch = None
+
     # ---- Dialog ----
     def _coerce_font(self, value, default_font: Font | None) -> Font:
         if isinstance(value, Font):
@@ -364,6 +382,7 @@ class TextTool(BaseTool):
         super().on_left_press(x, y)
         if self._editor is None:
             return
+        self._clear_move_anchor()
         x_mm, y_mm = self._cursor_mm(x, y)
         hit, mode, geom = self._hit_test(x_mm, y_mm)
         self._active_text = hit
@@ -397,6 +416,8 @@ class TextTool(BaseTool):
             else:
                 self._editor.draw_frame()
 
+        self._capture_move_anchor(x, y, x_mm)
+
         super().on_left_drag_start(x, y)
 
     def on_left_drag(self, x: float, y: float, dx: float, dy: float) -> None:
@@ -415,9 +436,26 @@ class TextTool(BaseTool):
                 ang = round(ang / step) * step
             self._active_text.rotation = float(ang)
         elif self._active_mode == 'move':
+            if (
+                self._move_anchor_cursor_time is None
+                or self._move_anchor_cursor_x_mm is None
+                or self._move_anchor_text_time is None
+                or self._move_anchor_text_rpitch is None
+            ):
+                self._capture_move_anchor(x, y, x_mm)
+
             t_raw = float(self._editor.y_to_time(y))
-            t_snap = float(self._editor.snap_time(t_raw))
-            rp = self.x_mm_to_relative_x(x_mm)
+            anchor_time = float(self._move_anchor_cursor_time or t_raw)
+            base_text_time = float(self._move_anchor_text_time or 0.0)
+            t_snap = max(0.0, float(self._editor.snap_time(base_text_time + (t_raw - anchor_time))))
+
+            semitone_mm = float(getattr(self._editor, 'semitone_dist', 0.0) or 0.0)
+            if semitone_mm > 1e-6:
+                rp_delta = int(round((x_mm - float(self._move_anchor_cursor_x_mm or x_mm)) / semitone_mm))
+            else:
+                rp_delta = 0
+            base_rp = int(self._move_anchor_text_rpitch or 0)
+            rp = max(-68, min(73, base_rp + rp_delta))
             self._active_text.time = float(t_snap)
             self._active_text.x_rpitch = int(rp)
         if hasattr(self._editor, 'force_redraw_from_model'):
@@ -434,6 +472,7 @@ class TextTool(BaseTool):
             self._editor._snapshot_if_changed(coalesce=True, label=label)
         self._active_mode = None
         self._cached_center = None
+        self._clear_move_anchor()
 
     def on_left_unpress(self, x: float, y: float) -> None:
         super().on_left_unpress(x, y)
@@ -445,6 +484,7 @@ class TextTool(BaseTool):
         self._active_text = None
         self._active_mode = None
         self._cached_center = None
+        self._clear_move_anchor()
 
     def on_left_click(self, x: float, y: float) -> None:
         super().on_left_click(x, y)
