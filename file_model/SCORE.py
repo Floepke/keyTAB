@@ -220,13 +220,8 @@ class SCORE:
 		return obj
 
 	def new_pedal(self, **kwargs) -> Pedal:
-		base = {'time': 0.0, 'rpitch': 0, 'symbol': 'down'}
+		base = {'time': 0.0, 'rpitch': 0, 'symbol': 'down_keytab'}
 		base.update(kwargs)
-		legacy_type = str(base.pop('type', '') or '').strip().lower()
-		if legacy_type in ('v', 'down') and 'symbol' not in kwargs:
-			base['symbol'] = 'down'
-		elif legacy_type in ('^', 'up') and 'symbol' not in kwargs:
-			base['symbol'] = 'up'
 		obj = Pedal(**base, _id=self._gen_id())
 		self.events.pedal.append(obj)
 		return obj

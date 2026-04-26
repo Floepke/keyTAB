@@ -15,20 +15,20 @@ LEFT_PANEL_PADDING_PX: int = 6
 # - 'tooltip': hover text description (optional)
 TOOL_ITEMS: list[dict] = [
     # basic notation elements
-    { 'name': 'note',           'displayed_name': 'Note',           'icon': 'note',           'tooltip': 'Note tool. Enter and edit notes. To edit duration, click and drag on a colored midi-rectangle and move down/up. To edit pitch+time, click and drag on the notehead. To delete, right click on a note.' },
-    { 'name': 'grace_note',     'displayed_name': 'Grace Note',     'icon': 'grace_note',     'tooltip': 'Grace Note tool. Enter small ornamental notes without normal rhythmic duration. Use this for trills, mordents, and similar decorations. Click in empty space to add. Drag on existing grace note to edit time+pitch. Right click to delete.' },
-    { 'name': 'count_line',     'displayed_name': 'Count Line',     'icon': 'count_line',     'tooltip': 'Count Line tool. Draw guide lines to highlight rhythmic grid subdivisions. Left click on empty space to add. Drag on a handle to edit. Right click on a handle to delete.' },
-    { 'name': 'dynamic',        'displayed_name': 'Dynamics',       'icon': 'dynamics',       'tooltip': 'Dynamics tool. Insert crescendo (<) and decrescendo (>) hairpins, or choose dynamic mode to place standalone dynamic symbols.' },
-    { 'name': 'text',           'displayed_name': 'Text',           'icon': 'text',           'tooltip': 'Text tool. Place text annotations.' },
-    { 'name': 'beam',           'displayed_name': 'Note Grouping',  'icon': 'beam',           'tooltip': 'Note Grouping tool. Overwrite the default time signature beam grouping by placing beam markers. Click/drag to the left/right of the clef to add/edit for left/right hand. Right click left/right of the clef in a marker time range to delete. ' },
+    { 'name': 'note',           'displayed_name': 'Note',           'icon': 'note',           'tooltip': 'Left Click/Drag: edit an existing note (duration on body, pitch+time on notehead). Left Click/Drag in empty space: create a note, then drag to set it. Right Click: delete note. Double Click: set/reset custom notehead.' },
+    { 'name': 'grace_note',     'displayed_name': 'Grace Note',     'icon': 'grace_note',     'tooltip': 'Left Click/Drag: move an existing grace note (pitch+time). Left Click/Drag in empty space: create a grace note, then drag to adjust. Right Click: delete grace note.' },
+    { 'name': 'count_line',     'displayed_name': 'Count Line',     'icon': 'count_line',     'tooltip': 'Left Click/Drag: edit an existing count line handle (start/end and time). Left Click/Drag in empty space: create a count line, then drag its end handle. Right Click: delete count line by handle.' },
+    { 'name': 'dynamic',        'displayed_name': 'Dynamics',       'icon': 'dynamics',       'tooltip': 'Left Click/Drag: edit existing dynamic item (hairpin handle or dynamic symbol). Left Click/Drag in empty space: create new item from current mode (hairpin or symbol), then drag to position/length. Right Click: delete symbol or hairpin.' },
+    { 'name': 'text',           'displayed_name': 'Text',           'icon': 'text',           'tooltip': 'Left Click/Drag: move existing text, or drag the red handle to rotate. Left Click/Drag in empty space: create new text + edit afterwards in the dialog. Right Click: delete text item.' },
+    { 'name': 'beam',           'displayed_name': 'Note Grouping',  'icon': 'beam',           'tooltip': 'Left Click/Drag: edit an existing beam marker duration. Left Click/Drag in empty space: create a beam marker, then drag to set duration. Right Click: delete marker under cursor (or create one if none exists there).' },
     # layout elements
-    { 'name': 'line_break',     'displayed_name': 'Line/Page-Break Marker','icon': 'line_break',     'tooltip': 'Line/Page Break Marker tool. Insert line/page breaks. Click to insert a marker. Right-click to remove a marker. Click an existing marker to switch between a Line (L) and Page (P) marker.' },
-    { 'name': 'time_signature', 'displayed_name': 'Time Signature', 'icon': 'time_signature', 'tooltip': 'Time Signature tool. Configure meter and base grid subdivision.' },
-    { 'name': 'grid_band',      'displayed_name': 'Grid Band',      'icon': 'grid_band',      'tooltip': 'Grid Band tool. Add and edit grid band markers. Click below pitch 39 for left hand, above 45 for right hand, or between 39-45 for both. Drag a marker to set its length; snapping keeps ends on the current snap size. Drag back to its start for zero duration (renders a red line). Right click deletes markers only.' },
-    { 'name': 'tempo',          'displayed_name': 'Tempo',          'icon': 'metronome',      'tooltip': 'Tempo tool. Add tempo regions in units per minute over a duration.'} ,
-    { 'name': 'slur',           'displayed_name': 'Slur',           'icon': 'slur',           'tooltip': 'Slur tool. Place phrasing slurs.' },
-    { 'name': 'barline',        'displayed_name': 'Barline Symbols','icon': 'repeats',        'tooltip': 'Barline Symbols tool. Insert start repeat, end repeat and double barline symbols.' },
-    { 'name': 'pedal',          'displayed_name': 'Pedal',          'icon': 'pedal',          'tooltip': 'Pedal tool. Add pedal markings.' },
+    { 'name': 'line_break',     'displayed_name': 'Line/Page-Break Marker','icon': 'line_break',     'tooltip': 'Left Click/Drag: edit existing line/page-break marker (toggle L/P on click, move on drag). Left Click/Drag in empty space: create a new line-break marker at cursor time. Right Click: delete marker.' },
+    { 'name': 'time_signature', 'displayed_name': 'Time Signature', 'icon': 'time_signature', 'tooltip': 'Left Click/Drag: edit existing meter/grid context (on barline: open time-signature dialog; off barline: add grid line). Left Click/Drag in empty space: create a new subdivision in current measure. Right Click: remove subdivision, or remove a time-signature change at a barline.' },
+    { 'name': 'grid_band',      'displayed_name': 'Grid Band',      'icon': 'grid_band',      'tooltip': 'Left Click/Drag: edit an existing grid-band marker duration. Left Click/Drag in empty space: create a grid-band marker, then drag to set duration. Right Click: insert/remove a stop marker (zero duration) at the clicked band start.' },
+    { 'name': 'tempo',          'displayed_name': 'Tempo',          'icon': 'metronome',      'tooltip': 'Left Click/Drag: edit existing tempo (click to change BPM, drag to resize duration). Left Click/Drag in empty space: create a tempo marker + drag to set duration. Right Click: delete tempo (first tempo cannot be deleted).'} ,
+    { 'name': 'slur',           'displayed_name': 'Slur',           'icon': 'slur',           'tooltip': 'Left Click/Drag: edit existing slur by dragging a control handle. Left Click/Drag in empty space: create a new slur + shape it by dragging. Right Click: delete slur at handle.' },
+    { 'name': 'barline',        'displayed_name': 'Barline Symbols','icon': 'repeats',        'tooltip': 'Left Click/Drag: edit existing barline symbol placement by inserting selected symbol at clicked position. Left Click/Drag in empty space: create selected barline symbol (start repeat, end repeat, or double barline). Right Click: delete any barline symbol at nearest event position.' },
+    { 'name': 'pedal',          'displayed_name': 'Pedal',          'icon': 'pedal',          'tooltip': 'Left Click/Drag: move existing pedal symbol (paired up/down moves together when linked). Left Click/Drag in empty space: create selected pedal symbol + adjust afterwards. Right Click: delete pedal symbol. Double Click: toggle symbol visibility in engraving.' },
 ]
 
 
@@ -88,7 +88,7 @@ class ToolSelectorWidget(QtWidgets.QListWidget):
             'count_line':     self.tr("Count Line"),
             'dynamic':        self.tr("Dynamics"),
             'beam':           self.tr("Note Grouping"),
-            'line_break':     self.tr("Line/Page Break Marker"),
+            'line_break':     self.tr("Line/Page Break"),
             'time_signature': self.tr("Time Signature"),
             'grid_band':      self.tr("Grid Band"),
             'tempo':          self.tr("Tempo"),
@@ -98,19 +98,19 @@ class ToolSelectorWidget(QtWidgets.QListWidget):
             'pedal':          self.tr("Pedal"),
         }
         _tooltips = {
-            'note':           self.tr("Note tool. Enter and edit notes. To edit duration, click and drag on a colored midi-rectangle and move down/up. To edit pitch+time, click and drag on the notehead. To delete, right click on a note."),
-            'grace_note':     self.tr("Grace Note tool. Enter small ornamental notes without normal rhythmic duration. Use this for trills, mordents, and similar decorations. Click in empty space to add. Drag on existing grace note to edit time+pitch. Right click to delete."),
-            'count_line':     self.tr("Count Line tool. Draw guide lines to highlight rhythmic grid subdivisions. Left click on empty space to add. Drag on a handle to edit. Right click on a handle to delete."),
-            'dynamic':        self.tr("Dynamics tool. Insert crescendo (<) and decrescendo (>) hairpins, or choose dynamic mode to place standalone dynamic symbols."),
-            'beam':           self.tr("Note Grouping tool. Overwrite the default time signature beam grouping by placing beam markers. Click/drag to the left/right of the clef to add/edit for left/right hand. Right click left/right of the clef in a marker time range to delete."),
-            'line_break':     self.tr("Line/Page Break marker tool. Insert line/page breaks. Click to insert a marker. Right-click to remove a marker. Click an existing marker to switch between a Line (L) and Page (P) marker."),
-            'time_signature': self.tr("Time Signature tool. Configure meter and base grid subdivision."),
-            'grid_band':      self.tr("Grid Band tool. Add and edit grid band markers. Click below pitch 39 for left hand, above 45 for right hand, or between 39-45 for both. Drag a marker to set its length; snapping keeps ends on the current snap size. Drag back to its start for zero duration (renders a red line). Right click deletes markers only."),
-            'tempo':          self.tr("Tempo tool. Add tempo regions in units per minute over a duration."),
-            'slur':           self.tr("Slur tool. Place phrasing slurs."),
-            'text':           self.tr("Text tool. Place text annotations."),
-            'barline':        self.tr("Barline Symbols tool. Insert start repeat, end repeat and double barline symbols."),
-            'pedal':          self.tr("Pedal tool. Add pedal markings."),
+            'note':           self.tr("Left Click/Drag: edit an existing note (duration on body, pitch+time on notehead). Left Click/Drag in empty space: create a note, then drag to set it. Right Click: delete note. Double Click: set/reset custom notehead."),
+            'grace_note':     self.tr("Left Click/Drag: move an existing grace note (pitch+time). Left Click/Drag in empty space: create a grace note, then drag to adjust. Right Click: delete grace note."),
+            'count_line':     self.tr("Left Click/Drag: edit an existing count line handle (start/end and time). Left Click/Drag in empty space: create a count line, then drag its end handle. Right Click: delete count line by handle."),
+            'dynamic':        self.tr("Left Click/Drag: edit existing dynamic item (hairpin handle or dynamic symbol). Left Click/Drag in empty space: create new item from current mode (hairpin or symbol), then drag to position/length. Right Click: delete symbol or hairpin."),
+            'beam':           self.tr("Left Click/Drag: edit an existing beam marker duration. Left Click/Drag in empty space: create a beam marker, then drag to set duration. Right Click: delete marker under cursor (or create one if none exists there)."),
+            'line_break':     self.tr("Left Click/Drag: edit existing line/page-break marker (toggle L/P on click, move on drag). Left Click/Drag in empty space: create a new line-break marker at cursor time. Right Click: delete marker."),
+            'time_signature': self.tr("Left Click/Drag: edit existing meter/grid context (on barline: open time-signature dialog; off barline: add grid line). Left Click/Drag in empty space: create a new subdivision in current measure. Right Click: remove subdivision, or remove a time-signature change at a barline."),
+            'grid_band':      self.tr("Left Click/Drag: edit an existing grid-band marker duration. Left Click/Drag in empty space: create a grid-band marker, then drag to set duration. Right Click: insert/remove a stop marker (zero duration) at the clicked band start."),
+            'tempo':          self.tr("Left Click/Drag: edit existing tempo (click to change BPM, drag to resize duration). Left Click/Drag in empty space: create a tempo marker + drag to set duration. Right Click: delete tempo (first tempo cannot be deleted)."),
+            'slur':           self.tr("Left Click/Drag: edit existing slur by dragging a control handle. Left Click/Drag in empty space: create a new slur + shape it by dragging. Right Click: delete slur at handle."),
+            'text':           self.tr("Left Click/Drag: move existing text, or drag the red handle to rotate. Left Click/Drag in empty space: create new text + edit afterwards in the dialog. Right Click: delete text item."),
+            'barline':        self.tr("Left Click/Drag: edit existing barline symbol placement by inserting selected symbol at clicked position. Left Click/Drag in empty space: create selected barline symbol (start repeat, end repeat, or double barline). Right Click: delete any barline symbol at nearest event position."),
+            'pedal':          self.tr("Left Click/Drag: move existing pedal symbol (paired up/down moves together when linked). Left Click/Drag in empty space: create selected pedal symbol + adjust afterwards. Right Click: delete pedal symbol. Double Click: toggle symbol visibility in engraving."),
         }
         for conf in TOOL_ITEMS:
             name = str(conf.get('name', ''))

@@ -118,6 +118,8 @@ ENGRAVER_LAYERING = [
     'copyright',
     'text_bg',
     'text',
+    'tempo_bg',
+    'tempo_text',
     'slur',
     'crescendo',
     'crescendo_handle',
@@ -132,8 +134,6 @@ ENGRAVER_LAYERING = [
     'ts_classic',
     'pedal_symbol_bg',
     'pedal_symbol',
-    'tempo_bg',
-    'tempo_text',
 ]
 
 # Keyboard constants

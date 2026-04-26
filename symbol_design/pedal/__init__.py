@@ -5,12 +5,14 @@ from typing import Callable, Literal, Any
 from file_model.events.pedal import Pedal
 from ui.widgets.draw_util import DrawUtil
 
-from .down import draw_down
+from .down_keytab import draw_down_keytab
+from .down_klavarskribo import draw_down_klavarskribo
 from .heel import draw_heel
 from .toe import draw_toe
-from .up import draw_up
+from .up_keytab import draw_up_keytab
+from .up_klavarskribo import draw_up_klavarskribo
 
-PedalSymbol = Literal["down", "up", "toe", "heel"]
+PedalSymbol = Literal["down_keytab", "up_keytab", "down_klavarskribo", "up_klavarskribo", "toe", "heel"]
 
 
 def draw_pedal_symbol(
@@ -30,12 +32,13 @@ def draw_pedal_symbol(
     """Dispatch to the pedal-symbol template selected by pedal.symbol."""
     if isinstance(pedal, dict):
         raw_symbol = pedal.get("symbol", None)
-        if raw_symbol is None:
-            legacy_type = str(pedal.get("type", "") or "").strip().lower()
-            raw_symbol = "up" if legacy_type in ("^", "up") else "down"
+        rpitch = int(pedal.get("rpitch", 0) or 0)
+        p_time = float(pedal.get("time", 0.0) or 0.0)
     else:
-        raw_symbol = getattr(pedal, "symbol", "down")
-    symbol = str(raw_symbol or "down").strip().lower()
+        raw_symbol = getattr(pedal, "symbol", None)
+        rpitch = int(getattr(pedal, "rpitch", 0) or 0)
+        p_time = float(getattr(pedal, "time", 0.0) or 0.0)
+    symbol = str(raw_symbol or "").strip().lower()
 
     kwargs = {
         "time_to_y_mm": time_to_y_mm,
@@ -49,19 +52,28 @@ def draw_pedal_symbol(
         "tags": tags,
     }
 
-    if symbol == "up":
-        return draw_up(du, pedal, **kwargs)
+    if symbol == "up_keytab":
+        return draw_up_keytab(du, pedal, **kwargs)
+    if symbol == "down_keytab":
+        return draw_down_keytab(du, pedal, **kwargs)
+    if symbol == "up_klavarskribo":
+        return draw_up_klavarskribo(du, pedal, **kwargs)
+    if symbol == "down_klavarskribo":
+        return draw_down_klavarskribo(du, pedal, **kwargs)
     if symbol == "toe":
         return draw_toe(du, pedal, **kwargs)
     if symbol == "heel":
         return draw_heel(du, pedal, **kwargs)
-    return draw_down(du, pedal, **kwargs)
+    # Unknown/legacy symbols are intentionally ignored.
+    return (float(rpitch_to_x_mm(rpitch)), float(time_to_y_mm(p_time)))
 
 
 __all__ = [
     "PedalSymbol",
-    "draw_down",
-    "draw_up",
+    "draw_down_keytab",
+    "draw_up_keytab",
+    "draw_down_klavarskribo",
+    "draw_up_klavarskribo",
     "draw_toe",
     "draw_heel",
     "draw_pedal_symbol",

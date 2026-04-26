@@ -343,8 +343,17 @@ class NoteDrawerMixin:
         dot_d = w * 0.8
         dot_pitch = int(getattr(n, 'pitch', 0) or 0)
         layout = self.current_score().layout
+        # Build a set of double-barline tick positions to avoid overlap.
+        _double_bar_ticks: set[float] = {
+            float(getattr(ev, 'time', 0.0) or 0.0)
+            for ev in (getattr(self.current_score().events, 'double_bar', []) or [])
+        }
         for t in sorted(set(dot_times)):
             y_center = float(self.time_to_mm(t)) + w
+            # Shift dot down one semitone when it lands on a double barline
+            # so the two vertical lines don't overlap the dot.
+            if any(self._time_op.eq(float(t), dbt) for dbt in _double_bar_ticks):
+                y_center += float(self.semitone_dist or 0.5)
 
             # If another note starts at this exact time on adjacent pitch,
             # push continuation dot forward two semitone distances to avoid overlap.
@@ -420,11 +429,8 @@ class NoteDrawerMixin:
         rule = str(getattr(layout, 'black_note_rule', 'below_stem') or 'below_stem')
         if rule == 'above_stem':
             return True
-        try:
-            cache = cast("Editor", self)._draw_cache or {}
-            notes_view = cache.get('notes_view') or (self._cached_notes_view or [])
-        except Exception:
-            notes_view = self._cached_notes_view or []
+        cache = cast("Editor", self)._draw_cache or {}
+        notes_view = cache.get('notes_view') or (self._cached_notes_view or [])
         t0 = float(getattr(n, 'time', 0.0) or 0.0)
         p0 = int(getattr(n, 'pitch', 0) or 0)
         if rule in ('above_stem_if_collision', 'only_above_stem_if_collision'):

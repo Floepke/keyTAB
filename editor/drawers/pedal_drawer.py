@@ -70,7 +70,20 @@ class PedalDrawerMixin:
             ev_id = int(getattr(ev, '_id', 0) or 0)
             rp = int(getattr(ev, 'rpitch', 0) or 0)
             x_mm = rpitch_to_x_mm(rp)
-            symbol = str(getattr(ev, 'symbol', 'down') or 'down').strip().lower()
+            symbol = str(getattr(ev, 'symbol', '') or '').strip().lower()
+            is_invisible = bool(getattr(ev, 'invisible', False))
+
+            pedal_color = notation_color
+            if is_invisible:
+                # Hidden pedal symbols remain editable in editor, shown as muted gray.
+                nr, ng, nb, _na = notation_color
+                pr, pg, pb, _pa = paper_color
+                pedal_color = (
+                    (float(nr) * 0.35) + (float(pr) * 0.65),
+                    (float(ng) * 0.35) + (float(pg) * 0.65),
+                    (float(nb) * 0.35) + (float(pb) * 0.65),
+                    1.0,
+                )
 
             try:
                 draw_pedal_symbol(
@@ -78,7 +91,7 @@ class PedalDrawerMixin:
                     ev,
                     time_to_y_mm=time_to_y_mm,
                     rpitch_to_x_mm=rpitch_to_x_mm,
-                    color=notation_color,
+                    color=pedal_color,
                     background_color=paper_color,
                     width_mm=pedal_thickness_mm,
                     semitone_space_mm=semitone_space_mm,
@@ -100,12 +113,12 @@ class PedalDrawerMixin:
             except (TypeError, ValueError, AttributeError):
                 background_pad = 0.0
             background_pad = max(0.0, float(background_pad))
-            if symbol == 'down':
+            if symbol in ('down_keytab', 'down_klavarskribo'):
                 x1 = float(x_mm - (span * 2.0) - background_pad)
                 y1r = float(y_mm)
                 x2 = float(x_mm + (span * 2.0) + background_pad)
                 y2r = float(y_mm + (span * 2.0) + background_pad)
-            elif symbol == 'up':
+            elif symbol in ('up_keytab', 'up_klavarskribo'):
                 x1 = float(x_mm - (span * 2.0) - background_pad)
                 y1r = float(y_mm - (span * 2.0) - background_pad)
                 x2 = float(x_mm + (span * 2.0) + background_pad)
@@ -115,11 +128,13 @@ class PedalDrawerMixin:
                 y1r = float(y_mm)
                 x2 = float(x_mm + (span * 0.25))
                 y2r = float(y_mm + span)
-            else:  # toe and fallback
+            elif symbol == 'toe':
                 x1 = float(x_mm)
                 y1r = float(y_mm - (span * 0.25))
                 x2 = float(x_mm + span)
                 y2r = float(y_mm + (span * 0.25))
+            else:
+                continue
 
             if hasattr(self, 'register_hit_rect'):
                 self.register_hit_rect('pedal', ev_id, x1, y1r, x2, y2r, symbol=symbol)

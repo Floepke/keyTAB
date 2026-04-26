@@ -12,7 +12,7 @@ def _read_pedal_field(pedal: Pedal | dict, name: str, default):
     return getattr(pedal, name, default)
 
 
-def draw_down(
+def draw_down_keytab(
     du: DrawUtil,
     pedal: Pedal | dict,
     *,
@@ -26,7 +26,7 @@ def draw_down(
     id: int | None = None,
     tags: list[str] | None = None,
 ) -> tuple[float, float]:
-    """Klavarskribo traditional pedal down symbol.
+    """keyTAB pedal down symbol.
 
     Draws two 45-degree strokes downward from the anchor point:
     one to the left and one to the right, each one semitone in X and Y.

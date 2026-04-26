@@ -775,13 +775,12 @@ class Player:
         self._playhead_timeline: Optional[List[Tuple[float, float, float, float]]] = None
         self._playhead_sync_delay_ms: int = 0
         self._off_epsilon_sec: float = 0.003  # ~3 ms safety gap before offs
+        self._repedal_gap_sec: float = 0.012  # ~12 ms gap for quick up->down re-pedal
         self._min_duration_units: float = 4.0
         self._grace_duration_units: float = 32.0  # Default grace note length (32nd note)
-        try:
-            if self._backend is not None:
-                self._backend.program_select()
-        except Exception:
-            pass
+
+        if self._backend is not None:
+            self._backend.program_select()
 
         # Load and apply reverb settings for FluidSynth backend
         if self._backend_kind == "fluidsynth" and isinstance(self._backend, _FluidsynthBackend):
@@ -1030,11 +1029,22 @@ class Player:
                     state_at_start = self._sustain_state_at(seg_start, pedal_points)
                     events.append(('cc', seg_sec_start, 64, int(state_at_start)))
 
+                prev_src_time: Optional[float] = None
+                prev_src_val: Optional[int] = None
                 for p_time, p_val in pedal_points:
                     if p_time < seg_start or p_time >= seg_end:
                         continue
                     cc_t = seg_sec_start + self._seconds_between(seg_start, float(p_time), segs)
+                    if (
+                        prev_src_time is not None
+                        and abs(float(p_time) - float(prev_src_time)) <= 1e-9
+                        and int(prev_src_val or 0) == 0
+                        and int(p_val) == 127
+                    ):
+                        cc_t = float(cc_t) + float(self._repedal_gap_sec)
                     events.append(('cc', float(cc_t), 64, int(p_val)))
+                    prev_src_time = float(p_time)
+                    prev_src_val = int(p_val)
 
                 prev_seg_end = seg_end
 
@@ -1071,11 +1081,22 @@ class Player:
         if pedal_points:
             state_at_start = self._sustain_state_at(su, pedal_points)
             events.append(('cc', 0.0, 64, int(state_at_start)))
+            prev_src_time: Optional[float] = None
+            prev_src_val: Optional[int] = None
             for p_time, p_val in pedal_points:
                 if p_time < su:
                     continue
                 cc_t = self._seconds_between(su, float(p_time), segs)
+                if (
+                    prev_src_time is not None
+                    and abs(float(p_time) - float(prev_src_time)) <= 1e-9
+                    and int(prev_src_val or 0) == 0
+                    and int(p_val) == 127
+                ):
+                    cc_t = float(cc_t) + float(self._repedal_gap_sec)
                 events.append(('cc', float(cc_t), 64, int(p_val)))
+                prev_src_time = float(p_time)
+                prev_src_val = int(p_val)
         for n, dur_units in self._iter_playable_events(score):
             start = float(getattr(n, 'time', 0.0) or 0.0)
             end = float(start + dur_units)
@@ -1135,18 +1156,28 @@ class Player:
         """Collect sustain pedal CC64 points from pedal symbols.
 
         Returns sorted list of (time_units, cc_value) where cc_value is 127 (down)
-        or 0 (up). Only up/down symbols are considered.
+        or 0 (up). Only *_keytab and *_klavarskribo up/down symbols are considered.
+
+        Two consecutive down symbols are interpreted as a quick re-pedal:
+        release and immediately press again at the second symbol time.
         """
         out: List[Tuple[float, int]] = []
         events_obj = getattr(score, 'events', None)
-        for ev in list(getattr(events_obj, 'pedal', []) or []):
+        pedal_events = list(getattr(events_obj, 'pedal', []) or [])
+        pedal_events = sorted(pedal_events, key=lambda ev: float(getattr(ev, 'time', 0.0) or 0.0))
+        last_symbol: Optional[str] = None
+        for ev in pedal_events:
             p_time = float(getattr(ev, 'time', 0.0) or 0.0)
             symbol = str(getattr(ev, 'symbol', '') or '').strip().lower()
             
-            if symbol == 'down':
+            if symbol in ('down_keytab', 'down_klavarskribo'):
+                if last_symbol == 'down':
+                    out.append((p_time, 0))
                 out.append((p_time, 127))
-            elif symbol == 'up':
+                last_symbol = 'down'
+            elif symbol in ('up_keytab', 'up_klavarskribo'):
                 out.append((p_time, 0))
+                last_symbol = 'up'
 
         out.sort(key=lambda m: float(m[0]))
         return out

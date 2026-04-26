@@ -284,6 +284,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
             'tempo': tempo_val,
             'id': int(ev.get('_id', 0) or 0),
             'idx': int(idx),
+            'invisible': bool(ev.get('invisible', False)),
         })
     if norm_tempos:
         norm_tempos = sorted(norm_tempos, key=lambda m: float(m.get('time', 0.0) or 0.0))
@@ -2321,7 +2322,24 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
 
                 for pedal_ev in pedals:
                     p_t = float(_read_pedal_field(pedal_ev, 'time', 0.0) or 0.0)
-                    if op_time.lt(p_t, float(line['time_start'])) or op_time.gt(p_t, float(line['time_end'])):
+                    p_symbol = str(_read_pedal_field(pedal_ev, 'symbol', '') or '')
+                    _is_up_symbol = p_symbol in ('up_keytab', 'up_klavarskribo')
+                    # up symbols at line_end belong to the ending line only (drawn upward);
+                    # skip them at line_start so they don't repeat on the new line.
+                    # All other symbols at line_end belong to the next line.
+                    if _is_up_symbol:
+                        if op_time.le(p_t, float(line['time_start'])) or op_time.gt(p_t, float(line['time_end'])):
+                            continue
+                    else:
+                        if op_time.lt(p_t, float(line['time_start'])) or op_time.ge(p_t, float(line['time_end'])):
+                            continue
+
+                    invisible_raw = _read_pedal_field(pedal_ev, 'invisible', False)
+                    if isinstance(invisible_raw, str):
+                        is_invisible = str(invisible_raw).strip().lower() in ('1', 'true', 'yes', 'on')
+                    else:
+                        is_invisible = bool(invisible_raw)
+                    if is_invisible:
                         continue
                     
                     try:
@@ -2440,7 +2458,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                 line_end = float(line.get('time_end', 0.0) or 0.0)
                 for ds in norm_dynamic_symbols:
                     t_time = float(ds.get('time', 0.0) or 0.0)
-                    if op_time.lt(t_time, float(line_start)) or op_time.gt(t_time, float(line_end)):
+                    if op_time.lt(t_time, float(line_start)) or op_time.ge(t_time, float(line_end)):
                         continue
                     line_dynamic_symbols.append(ds)
 
@@ -2878,7 +2896,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                 except Exception:
                     tempo_font_family = 'Edwin'
 
-                tempo_font_size_pt = 24.0 * scale
+                tempo_font_size_pt = 32.0 * scale
                 tempo_rect_w = max(6.0, 12.0 * scale)
 
                 def _tempo_left_x(tp_time: float) -> float:
@@ -2896,6 +2914,8 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                         t1 = float(tp.get('end', t0) or t0)
                         tempo_val = int(tp.get('tempo', 60) or 60)
                     except Exception:
+                        continue
+                    if tp.get('invisible', False):
                         continue
                     if op_time.le(t1, t0):
                         continue
@@ -2917,11 +2937,12 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                         y0_tempo,
                         tempo_x_left + tempo_rect_w,
                         y1_tempo,
-                        stroke_color=None,
-                        fill_color=(0.5, 0.5, 0.5, 1),
+                        stroke_color=notation_color,
+                        fill_color=None,
+                        stroke_width_mm=1.0 * scale,
                         id=int(tp.get('id', 0) or 0),
                         tags=['tempo_bg'],
-                        dash_pattern=None,
+                        dash_pattern=[1*scale,2*scale],
                     )
 
                     y_center_tempo = (y0_tempo + y1_tempo) * 0.5
@@ -2929,12 +2950,12 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                     du.add_text(
                         x_center_tempo,
                         y_center_tempo,
-                        str(tempo_val),
+                        str(tempo_val) + '.',
                         family=tempo_font_family,
                         size_pt=tempo_font_size_pt,
                         italic=False,
                         bold=True,
-                        color=(1, 1, 1, 1),
+                        color=notation_color,
                         anchor='center',
                         id=int(tp.get('id', 0) or 0),
                         tags=['tempo_text'],
@@ -3592,6 +3613,11 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                         dot_times.append(bt)
                 if continues_from_prev_line:
                     dot_times.append(float(line_start))
+                # Problem solved: explicitly draw a dot at the stave bottom for any
+                # note that continues to the next line, mirroring the continues_from_prev_line
+                # behaviour on the previous line and making line crossings always visible.
+                if continues_to_next_line:
+                    dot_times.append(float(line_end))
                 if dot_times and bool(layout.get('note_continuation_dot_visible', True)):
                     dot_d = float(layout.get('note_continuation_dot_size_mm', 0.0) or 0.0)
                     if dot_d > 0.0:
@@ -3599,8 +3625,16 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                     else:
                         dot_d = w * 0.8
                     dot_pitch = int(item.get('pitch', 0) or 0)
+                    # Pre-build a set of double-barline tick positions for fast lookup.
+                    _double_bar_ticks: set[float] = {
+                        float(ev.get('time', 0.0) or 0.0) for ev in norm_double_bars
+                    }
                     for t in sorted(set(dot_times)):
                         y_center = _time_to_y(float(t)) + w
+                        # Shift dot down one semitone when it lands on a double barline
+                        # so the two vertical lines don't overlap the dot.
+                        if any(op_time.eq(float(t), dbt) for dbt in _double_bar_ticks):
+                            y_center += float(semitone_mm)
 
                         # Keep continuation dots legible: if another note starts at
                         # this exact time on adjacent pitch, move the dot forward.

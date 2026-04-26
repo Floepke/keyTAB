@@ -13,4 +13,5 @@ class Tempo:
     time: float = 0.0        # start time in ticks
     duration: float = 256.0  # duration in ticks
     tempo: int = 120         # units per minute
+    invisible: bool = False
     _id: int = 0

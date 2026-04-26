@@ -12,7 +12,7 @@ def _read_pedal_field(pedal: Pedal | dict, name: str, default):
     return getattr(pedal, name, default)
 
 
-def draw_up(
+def draw_up_klavarskribo(
     du: DrawUtil,
     pedal: Pedal | dict,
     *,

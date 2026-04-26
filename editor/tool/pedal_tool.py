@@ -6,15 +6,17 @@ from editor.tool.base_tool import BaseTool
 class PedalTool(BaseTool):
     TOOL_NAME = 'pedal'
 
-    _SYMBOL_DOWN = 'down'
-    _SYMBOL_UP = 'up'
+    _SYMBOL_DOWN_KEYTAB = 'down_keytab'
+    _SYMBOL_UP_KEYTAB = 'up_keytab'
+    _SYMBOL_DOWN_KLAVARSKRIBO = 'down_klavarskribo'
+    _SYMBOL_UP_KLAVARSKRIBO = 'up_klavarskribo'
     _SYMBOL_TOE = 'toe'
     _SYMBOL_HEEL = 'heel'
 
 
     def __init__(self) -> None:
         super().__init__()
-        self._symbol: str = self._SYMBOL_DOWN
+        self._symbol: str = self._SYMBOL_DOWN_KEYTAB
         self._active_pedal = None
         self._active_bound_partner = None
 
@@ -28,10 +30,14 @@ class PedalTool(BaseTool):
 
     @staticmethod
     def _opposite_symbol(symbol: str) -> str:
-        if symbol == 'down':
-            return 'up'
-        if symbol == 'up':
-            return 'down'
+        if symbol == 'down_keytab':
+            return 'up_keytab'
+        if symbol == 'up_keytab':
+            return 'down_keytab'
+        if symbol == 'down_klavarskribo':
+            return 'up_klavarskribo'
+        if symbol == 'up_klavarskribo':
+            return 'down_klavarskribo'
         return ''
 
     def _find_matching_opposite(self, score, active_ev, rpitch: int, time_val: float):
@@ -58,18 +64,32 @@ class PedalTool(BaseTool):
     def toolbar_spec(self) -> list[dict]:
         return [
             {
-                'name': self._SYMBOL_UP,
+                'name': self._SYMBOL_UP_KEYTAB,
                 'icon': 'up',
-                'text': 'U',
-                'tooltip': 'Insert pedal up symbol',
-                'active': self._symbol == self._SYMBOL_UP,
+                'text': 'U-K',
+                'tooltip': 'Insert pedal up symbol (keyTAB)',
+                'active': self._symbol == self._SYMBOL_UP_KEYTAB,
             },
             {
-                'name': self._SYMBOL_DOWN,
+                'name': self._SYMBOL_DOWN_KEYTAB,
                 'icon': 'down',
-                'text': 'D',
-                'tooltip': 'Insert pedal down symbol',
-                'active': self._symbol == self._SYMBOL_DOWN,
+                'text': 'D-K',
+                'tooltip': 'Insert pedal down symbol (keyTAB)',
+                'active': self._symbol == self._SYMBOL_DOWN_KEYTAB,
+            },
+            {
+                'name': self._SYMBOL_UP_KLAVARSKRIBO,
+                'icon': 'up',
+                'text': 'U-L',
+                'tooltip': 'Insert pedal up symbol (Klavarskribo)',
+                'active': self._symbol == self._SYMBOL_UP_KLAVARSKRIBO,
+            },
+            {
+                'name': self._SYMBOL_DOWN_KLAVARSKRIBO,
+                'icon': 'down',
+                'text': 'D-L',
+                'tooltip': 'Insert pedal down symbol (Klavarskribo)',
+                'active': self._symbol == self._SYMBOL_DOWN_KLAVARSKRIBO,
             },
             {
                 'name': self._SYMBOL_TOE,
@@ -129,7 +149,14 @@ class PedalTool(BaseTool):
             pass
 
     def on_toolbar_button(self, name: str) -> None:
-        if name in (self._SYMBOL_DOWN, self._SYMBOL_UP, self._SYMBOL_TOE, self._SYMBOL_HEEL):
+        if name in (
+            self._SYMBOL_DOWN_KEYTAB,
+            self._SYMBOL_UP_KEYTAB,
+            self._SYMBOL_DOWN_KLAVARSKRIBO,
+            self._SYMBOL_UP_KLAVARSKRIBO,
+            self._SYMBOL_TOE,
+            self._SYMBOL_HEEL,
+        ):
             self._symbol = str(name)
 
     def on_left_click(self, x: float, y: float) -> None:
@@ -202,7 +229,7 @@ class PedalTool(BaseTool):
 
         # Bind by position for up/down: once matched, keep partner aligned while dragging.
         active_symbol = self._ev_symbol(self._active_pedal)
-        if active_symbol in ('up', 'down'):
+        if active_symbol in ('up_keytab', 'down_keytab', 'up_klavarskribo', 'down_klavarskribo'):
             partner = self._active_bound_partner
             if partner is None:
                 partner = self._find_matching_opposite(score, self._active_pedal, int(rpitch), float(t_snap))
@@ -261,6 +288,39 @@ class PedalTool(BaseTool):
 
         score.events.pedal = out
         self._editor._snapshot_if_changed(coalesce=False, label='pedal_symbol_delete')
+        if hasattr(self._editor, 'force_redraw_from_model'):
+            self._editor.force_redraw_from_model()
+        else:
+            self._editor.draw_frame()
+
+    def on_left_double_click(self, x: float, y: float) -> None:
+        super().on_left_double_click(x, y)
+        if self._editor is None:
+            return
+        score = self._editor.current_score()
+        if score is None:
+            return
+
+        hit = self._hit_pedal(x, y)
+        if hit is None:
+            return
+
+        hit_id = int(hit.get('_id', 0) or 0)
+        target = None
+        for ev in list(getattr(score.events, 'pedal', []) or []):
+            if int(getattr(ev, '_id', 0) or 0) == hit_id:
+                target = ev
+                break
+        if target is None:
+            return
+
+        current = bool(getattr(target, 'invisible', False))
+        try:
+            target.invisible = not current
+        except Exception:
+            return
+
+        self._editor._snapshot_if_changed(coalesce=False, label='pedal_symbol_toggle_visibility')
         if hasattr(self._editor, 'force_redraw_from_model'):
             self._editor.force_redraw_from_model()
         else:
