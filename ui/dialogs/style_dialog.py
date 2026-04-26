@@ -806,6 +806,7 @@ class StyleDialog(QtWidgets.QDialog):
             'hairpin_width_mm': 'Dynamic',
             'hairpin_font_size_pt': 'Dynamic',
             'hairpin_text_gap_mm': 'Dynamic',
+            'dynamic_symbol_font_size_pt': 'Dynamic',
             'dynamic_symbol_background_padding_mm': 'Dynamic',
             # Pedal
             'pedal_symbol_thickness_mm': 'Pedal',

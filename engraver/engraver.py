@@ -2585,6 +2585,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
             text_h_mm = size_pt * mm_per_pt
             measure_pad = 1.5
             measure_symbol_anchor: dict[float, tuple[float, float, float]] = {}
+            measure_symbol_guide_right: dict[float, float] = {}
             measure_symbol_default_right_x = float(grid_right + measure_pad * 2.0)
             tempo_gap_mm = 1.0
             measure_guide_width_mm = max(
@@ -2854,11 +2855,12 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                     x1 = x_pos + text_w_mm
                     tries += 1
                 guide_y = _time_to_y(t0)
+                guide_right = float(x_pos_guide + text_w_mm)
                 if mn_guide_visible:
                     du.add_line(
                         grid_right,
                         guide_y,
-                        x_pos_guide + text_w_mm,
+                        guide_right,
                         guide_y,
                         color=notation_color,
                         width_mm=measure_guide_width_mm,
@@ -2886,6 +2888,8 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                     float(text_w_mm),
                     float(y_text),
                 )
+                if mn_numbers_visible:
+                    measure_symbol_guide_right[round(float(m_start), 6)] = float(guide_right)
                 measure_symbol_default_right_x = max(
                     float(measure_symbol_default_right_x),
                     float(x_pos_guide + text_w_mm),
@@ -2898,7 +2902,10 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                     tempo_font_family = 'Edwin'
 
                 tempo_font_size_pt = 32.0 * scale
-                tempo_rect_w = max(6.0, 12.0 * scale)
+                tempo_rect_w = max(4.0, 4.0)
+                tempo_dash = [0.5, 1.0]
+                tempo_stroke = 0.25
+                right_outer_stave_x = float(grid_right)
 
                 def _tempo_left_x(tp_time: float) -> float:
                     key = round(float(tp_time), 6)
@@ -2908,6 +2915,16 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                         return float(x_num + w_num + tempo_gap_mm)
                     # Mid-measure tempo changes: use the outer measure-number guide end.
                     return float(measure_symbol_default_right_x + tempo_gap_mm)
+
+                def _tempo_top_start_x(tp_time: float) -> float:
+                    key = round(float(tp_time), 6)
+                    # If a measure number exists at this barline position, start the
+                    # tempo top line at the outer right edge of the measure guide to
+                    # avoid overlapping guide dashes.
+                    guide_right = measure_symbol_guide_right.get(key)
+                    if guide_right is not None:
+                        return float(guide_right)
+                    return float(right_outer_stave_x)
 
                 for tp in line_tempos:
                     try:
@@ -2935,12 +2952,11 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                     tempo_x_left = _tempo_left_x(t0) + (tempo_x_offset * scale)
 
                     tempo_x_right = tempo_x_left + tempo_rect_w
-                    tempo_dash = [1 * scale, 2 * scale]
-                    tempo_stroke = 1.0 * scale
+                    tempo_top_start_x = _tempo_top_start_x(t0)
 
                     # Open-left dashed bracket (top, right, bottom only).
                     du.add_line(
-                        tempo_x_left,
+                        tempo_top_start_x,
                         y0_tempo,
                         tempo_x_right,
                         y0_tempo,

@@ -105,9 +105,9 @@ class LineBreakTool(BaseTool):
             page_w_mm = float(stave_right + float(getattr(self._editor, 'margin', 0.0) or 0.0))
         try:
             from fonts import register_font_from_bytes
-            font_family = register_font_from_bytes('C059') or 'C059'
+            font_family = register_font_from_bytes('Edwin') or 'Edwin'
         except Exception:
-            font_family = 'C059'
+            font_family = 'Edwin'
         # Prefer hits on the marker region using snapped time; fallback to nearest by time
         best = None
         best_dt = None

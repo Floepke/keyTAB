@@ -1,7 +1,6 @@
 from __future__ import annotations
 from typing import TYPE_CHECKING, cast
 from ui.widgets.draw_util import DrawUtil
-from utils.CONSTANT import QUARTER_NOTE_UNIT
 
 if TYPE_CHECKING:
     from editor.editor import Editor
@@ -11,8 +10,8 @@ class TempoDrawerMixin:
     def draw_tempo(self, du: DrawUtil) -> None:
         self = cast("Editor", self)
         tool_name = getattr(getattr(self, "_tool", None), "TOOL_NAME", "")
-        if tool_name != "tempo":
-            return
+        # if tool_name != "tempo":
+        #     return
         score = self.current_score()
         if score is None:
             return
@@ -27,18 +26,26 @@ class TempoDrawerMixin:
         if not events:
             return
 
-        # Font setup: reuse C059 if available
+        # Font setup: mirror engraver tempo typography.
         try:
             from fonts import register_font_from_bytes
-            font_family = register_font_from_bytes('C059') or 'C059'
+            font_family = register_font_from_bytes('Edwin') or 'Edwin'
         except Exception:
-            font_family = 'C059'
+            font_family = 'Edwin'
 
-        font_size_pt = 24.0
+        try:
+            layout = getattr(score, 'layout', None)
+            scale = float(getattr(layout, 'scale', 1.0) or 1.0)
+        except Exception:
+            scale = 1.0
+
+        font_size_pt = 32.0 * scale
         font_italic = False
         font_bold = True
-        text_padding_mm = 1.0
-        rect_width_mm = 12.0  # fixed width to avoid wobble based on glyph height
+        rect_width_mm = max(4.0, 4.0)
+        bracket_dash = [.5, 1]
+        bracket_stroke = .25
+        right_outer_stave_x = float(page_w_mm) - margin - (float(self.semitone_dist or 0.0) * 2.0)
 
         for tp in events:
             try:
@@ -47,60 +54,72 @@ class TempoDrawerMixin:
                 tempo_val = int(getattr(tp, 'tempo', 60) or 60)
             except Exception:
                 continue
+            if bool(getattr(tp, 'invisible', False)):
+                continue
             if du_ticks <= 0.0:
                 continue
             # Positions in mm
             y0 = float(self.time_to_mm(t0))
             y1 = float(self.time_to_mm(t0 + du_ticks))
-            y3 = float(y0 + 50.0)
             if y1 < y0:
                 y0, y1 = y1, y0
-            text = str(tempo_val)
-            angle_deg = 90.0  # rotate clockwise
+            text = str(tempo_val) + '.'
 
             # Fixed-width lane; center text inside
             rect_w = rect_width_mm
-            x_left = float(page_w_mm) - rect_w - margin * 0.35
-            x_center = x_left + rect_w * 0.5
+            x_left = float(page_w_mm) - rect_w - margin * 0.5
+            x_right = x_left + rect_w
             y_center = (y0 + y1) * 0.5
 
-            # Black duration bar sized by tempo duration
-            du.add_rectangle(
-                x_left,
+            # Open-left dashed bracket (top/right/bottom) like engraver.
+            du.add_line(
+                right_outer_stave_x,
                 y0,
-                x_left + rect_w,
-                y1,
-                stroke_color=None,
-                fill_color=(0, 0, 0, 1),
+                x_right,
+                y0,
+                color=self.notation_color,
+                width_mm=bracket_stroke,
                 id=0,
                 tags=["tempo_bg"],
-                dash_pattern=None,
+                dash_pattern=bracket_dash,
             )
-            try:
-                self.register_hit_rect('tempo', int(getattr(tp, '_id', 0) or 0), x_left, min(y0, y1), x_left + rect_w, max(y0, y1))
-            except Exception:
-                pass
-            # add guide start line (black)
-            du.add_line(page_w_mm - margin - self.semitone_dist * 2, y0, x_left, y0,
-                        color=(0, 0, 0, 1), width_mm=0.25, id=0,
-                        tags=["tempo_guide_line"], dash_pattern=[0,1])
-            # add guide line end (black)
-            du.add_line(page_w_mm - margin - self.semitone_dist * 2, y1, x_left, y1,
-                        color=(0, 0, 0, 1), width_mm=0.25, id=0,
-                        tags=["tempo_guide_line"], dash_pattern=[0,1])
-            # Rotated white text centered inside the black bar
+            du.add_line(
+                x_right,
+                y0,
+                x_right,
+                y1,
+                color=self.notation_color,
+                width_mm=bracket_stroke,
+                id=0,
+                tags=["tempo_bg"],
+                dash_pattern=bracket_dash,
+            )
+            du.add_line(
+                x_left,
+                y1,
+                x_right,
+                y1,
+                color=self.notation_color,
+                width_mm=bracket_stroke,
+                id=0,
+                tags=["tempo_bg"],
+                dash_pattern=bracket_dash,
+            )
+            self.register_hit_rect('tempo', int(getattr(tp, '_id', 0) or 0), x_left, min(y0, y1), x_right, max(y0, y1))
+
+            x_text_right = x_right - (0.6 * scale)
             du.add_text(
-                x_center,
+                x_text_right - 2 * scale,
                 y_center,
                 text,
                 family=font_family,
                 size_pt=font_size_pt,
                 italic=font_italic,
                 bold=font_bold,
-                color=(1, 1, 1, 1),
-                anchor='center',
+                color=self.notation_color,
+                anchor='e',
                 id=0,
                 tags=["tempo_text"],
                 hit_rect_mm=None,
-                angle_deg=angle_deg,
+                angle_deg=0.0,
             )
