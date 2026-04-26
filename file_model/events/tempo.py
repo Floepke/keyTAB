@@ -13,5 +13,6 @@ class Tempo:
     time: float = 0.0        # start time in ticks
     duration: float = 256.0  # duration in ticks
     tempo: int = 120         # units per minute
+    x_offset: float = 0.0    # engraver-only horizontal offset in mm
     invisible: bool = False
     _id: int = 0

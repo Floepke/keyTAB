@@ -71,6 +71,7 @@ class TempoTool(BaseTool):
         # If clicked on existing, edit tempo value
         if existing is not None:
             cur_tempo = int(getattr(existing, 'tempo', 60) or 60)
+            cur_x_offset = float(getattr(existing, 'x_offset', 0.0) or 0.0)
             cur_invisible = bool(getattr(existing, 'invisible', False))
             parent_w = None
             parent_w = QtWidgets.QApplication.activeWindow()
@@ -85,6 +86,12 @@ class TempoTool(BaseTool):
             tempo.setRange(1, 1000)
             tempo.setValue(cur_tempo)
             lay.addRow(QtCore.QCoreApplication.translate("TempoTool", "This many of these units in one minute:"), tempo)
+            x_offset = QtWidgets.QDoubleSpinBox(dlg)
+            x_offset.setRange(-500.0, 500.0)
+            x_offset.setDecimals(2)
+            x_offset.setSingleStep(0.1)
+            x_offset.setValue(cur_x_offset)
+            lay.addRow(QtCore.QCoreApplication.translate("TempoTool", "X offset (mm):"), x_offset)
             visible_chk = QtWidgets.QCheckBox(dlg)
             visible_chk.setChecked(not cur_invisible)
             lay.addRow(QtCore.QCoreApplication.translate("TempoTool", "Visible:"), visible_chk)
@@ -94,6 +101,7 @@ class TempoTool(BaseTool):
             btns.rejected.connect(dlg.reject)
             def _apply():
                 existing.tempo = int(tempo.value())
+                existing.x_offset = float(x_offset.value())
                 existing.invisible = not visible_chk.isChecked()
                 self._editor._snapshot_if_changed(coalesce=True, label='tempo_edit')
                 if hasattr(self._editor, 'force_redraw_from_model'):

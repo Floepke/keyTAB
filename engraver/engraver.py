@@ -282,6 +282,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
             'duration': dur,
             'end': t0 + dur,
             'tempo': tempo_val,
+            'x_offset': float(ev.get('x_offset', 0.0) or 0.0),
             'id': int(ev.get('_id', 0) or 0),
             'idx': int(idx),
             'invisible': bool(ev.get('invisible', False)),
@@ -2913,6 +2914,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                         t0 = float(tp.get('time', 0.0) or 0.0)
                         t1 = float(tp.get('end', t0) or t0)
                         tempo_val = int(tp.get('tempo', 60) or 60)
+                        tempo_x_offset = float(tp.get('x_offset', 0.0) or 0.0)
                     except Exception:
                         continue
                     if tp.get('invisible', False):
@@ -2930,25 +2932,51 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                     if op_time.gt(y0_tempo, y1_tempo):
                         y0_tempo, y1_tempo = y1_tempo, y0_tempo
 
-                    tempo_x_left = _tempo_left_x(t0)
+                    tempo_x_left = _tempo_left_x(t0) + (tempo_x_offset * scale)
 
-                    du.add_rectangle(
+                    tempo_x_right = tempo_x_left + tempo_rect_w
+                    tempo_dash = [1 * scale, 2 * scale]
+                    tempo_stroke = 1.0 * scale
+
+                    # Open-left dashed bracket (top, right, bottom only).
+                    du.add_line(
                         tempo_x_left,
                         y0_tempo,
-                        tempo_x_left + tempo_rect_w,
-                        y1_tempo,
-                        stroke_color=notation_color,
-                        fill_color=None,
-                        stroke_width_mm=1.0 * scale,
+                        tempo_x_right,
+                        y0_tempo,
+                        color=notation_color,
+                        width_mm=tempo_stroke,
                         id=int(tp.get('id', 0) or 0),
                         tags=['tempo_bg'],
-                        dash_pattern=[1*scale,2*scale],
+                        dash_pattern=tempo_dash,
+                    )
+                    du.add_line(
+                        tempo_x_right,
+                        y0_tempo,
+                        tempo_x_right,
+                        y1_tempo,
+                        color=notation_color,
+                        width_mm=tempo_stroke,
+                        id=int(tp.get('id', 0) or 0),
+                        tags=['tempo_bg'],
+                        dash_pattern=tempo_dash,
+                    )
+                    du.add_line(
+                        tempo_x_left,
+                        y1_tempo,
+                        tempo_x_right,
+                        y1_tempo,
+                        color=notation_color,
+                        width_mm=tempo_stroke,
+                        id=int(tp.get('id', 0) or 0),
+                        tags=['tempo_bg'],
+                        dash_pattern=tempo_dash,
                     )
 
                     y_center_tempo = (y0_tempo + y1_tempo) * 0.5
-                    x_center_tempo = tempo_x_left + (tempo_rect_w * 0.5)
+                    x_text_right = tempo_x_right - (0.6 * scale)
                     du.add_text(
-                        x_center_tempo,
+                        x_text_right - 2*scale,
                         y_center_tempo,
                         str(tempo_val) + '.',
                         family=tempo_font_family,
@@ -2956,11 +2984,11 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                         italic=False,
                         bold=True,
                         color=notation_color,
-                        anchor='center',
+                        anchor='e',
                         id=int(tp.get('id', 0) or 0),
                         tags=['tempo_text'],
                         hit_rect_mm=None,
-                        angle_deg=90.0,
+                        angle_deg=0.0,
                     )
 
             symbol_width = max(3.0, semitone_mm * 4.0)
