@@ -359,9 +359,6 @@ class BeamDrawerMixin:
         # Cache on editor for downstream drawing steps
         self._beam_groups_by_hand = groups_all
 
-        if not bool(layout.beam_visible):
-            return
-
         # If beam tool is active, visualize override windows as gutter lines per hand
         tool_name = getattr(getattr(self, '_tool', None), 'TOOL_NAME', '')
         if tool_name == 'beam':

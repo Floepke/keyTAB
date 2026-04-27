@@ -30,8 +30,8 @@ class GridDrawerMixin:
         self = cast("Editor", self)
         score: SCORE = self.current_score()
         layout = getattr(score, 'layout', None)
-        barline_visible = bool(getattr(layout, 'barline_visible', True)) if layout is not None else True
-        grid_line_visible = bool(getattr(layout, 'grid_line_visible', True)) if layout is not None else True
+        barline_visible = True
+        grid_line_visible = True
 
         # draw title and composer at top-left
         title_text = score.info.title
@@ -108,7 +108,7 @@ class GridDrawerMixin:
         notes_by_hand_cache = dict(cache.get('notes_by_hand') or {}) if isinstance(cache, dict) else {}
         beam_markers = dict(cache.get('beam_by_hand') or {}) if isinstance(cache, dict) else {}
 
-        note_stem_visible = bool(getattr(layout, 'note_stem_visible', True)) if layout is not None else True
+        note_stem_visible = True
         semitone_mm = float(self.semitone_dist or 0.5)
         stem_len_mm = float(getattr(layout, 'note_stem_length_semitone', 3) or 3) * semitone_mm if layout is not None else (3.0 * semitone_mm)
         note_head_half_w = semitone_mm * float(getattr(layout, 'note_width_scaling', 0.75) or 0.75) if layout is not None else (semitone_mm * 0.75)
@@ -290,22 +290,20 @@ class GridDrawerMixin:
                     ))
             # Chord connector lines span from lowest to highest pitch in same-hand chords.
             # Without this, the connector line between note heads can cross a barline gap.
-            chord_connect_visible = bool(getattr(layout, 'chord_connect_visible', True)) if layout is not None else True
-            if chord_connect_visible:
-                for chord_hand_key in ('l', 'r'):
-                    chord_notes_at_tick = [
-                        n for n in notes_view
-                        if _barline_time_eq(float(getattr(n, 'time', 0.0) or 0.0), float(ticks))
-                        and str(getattr(n, 'hand', 'l') or 'l') == chord_hand_key
-                    ]
-                    if len(chord_notes_at_tick) >= 2:
-                        pitches_at_tick = [int(getattr(n, 'pitch', 0) or 0) for n in chord_notes_at_tick]
-                        x_lo = float(self.pitch_to_x(min(pitches_at_tick)))
-                        x_hi = float(self.pitch_to_x(max(pitches_at_tick)))
-                        intervals.append((
-                            x_lo - stem_collision_pad - barline_symbol_gap_mm,
-                            x_hi + stem_collision_pad + barline_symbol_gap_mm,
-                        ))
+            for chord_hand_key in ('l', 'r'):
+                chord_notes_at_tick = [
+                    n for n in notes_view
+                    if _barline_time_eq(float(getattr(n, 'time', 0.0) or 0.0), float(ticks))
+                    and str(getattr(n, 'hand', 'l') or 'l') == chord_hand_key
+                ]
+                if len(chord_notes_at_tick) >= 2:
+                    pitches_at_tick = [int(getattr(n, 'pitch', 0) or 0) for n in chord_notes_at_tick]
+                    x_lo = float(self.pitch_to_x(min(pitches_at_tick)))
+                    x_hi = float(self.pitch_to_x(max(pitches_at_tick)))
+                    intervals.append((
+                        x_lo - stem_collision_pad - barline_symbol_gap_mm,
+                        x_hi + stem_collision_pad + barline_symbol_gap_mm,
+                    ))
             for seg in beam_segments:
                 t0 = float(seg.get('t_start', 0.0) or 0.0)
                 t1 = float(seg.get('t_end', 0.0) or 0.0)
@@ -431,7 +429,7 @@ class GridDrawerMixin:
                     (["barline", "end_barline"] if is_last else ["barline"]),
                 )
 
-        if barline_visible and bool(getattr(layout, 'double_barline_visible', True)) and layout is not None:
+        if barline_visible and layout is not None:
             double_events = list(getattr(score.events, 'double_bar', []) or [])
             if double_events:
                 top_mm = float(getattr(self, '_view_y_mm_offset', 0.0) or 0.0)

@@ -80,7 +80,7 @@ class SnapDrawerMixin:
             snap_units = float(QUARTER_NOTE_UNIT) / 2.0
         snap_mm = (snap_units / float(QUARTER_NOTE_UNIT)) * zpq
 
-        layout = getattr(score, 'layout', None)
+        # get color
         try:
             from ui.style import Style
             sr, sg, sb = Style.get_named_rgb('snap_band', (230, 230, 230))

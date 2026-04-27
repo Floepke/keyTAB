@@ -255,8 +255,6 @@ class GridBandDrawerMixin:
         if score is None:
             return
         layout = score.layout
-        if not bool(getattr(layout, 'grid_band_visible', True)):
-            return
 
         # Fixed horizontal span: draw a single band area from key 10 to key 77.
         x10 = float(self.pitch_to_x(10))

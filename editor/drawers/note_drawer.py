@@ -193,8 +193,6 @@ class NoteDrawerMixin:
         if not on_barline:
             return
         layout = self.current_score().layout
-        if not bool(getattr(layout, 'barline_visible', True)):
-            return
         w = float(self.semitone_dist or 0.5)
         stem_len = float(layout.note_stem_length_semitone or 3) * w
         thickness = self._editor_line_width_mm()
@@ -255,8 +253,6 @@ class NoteDrawerMixin:
         if getattr(self, 'is_tiny_mode', None) and self.is_tiny_mode():
             return
         layout = self.current_score().layout
-        if not bool(getattr(layout, 'note_stop_visible', True)):
-            return
         # Show stop triangle if followed by a rest in same hand
         if not self._is_followed_by_rest(n):
             return
@@ -307,8 +303,6 @@ class NoteDrawerMixin:
         if getattr(self, 'is_tiny_mode', None) and self.is_tiny_mode():
             return
         layout = self.current_score().layout
-        if not bool(getattr(layout, 'note_continuation_dot_visible', True)):
-            return
         # Draw dots where other notes in same hand start or end within this note duration
         hand = getattr(n, 'hand', 'l')
         start = float(n.time)
@@ -394,8 +388,6 @@ class NoteDrawerMixin:
         self = cast("Editor", self)
         # Connect notes in a chord (same start time, same hand)
         layout = self.current_score().layout
-        if not bool(getattr(layout, 'chord_connect_visible', True)):
-            return
         stem_w = self._editor_line_width_mm()
         hand = getattr(n, 'hand', 'l')
         t = float(n.time)

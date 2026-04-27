@@ -18,8 +18,7 @@ class RepeatDrawerMixin:
         if score is None:
             return
         layout = getattr(score, 'layout', None)
-        visibility_key = 'repeat_start_visible' if kind == 'start' else 'repeat_end_visible'
-        if layout is None or not bool(getattr(layout, visibility_key, True)):
+        if layout is None:
             return
 
         event_attr = 'start_repeat' if kind == 'start' else 'end_repeat'

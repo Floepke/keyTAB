@@ -112,8 +112,6 @@ class DecrescendoDrawerMixin:
             return
 
         layout = getattr(score, 'layout', None)
-        if layout is not None and not bool(getattr(layout, 'hairpin_visible', True)):
-            return
 
         events = list(getattr(score.events, 'decrescendo', []) or [])
         if not events:
