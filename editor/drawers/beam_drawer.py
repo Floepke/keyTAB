@@ -147,10 +147,7 @@ class BeamDrawerMixin:
 
         # Skip heavy beam rendering in tiny mode
         if getattr(self, 'is_tiny_mode', None) and self.is_tiny_mode():
-            try:
-                self._beam_groups_by_hand = {}
-            except Exception:
-                pass
+            self._beam_groups_by_hand = {}
             return
 
         notes_by_hand = cache.get('notes_by_hand') or {}
@@ -316,7 +313,7 @@ class BeamDrawerMixin:
                 start_candidates.append(float(min(float(getattr(m, 'time', 0.0) or 0.0) for m in markers)))
             score_start = float(min(start_candidates))
 
-            end_candidates = [0.0]
+            end_candidates = [self._calc_base_grid_list_total_length()]
             if times:
                 end_candidates.append(float(times[-1]))
             if starts:

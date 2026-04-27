@@ -113,6 +113,8 @@ class TempoTool(BaseTool):
             dlg.activateWindow()
             self._tempo_dialog = dlg
             dlg.show()
+            tempo.setFocus()
+            tempo.selectAll()
             return
         # Create new tempo with minimum duration = one beat of active time signature
         numer, denom = self._find_active_ts_at_time(t)

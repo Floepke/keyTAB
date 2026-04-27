@@ -2587,7 +2587,6 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
             measure_symbol_anchor: dict[float, tuple[float, float, float]] = {}
             measure_symbol_guide_right: dict[float, float] = {}
             measure_symbol_default_right_x = float(grid_right + measure_pad * 2.0)
-            tempo_gap_mm = 1.0
             measure_guide_width_mm = max(
                 0.05,
                 float(layout.get('measure_numbering_guide_thickness_mm', 1.0) or 1.0) * scale,
@@ -2748,6 +2747,8 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                     if not dot_times:
                         continue
 
+                    dot_x = float(_key_to_x(int(p)))
+                    min_collision_gap = max(0.0, float(semitone_mm) * 2.0 - 1e-6)
                     for t in sorted(set(dot_times)):
                         y_center = _time_to_y(float(t)) + float(semitone_mm)
 
@@ -2766,6 +2767,9 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                                     and _black_note_above_stem(other, black_rule, line_notes, op_time)
                                 )
                                 if other_black_above:
+                                    continue
+                                other_x = float(_key_to_x(int(other_pitch)))
+                                if abs(other_x - dot_x) >= min_collision_gap:
                                     continue
                                 has_adjacent_start = True
                                 break
@@ -2902,19 +2906,19 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                     tempo_font_family = 'Edwin'
 
                 tempo_font_size_pt = 32.0 * scale
-                tempo_rect_w = max(4.0, 4.0)
                 tempo_dash = [0.5, 1.0]
                 tempo_stroke = 0.25
                 right_outer_stave_x = float(grid_right)
+                tempo_right_pad = max(0.6, 0.8 * scale)
 
                 def _tempo_left_x(tp_time: float) -> float:
                     key = round(float(tp_time), 6)
                     anchored = measure_symbol_anchor.get(key)
                     if anchored is not None:
                         x_num, w_num, _y_num = anchored
-                        return float(x_num + w_num + tempo_gap_mm)
+                        return float(x_num + w_num)
                     # Mid-measure tempo changes: use the outer measure-number guide end.
-                    return float(measure_symbol_default_right_x + tempo_gap_mm)
+                    return float(measure_symbol_default_right_x)
 
                 def _tempo_top_start_x(tp_time: float) -> float:
                     key = round(float(tp_time), 6)
@@ -2949,9 +2953,22 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                     if op_time.gt(y0_tempo, y1_tempo):
                         y0_tempo, y1_tempo = y1_tempo, y0_tempo
 
-                    tempo_x_left = _tempo_left_x(t0) + (tempo_x_offset * scale)
+                    tempo_text = str(tempo_val) + '.'
+                    _txb, _tyb, tempo_text_w, _th = du._get_text_extents_mm(
+                        tempo_text,
+                        tempo_font_family,
+                        tempo_font_size_pt,
+                        False,
+                        True,
+                    )
+                    tempo_text_w = max(1.0, float(tempo_text_w))
 
-                    tempo_x_right = tempo_x_left + tempo_rect_w
+                    # Keep the left edge of tempo text aligned with the right edge
+                    # of the measure-number text; variable text width grows to the right.
+                    tempo_text_left = _tempo_left_x(t0) + (tempo_x_offset * scale)
+                    tempo_x_left = float(tempo_text_left)
+                    x_text_right = float(tempo_text_left + tempo_text_w)
+                    tempo_x_right = float(x_text_right + tempo_right_pad)
                     tempo_top_start_x = _tempo_top_start_x(t0)
 
                     # Open-left dashed bracket (top, right, bottom only).
@@ -2990,11 +3007,10 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                     )
 
                     y_center_tempo = (y0_tempo + y1_tempo) * 0.5
-                    x_text_right = tempo_x_right - (0.6 * scale)
                     du.add_text(
-                        x_text_right - 2*scale,
+                        x_text_right,
                         y_center_tempo,
-                        str(tempo_val) + '.',
+                        tempo_text,
                         family=tempo_font_family,
                         size_pt=tempo_font_size_pt,
                         italic=False,
@@ -3673,6 +3689,8 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                     _double_bar_ticks: set[float] = {
                         float(ev.get('time', 0.0) or 0.0) for ev in norm_double_bars
                     }
+                    dot_x = float(_key_to_x(int(dot_pitch)))
+                    min_collision_gap = max(0.0, float(semitone_mm) * 2.0 - 1e-6)
                     for t in sorted(set(dot_times)):
                         y_center = _time_to_y(float(t)) + w
                         # Shift dot down one semitone when it lands on a double barline
@@ -3699,6 +3717,9 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                                     and _black_note_above_stem(n, black_rule, line_notes, op_time)
                                 )
                                 if other_black_above:
+                                    continue
+                                other_x = float(_key_to_x(int(other_pitch)))
+                                if abs(other_x - dot_x) >= min_collision_gap:
                                     continue
                                 has_adjacent_start = True
                                 break
@@ -3749,7 +3770,10 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                     and not continues_to_next_line
                     and _has_followed_rest(item)
                 ):
-                    w_stop = w * 1.8
+                    w_stop = w * 2.0
+                    # Ledger lines start semitone_mm*2 above the outer top edge of
+                    # the stop symbol (y_end - w_stop) so they're clearly visible.
+                    _draw_manual_ledgers_for_pitch_at_y(int(p), float(y_end - w_stop + w))
                     points = [
                         (x - w_stop / 2.0, y_end - w_stop),
                         (x, y_end),
@@ -4260,7 +4284,6 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                         _, _, _pxb, _pyb = _split_slur(_px, _py, t_cut)
                         _draw_slur_seg(*_pts_to_page(_pxb, _pyb, _time_to_y_ext),
                                        t_cut, 1.0, _sl_id, tags=['slur', 'slur_indicator'])
-
             x_cursor = x_cursor + float(line['total_width']) + gap
 
 

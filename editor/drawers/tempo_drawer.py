@@ -26,6 +26,9 @@ class TempoDrawerMixin:
         if not events:
             return
 
+        notation_color = tuple(getattr(self, 'notation_color', (0.0, 0.0, 0.0, 1.0)))
+        paper_color = tuple(getattr(self, 'paper_color', (1.0, 1.0, 1.0, 1.0)))
+
         # Font setup: mirror engraver tempo typography.
         try:
             from fonts import register_font_from_bytes
@@ -54,8 +57,18 @@ class TempoDrawerMixin:
                 tempo_val = int(getattr(tp, 'tempo', 60) or 60)
             except Exception:
                 continue
-            if bool(getattr(tp, 'invisible', False)):
-                continue
+            is_invisible = bool(getattr(tp, 'invisible', False))
+            draw_color = notation_color
+            if is_invisible:
+                # Keep hidden tempo markers editable in editor by drawing them muted.
+                nr, ng, nb, _na = notation_color
+                pr, pg, pb, _pa = paper_color
+                draw_color = (
+                    (float(nr) * 0.35) + (float(pr) * 0.65),
+                    (float(ng) * 0.35) + (float(pg) * 0.65),
+                    (float(nb) * 0.35) + (float(pb) * 0.65),
+                    1.0,
+                )
             if du_ticks <= 0.0:
                 continue
             # Positions in mm
@@ -77,7 +90,7 @@ class TempoDrawerMixin:
                 y0,
                 x_right,
                 y0,
-                color=self.notation_color,
+                color=draw_color,
                 width_mm=bracket_stroke,
                 id=0,
                 tags=["tempo_bg"],
@@ -88,7 +101,7 @@ class TempoDrawerMixin:
                 y0,
                 x_right,
                 y1,
-                color=self.notation_color,
+                color=draw_color,
                 width_mm=bracket_stroke,
                 id=0,
                 tags=["tempo_bg"],
@@ -99,13 +112,14 @@ class TempoDrawerMixin:
                 y1,
                 x_right,
                 y1,
-                color=self.notation_color,
+                color=draw_color,
                 width_mm=bracket_stroke,
                 id=0,
                 tags=["tempo_bg"],
                 dash_pattern=bracket_dash,
             )
-            self.register_hit_rect('tempo', int(getattr(tp, '_id', 0) or 0), x_left, min(y0, y1), x_right, max(y0, y1))
+            hit_x_left = min(float(right_outer_stave_x), float(x_left))
+            self.register_hit_rect('tempo', int(getattr(tp, '_id', 0) or 0), hit_x_left, min(y0, y1), x_right, max(y0, y1))
 
             x_text_right = x_right - (0.6 * scale)
             du.add_text(
@@ -116,7 +130,7 @@ class TempoDrawerMixin:
                 size_pt=font_size_pt,
                 italic=font_italic,
                 bold=font_bold,
-                color=self.notation_color,
+                color=draw_color,
                 anchor='e',
                 id=0,
                 tags=["tempo_text"],

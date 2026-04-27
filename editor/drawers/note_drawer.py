@@ -348,6 +348,8 @@ class NoteDrawerMixin:
             float(getattr(ev, 'time', 0.0) or 0.0)
             for ev in (getattr(self.current_score().events, 'double_bar', []) or [])
         }
+        dot_x = float(self.pitch_to_x(dot_pitch))
+        min_collision_gap = max(0.0, float(self.semitone_dist or 0.5) * 2.0 - 1e-6)
         for t in sorted(set(dot_times)):
             y_center = float(self.time_to_mm(t)) + w
             # Shift dot down one semitone when it lands on a double barline
@@ -368,6 +370,9 @@ class NoteDrawerMixin:
                     # Black adjacent notes drawn above stem do not collide with the
                     # default continuation-dot position.
                     if mp in BLACK_KEYS and self._black_note_above_stem(m, layout):
+                        continue
+                    other_x = float(self.pitch_to_x(mp))
+                    if abs(other_x - dot_x) >= min_collision_gap:
                         continue
                     has_adjacent_start = True
                     break

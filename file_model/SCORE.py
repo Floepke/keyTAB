@@ -314,7 +314,7 @@ class SCORE:
 		return obj
 
 	def new_tempo(self, **kwargs) -> Tempo:
-		base = {'time': 0.0, 'duration': 0.0, 'tempo': 60}
+		base = {'time': 0.0, 'duration': 0.0, 'tempo': Tempo().tempo}
 		base.update(kwargs)
 		obj = Tempo(**base, _id=self._gen_id())
 		self.events.tempo.append(obj)
@@ -482,15 +482,12 @@ class SCORE:
 			# Check if any tempo at time 0 exists
 			at_zero = any(float(getattr(tp, 'time', 0.0) or 0.0) == 0.0 for tp in self.events.tempo)
 			if not at_zero:
-				self.new_tempo(time=0.0, duration=float(beat_len), tempo=60)
+				self.new_tempo(time=0.0, duration=float(beat_len))
 		except Exception:
 			pass
 
 		# Ensure a line break exists at time 0
-		try:
-			self._ensure_line_break_zero()
-		except Exception:
-			pass
+		self._ensure_line_break_zero()
 		return self
 
 	@classmethod
@@ -597,7 +594,7 @@ class SCORE:
 		denom = int(getattr(self.base_grid[0], 'denominator', 4) or 4) if self.base_grid else 4
 		measure_len = float(numer) * (4.0 / float(denom)) * float(QUARTER_NOTE_UNIT)
 		beat_len = measure_len / max(1, int(numer))
-		self.new_tempo(time=0.0, duration=float(beat_len), tempo=60)
+		self.new_tempo(time=0.0, duration=float(beat_len))
 		return self
 
 	def _ensure_line_break_zero(self) -> None:
@@ -616,19 +613,23 @@ class SCORE:
 		converted_grace: List[GraceNote] = []
 		remaining_notes: List[Note] = []
 		for n in getattr(self.events, 'note', []) or []:
+			# hand
 			h = str(getattr(n, 'hand', 'l') or 'l').strip()
 			if h not in ('l', 'r'):
 				h = 'l'
 			setattr(n, 'hand', h)
-			try:
-				acc = int(getattr(n, 'acc', 0) or 0)
-			except Exception:
-				acc = 0
+			
+			# accidental
+			acc = int(getattr(n, 'acc', 0) or 0)
 			acc = int(max(-2, min(2, acc)))
 			setattr(n, 'acc', acc)
+			
+			# color
 			c = str(getattr(n, 'color', '') or '').strip()
 			if not c:
 				setattr(n, 'color', 'auto')
+			
+			# duration -> grace note conversion
 			dur = float(getattr(n, 'duration', 0.0) or 0.0)
 			if dur < float(GRACENOTE_THRESHOLD):
 				converted_grace.append(
@@ -734,7 +735,7 @@ class SCORE:
 		- Always inserts a line break at time 0, then repeats the provided group sizes.
 		- Carries forward page/line type, margins, and ranges from existing line breaks
 		  in order; if there are fewer existing breaks than needed, the last known
-		  values are reused.
+		  value is reused.
 		"""
 		try:
 			group_list = [int(g) for g in groups if int(g) > 0]
@@ -747,12 +748,9 @@ class SCORE:
 		starts: List[float] = [0.0]
 		cursor = 0.0
 		for bg in list(getattr(self, 'base_grid', []) or []):
-			try:
-				numer = int(getattr(bg, 'numerator', 4) or 4)
-				denom = int(getattr(bg, 'denominator', 4) or 4)
-				measures = int(getattr(bg, 'measure_amount', 1) or 1)
-			except Exception:
-				continue
+			numer = int(getattr(bg, 'numerator', 4) or 4)
+			denom = int(getattr(bg, 'denominator', 4) or 4)
+			measures = int(getattr(bg, 'measure_amount', 1) or 1)
 			if measures <= 0:
 				continue
 			measure_len = float(numer) * (4.0 / float(max(1, denom))) * float(QUARTER_NOTE_UNIT)
@@ -763,10 +761,7 @@ class SCORE:
 			return False
 
 		# Preserve styling from existing line breaks in order; reuse last when exhausted
-		try:
-			existing = sorted(list(getattr(self.events, 'line_break', []) or []), key=lambda lb: float(getattr(lb, 'time', 0.0) or 0.0))
-		except Exception:
-			existing = []
+		existing = sorted(list(getattr(self.events, 'line_break', []) or []), key=lambda lb: float(getattr(lb, 'time', 0.0) or 0.0))
 		defaults = LineBreak()
 
 		def _template_for(idx: int) -> tuple[list[float], list[int] | Literal['auto'] | bool, bool]:
@@ -804,11 +799,6 @@ class SCORE:
 			if group_len <= 0:
 				break
 			index += group_len
-
-		try:
-			self.events.line_break.sort(key=lambda lb: float(getattr(lb, 'time', 0.0) or 0.0))
-		except Exception:
-			pass
+		self.events.line_break.sort(key=lambda lb: float(getattr(lb, 'time', 0.0) or 0.0))
 		return True
-	
-	# ---- Convenience methods ----
+

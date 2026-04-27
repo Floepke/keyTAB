@@ -765,7 +765,6 @@ class Editor(QtCore.QObject,
     def _calc_base_grid_list_total_length(self) -> int:
         """Return the total length of the current SCORE in ticks."""
         score: SCORE = self.current_score()
-        
         length_ticks = 0
         for bg in score.base_grid:
             base_grid_length = bg.numerator * (4.0 / bg.denominator) * bg.measure_amount * QUARTER_NOTE_UNIT

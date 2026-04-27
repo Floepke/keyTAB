@@ -19,7 +19,19 @@ def show_error_dialog(
 
     This is intended as the shared path for user-facing error popups.
     """
-    msg = QtWidgets.QMessageBox(parent)
+    class _StickyCopyMessageBox(QtWidgets.QMessageBox):
+        """Keep the dialog open when the copy-action button is clicked."""
+
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            self._copy_btn = None
+
+        def done(self, result: int) -> None:
+            if self._copy_btn is not None and self.clickedButton() is self._copy_btn:
+                return
+            super().done(result)
+
+    msg = _StickyCopyMessageBox(parent)
     msg.setIcon(icon)
     msg.setWindowTitle(str(title or _tr("Error")))
     msg.setText(str(text or _tr("An error occurred.")))
@@ -40,17 +52,20 @@ def show_error_dialog(
     copy_btn = None
     if detail_text or text:
         copy_btn = msg.addButton(_tr("Copy Error Log"), QtWidgets.QMessageBox.ButtonRole.ActionRole)
+        msg._copy_btn = copy_btn
 
-    while True:
-        msg.exec()
-        clicked = msg.clickedButton()
-        if copy_btn is not None and clicked is copy_btn:
+    if copy_btn is not None:
+        payload = detail_text or str(text or "")
+
+        def _copy_error_log() -> None:
             clipboard = QtWidgets.QApplication.clipboard()
-            payload = detail_text or str(text or "")
             try:
                 clipboard.setText(payload)
             except Exception:
                 pass
-            continue
-        if clicked is ok_btn or clicked is None:
-            break
+
+        copy_btn.clicked.connect(_copy_error_log)
+
+    if isinstance(ok_btn, QtWidgets.QPushButton):
+        msg.setDefaultButton(ok_btn)
+    msg.exec()
