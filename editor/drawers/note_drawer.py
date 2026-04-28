@@ -231,6 +231,17 @@ class NoteDrawerMixin:
     def _draw_notehead(self, du: DrawUtil, n, x: float, y1: float, draw_mode: str) -> None:
         self = cast("Editor", self)
         layout = self.current_score().layout
+        layout_for_notehead = layout
+        if self._should_tune_under_stem_black_width(n, layout):
+            try:
+                if isinstance(layout, dict):
+                    layout_for_notehead = dict(layout)
+                else:
+                    layout_for_notehead = dict(vars(layout))
+                base_scale = float(layout_for_notehead.get('note_width_scaling', 0.75) or 0.75)
+                layout_for_notehead['note_width_scaling'] = max(0.05, base_scale * 0.85)
+            except Exception:
+                layout_for_notehead = layout
         outline_w = self._editor_line_width_mm()
         paper_r, paper_g, paper_b = Style.get_named_rgb('paper', (255, 255, 255))
         bg_fill = (paper_r / 255.0, paper_g / 255.0, paper_b / 255.0, 1.0)
@@ -238,7 +249,7 @@ class NoteDrawerMixin:
             x_mm=float(x),
             y_mm=float(y1),
             note=n,
-            layout=layout,
+            layout=layout_for_notehead,
             semitone_space_mm=float(self.semitone_dist or 0.5),
             notation_color=self.notation_color,
             paper_color=bg_fill,
@@ -482,6 +493,29 @@ class NoteDrawerMixin:
                 continue
             mp = int(getattr(m, 'pitch', 0) or 0)
             if mp not in BLACK_KEYS and abs(mp - p0) == 1:
+                return True
+        return False
+
+    def _should_tune_under_stem_black_width(self, n, layout) -> bool:
+        """Narrow black noteheads for under-stem small-second collisions."""
+        rule = str(getattr(layout, 'black_note_rule', 'below_stem') or 'below_stem').strip().lower()
+        if rule not in ('under_stem', 'below_stem'):
+            return False
+        p0 = int(getattr(n, 'pitch', 0) or 0)
+        if p0 not in BLACK_KEYS:
+            return False
+        t0 = float(getattr(n, 'time', 0.0) or 0.0)
+        try:
+            cache = cast("Editor", self)._draw_cache or {}
+            notes_view = cache.get('notes_view') or (self._cached_notes_view or [])
+        except Exception:
+            notes_view = self._cached_notes_view or []
+        for m in notes_view:
+            if getattr(m, '_id', None) == getattr(n, '_id', None):
+                continue
+            if not self._time_op.eq(float(getattr(m, 'time', 0.0) or 0.0), t0):
+                continue
+            if abs(int(getattr(m, 'pitch', 0) or 0) - p0) == 1:
                 return True
         return False
 

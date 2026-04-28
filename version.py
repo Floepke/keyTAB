@@ -48,4 +48,5 @@ change_log = '''
 - fix: the full screen toggle checkbox works correct now in the menu on app startup
 - fit button works now as splitter handle too, allowing to drag it to resize the editor and print-preview areas. The tooltip is updated to reflect this new behavior.
 - implemented miniature piano keyboard in editor below the end barline, showing the full range of keys with octave numbers. This is a visual aid for users to understand the pitch layout of the piano-roll stave.
+- fit page to window works correctly if page orientation is landscape now
 '''

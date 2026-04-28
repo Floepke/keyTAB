@@ -1515,8 +1515,12 @@ class Editor(QtCore.QObject,
         self._sel_max_pitch = 88
         self._selection_active = True
 
-    def _selected_notes_from_model(self) -> list:
-        """Return selected notes resolved from the live SCORE model."""
+    def _selected_notes_from_model(self, include_grace: bool = False) -> list:
+        """Return selected pitch events resolved from the live SCORE model.
+
+        By default this returns regular notes only. When `include_grace=True`,
+        grace notes are included as well.
+        """
         score: SCORE | None = self.current_score()
         if score is None or not self._selection_active:
             return []
@@ -1525,14 +1529,19 @@ class Editor(QtCore.QObject,
         min_p = max(1, min(88, int(getattr(self, '_sel_min_pitch', 1))))
         max_p = max(1, min(88, int(getattr(self, '_sel_max_pitch', 88))))
         out = []
-        for n in list(getattr(score.events, 'note', []) or []):
-            try:
-                t0 = float(getattr(n, 'time', 0.0) or 0.0)
-                p0 = int(getattr(n, 'pitch', 0) or 0)
-            except Exception:
-                continue
-            if a <= t0 <= b and min_p <= p0 <= max_p:
-                out.append(n)
+        event_lists = [list(getattr(score.events, 'note', []) or [])]
+        if bool(include_grace):
+            event_lists.append(list(getattr(score.events, 'grace_note', []) or []))
+
+        for lst in event_lists:
+            for n in lst:
+                try:
+                    t0 = float(getattr(n, 'time', 0.0) or 0.0)
+                    p0 = int(getattr(n, 'pitch', 0) or 0)
+                except Exception:
+                    continue
+                if a <= t0 <= b and min_p <= p0 <= max_p:
+                    out.append(n)
         return out
 
     def _transpose_step_units_for_anchor_key(self, anchor_key: int, direction: int) -> int:
@@ -1587,7 +1596,7 @@ class Editor(QtCore.QObject,
             float(self._sel_start_units),
             float(self._sel_end_units) - 0.1,
         )
-        notes = self._selected_notes_from_model()
+        notes = self._selected_notes_from_model(include_grace=True)
         updated = False
 
         # Notes: regular semitone transpose in piano-key space.

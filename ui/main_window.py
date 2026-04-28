@@ -2638,7 +2638,17 @@ class MainWindow(QtWidgets.QMainWindow):
             sc = self.file_manager.current()
             lay = getattr(sc, 'layout', None)
             if lay:
-                return float(lay.page_width_mm), float(lay.page_height_mm)
+                w_mm = float(getattr(lay, 'page_width_mm', 210.0) or 210.0)
+                h_mm = float(getattr(lay, 'page_height_mm', 297.0) or 297.0)
+                page_orientation = str(getattr(lay, 'page_orientation', 'portrait') or 'portrait').strip().lower()
+                # Keep compatibility with legacy horizontal/vertical orientation values.
+                if page_orientation == 'vertical':
+                    page_orientation = 'portrait'
+                elif page_orientation == 'horizontal':
+                    page_orientation = 'landscape'
+                if page_orientation == 'landscape':
+                    w_mm, h_mm = h_mm, w_mm
+                return w_mm, h_mm
         except Exception:
             pass
         # Fallback to DrawUtil current page size

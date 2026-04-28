@@ -864,6 +864,24 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                 return True
         return False
 
+    def _should_tune_under_stem_black_width(item: dict, rule: str, notes: list[dict], op: Operator) -> bool:
+        rule_norm = str(rule or 'below_stem').strip().lower()
+        if rule_norm not in ('under_stem', 'below_stem'):
+            return False
+        p0 = int(item.get('pitch', 0) or 0)
+        if p0 not in BLACK_KEYS:
+            return False
+        t0 = float(item.get('time', 0.0) or 0.0)
+        idx0 = int(item.get('idx', -1) or -1)
+        for n in notes:
+            if int(n.get('idx', -2) or -2) == idx0:
+                continue
+            if not op.eq(float(n.get('time', 0.0) or 0.0), t0):
+                continue
+            if abs(int(n.get('pitch', 0) or 0) - p0) == 1:
+                return True
+        return False
+
     def _has_followed_rest(item: dict) -> bool:
         """Return True when a note has no immediate following note in its hand.
 
@@ -3522,11 +3540,19 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
 
                 # Problem solved: avoid duplicated heads on continuations.
                 if not continues_from_prev_line and bool(layout.get('note_head_visible', True)):
+                    notehead_layout = layout
+                    if _should_tune_under_stem_black_width(item, black_rule, line_notes, op_time):
+                        try:
+                            notehead_layout = dict(layout)
+                            base_scale = float(notehead_layout.get('note_width_scaling', 0.75) or 0.75)
+                            notehead_layout['note_width_scaling'] = max(0.05, base_scale * 0.85)
+                        except Exception:
+                            notehead_layout = layout
                     notehead = Notehead.from_note(
                         x_mm=float(x),
                         y_mm=float(y_start),
                         note=n,
-                        layout=layout,
+                        layout=notehead_layout,
                         semitone_space_mm=float(semitone_mm),
                         notation_color=notation_color,
                         paper_color=paper_color,
