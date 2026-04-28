@@ -96,7 +96,7 @@ def _defaults_for(dc_type):
 def _apply_legacy_conversion(data: dict) -> dict:
 	"""Apply legacy file conversions (fail-open)."""
 	try:
-		from scripts.old_file_conversion import convert_legacy_piano_data
+		from file_model.old_file_conversion import convert_legacy_piano_data
 		data = convert_legacy_piano_data(data)
 	except Exception:
 		pass

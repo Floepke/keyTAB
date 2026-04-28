@@ -8,6 +8,7 @@ from scripting.spec import (
     StringField,
     ArrayField,
     LabelField,
+    ActionButtonField,
 )
 
 __all__ = [
@@ -21,4 +22,5 @@ __all__ = [
     "StringField",
     "ArrayField",
     "LabelField",
+    "ActionButtonField",
 ]

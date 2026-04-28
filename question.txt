@@ -1,0 +1,1 @@
+i have a question. i use pycairo to draw but after drawing we upload a image to the ui editor. is it possible to optimize the size of the image to have identical dpi to the current monitor or whatever the computer is streaming that amount of pixels dpi? maybe we are over sizing the image dpi?

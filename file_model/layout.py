@@ -11,10 +11,10 @@ class Layout:
     read_direction: Literal['horizontal', 'vertical'] = 'vertical'
     page_width_mm: float = 210.0
     page_height_mm: float = 297.0
-    page_top_margin_mm: float = 7.5
-    page_bottom_margin_mm: float = 5.0
-    page_left_margin_mm: float = 5.0
-    page_right_margin_mm: float = 5.0
+    page_top_margin_mm: float = 10.0
+    page_bottom_margin_mm: float = 10.0
+    page_left_margin_mm: float = 10.0
+    page_right_margin_mm: float = 10.0
     header_height_mm: float = 15.0
     footer_height_mm: float = 7.5
 

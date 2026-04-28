@@ -127,7 +127,13 @@ def _parse_midi_file(data: bytes) -> Tuple[int, List[List]]:
                     break
                 meta_bytes = tb.read(int(meta_len))
                 # meta events do NOT update running_status
-                if meta_type == 0x51 and len(meta_bytes) >= 3:
+                if meta_type in (0x03, 0x04):
+                    # Track Name / Instrument Name
+                    try:
+                        events.append(('name', abs_tick, meta_bytes.decode('utf-8', errors='replace')))
+                    except Exception:
+                        pass
+                elif meta_type == 0x51 and len(meta_bytes) >= 3:
                     # Set Tempo
                     us = (meta_bytes[0] << 16) | (meta_bytes[1] << 8) | meta_bytes[2]
                     events.append(('tempo', abs_tick, max(1, us)))
@@ -235,12 +241,13 @@ def _grid_positions_for(numer: int, denom: int) -> List[int]:
     return seq
 
 
-def _emit_note(score: SCORE, tpq: int, on_tick: int, off_tick: int, pitch: int, vel: int) -> None:
+def _emit_note(score: SCORE, tpq: int, on_tick: int, off_tick: int, pitch: int, vel: int, hand: str | None = None) -> None:
     start_units  = _ticks_to_units(on_tick,  tpq)
     end_units    = _ticks_to_units(off_tick, tpq)
     dur_units    = max(0.0, end_units - start_units)
     app_pitch    = int(pitch) - 20  # MIDI A4=69 -> app A4=49
-    hand         = 'l' if app_pitch < 40 else 'r'
+    if hand is None:
+        hand = 'l' if app_pitch < 40 else 'r'
     vel          = max(0, min(127, int(vel)))
     if dur_units < float(GRACENOTE_THRESHOLD):
         score.new_grace_note(pitch=int(app_pitch), time=float(start_units))
@@ -254,16 +261,96 @@ def _emit_note(score: SCORE, tpq: int, on_tick: int, off_tick: int, pitch: int, 
         )
 
 
+def _midi_pitch_to_name(midi_pitch: int) -> str:
+    """Convert a MIDI pitch number to a human-readable note name (e.g. 60 → 'C4')."""
+    names = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B']
+    octave = (int(midi_pitch) // 12) - 1
+    return f"{names[int(midi_pitch) % 12]}{octave}"
+
+
+def midi_analyze_tracks(path: str) -> List[dict]:
+    """Analyze a MIDI file and return per-track metadata.
+
+    Returns a list of dicts (one per non-empty, non-drum-only track) with:
+        index        – 0-based track index in the raw MIDI file
+        name         – track name from meta 0x03/0x04 event, or 'Track N'
+        note_count   – number of non-drum note_on events with velocity > 0
+        min_pitch    – lowest MIDI pitch seen (as note name string)
+        max_pitch    – highest MIDI pitch seen (as note name string)
+        default_hand – 'l', 'r', or 'skip' (skip for drum-only tracks)
+    Tracks that contain no notes at all are omitted.
+    """
+    p = Path(path)
+    if not p.exists():
+        raise FileNotFoundError(f"MIDI file not found: {path}")
+    _tpq, tracks = _parse_midi_file(p.read_bytes())
+
+    result: List[dict] = []
+    for idx, track in enumerate(tracks):
+        # Collect name from first name meta event
+        name = ""
+        for ev in track:
+            if ev[0] == 'name':
+                name = str(ev[2]).strip()
+                if name:
+                    break
+        if not name:
+            name = f"Track {idx + 1}"
+
+        # Count notes and collect pitch statistics
+        note_pitches: List[int] = []
+        all_drum = True
+        has_non_drum = False
+        for ev in track:
+            if ev[0] == 'note_on' and int(ev[4]) > 0:  # velocity > 0
+                ch = int(ev[2])
+                pitch = int(ev[3])
+                if ch == 9:
+                    continue  # drum — don't count
+                has_non_drum = True
+                all_drum = False
+                note_pitches.append(pitch)
+            elif ev[0] in ('note_on', 'note_off'):
+                if int(ev[2]) != 9:
+                    all_drum = False
+
+        if not note_pitches:
+            continue  # skip empty / drum-only tracks
+
+        avg_pitch = sum(note_pitches) / len(note_pitches)
+        default_hand = 'l' if avg_pitch < 60 else 'r'
+
+        result.append({
+            'index': idx,
+            'name': name,
+            'note_count': len(note_pitches),
+            'min_pitch': _midi_pitch_to_name(min(note_pitches)),
+            'max_pitch': _midi_pitch_to_name(max(note_pitches)),
+            'default_hand': default_hand,
+        })
+
+    return result
+
+
 # ---------------------------------------------------------------------------
 # Public entry point
 # ---------------------------------------------------------------------------
 
-def midi_load(path: str) -> SCORE:
+def midi_load(path: str, track_assignments: Dict[int, str] | None = None) -> SCORE:
     """Load a MIDI file and convert it to a SCORE model.
 
     Uses a pure-Python byte-level parser with no dependency on mido or
     pretty_midi for parsing.  Malformed/truncated data is silently skipped
     rather than raising an exception.
+
+    Args:
+        path:             Path to the MIDI file.
+        track_assignments: Optional dict mapping 0-based track index to 'l'
+                           (left hand), 'r' (right hand), or 'skip'. When
+                           provided, the assigned hand overrides the default
+                           pitch-based heuristic; 'skip' excludes all notes
+                           from that track.  When None, the original
+                           pitch-based heuristic is used for every note.
     """
     p = Path(path)
     if not p.exists():
@@ -309,7 +396,17 @@ def midi_load(path: str) -> SCORE:
     # Notes – pair note_on / note_off per (channel, pitch) within each track.
     # Drum channel (MIDI ch 9) is skipped.
     max_end_tick = 0
-    for track in tracks:
+    for track_idx, track in enumerate(tracks):
+        # Determine hand override for this track (if assignments provided)
+        if track_assignments is not None:
+            track_hand = track_assignments.get(track_idx)
+            if track_hand == 'skip':
+                continue  # exclude this track entirely
+            if track_hand not in ('l', 'r'):
+                track_hand = None  # fall back to pitch heuristic
+        else:
+            track_hand = None  # always use pitch heuristic
+
         open_notes: Dict[Tuple[int, int], List[Tuple[int, int]]] = {}
         for ev in track:
             kind = ev[0]
@@ -325,7 +422,7 @@ def midi_load(path: str) -> SCORE:
                 lst = open_notes.get((ch, pitch))
                 if lst:
                     on_vel, on_tick = lst.pop()
-                    _emit_note(score, tpq, on_tick, int(tick), pitch, on_vel)
+                    _emit_note(score, tpq, on_tick, int(tick), pitch, on_vel, hand=track_hand)
                     max_end_tick = max(max_end_tick, int(tick))
 
         # Close any dangling note_ons with a 1/32-note fallback duration
@@ -334,7 +431,7 @@ def midi_load(path: str) -> SCORE:
                 continue
             for vel, on_tick in lst:
                 off_tick = on_tick + max(1, tpq // 8)
-                _emit_note(score, tpq, on_tick, off_tick, pitch, vel)
+                _emit_note(score, tpq, on_tick, off_tick, pitch, vel, hand=track_hand)
                 max_end_tick = max(max_end_tick, off_tick)
 
     # ---- Base grid from time signatures ---------------------------

@@ -5,6 +5,7 @@ from typing import Callable, Dict
 from PySide6 import QtCore, QtGui, QtWidgets
 
 from scripting.spec import (
+    ActionButtonField,
     ArrayField,
     BoolField,
     DialogSpec,
@@ -33,6 +34,7 @@ class ScriptDialog(QtWidgets.QDialog):
         self._on_apply = on_apply
         self._on_cancel = on_cancel
         self._widgets: Dict[str, QtWidgets.QWidget] = {}
+        self._last_action: str | None = None
         self._status = QtWidgets.QLabel("")
         self._status.setWordWrap(True)
         self._status.setStyleSheet("color: gray;")
@@ -44,7 +46,7 @@ class ScriptDialog(QtWidgets.QDialog):
         form = QtWidgets.QFormLayout()
         for field in self._spec.fields:
             widget = self._build_widget_for_field(field)
-            if isinstance(field, LabelField):
+            if isinstance(field, (LabelField, ActionButtonField)):
                 form.addRow(widget)
                 continue
             self._widgets[field.name] = widget
@@ -67,6 +69,10 @@ class ScriptDialog(QtWidgets.QDialog):
         if isinstance(field, LabelField):
             w = QtWidgets.QLabel(str(field.text or field.label or ""))
             w.setWordWrap(True)
+            return w
+        if isinstance(field, ActionButtonField):
+            w = QtWidgets.QPushButton(str(field.label or ""))
+            w.clicked.connect(lambda _checked=False, action_name=str(field.name or ""): self._handle_action_button(action_name))
             return w
         if isinstance(field, BoolField):
             w = QtWidgets.QCheckBox()
@@ -101,11 +107,16 @@ class ScriptDialog(QtWidgets.QDialog):
     def _collect_values(self) -> Dict[str, object]:
         values: Dict[str, object] = {}
         for field in self._spec.fields:
-            if isinstance(field, LabelField):
+            if isinstance(field, (LabelField, ActionButtonField)):
                 continue
             widget = self._widgets[field.name]
             values[field.name] = self._value_for_field(field, widget)
+        values["_action"] = self._last_action
         return values
+
+    def _handle_action_button(self, action_name: str) -> None:
+        self._last_action = str(action_name or "")
+        self._handle_preview()
 
     def _value_for_field(self, field: Field, widget: QtWidgets.QWidget) -> object:
         if isinstance(field, BoolField):

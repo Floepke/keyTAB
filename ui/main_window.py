@@ -58,6 +58,7 @@ class MainWindow(QtWidgets.QMainWindow):
         # File management
         self.file_manager = FileManager(self)
         self.file_manager.set_before_save_hook(self._collect_app_state_for_save)
+        self.file_manager.midi_import_hook = self._handle_midi_import
 
         # View options
         try:
@@ -1957,82 +1958,155 @@ class MainWindow(QtWidgets.QMainWindow):
     def _flush_score_change_engrave(self) -> None:
         self.engraver.engrave(self._current_score_dict(), pageno=int(getattr(self, '_page_counter', 0)))
 
+    # ------------------------------------------------------------------
+    # MIDI import – track-to-hand assignment dialog
+    # ------------------------------------------------------------------
+
+    def _handle_midi_import(self, path: str):
+        """MIDI import hook called by FileManager when opening a .mid/.midi file.
+
+        Shows the track-assignment dialog with live preview.  Returns the
+        imported SCORE on accept or None if the user cancels.
+        """
+        from midi.midi_loader import midi_analyze_tracks, midi_load
+        from ui.dialogs.midi_import_dialog import MidiImportDialog
+        from ui.preview_service import PreviewSession
+
+        # Analyze tracks; fall back to simple load when there is nothing to assign.
+        try:
+            track_infos = midi_analyze_tracks(path)
+        except Exception:
+            track_infos = []
+
+        if not track_infos:
+            # No assignable tracks – just load without dialog.
+            try:
+                sc = midi_load(path)
+                if hasattr(sc, '_normalize_events_after_load'):
+                    sc._normalize_events_after_load()
+                return sc
+            except Exception as exc:
+                raise RuntimeError(f"Failed to load MIDI: {exc}") from exc
+
+        # Snapshot the current score so we can restore it on cancel.
+        preview = PreviewSession(self.file_manager, self.editor_controller, parent=self, debounce_ms=80)
+        latest_assignments: dict = {}
+
+        def _reload_with_assignments(assignments: dict) -> None:
+            """Reload MIDI with the given hand assignments and refresh the view."""
+            sc = midi_load(path, track_assignments=assignments)
+            if hasattr(sc, '_normalize_events_after_load'):
+                sc._normalize_events_after_load()
+            self.file_manager.replace_current(sc)
+
+        def _schedule_live_preview(assignments: dict) -> None:
+            nonlocal latest_assignments
+            latest_assignments = dict(assignments or {})
+            preview.schedule_preview(
+                mutator=lambda: _reload_with_assignments(latest_assignments),
+                restore_first=False,
+            )
+
+        # Initial load with default assignments so the editor shows a preview right away.
+        initial_assignments = {ti['index']: ti['default_hand'] for ti in track_infos}
+        _reload_with_assignments(initial_assignments)
+        preview.refresh()
+
+        # Build and show the dialog.
+        dlg = MidiImportDialog(track_infos=track_infos, parent=self)
+        dlg.assignments_changed.connect(_schedule_live_preview)
+
+        result = dlg.exec()
+
+        if result == QtWidgets.QDialog.DialogCode.Accepted:
+            # Flush any queued preview update so the final combo state is applied
+            # before committing and returning from the hook.
+            try:
+                preview._timer.stop()
+            except Exception:
+                pass
+            try:
+                _reload_with_assignments(dlg.get_assignments())
+                preview.refresh()
+            except Exception:
+                pass
+
+            # Apply the final selection and hand back the finished SCORE.
+            preview.commit(
+                mutator=lambda: _reload_with_assignments(dlg.get_assignments()),
+                restore_first=False,
+            )
+            # Extra safety: fully rebind and refresh views so the final imported
+            # state is always visible immediately after pressing OK.
+            try:
+                self.editor_controller.set_score(self.file_manager.current())
+            except Exception:
+                pass
+            try:
+                self._refresh_views_from_score()
+            except Exception:
+                pass
+            try:
+                if hasattr(self.editor_controller, 'force_redraw_from_model'):
+                    self.editor_controller.force_redraw_from_model()
+                else:
+                    self.editor_controller.draw_frame()
+            except Exception:
+                pass
+            return self.file_manager.current()
+        else:
+            # User cancelled – restore the original score.
+            preview.restore_original()
+            return None
+
     def _open_style_dialog(self) -> None:
-        from dataclasses import asdict
-        from file_model.layout import Layout
         from ui.dialogs.style_dialog import StyleDialog
+        from ui.preview_service import PreviewSession
 
         sc = self.file_manager.current()
         layout = getattr(sc, 'layout', None)
-        original_layout = asdict(layout) if layout is not None else None
         dlg = StyleDialog(parent=self, layout=layout, score=sc)
 
-        try:
-            adm = get_appdata_manager()
-            dlg_w = int(adm.get('style_dialog_width', 600) or 600)
-            dlg_h = int(adm.get('style_dialog_height', 550) or 550)
-            dlg.resize(max(280, dlg_w), max(300, dlg_h))
-            dlg_x = int(adm.get('style_dialog_x', -1) or -1)
-            dlg_y = int(adm.get('style_dialog_y', -1) or -1)
-            if dlg_x >= 0 and dlg_y >= 0:
-                # Avoid restoring a stale off-screen position after monitor/layout changes.
-                target = QtCore.QPoint(dlg_x, dlg_y)
-                on_screen = False
-                for screen in QtGui.QGuiApplication.screens():
-                    geo = screen.availableGeometry()
-                    if geo.contains(target):
-                        on_screen = True
-                        break
-                if on_screen:
-                    dlg.move(target)
-        except Exception:
-            pass
+        adm = get_appdata_manager()
+        dlg_w = int(adm.get('style_dialog_width', 600) or 600)
+        dlg_h = int(adm.get('style_dialog_height', 550) or 550)
+        dlg.resize(max(280, dlg_w), max(300, dlg_h))
+        dlg_x = int(adm.get('style_dialog_x', -1) or -1)
+        dlg_y = int(adm.get('style_dialog_y', -1) or -1)
+        if dlg_x >= 0 and dlg_y >= 0:
+            # Avoid restoring a stale off-screen position after monitor/layout changes.
+            target = QtCore.QPoint(dlg_x, dlg_y)
+            on_screen = False
+            for screen in QtGui.QGuiApplication.screens():
+                geo = screen.availableGeometry()
+                if geo.contains(target):
+                    on_screen = True
+                    break
+            if on_screen:
+                dlg.move(target)
 
         app_state = self._current_app_state()
         dlg.set_current_tab(int(getattr(app_state, 'style_dialog_tab_index', 0) or 0))
 
-        preview_timer = QtCore.QTimer(dlg)
-        preview_timer.setSingleShot(True)
-        preview_timer.setInterval(150)
+        preview = PreviewSession(self.file_manager, self.editor_controller, parent=dlg, debounce_ms=150)
 
-        def _emit_preview() -> None:
-            self.editor_controller.force_redraw_from_model()
-            self.editor_controller.score_changed.emit()
+        def _apply_dialog_values() -> None:
+            cur = self.file_manager.current()
+            cur.layout = dlg.get_values()
 
-        preview_timer.timeout.connect(_emit_preview)
-
-        def _schedule_preview() -> None:
-            preview_timer.stop()
-            preview_timer.start()
-
-        def _apply_live(commit_snapshot: bool = False) -> None:
-            sc.layout = dlg.get_values()
-            if commit_snapshot:
-                self.editor_controller._snapshot_if_changed(coalesce=False, label='style_edit')
-            _schedule_preview()
-
-        def _revert_state() -> None:
-            if original_layout is None:
-                return
-            sc.layout = Layout(**original_layout)
-            _schedule_preview()
-
-        dlg.values_changed.connect(lambda: _apply_live(False))
-        dlg.accepted.connect(lambda: _apply_live(True))
-        dlg.rejected.connect(_revert_state)
+        dlg.values_changed.connect(lambda: preview.schedule_preview(_apply_dialog_values, restore_first=True))
+        dlg.accepted.connect(lambda: preview.commit(label='style_edit', mutator=_apply_dialog_values, restore_first=True))
+        dlg.rejected.connect(preview.restore_original)
 
         def _persist_tab_index() -> None:
             app_state.style_dialog_tab_index = int(dlg.current_tab_index())
-            try:
-                adm = get_appdata_manager()
-                adm.set('style_dialog_width', int(dlg.width()))
-                adm.set('style_dialog_height', int(dlg.height()))
-                pos = dlg.pos()
-                adm.set('style_dialog_x', int(pos.x()))
-                adm.set('style_dialog_y', int(pos.y()))
-                adm.save()
-            except Exception:
-                pass
+            adm = get_appdata_manager()
+            adm.set('style_dialog_width', int(dlg.width()))
+            adm.set('style_dialog_height', int(dlg.height()))
+            pos = dlg.pos()
+            adm.set('style_dialog_x', int(pos.x()))
+            adm.set('style_dialog_y', int(pos.y()))
+            adm.save()
 
         dlg.finished.connect(lambda _res: _persist_tab_index())
         dlg.accepted.connect(lambda: self.file_manager.save() if self.file_manager.path() is not None else None)
@@ -2048,31 +2122,20 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def _open_line_break_dialog(self) -> None:
         from ui.dialogs.line_break_dialog import LineBreakDialog
+        from ui.preview_service import PreviewSession
 
         score = self.file_manager.current()
         if score is None:
             return
 
-        preview_timer = QtCore.QTimer(self)
-        preview_timer.setSingleShot(True)
-        preview_timer.setInterval(150)
-
-        def _emit_preview() -> None:
-            self.editor_controller.force_redraw_from_model()
-            self.editor_controller.score_changed.emit()
-
-        preview_timer.timeout.connect(_emit_preview)
-
-        def _schedule_preview() -> None:
-            preview_timer.stop()
-            preview_timer.start()
+        preview = PreviewSession(self.file_manager, self.editor_controller, parent=self, debounce_ms=150)
 
         dlg = LineBreakDialog(
             parent=self,
             score=score,
             selected_line_break=None,
             measure_resolver=(lambda t: self.editor_controller.get_measure_index_for_time(t)) if hasattr(self.editor_controller, 'get_measure_index_for_time') else None,
-            on_change=_schedule_preview,
+            on_change=preview.schedule_refresh,
         )
 
         try:
@@ -2097,11 +2160,10 @@ class MainWindow(QtWidgets.QMainWindow):
             pass
 
         def _on_accept() -> None:
-            self.editor_controller._snapshot_if_changed(coalesce=False, label='line_break_edit')
-            _schedule_preview()
+            preview.commit(label='line_break_edit', restore_first=False)
 
         def _on_reject() -> None:
-            _schedule_preview()
+            preview.restore_original()
 
         def _on_finished(_result: int) -> None:
             try:
@@ -2114,7 +2176,8 @@ class MainWindow(QtWidgets.QMainWindow):
                 adm.save()
             except Exception:
                 pass
-            self.file_manager.on_model_changed()
+            if int(_result) == int(QtWidgets.QDialog.DialogCode.Accepted):
+                self.file_manager.on_model_changed()
 
         dlg.accepted.connect(_on_accept)
         dlg.rejected.connect(_on_reject)
@@ -2197,9 +2260,32 @@ class MainWindow(QtWidgets.QMainWindow):
             recent = adm.get("recent_files", []) or []
         except Exception:
             recent = []
+            adm = None
         if not isinstance(recent, list):
             recent = []
-        recent = [str(p) for p in recent if str(p).strip()]
+        original_recent = [str(p) for p in recent if str(p).strip()]
+
+        # Normalize, remove duplicates, and prune non-existing paths before building the menu.
+        seen: set[str] = set()
+        cleaned_recent: list[str] = []
+        for raw_path in original_recent:
+            normalized = str(Path(raw_path).expanduser())
+            if normalized in seen:
+                continue
+            seen.add(normalized)
+            if not Path(normalized).is_file():
+                continue
+            cleaned_recent.append(normalized)
+
+        recent = cleaned_recent
+        if recent != original_recent:
+            try:
+                if adm is not None:
+                    adm.set("recent_files", recent)
+                    adm.save()
+            except Exception:
+                pass
+
         if not recent:
             empty_act = QtGui.QAction(self.tr("No recent files"), self)
             empty_act.setEnabled(False)
@@ -2302,9 +2388,32 @@ class MainWindow(QtWidgets.QMainWindow):
             )
 
     def _open_recent_file(self, path: str) -> None:
+        candidate = Path(str(path or "")).expanduser()
+        if not candidate.is_file():
+            try:
+                adm = get_appdata_manager()
+                recent = adm.get("recent_files", []) or []
+                if not isinstance(recent, list):
+                    recent = []
+                candidate_s = str(candidate)
+                filtered = [str(p) for p in recent if str(p).strip() and str(p) != candidate_s]
+                adm.set("recent_files", filtered)
+                adm.save()
+            except Exception:
+                pass
+            QtWidgets.QMessageBox.information(
+                self,
+                self.tr("Recent File Missing"),
+                self.tr("This file no longer exists and was removed from Recent Files:\n{path}").format(
+                    path=str(candidate),
+                ),
+            )
+            self._refresh_recent_files_menu()
+            return
+
         if not self.file_manager.confirm_save_for_action("opening another project", force_prompt=True):
             return
-        sc = self.file_manager.open_path(str(path))
+        sc = self.file_manager.open_path(str(candidate))
         if sc:
             try:
                 self._refresh_recent_files_menu()

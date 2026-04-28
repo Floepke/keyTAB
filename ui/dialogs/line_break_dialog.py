@@ -1,5 +1,4 @@
 from __future__ import annotations
-import copy
 from typing import Callable, Optional, Tuple
 from PySide6 import QtCore, QtGui, QtWidgets
 
@@ -156,8 +155,6 @@ class LineBreakDialog(QtWidgets.QDialog):
         self._on_change_cb = on_change
         self._layout = getattr(score, 'layout', None) if score is not None else None
         self._measure_grouping_text = str(getattr(self._layout, 'measure_grouping', "") or "") if self._layout is not None else ""
-        self._original_breaks: list[LineBreak] = copy.deepcopy(self._line_breaks)
-        self._original_grouping: str = str(self._measure_grouping_text)
         self._measure_starts_mm: list[float] = self._build_measure_starts()
         self._suppress_measure_change: bool = False
 
@@ -645,7 +642,7 @@ class LineBreakDialog(QtWidgets.QDialog):
                     "is the count of measures on a line; after the list is exhausted, the last\n"
                     "number repeats. Existing margins, ranges, and page/line types are reused\n"
                     "in order. Click 'Apply Measure Grouping' to generate breaks; OK saves\n"
-                    "other edits, Cancel reverts to the original state.")
+                    "other edits and Cancel discards the previewed changes.")
         )
         QtWidgets.QMessageBox.information(self, self.tr("Line Break Help"), msg)
 
@@ -766,32 +763,6 @@ class LineBreakDialog(QtWidgets.QDialog):
             except Exception:
                 pass
 
-    def restore_original_state(self) -> None:
-        if self._score is None:
-            return
-        try:
-            self._score.events.line_break = copy.deepcopy(self._original_breaks)
-        except Exception:
-            try:
-                self._score.events.line_break = [copy.deepcopy(lb) for lb in (self._original_breaks or [])]
-            except Exception:
-                self._score.events.line_break = []
-        self._line_breaks = list(getattr(self._score.events, 'line_break', []) or [])
-        if self._layout is not None:
-            try:
-                self._layout.measure_grouping = str(self._original_grouping)
-            except Exception:
-                pass
-        self._measure_starts_mm = self._build_measure_starts()
-        self._populate_break_list()
-        if self._line_breaks:
-            self._selected_line_break = self._line_breaks[0]
-        else:
-            self._selected_line_break = None
-        self._select_line_break(self._selected_line_break)
-        self._validate_form()
-        self.valuesChanged.emit()
-
     def _persist_measure_grouping(self) -> None:
         if self._layout is None:
             return
@@ -800,17 +771,10 @@ class LineBreakDialog(QtWidgets.QDialog):
         except Exception:
             pass
 
-    def done(self, result: int) -> None:
-        if result == QtWidgets.QDialog.Accepted:
-            self._persist_measure_grouping()
-            self._validate_form()
-            self.valuesChanged.emit()
-        else:
-            self.restore_original_state()
-        super().done(result)
-
     def _on_accept_clicked(self) -> None:
         if not self._validate_form():
             return
         self.msg_label.setText("")
+        self._persist_measure_grouping()
+        self.valuesChanged.emit()
         self.accept()

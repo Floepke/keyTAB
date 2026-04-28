@@ -14,6 +14,7 @@ from appdata_manager import get_appdata_manager
 from file_model.SCORE import SCORE
 from scripting.dialog import ScriptDialog
 from scripting.spec import DialogSpec
+from ui.preview_service import PreviewSession
 
 
 class ScriptContext:
@@ -90,11 +91,6 @@ class ScriptEngine:
             self._show_error("Script error", exc)
 
     def _run_module(self, module, path: Path) -> None:
-        snapshot = copy.deepcopy(self._file_manager.current().get_dict())
-        try:
-            dirty_before = bool(self._file_manager.is_dirty())
-        except Exception:
-            dirty_before = True
         ctx = ScriptContext(self._file_manager, self._editor, parent=self._parent)
         dialog_factory = getattr(module, "build_dialog", None)
         dialog_spec = getattr(module, "DIALOG_SPEC", None)
@@ -107,19 +103,17 @@ class ScriptEngine:
             spec = dialog_spec if isinstance(dialog_spec, DialogSpec) else dialog_factory(ctx)
             if not isinstance(spec, DialogSpec):
                 raise ValueError("Dialog spec must be a DialogSpec instance")
-            self._run_with_dialog(spec, ctx, snapshot, dirty_before, apply_fn, preview_fn, label)
+            self._run_with_dialog(spec, ctx, apply_fn, preview_fn, label)
             return
 
         if callable(run_fn):
-            self._restore_snapshot(snapshot)
-            self._invoke(run_fn, ctx, None)
-            self._finalize_apply(label)
+            session = PreviewSession(self._file_manager, self._editor, parent=self._parent, debounce_ms=0)
+            session.commit(label=label, mutator=lambda: self._invoke(run_fn, ctx, None), restore_first=True)
             return
 
         if callable(apply_fn):
-            self._restore_snapshot(snapshot)
-            self._invoke(apply_fn, ctx, None)
-            self._finalize_apply(label)
+            session = PreviewSession(self._file_manager, self._editor, parent=self._parent, debounce_ms=0)
+            session.commit(label=label, mutator=lambda: self._invoke(apply_fn, ctx, None), restore_first=True)
             return
 
         raise ValueError("Script must define build_dialog(), apply(), preview(), run(), or main().")
@@ -128,29 +122,32 @@ class ScriptEngine:
         self,
         spec: DialogSpec,
         ctx: ScriptContext,
-        snapshot: dict,
-        dirty_before: bool,
         apply_fn: Callable | None,
         preview_fn: Callable | None,
         label: str,
     ) -> None:
+        session = PreviewSession(self._file_manager, self._editor, parent=self._parent, debounce_ms=0)
+
         def _preview(values: dict[str, Any]) -> None:
-            self._restore_snapshot(snapshot, dirty_state=dirty_before)
             if callable(preview_fn):
-                self._invoke(preview_fn, ctx, values)
-            ctx.refresh()
+                session.preview(mutator=lambda: self._invoke(preview_fn, ctx, values), restore_first=True)
 
         def _apply(values: dict[str, Any]) -> None:
-            self._restore_snapshot(snapshot)
             if callable(apply_fn):
-                self._invoke(apply_fn, ctx, values)
+                session.commit(
+                    label=label,
+                    mutator=lambda: self._invoke(apply_fn, ctx, values),
+                    restore_first=True,
+                )
             elif callable(preview_fn):
-                self._invoke(preview_fn, ctx, values)
-            self._finalize_apply(label)
+                session.commit(
+                    label=label,
+                    mutator=lambda: self._invoke(preview_fn, ctx, values),
+                    restore_first=True,
+                )
 
         def _cancel() -> None:
-            self._restore_snapshot(snapshot, dirty_state=dirty_before)
-            ctx.refresh()
+            session.restore_original()
 
         dlg = ScriptDialog(spec=spec, on_preview=_preview, on_apply=_apply, on_cancel=_cancel, parent=self._parent)
         dlg.setModal(False)
@@ -169,29 +166,6 @@ class ScriptEngine:
         dlg.show()
         dlg.raise_()
         dlg.activateWindow()
-
-    def _restore_snapshot(self, snapshot: dict, dirty_state: bool | None = None) -> None:
-        try:
-            sc = SCORE.from_dict(copy.deepcopy(snapshot))
-            self._file_manager.replace_current(sc)
-            if dirty_state is not None:
-                if dirty_state:
-                    self._file_manager.mark_dirty()
-                else:
-                    self._file_manager.clear_dirty()
-        except Exception:
-            pass
-
-    def _finalize_apply(self, label: str) -> None:
-        try:
-            self._editor._snapshot_if_changed(coalesce=False, label=label)
-        except Exception:
-            pass
-        try:
-            self._editor.force_redraw_from_model()
-            self._editor.score_changed.emit()
-        except Exception:
-            pass
 
     def _invoke(self, fn: Callable, ctx: ScriptContext, values: dict | None) -> None:
         sig = inspect.signature(fn)

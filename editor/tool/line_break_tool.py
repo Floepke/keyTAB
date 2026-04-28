@@ -227,8 +227,13 @@ class LineBreakTool(BaseTool):
             return
         self._dialog_open = True
         from ui.dialogs.line_break_dialog import LineBreakDialog
+        from ui.preview_service import PreviewSession
         parent_w = QtWidgets.QApplication.activeWindow() if hasattr(QtWidgets, 'QApplication') else None
         score = self._editor.current_score()
+        file_manager = getattr(self._editor, '_file_manager', None)
+        preview = None
+        if file_manager is not None:
+            preview = PreviewSession(file_manager, self._editor, parent=parent_w, debounce_ms=150)
 
         def _apply_dialog_values() -> None:
             if hasattr(self._editor, 'force_redraw_from_model'):
@@ -245,17 +250,25 @@ class LineBreakTool(BaseTool):
             score=score,
             selected_line_break=lb,
             measure_resolver=(lambda t: self._editor.get_measure_index_for_time(t)) if hasattr(self._editor, 'get_measure_index_for_time') else None,
-            on_change=_apply_dialog_values,
+            on_change=preview.schedule_refresh if preview is not None else _apply_dialog_values,
         )
 
-        def _finalize_dialog(result: int) -> None:
-            try:
-                if result == QtWidgets.QDialog.Accepted:
-                    self._editor._snapshot_if_changed(coalesce=False, label='line_break_edit')
-            finally:
-                self._dialog_open = False
+        def _on_accept() -> None:
+            if preview is not None:
+                preview.commit(label='line_break_edit', restore_first=False)
+            else:
+                self._editor._snapshot_if_changed(coalesce=False, label='line_break_edit')
 
-        dlg.finished.connect(_finalize_dialog)
+        def _on_reject() -> None:
+            if preview is not None:
+                preview.restore_original()
+
+        def _on_finished(_result: int) -> None:
+            self._dialog_open = False
+
+        dlg.accepted.connect(_on_accept)
+        dlg.rejected.connect(_on_reject)
+        dlg.finished.connect(_on_finished)
         dlg.show()
 
     def on_left_drag_start(self, x: float, y: float) -> None:
