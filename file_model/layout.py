@@ -27,11 +27,11 @@ class Layout:
     chord_connect_visible: bool = True
     note_stop_visible: bool = True
     note_stem_length_semitone: int = 6
-    note_stem_thickness_mm: float = 1.1 # Thickness of the stem as well the notehead outline width
+    note_stem_thickness_mm: float = 1.15 # Thickness of the stem as well the notehead outline width
     note_stopsign_thickness_mm: float = 1.25
     note_leftdot_visible: bool = False
     note_continuation_dot_visible: bool = True
-    note_continuation_dot_size_mm: float = 2.4
+    note_continuation_dot_size_mm: float = 2.5
     note_midinote_visible: bool = False
     note_midinote_left_color: str = '#ccc'
     note_midinote_right_color: str = '#ccc'
@@ -57,8 +57,8 @@ class Layout:
 
     # Slur appearance
     slur_visible: bool = True
-    slur_width_sides_mm: float = 0.5
-    slur_width_middle_mm: float = 1.5
+    slur_width_sides_mm: float = 0.75
+    slur_width_middle_mm: float = 2.0
 
     # Hairpin (crescendo / decrescendo) appearance
     hairpin_visible: bool = True
@@ -79,7 +79,7 @@ class Layout:
 
     # Count line
     countline_visible: bool = True
-    countline_dash_pattern: list[float] = field(default_factory=lambda: [0.0, 3.5])  # Dash pattern for count lines (e.g., [dash_length, gap_length])
+    countline_dash_pattern: list[float] = field(default_factory=lambda: [0.0, 2.0])  # Dash pattern for count lines (e.g., [dash_length, gap_length])
     countline_thickness_mm: float = 1.25
 
     # Grid lines
@@ -88,9 +88,9 @@ class Layout:
     grid_line_visible: bool = True
     grid_band_visible: bool = True
     grid_band_track: list[GridBand] = field(default_factory=list) # Grid Band track. Single track for alternating bands.
-    grid_barline_thickness_mm: float = 1.25
-    grid_gridline_thickness_mm: float = 0.5
-    grid_gridline_dash_pattern_mm: list[float] = field(default_factory=lambda: [1.5, 3.0])
+    grid_barline_thickness_mm: float = 1.0
+    grid_gridline_thickness_mm: float = 1.0
+    grid_gridline_dash_pattern_mm: list[float] = field(default_factory=lambda: [3.0, 4.0])
     grid_band_color: str = '#ccc'
     grid_band_start_phase: Literal['dark', 'light'] = 'dark'
 
@@ -99,9 +99,9 @@ class Layout:
     time_signature_indicator_type: Literal['classical', 'klavarskribo', 'classical & klavarskribo'] = 'classical & klavarskribo'
     
     # Time signature indicator lane (left of stave)
-    time_signature_indicator_lane_width_mm: float = 30.0
-    time_signature_indicator_guide_thickness_mm: float = 0.5
-    time_signature_indicator_divide_guide_thickness_mm: float = 1.0
+    time_signature_indicator_lane_width_mm: float = 35.0
+    time_signature_indicator_guide_thickness_mm: float = 1.0
+    time_signature_indicator_divide_guide_thickness_mm: float = 2.0
     time_signature_indicator_classic_font: Font = field(default_factory=lambda: Font(
         family="Edwin",
         size_pt=40.0,
@@ -159,7 +159,7 @@ class Layout:
 
     # Stave appearence
     stave_two_line_thickness_mm: float = 0.5
-    stave_three_line_thickness_mm: float = 1.1
+    stave_three_line_thickness_mm: float = 0.9
     stave_clef_line_thickness_mm: float = 0.5
     stave_ledger_line_length_mm: float = 13.0
     stave_clef_line_dash_pattern_mm: list[float] = field(default_factory=lambda: [3.0])  # Dash pattern for clef lines (e.g., [dash_length, gap_length])
@@ -188,7 +188,7 @@ LAYOUT_FLOAT_CONFIG: dict[str, dict[str, float]] = {
     'text_background_padding_mm': {'min': 0.0, 'max': 20.0, 'step': 0.05},
     'hairpin_line_width_mm': {'min': 0.05, 'max': 5.0, 'step': 0.05},
     'hairpin_width_mm': {'min': 0.05, 'max': 20.0, 'step': 0.05},
-    'hairpin_font_size_pt': {'min': 4.0, 'max': 48.0, 'step': 0.5},
+    'dynamic_symbol_font_size_pt': {'min': 4.0, 'max': 48.0, 'step': 0.5},
     'hairpin_text_gap_mm': {'min': 0.0, 'max': 20.0, 'step': 0.05},
     'dynamic_symbol_background_padding_mm': {'min': 0.0, 'max': 20.0, 'step': 0.05},
     'slur_width_sides_mm': {'min': 0.05, 'max': 5.0, 'step': 0.05},
