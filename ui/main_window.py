@@ -2984,10 +2984,47 @@ class MainWindow(QtWidgets.QMainWindow):
                 self.editor_canvas.request_overlay_refresh()
             else:
                 self.editor_canvas.update()
-                pass
+            # --- Print-view playhead overlay ---
+            self._update_print_view_playhead(units)
         else:
             # Not playing: clear and stop timer
             self._clear_playhead_overlay()
+
+    def _update_print_view_playhead(self, units: Optional[float]) -> None:
+        """Update the playhead line on the print view and auto-turn pages."""
+        try:
+            from midi.printview_playhead import time_to_print_position, build_print_time_map
+            time_map = build_print_time_map(self.du)
+            if not time_map or units is None:
+                return
+            result = time_to_print_position(float(units), time_map)
+            if result is None:
+                self.print_view.clear_playhead_overlay()
+                return
+            target_page, y_mm, x1_mm, x2_mm = result
+            # Auto page turn: re-engrave the target page if it differs from the current one
+            current_page = int(getattr(self, '_page_counter', 0) or 0)
+            if target_page != current_page:
+                self._page_counter = int(target_page)
+                try:
+                    self.du.set_current_page(int(target_page))
+                except Exception:
+                    pass
+                try:
+                    self.print_view.set_page(int(target_page), request_render=False)
+                except Exception:
+                    pass
+                # Re-engrave the new page so it is fully rendered
+                try:
+                    self.engraver.engrave(
+                        self._current_score_dict(),
+                        pageno=int(target_page),
+                    )
+                except Exception:
+                    pass
+            self.print_view.set_playhead_overlay(y_mm, x1_mm, x2_mm)
+        except Exception:
+            pass
 
     def _center_playhead_scroll(self, units: Optional[float]) -> None:
         """Scroll so the current playhead measure sits at top+margin and advance only after full measures pass.
@@ -3104,6 +3141,10 @@ class MainWindow(QtWidgets.QMainWindow):
                 self.editor_canvas.request_overlay_refresh()
             else:
                 self.editor_canvas.update()
+        except Exception:
+            pass
+        try:
+            self.print_view.clear_playhead_overlay()
         except Exception:
             pass
         self._playhead_anchor_measure = None

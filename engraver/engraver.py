@@ -4287,6 +4287,45 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
             x_cursor = x_cursor + float(line['total_width']) + gap
 
 
+    # Build a compact time-to-page map so the print-view playhead can locate any
+    # source-time position without re-running the full engraver.
+    # Structure: list[list[dict]] – one outer entry per page, each inner list
+    # contains one dict per stave line with time/y/x geometry.
+    _ptm: list = []
+    for _p_idx, _p_lines in enumerate(pages):
+        _page_lines_ord = list(reversed(_p_lines)) if horizontal_read_direction else _p_lines
+        # y range for this page
+        if horizontal_read_direction:
+            _y_top = float(page_top)
+            _y_bot = float(page_h - page_bottom)
+        else:
+            _h_off = float(header_height) if _p_idx == 0 else 0.0
+            _y_top = float(page_top + _h_off)
+            _y_bot = float(page_h - page_bottom - footer_height)
+        # x justification for this page
+        _lr, _rr = _line_axis_reserves_for_page(_p_idx)
+        _avail = max(1e-6, page_w - page_left - page_right - _lr - _rr)
+        _used = sum(float(_l['total_width']) for _l in _page_lines_ord)
+        _leftover = max(0.0, _avail - _used)
+        _gap = _leftover / float(len(_page_lines_ord) + 1) if _page_lines_ord else 0.0
+        _xc = page_left + _lr + _gap
+        _lines_map: list = []
+        for _line in _page_lines_ord:
+            _lo = float(_line.get('ledger_left_overhang', 0.0) or 0.0)
+            _lx_s = _xc + float(_line['margin_left']) + _lo
+            _lx_e = _lx_s + float(_line.get('stave_width', 0.0) or 0.0)
+            _lines_map.append({
+                'time_start': float(_line.get('time_start', 0.0)),
+                'time_end': float(_line.get('time_end', 0.0)),
+                'y_top': float(_y_top),
+                'y_bottom': float(_y_bot),
+                'x_start': float(_lx_s),
+                'x_end': float(_lx_e),
+            })
+            _xc += float(_line['total_width']) + _gap
+        _ptm.append(_lines_map)
+    du.print_time_map = _ptm
+
     # Ensure a valid current page index
     if du.page_count() > 0:
         if pdf_export:
@@ -4353,16 +4392,10 @@ class Engraver(QtCore.QObject):
 
     def _close_result_pipe(self) -> None:
         if self._result_send is not None:
-            try:
-                self._result_send.close()
-            except Exception:
-                pass
+            self._result_send.close()
             self._result_send = None
         if self._result_recv is not None:
-            try:
-                self._result_recv.close()
-            except Exception:
-                pass
+            self._result_recv.close()
             self._result_recv = None
 
     def engrave(self, score: dict, pageno: int | None = None) -> None:
@@ -4526,6 +4559,10 @@ class Engraver(QtCore.QObject):
             self.analysis = getattr(result_du, 'analysis', None)
             try:
                 self._du.analysis = self.analysis
+            except Exception:
+                pass
+            try:
+                self._du.print_time_map = getattr(result_du, 'print_time_map', [])
             except Exception:
                 pass
             self.engraved.emit()

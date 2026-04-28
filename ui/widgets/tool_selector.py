@@ -176,6 +176,15 @@ class ToolSelectorDock(QtWidgets.QDockWidget):
         # Lock dock: no moving, no floating, no closing
         self.setAllowedAreas(QtCore.Qt.DockWidgetArea.LeftDockWidgetArea | QtCore.Qt.DockWidgetArea.RightDockWidgetArea)
         self.setFeatures(QtWidgets.QDockWidget.DockWidgetFeature.NoDockWidgetFeatures)
+        self.setToolTip(self.tr(
+            "Select a tool by clicking or scrolling through the list.\n\n"
+            "Mouse interaction (applies to all tools):\n"
+            "  • Left-click on empty space — add a new object\n"
+            "  • Left-click on an existing object — edit it\n"
+            "  • Right-click on an existing object — delete it\n\n"
+            "Some tools provide a contextual toolbar beneath the vertical divider line.\n"
+            "There you can choose the object type to place or edit; "
+        ))
         # Wrap the list in a container with small margins to match Snap Size indent
         container = QtWidgets.QWidget(self)
         lay = QtWidgets.QVBoxLayout(container)

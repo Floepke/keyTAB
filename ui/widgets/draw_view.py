@@ -73,6 +73,10 @@ class DrawUtilView(QtWidgets.QWidget):
         self._scroll_px: float = 0.0
         self._score: dict | None = None
         self._page_prev_cb = None
+        # Playhead overlay: set by set_playhead_overlay(), drawn in paintEvent
+        self._playhead_y_mm: float | None = None
+        self._playhead_x1_mm: float | None = None
+        self._playhead_x2_mm: float | None = None
         self._page_next_cb = None
         # Resize throttling: scale existing image during drag, re-render after settle
         self._resizing: bool = False
@@ -101,6 +105,20 @@ class DrawUtilView(QtWidgets.QWidget):
     def set_page_turn_callbacks(self, prev_cb, next_cb) -> None:
         self._page_prev_cb = prev_cb
         self._page_next_cb = next_cb
+
+    def set_playhead_overlay(self, y_mm: float, x1_mm: float, x2_mm: float) -> None:
+        """Set the print-view playhead position and trigger a repaint."""
+        self._playhead_y_mm = float(y_mm)
+        self._playhead_x1_mm = float(x1_mm)
+        self._playhead_x2_mm = float(x2_mm)
+        self.update()
+
+    def clear_playhead_overlay(self) -> None:
+        """Remove the playhead overlay and trigger a repaint."""
+        self._playhead_y_mm = None
+        self._playhead_x1_mm = None
+        self._playhead_x2_mm = None
+        self.update()
 
     def sizeHint(self) -> QtCore.QSize:
         return QtCore.QSize(600, 800)
@@ -208,6 +226,58 @@ class DrawUtilView(QtWidgets.QWidget):
                 _draw_image(self._image, self._fade_progress)
             else:
                 _draw_image(self._image, 1.0)
+
+        # --- Playhead overlay (drawn on top of the page image) ---
+        if (
+            self._playhead_y_mm is not None
+            and self._playhead_x1_mm is not None
+            and self._playhead_x2_mm is not None
+            and self._image is not None
+        ):
+            try:
+                from ui.style import Style as _Style
+                _accent_rgb = _Style.get_named_rgb('accent', fallback=(51, 153, 255))
+                _ph_color = QtGui.QColor(
+                    int(_accent_rgb[0]),
+                    int(_accent_rgb[1]),
+                    int(_accent_rgb[2]),
+                    int(0.8 * 255),
+                )
+                # Convert mm → widget px using the same transform as the image
+                _img_w = self._image.width() / self._image.devicePixelRatio()
+                _img_h = self._image.height() / self._image.devicePixelRatio()
+                if self._resizing and _img_w > 0:
+                    _scale = float(self.width()) / float(_img_w)
+                else:
+                    _scale = 1.0
+                _tgt_w = int(round(_img_w * _scale))
+                _tgt_h = int(round(_img_h * _scale))
+                _img_x = 0
+                if _tgt_h <= self.height():
+                    _img_y = (self.height() - _tgt_h) // 2
+                else:
+                    _max_sc = max(0, _tgt_h - self.height())
+                    _img_y = -int(round(min(float(_max_sc), float(self._scroll_px))))
+                # widget px per mm: tgt_w / page_w_mm
+                try:
+                    _page_w_mm, _ = self._du.current_page_size_mm()
+                    _ppm = float(_tgt_w) / max(1e-6, float(_page_w_mm))
+                except Exception:
+                    _ppm = float(_tgt_w) / 210.0
+                _x1_px = _img_x + int(round(self._playhead_x1_mm * _ppm))
+                _x2_px = _img_x + int(round(self._playhead_x2_mm * _ppm))
+                _y_px = _img_y + int(round(self._playhead_y_mm * _ppm))
+                _pen = QtGui.QPen(_ph_color)
+                _pen.setWidthF(max(1.5, _ppm * 1.0))
+                _pen.setCapStyle(QtCore.Qt.PenCapStyle.FlatCap)
+                painter.save()
+                painter.setRenderHint(QtGui.QPainter.RenderHint.Antialiasing, True)
+                painter.setPen(_pen)
+                painter.drawLine(_x1_px, _y_px, _x2_px, _y_px)
+                painter.restore()
+            except Exception:
+                pass
+
         painter.end()
 
     def wheelEvent(self, ev: QtGui.QWheelEvent) -> None:
