@@ -81,7 +81,7 @@ class StaveDrawerMixin:
             (52, 63),   # C5–B5
             (76, 87),   # C7–B7
         ]
-        grey_fill = (0.5, 0.5, 0.5, 0.18)
+        grey_fill = (0.9, 0.9, 0.9, 1.0)
         for span_start, span_end in grey_octave_spans:
             gx1 = float(self.pitch_to_x(span_start)) - semitone_dx
             gx2 = float(self.pitch_to_x(span_end)) + semitone_dx

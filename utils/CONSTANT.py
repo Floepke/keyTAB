@@ -25,6 +25,7 @@ EDITOR_SIDE_BAND_INSET_SEMITONES: int = 10
 EDITOR_LAYERING = [
     # layers from background to foreground
     'page_background',
+    'piano_octave_band',
     'grid_band_stop_line',
     'grid_band',
     'snap_band',
