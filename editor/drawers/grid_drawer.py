@@ -419,13 +419,13 @@ class GridDrawerMixin:
                     dash_pattern=[2.0, 2.0],
                 )
 
-        # Draw regular barlines; draw final end barline thicker.
+        # Draw regular barlines; draw final end barline twice as thick.
         if barline_visible:
             for idx, t in enumerate(barline_times):
                 is_last = idx == (len(barline_times) - 1)
                 _draw_barline_constructive(
                     float(t),
-                    bar_width_mm,
+                    bar_width_mm * 2.0 if is_last else bar_width_mm,
                     (["barline", "end_barline"] if is_last else ["barline"]),
                 )
 
