@@ -7,7 +7,7 @@ Bump policy (Semantic Versioning):
   PATCH - bug fixes only
 """
 
-__version__ = "1.0.5beta"
+__version__ = "1.0.5"
 APP_NAME    = "keyTAB"
 
 change_log = '''
@@ -47,4 +47,5 @@ change_log = '''
 - implemented horizontal read mode in engraver, this requires probably further finetuning
 - fix: the full screen toggle checkbox works correct now in the menu on app startup
 - fit button works now as splitter handle too, allowing to drag it to resize the editor and print-preview areas. The tooltip is updated to reflect this new behavior.
+- implemented miniature piano keyboard in editor below the end barline, showing the full range of keys with octave numbers. This is a visual aid for users to understand the pitch layout of the piano-roll stave.
 '''
