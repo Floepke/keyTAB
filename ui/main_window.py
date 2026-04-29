@@ -2648,6 +2648,8 @@ class MainWindow(QtWidgets.QMainWindow):
                     page_orientation = 'landscape'
                 if page_orientation == 'landscape':
                     w_mm, h_mm = h_mm, w_mm
+                # The engraver always rotates -90° for horizontal read direction,
+                # which swaps the output dimensions reported by DrawUtil.
                 read_direction = str(getattr(lay, 'read_direction', 'vertical') or 'vertical').strip().lower()
                 if read_direction == 'horizontal':
                     w_mm, h_mm = h_mm, w_mm

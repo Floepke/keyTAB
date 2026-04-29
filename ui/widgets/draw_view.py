@@ -128,11 +128,8 @@ class DrawUtilView(QtWidgets.QWidget):
         return QtCore.QSize(600, 800)
 
     def _is_horizontal_read_direction(self) -> bool:
-        try:
-            layout = (self._score or {}).get('layout', {}) or {}
-            return str(layout.get('read_direction', 'vertical') or 'vertical').strip().lower() == 'horizontal'
-        except Exception:
-            return False
+        layout = (self._score or {}).get('layout', {}) or {}
+        return str(layout.get('read_direction', 'vertical') or 'vertical').strip().lower() == 'horizontal'
 
     def _fit_scale_for_page(self, page_w_mm: float, page_h_mm: float, dpr: float) -> float:
         if self._is_horizontal_read_direction():
