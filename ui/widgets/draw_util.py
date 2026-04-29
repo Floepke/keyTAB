@@ -280,6 +280,37 @@ class DrawUtil:
             return (float(page.width_mm) - float(x_mm), float(page.height_mm) - float(y_mm))
         return (float(x_mm), float(y_mm))
 
+    def page_rotation_deg(self, page_index: Optional[int] = None) -> float:
+        """Return the configured page rotation (degrees) for a page."""
+        if page_index is None:
+            page_index = self._current_index
+        if page_index < 0 or page_index >= len(self._pages):
+            return 0.0
+        return float(self._pages[page_index].rotation_deg or 0.0)
+
+    def map_page_point_to_output_mm(self, x_mm: float, y_mm: float, page_index: Optional[int] = None) -> Tuple[float, float]:
+        """Map page-space millimeter coordinates to output-space coordinates.
+
+        Page-space coordinates are the unrotated drawing coordinates used while
+        recording DrawUtil items. Output-space coordinates are what callers see
+        in rendered images and hit-testing APIs.
+        """
+        if page_index is None:
+            page_index = self._current_index
+        if page_index < 0 or page_index >= len(self._pages):
+            return (float(x_mm), float(y_mm))
+        page = self._pages[page_index]
+        rotation = int(round(float(page.rotation_deg or 0.0))) % 360
+        px = float(x_mm)
+        py = float(y_mm)
+        if rotation == 270:
+            return (py, float(page.width_mm) - px)
+        if rotation == 90:
+            return (float(page.height_mm) - py, px)
+        if rotation == 180:
+            return (float(page.width_mm) - px, float(page.height_mm) - py)
+        return (px, py)
+
     def add_line(self, x1_mm: float, y1_mm: float, x2_mm: float, y2_mm: float,
                  color: Color = (0, 0, 0, 1), width_mm: float = 0.3,
                  dash_pattern: Optional[Sequence[float]] = None,

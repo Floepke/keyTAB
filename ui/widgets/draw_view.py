@@ -69,8 +69,10 @@ class DrawUtilView(QtWidgets.QWidget):
         self._last_px_per_mm: float = 1.0  # device px per mm
         self._last_widget_px_per_mm: float = 1.0  # widget px per mm
         self._last_dpr: float = 1.0
+        self._last_w_px: int = 0
         self._last_h_px: int = 0
-        self._scroll_px: float = 0.0
+        self._scroll_x_px: float = 0.0
+        self._scroll_y_px: float = 0.0
         self._score: dict | None = None
         self._page_prev_cb = None
         # Playhead overlay: set by set_playhead_overlay(), drawn in paintEvent
@@ -98,7 +100,8 @@ class DrawUtilView(QtWidgets.QWidget):
 
     def set_page(self, index: int, request_render: bool = True):
         self._page_index = index
-        self._scroll_px = 0.0
+        self._scroll_x_px = 0.0
+        self._scroll_y_px = 0.0
         if request_render:
             self.request_render()
 
@@ -111,6 +114,7 @@ class DrawUtilView(QtWidgets.QWidget):
         self._playhead_y_mm = float(y_mm)
         self._playhead_x1_mm = float(x1_mm)
         self._playhead_x2_mm = float(x2_mm)
+        self._update_playhead_scroll()
         self.update()
 
     def clear_playhead_overlay(self) -> None:
@@ -123,9 +127,100 @@ class DrawUtilView(QtWidgets.QWidget):
     def sizeHint(self) -> QtCore.QSize:
         return QtCore.QSize(600, 800)
 
+    def _is_horizontal_read_direction(self) -> bool:
+        try:
+            layout = (self._score or {}).get('layout', {}) or {}
+            return str(layout.get('read_direction', 'vertical') or 'vertical').strip().lower() == 'horizontal'
+        except Exception:
+            return False
+
+    def _fit_scale_for_page(self, page_w_mm: float, page_h_mm: float, dpr: float) -> float:
+        if self._is_horizontal_read_direction():
+            return (max(1, self.height()) * float(dpr)) / max(1e-6, float(page_h_mm))
+        return (max(1, self.width()) * float(dpr)) / max(1e-6, float(page_w_mm))
+
+    def _scaled_image_metrics(self, img: QtGui.QImage) -> tuple[int, int, int, int, float, float, float]:
+        img_w = float(img.width()) / max(1e-6, float(img.devicePixelRatio()))
+        img_h = float(img.height()) / max(1e-6, float(img.devicePixelRatio()))
+        if self._resizing and img_w > 0.0 and img_h > 0.0:
+            if self._is_horizontal_read_direction():
+                scale = float(max(1, self.height())) / float(img_h)
+            else:
+                scale = float(max(1, self.width())) / float(img_w)
+        else:
+            scale = 1.0
+        tgt_w = int(round(img_w * scale))
+        tgt_h = int(round(img_h * scale))
+        max_scroll_x = max(0.0, float(tgt_w - self.width()))
+        max_scroll_y = max(0.0, float(tgt_h - self.height()))
+        self._scroll_x_px = max(0.0, min(float(max_scroll_x), float(self._scroll_x_px)))
+        self._scroll_y_px = max(0.0, min(float(max_scroll_y), float(self._scroll_y_px)))
+        if tgt_w <= self.width():
+            img_x = (self.width() - tgt_w) // 2
+        else:
+            img_x = -int(round(self._scroll_x_px))
+        if tgt_h <= self.height():
+            img_y = (self.height() - tgt_h) // 2
+        else:
+            img_y = -int(round(self._scroll_y_px))
+        return (tgt_w, tgt_h, img_x, img_y, scale, max_scroll_x, max_scroll_y)
+
+    def _playhead_midpoint_output_px(self, ppm: float) -> tuple[float, float] | None:
+        if (
+            self._playhead_y_mm is None
+            or self._playhead_x1_mm is None
+            or self._playhead_x2_mm is None
+        ):
+            return None
+        x1_mm_out, y1_mm_out = self._du.map_page_point_to_output_mm(
+            float(self._playhead_x1_mm),
+            float(self._playhead_y_mm),
+            self._page_index,
+        )
+        x2_mm_out, y2_mm_out = self._du.map_page_point_to_output_mm(
+            float(self._playhead_x2_mm),
+            float(self._playhead_y_mm),
+            self._page_index,
+        )
+        return (
+            ((float(x1_mm_out) + float(x2_mm_out)) * 0.5) * float(ppm),
+            ((float(y1_mm_out) + float(y2_mm_out)) * 0.5) * float(ppm),
+        )
+
+    def _update_playhead_scroll(self) -> None:
+        if self._image is None:
+            return
+
+        # Compute the playhead midpoint in output pixels, then adjust scroll to center it if possible.
+        tgt_w, tgt_h, _img_x, _img_y, _scale, max_scroll_x, max_scroll_y = self._scaled_image_metrics(self._image)
+        page_w_mm, page_h_mm = self._du.current_page_size_mm()
+        ppm_x = float(tgt_w) / max(1e-6, float(page_w_mm))
+        ppm_y = float(tgt_h) / max(1e-6, float(page_h_mm))
+        ppm = min(ppm_x, ppm_y) if ppm_x > 0.0 and ppm_y > 0.0 else max(ppm_x, ppm_y)
+        midpoint_px = self._playhead_midpoint_output_px(ppm)
+        if midpoint_px is None:
+            return
+        mid_x_px, mid_y_px = midpoint_px
+        changed = False
+        if self._is_horizontal_read_direction():
+            if max_scroll_x > 0.0:
+                target_scroll_x = max(0.0, min(float(max_scroll_x), float(mid_x_px - (self.width() * 0.5))))
+                if abs(float(self._scroll_x_px) - float(target_scroll_x)) > 0.5:
+                    self._scroll_x_px = float(target_scroll_x)
+                    changed = True
+        else:
+            if max_scroll_y > 0.0:
+                target_scroll_y = max(0.0, min(float(max_scroll_y), float(mid_y_px - (self.height() * 0.5))))
+                if abs(float(self._scroll_y_px) - float(target_scroll_y)) > 0.5:
+                    self._scroll_y_px = float(target_scroll_y)
+                    changed = True
+        if changed:
+            self.update()
+
     @QtCore.Slot()
     def request_render(self):
         w = max(1, self.width())
+        h = max(1, self.height())
         dpr = float(self.devicePixelRatioF())
         page_count = self._du.page_count()
         if page_count <= 0:
@@ -135,13 +230,14 @@ class DrawUtilView(QtWidgets.QWidget):
         page_w_mm, page_h_mm = self._du.current_page_size_mm()
         if page_w_mm <= 0 or page_h_mm <= 0:
             return
-        px_per_mm = (w * dpr) / page_w_mm
+        px_per_mm = self._fit_scale_for_page(page_w_mm, page_h_mm, dpr)
         h_px = int(page_h_mm * px_per_mm)
-        w_px = int(w * dpr)
+        w_px = int(page_w_mm * px_per_mm)
         # Store metrics for hit-testing
         self._last_px_per_mm = px_per_mm
-        self._last_widget_px_per_mm = (w) / page_w_mm
+        self._last_widget_px_per_mm = float(px_per_mm) / max(1e-6, float(dpr))
         self._last_dpr = dpr
+        self._last_w_px = w_px
         self._last_h_px = h_px
         task = RenderTask(self._du, w_px, h_px, px_per_mm, dpr, self._page_index, self._emitter, self._score, False)
         self._pool.start(task)
@@ -178,22 +274,7 @@ class DrawUtilView(QtWidgets.QWidget):
             except Exception:
                 paper_qcolor = QtCore.Qt.GlobalColor.white
 
-            img_w = self._image.width() / self._image.devicePixelRatio()
-            img_h = self._image.height() / self._image.devicePixelRatio()
-            # During resize, scale current image to widget width to avoid re-engraving per frame
-            if self._resizing and img_w > 0:
-                scale = float(self.width()) / float(img_w)
-            else:
-                scale = 1.0
-            tgt_w = int(round(img_w * scale))
-            tgt_h = int(round(img_h * scale))
-            x = 0
-            if tgt_h <= self.height():
-                y = (self.height() - tgt_h) // 2
-            else:
-                max_scroll = max(0, tgt_h - self.height())
-                self._scroll_px = max(0.0, min(float(max_scroll), float(self._scroll_px)))
-                y = -int(round(self._scroll_px))
+            tgt_w, tgt_h, x, y, _scale, _max_scroll_x, _max_scroll_y = self._scaled_image_metrics(self._image)
 
             # Keep a permanent paper layer behind transition frames so cross-fades remain white.
             painter.fillRect(QtCore.QRect(x, y, tgt_w, tgt_h), paper_qcolor)
@@ -201,22 +282,7 @@ class DrawUtilView(QtWidgets.QWidget):
             def _draw_image(img: QtGui.QImage, opacity: float) -> None:
                 painter.save()
                 painter.setOpacity(opacity)
-                img_w = img.width() / img.devicePixelRatio()
-                img_h = img.height() / img.devicePixelRatio()
-                # During resize, scale current image to widget width to avoid re-engraving per frame
-                if self._resizing and img_w > 0:
-                    scale = float(self.width()) / float(img_w)
-                else:
-                    scale = 1.0
-                tgt_w = int(round(img_w * scale))
-                tgt_h = int(round(img_h * scale))
-                x = 0
-                if tgt_h <= self.height():
-                    y = (self.height() - tgt_h) // 2
-                else:
-                    max_scroll = max(0, tgt_h - self.height())
-                    self._scroll_px = max(0.0, min(float(max_scroll), float(self._scroll_px)))
-                    y = -int(round(self._scroll_px))
+                tgt_w, tgt_h, x, y, _scale, _max_scroll_x, _max_scroll_y = self._scaled_image_metrics(img)
                 painter.drawImage(QtCore.QRect(x, y, tgt_w, tgt_h), img)
                 painter.restore()
 
@@ -244,36 +310,38 @@ class DrawUtilView(QtWidgets.QWidget):
                     int(0.8 * 255),
                 )
                 # Convert mm → widget px using the same transform as the image
-                _img_w = self._image.width() / self._image.devicePixelRatio()
-                _img_h = self._image.height() / self._image.devicePixelRatio()
-                if self._resizing and _img_w > 0:
-                    _scale = float(self.width()) / float(_img_w)
-                else:
-                    _scale = 1.0
-                _tgt_w = int(round(_img_w * _scale))
-                _tgt_h = int(round(_img_h * _scale))
-                _img_x = 0
-                if _tgt_h <= self.height():
-                    _img_y = (self.height() - _tgt_h) // 2
-                else:
-                    _max_sc = max(0, _tgt_h - self.height())
-                    _img_y = -int(round(min(float(_max_sc), float(self._scroll_px))))
+                _tgt_w, _tgt_h, _img_x, _img_y, _scale, _max_scroll_x, _max_scroll_y = self._scaled_image_metrics(self._image)
                 # widget px per mm: tgt_w / page_w_mm
                 try:
-                    _page_w_mm, _ = self._du.current_page_size_mm()
-                    _ppm = float(_tgt_w) / max(1e-6, float(_page_w_mm))
+                    _page_w_mm, _page_h_mm = self._du.current_page_size_mm()
+                    _ppm_x = float(_tgt_w) / max(1e-6, float(_page_w_mm))
+                    _ppm_y = float(_tgt_h) / max(1e-6, float(_page_h_mm))
+                    _ppm = min(_ppm_x, _ppm_y) if _ppm_x > 0.0 and _ppm_y > 0.0 else max(_ppm_x, _ppm_y)
                 except Exception:
                     _ppm = float(_tgt_w) / 210.0
-                _x1_px = _img_x + int(round(self._playhead_x1_mm * _ppm))
-                _x2_px = _img_x + int(round(self._playhead_x2_mm * _ppm))
-                _y_px = _img_y + int(round(self._playhead_y_mm * _ppm))
+                # Map from unrotated drawing-space mm to rendered output-space mm
+                # so the overlay follows the same page rotation as DrawUtil.
+                _x1_mm_out, _y1_mm_out = self._du.map_page_point_to_output_mm(
+                    float(self._playhead_x1_mm),
+                    float(self._playhead_y_mm),
+                    self._page_index,
+                )
+                _x2_mm_out, _y2_mm_out = self._du.map_page_point_to_output_mm(
+                    float(self._playhead_x2_mm),
+                    float(self._playhead_y_mm),
+                    self._page_index,
+                )
+                _x1_px = _img_x + int(round(_x1_mm_out * _ppm))
+                _y1_px = _img_y + int(round(_y1_mm_out * _ppm))
+                _x2_px = _img_x + int(round(_x2_mm_out * _ppm))
+                _y2_px = _img_y + int(round(_y2_mm_out * _ppm))
                 _pen = QtGui.QPen(_ph_color)
                 _pen.setWidthF(max(1.5, _ppm * 1.0))
                 _pen.setCapStyle(QtCore.Qt.PenCapStyle.FlatCap)
                 painter.save()
                 painter.setRenderHint(QtGui.QPainter.RenderHint.Antialiasing, True)
                 painter.setPen(_pen)
-                painter.drawLine(_x1_px, _y_px, _x2_px, _y_px)
+                painter.drawLine(_x1_px, _y1_px, _x2_px, _y2_px)
                 painter.restore()
             except Exception:
                 pass
@@ -283,16 +351,25 @@ class DrawUtilView(QtWidgets.QWidget):
     def wheelEvent(self, ev: QtGui.QWheelEvent) -> None:
         if self._image is None:
             return
-        img_h = int(self._image.height() / self._image.devicePixelRatio())
-        if img_h <= self.height():
+        _tgt_w, _tgt_h, _img_x, _img_y, _scale, max_scroll_x, max_scroll_y = self._scaled_image_metrics(self._image)
+        if max_scroll_x <= 0.0 and max_scroll_y <= 0.0:
             return
-        delta = ev.pixelDelta().y()
+        use_horizontal = bool(self._is_horizontal_read_direction() and max_scroll_x > 0.0)
+        pixel_delta = ev.pixelDelta()
+        angle_delta = ev.angleDelta()
+        delta = pixel_delta.x() if use_horizontal else pixel_delta.y()
         if delta == 0:
-            delta = ev.angleDelta().y() / 2
+            delta = angle_delta.x() if use_horizontal else angle_delta.y()
+        if delta == 0:
+            delta = angle_delta.y() if use_horizontal else angle_delta.x()
+        if delta != 0:
+            delta = delta / 2
         if delta == 0:
             return
-        max_scroll = max(0, img_h - self.height())
-        self._scroll_px = max(0.0, min(float(max_scroll), float(self._scroll_px - delta)))
+        if use_horizontal:
+            self._scroll_x_px = max(0.0, min(float(max_scroll_x), float(self._scroll_x_px - delta)))
+        else:
+            self._scroll_y_px = max(0.0, min(float(max_scroll_y), float(self._scroll_y_px - delta)))
         self.update()
         ev.accept()
 
@@ -306,14 +383,10 @@ class DrawUtilView(QtWidgets.QWidget):
         if self._image is None:
             return
         # Convert from widget px to page mm
-        img_h = int(self._image.height() / self._last_dpr)
-        if img_h <= self.height():
-            y_offset_px = (self.height() - img_h) // 2
-        else:
-            y_offset_px = -int(round(self._scroll_px))
-        x_px = ev.position().x()
+        _tgt_w, _tgt_h, x_offset_px, y_offset_px, _scale, _max_scroll_x, _max_scroll_y = self._scaled_image_metrics(self._image)
+        x_px = ev.position().x() - x_offset_px
         y_px = ev.position().y() - y_offset_px
-        if y_px < 0 or y_px > (self._last_h_px / self._last_dpr) or x_px < 0:
+        if x_px < 0 or y_px < 0 or x_px > float(_tgt_w) or y_px > float(_tgt_h):
             return
         # Use widget px per mm for conversion (since event positions are in widget px)
         x_mm = float(x_px) / self._last_widget_px_per_mm
@@ -365,6 +438,7 @@ class DrawUtilView(QtWidgets.QWidget):
             self._prev_image = None
             self._fade_progress = 1.0
         self._image = image
+        self._update_playhead_scroll()
         self.update()
 
     def _on_fade_tick(self) -> None:

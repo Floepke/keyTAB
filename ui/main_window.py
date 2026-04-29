@@ -2648,6 +2648,9 @@ class MainWindow(QtWidgets.QMainWindow):
                     page_orientation = 'landscape'
                 if page_orientation == 'landscape':
                     w_mm, h_mm = h_mm, w_mm
+                read_direction = str(getattr(lay, 'read_direction', 'vertical') or 'vertical').strip().lower()
+                if read_direction == 'horizontal':
+                    w_mm, h_mm = h_mm, w_mm
                 return w_mm, h_mm
         except Exception:
             pass
