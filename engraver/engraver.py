@@ -2930,7 +2930,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                 tempo_dash = [0.5, 1.0]
                 tempo_stroke = 0.25
                 right_outer_stave_x = float(grid_right)
-                tempo_right_pad = max(0.6, 0.8 * scale)
+                tempo_right_pad = max(0.6, 4.0 * scale)
 
                 def _tempo_left_x(tp_time: float) -> float:
                     key = round(float(tp_time), 6)
@@ -2974,22 +2974,24 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                     if op_time.gt(y0_tempo, y1_tempo):
                         y0_tempo, y1_tempo = y1_tempo, y0_tempo
 
-                    tempo_text = str(tempo_val) + '.'
-                    _txb, _tyb, tempo_text_w, _th = du._get_text_extents_mm(
-                        tempo_text,
-                        tempo_font_family,
-                        tempo_font_size_pt,
-                        False,
-                        True,
+                    tempo_text = str(tempo_val)
+                    _, _, tempo_text_w, tempo_text_h = du._get_text_extents_mm(
+                        text=tempo_text,
+                        family=tempo_font_family,
+                        size_pt=tempo_font_size_pt,
+                        italic=False,
+                        bold=True,
                     )
                     tempo_text_w = max(1.0, float(tempo_text_w))
+                    tempo_text_h = max(0.5, float(tempo_text_h))
+                    tempo_text_span_x = float(tempo_text_h) if horizontal_read_direction else float(tempo_text_w)
 
                     # Keep the left edge of tempo text aligned with the right edge
                     # of the measure-number text; variable text width grows to the right.
                     tempo_text_left = _tempo_left_x(t0) + (tempo_x_offset * scale)
                     tempo_x_left = float(tempo_text_left)
-                    x_text_right = float(tempo_text_left + tempo_text_w)
-                    tempo_x_right = float(x_text_right + tempo_right_pad)
+                    tempo_text_center_x = float(tempo_x_left + (tempo_text_span_x * 0.5))
+                    tempo_x_right = float(tempo_x_left + tempo_text_span_x + tempo_right_pad)
                     tempo_top_start_x = _tempo_top_start_x(t0)
 
                     # Open-left dashed bracket (top, right, bottom only).
@@ -3029,7 +3031,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
 
                     y_center_tempo = (y0_tempo + y1_tempo) * 0.5
                     du.add_text(
-                        x_text_right,
+                        tempo_text_center_x,
                         y_center_tempo,
                         tempo_text,
                         family=tempo_font_family,
@@ -3037,16 +3039,15 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                         italic=False,
                         bold=True,
                         color=notation_color,
-                        anchor='e',
+                        anchor='center',
                         id=int(tp.get('id', 0) or 0),
                         tags=['tempo_text'],
                         hit_rect_mm=None,
-                        angle_deg=0.0,
+                        angle_deg=90.0 if horizontal_read_direction else 0.0,
                     )
 
             symbol_width = max(3.0, semitone_mm * 4.0)
             symbol_gap = max(0.6, semitone_mm * 0.35)
-            symbol_thin_w = max(0.15, bar_width_mm * 0.9)
             symbol_thick_w = max(0.1, bar_width_mm)
             symbol_dot_d = max(1.0, semitone_mm * 0.6)
             # Minimum clear gap between the outer edge of the horizontal line
