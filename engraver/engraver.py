@@ -3548,8 +3548,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                     if _should_tune_under_stem_black_width(item, black_rule, line_notes, op_time):
                         try:
                             notehead_layout = dict(layout)
-                            base_scale = float(notehead_layout.get('note_width_scaling', 0.75) or 0.75)
-                            notehead_layout['note_width_scaling'] = max(0.05, base_scale * 0.75)
+                            notehead_layout['note_width_scaling'] = 0.75
                         except Exception:
                             notehead_layout = layout
                     notehead = Notehead.from_note(

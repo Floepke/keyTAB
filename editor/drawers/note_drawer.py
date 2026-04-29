@@ -238,8 +238,7 @@ class NoteDrawerMixin:
                     layout_for_notehead = dict(layout)
                 else:
                     layout_for_notehead = dict(vars(layout))
-                base_scale = float(layout_for_notehead.get('note_width_scaling', 0.75) or 0.75)
-                layout_for_notehead['note_width_scaling'] = max(0.05, base_scale * 0.75)
+                layout_for_notehead['note_width_scaling'] = 0.75
             except Exception:
                 layout_for_notehead = layout
         outline_w = self._editor_line_width_mm()
