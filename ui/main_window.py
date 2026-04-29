@@ -2634,33 +2634,27 @@ class MainWindow(QtWidgets.QMainWindow):
         self._show_status_default()
 
     def _page_dimensions_mm(self) -> tuple[float, float]:
-        try:
-            sc = self.file_manager.current()
-            lay = getattr(sc, 'layout', None)
-            if lay:
-                w_mm = float(getattr(lay, 'page_width_mm', 210.0) or 210.0)
-                h_mm = float(getattr(lay, 'page_height_mm', 297.0) or 297.0)
-                page_orientation = str(getattr(lay, 'page_orientation', 'portrait') or 'portrait').strip().lower()
-                # Keep compatibility with legacy horizontal/vertical orientation values.
-                if page_orientation == 'vertical':
-                    page_orientation = 'portrait'
-                elif page_orientation == 'horizontal':
-                    page_orientation = 'landscape'
-                if page_orientation == 'landscape':
-                    w_mm, h_mm = h_mm, w_mm
-                # The engraver always rotates -90° for horizontal read direction,
-                # which swaps the output dimensions reported by DrawUtil.
-                read_direction = str(getattr(lay, 'read_direction', 'vertical') or 'vertical').strip().lower()
-                if read_direction == 'horizontal':
-                    w_mm, h_mm = h_mm, w_mm
-                return w_mm, h_mm
-        except Exception:
-            pass
-        # Fallback to DrawUtil current page size
-        try:
+        sc = self.file_manager.current()
+        lay = getattr(sc, 'layout', None)
+        if not lay:
             return self.du.current_page_size_mm()
-        except Exception:
-            return (210.0, 297.0)
+        
+        w_mm = float(getattr(lay, 'page_width_mm', 210.0) or 210.0)
+        h_mm = float(getattr(lay, 'page_height_mm', 297.0) or 297.0)
+        page_orientation = str(getattr(lay, 'page_orientation', 'portrait') or 'portrait').strip().lower()
+        # Keep compatibility with legacy horizontal/vertical orientation values.
+        if page_orientation == 'vertical':
+            page_orientation = 'portrait'
+        elif page_orientation == 'horizontal':
+            page_orientation = 'landscape'
+        if page_orientation == 'landscape':
+            w_mm, h_mm = h_mm, w_mm
+        # The engraver always rotates -90° for horizontal read direction,
+        # which swaps the output dimensions reported by DrawUtil.
+        read_direction = str(getattr(lay, 'read_direction', 'vertical') or 'vertical').strip().lower()
+        if read_direction == 'horizontal':
+            w_mm, h_mm = h_mm, w_mm
+        return w_mm, h_mm
 
     def _fit_print_view_to_page(self, *_args) -> None:
         """Toggle fit/hidden state and ensure in-between positions snap to fit.
@@ -2677,6 +2671,13 @@ class MainWindow(QtWidgets.QMainWindow):
         # Helper: compute desired fit sizes
         def compute_fit_sizes() -> tuple[int, int]:
             w_mm, h_mm = self._page_dimensions_mm()
+            
+            # switch width and height if layout.read_direction is horizontal-
+            # to correct for the engraver's -90° rotation after drawing
+            score = self.file_manager.current()
+            if score.layout.read_direction == 'horizontal':
+                w_mm, h_mm = h_mm, w_mm
+
             if w_mm <= 0 or h_mm <= 0:
                 return (splitter.width(), 0)
             # Exclude handle width to compute available content width

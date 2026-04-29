@@ -865,6 +865,9 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
         return False
 
     def _should_tune_under_stem_black_width(item: dict, rule: str, notes: list[dict], op: Operator) -> bool:
+        '''if a black note is under the stem and a white note directly next to it
+        this method returns True, which means the black note should be tuned to be narrower 
+        to form a small second symbol with the white note.'''
         rule_norm = str(rule or 'below_stem').strip().lower()
         if rule_norm not in ('under_stem', 'below_stem'):
             return False
@@ -3545,7 +3548,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                         try:
                             notehead_layout = dict(layout)
                             base_scale = float(notehead_layout.get('note_width_scaling', 0.75) or 0.75)
-                            notehead_layout['note_width_scaling'] = max(0.05, base_scale * 0.85)
+                            notehead_layout['note_width_scaling'] = max(0.05, base_scale * 0.75)
                         except Exception:
                             notehead_layout = layout
                     notehead = Notehead.from_note(
@@ -3579,10 +3582,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                     )
 
                 # Problem solved: accidental guide line points to derived pitch position.
-                try:
-                    acc = int(n.get('acc', 0) or 0)
-                except Exception:
-                    acc = 0
+                acc = int(n.get('acc', 0) or 0)
                 if acc != 0 and Note.is_valid_accidental(n) and bool(layout.get('accidental_visible', True)):
                     derived_pitch = int(p + acc)
                     x_target = _key_to_x(derived_pitch)

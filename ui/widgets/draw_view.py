@@ -132,18 +132,13 @@ class DrawUtilView(QtWidgets.QWidget):
         return str(layout.get('read_direction', 'vertical') or 'vertical').strip().lower() == 'horizontal'
 
     def _fit_scale_for_page(self, page_w_mm: float, page_h_mm: float, dpr: float) -> float:
-        if self._is_horizontal_read_direction():
-            return (max(1, self.height()) * float(dpr)) / max(1e-6, float(page_h_mm))
         return (max(1, self.width()) * float(dpr)) / max(1e-6, float(page_w_mm))
 
     def _scaled_image_metrics(self, img: QtGui.QImage) -> tuple[int, int, int, int, float, float, float]:
         img_w = float(img.width()) / max(1e-6, float(img.devicePixelRatio()))
         img_h = float(img.height()) / max(1e-6, float(img.devicePixelRatio()))
         if self._resizing and img_w > 0.0 and img_h > 0.0:
-            if self._is_horizontal_read_direction():
-                scale = float(max(1, self.height())) / float(img_h)
-            else:
-                scale = float(max(1, self.width())) / float(img_w)
+            scale = float(max(1, self.width())) / float(img_w)
         else:
             scale = 1.0
         tgt_w = int(round(img_w * scale))
