@@ -65,6 +65,24 @@
     </message>
   </context>
   <context>
+    <name>BarlineTool</name>
+    <message>
+      <location filename="../editor/tool/barline_tool.py" line="28" />
+      <source>Insert start repeat symbol</source>
+      <translation>Startherhalingssymbool inv</translation>
+    </message>
+    <message>
+      <location filename="../editor/tool/barline_tool.py" line="34" />
+      <source>Insert end repeat symbol</source>
+      <translation>Einde herhalingssymbool inv</translation>
+    </message>
+    <message>
+      <location filename="../editor/tool/barline_tool.py" line="41" />
+      <source>Insert double barline symbol</source>
+      <translation>Dubbele streep-symbool invoegen</translation>
+    </message>
+  </context>
+  <context>
     <name>BulkKeyRangeDialog</name>
     <message>
       <location filename="../ui/dialogs/line_break_dialog.py" line="17" />
@@ -112,6 +130,24 @@
       <location filename="../ui/dialogs/dynamic_menu.py" line="83" />
       <source>Use no dynamic symbol</source>
       <translation>Geen dynamieksymbool gebruiken</translation>
+    </message>
+  </context>
+  <context>
+    <name>DynamicTool</name>
+    <message>
+      <location filename="../editor/tool/dynamic_tool.py" line="54" />
+      <source>Click to insert a crescendo hairpin. Drag the red handle to adjust position and length. Right-click to delete.</source>
+      <translation>Klik om een crescendo haarspeld in te voegen. Sleep de rode hendel om de positie en lengte aan te passen. Klik met de rechtermuisknop om te verwijderen.</translation>
+    </message>
+    <message>
+      <location filename="../editor/tool/dynamic_tool.py" line="61" />
+      <source>Click to insert a decrescendo hairpin. Drag the red handle to adjust position and length. Right-click to delete.</source>
+      <translation>Klik om een decrescendo haarspeld in te voegen. Sleep de rode hendel om de positie en lengte aan te passen. Klik met de rechtermuisknop om te verwijderen.</translation>
+    </message>
+    <message>
+      <location filename="../editor/tool/dynamic_tool.py" line="67" />
+      <source>Click to insert or edit an existing dynamic symbol. Drag to adjust position. Right-click to delete.</source>
+      <translation>Klik om een bestaand dynamisch symbool in te voegen of te bewerken. Sleep om de positie aan te passen. Klik met de rechtermuisknop om te verwijderen.</translation>
     </message>
   </context>
   <context>
@@ -381,116 +417,141 @@
       <translation>Maatgroepering toepassen</translation>
     </message>
     <message>
-      <location filename="../ui/dialogs/line_break_dialog.py" line="652" />
-      <location filename="../ui/dialogs/line_break_dialog.py" line="203" />
-      <source>Edit All Left Margins</source>
-      <translation>Alle linkermarges bewerken</translation>
-    </message>
-    <message>
-      <location filename="../ui/dialogs/line_break_dialog.py" line="652" />
-      <location filename="../ui/dialogs/line_break_dialog.py" line="204" />
-      <source>Edit All Right Margins</source>
-      <translation>Alle rechtermarges bewerken</translation>
-    </message>
-    <message>
-      <location filename="../ui/dialogs/line_break_dialog.py" line="205" />
-      <source>Set All Key Ranges</source>
-      <translation>Alle toetsbereiken instellen</translation>
-    </message>
-    <message>
-      <location filename="../ui/dialogs/line_break_dialog.py" line="248" />
-      <source>P</source>
-      <translation>P</translation>
-    </message>
-    <message>
-      <location filename="../ui/dialogs/line_break_dialog.py" line="248" />
-      <source>L</source>
-      <translation>R</translation>
-    </message>
-    <message>
-      <location filename="../ui/dialogs/line_break_dialog.py" line="482" />
-      <location filename="../ui/dialogs/line_break_dialog.py" line="281" />
-      <source>Page break.</source>
-      <translation>Pagina breekpunt.</translation>
-    </message>
-    <message>
-      <location filename="../ui/dialogs/line_break_dialog.py" line="482" />
-      <location filename="../ui/dialogs/line_break_dialog.py" line="281" />
-      <source>Line break.</source>
-      <translation>Regel breekpunt.</translation>
-    </message>
-    <message>
-      <location filename="../ui/dialogs/line_break_dialog.py" line="322" />
-      <source>Automatic key range</source>
-      <translation>Automatisch toetsbereik</translation>
-    </message>
-    <message>
-      <location filename="../ui/dialogs/line_break_dialog.py" line="328" />
-      <source>from</source>
-      <translation>van</translation>
-    </message>
-    <message>
-      <location filename="../ui/dialogs/line_break_dialog.py" line="329" />
-      <source>to</source>
-      <translation>tot</translation>
-    </message>
-    <message>
-      <location filename="../ui/dialogs/line_break_dialog.py" line="335" />
-      <source>{prefix} key {key} ({note})</source>
-      <translation>{prefix} toets {key} ({note})</translation>
-    </message>
-    <message>
-      <location filename="../ui/dialogs/line_break_dialog.py" line="527" />
-      <source>Delete this line break.</source>
-      <translation>Deze regel/pagina-begin verwijderen.</translation>
-    </message>
-    <message>
-      <location filename="../ui/dialogs/line_break_dialog.py" line="620" />
-      <source>Enter one or more positive integers separated by spaces.</source>
-      <translation>Voer een of meer positieve gehele getallen in, gescheiden door spaties.</translation>
-    </message>
-    <message>
-      <location filename="../ui/dialogs/line_break_dialog.py" line="636" />
-      <source>Could not apply measure grouping.</source>
-      <translation>Kon maatgroepering niet toepassen.</translation>
-    </message>
-    <message>
-      <location filename="../ui/dialogs/line_break_dialog.py" line="640" />
+      <location filename="../ui/dialogs/line_break_dialog.py" line="196" />
       <source>Measure Grouping lets you generate line breaks by measures.
 Enter positive integers separated by spaces (e.g. '4 6 4'). Each number
 is the count of measures on a line; after the list is exhausted, the last
 number repeats. Existing margins, ranges, and page/line types are reused
 in order. Click 'Apply Measure Grouping' to generate breaks; OK saves
 other edits and Cancel discards the previewed changes.</source>
-      <translation type="unfinished" />
+      <translation>Maatgroepering laat u het document indelen in x maten per regel.
+Voer positieve gehele getallen in, gescheiden door spaties (bijv. '4 6 4'). Elk getal
+is het aantal maten op een regel; het laatste getal in de lijst herhaalt zich.
+Bestaande marges, toetsbereik en regel/pagina breekpunten worden hergebruikt
+in volgorde. Klik op 'Pas maatgroepering toe' om breuken te genereren; OK slaat
+andere bewerkingen op en Annuleren verwerpt de voorbeeldwijzigingen.</translation>
     </message>
     <message>
-      <location filename="../ui/dialogs/line_break_dialog.py" line="647" />
-      <source>Line Break Help</source>
-      <translation>Hulp bij regel breek markers</translation>
+      <location filename="../ui/dialogs/line_break_dialog.py" line="663" />
+      <location filename="../ui/dialogs/line_break_dialog.py" line="216" />
+      <source>Edit All Left Margins</source>
+      <translation>Alle linkermarges bewerken</translation>
     </message>
     <message>
-      <location filename="../ui/dialogs/line_break_dialog.py" line="653" />
+      <location filename="../ui/dialogs/line_break_dialog.py" line="663" />
+      <location filename="../ui/dialogs/line_break_dialog.py" line="217" />
+      <source>Edit All Right Margins</source>
+      <translation>Alle rechtermarges bewerken</translation>
+    </message>
+    <message>
+      <location filename="../ui/dialogs/line_break_dialog.py" line="218" />
+      <source>Set All Key Ranges</source>
+      <translation>Alle toetsbereiken instellen</translation>
+    </message>
+    <message>
+      <location filename="../ui/dialogs/line_break_dialog.py" line="222" />
+      <source>Edit all current line/page break left margins in millimeters.</source>
+      <translation>Bewerk alle huidige regel/pagina-breekpunt linkermarges in millimeters.</translation>
+    </message>
+    <message>
+      <location filename="../ui/dialogs/line_break_dialog.py" line="223" />
+      <source>Edit all current line/page break right margins in millimeters.</source>
+      <translation>Bewerk alle huidige regel/pagina-breekpunt rechtermarges in millimeters.</translation>
+    </message>
+    <message>
+      <location filename="../ui/dialogs/line_break_dialog.py" line="224" />
+      <source>Set one key range for all current line/page break markers.</source>
+      <translation>Stel één toetsbereik in voor alle huidige regel/pagina-breekpunten.</translation>
+    </message>
+    <message>
+      <location filename="../ui/dialogs/line_break_dialog.py" line="248" />
+      <source>Save your line/page break edits and close this dialog.</source>
+      <translation>Sla uw regel/pagina-breekpunt bewerkingen op en sluit dit dialoogvenster.</translation>
+    </message>
+    <message>
+      <location filename="../ui/dialogs/line_break_dialog.py" line="251" />
+      <source>Discard previewed edits and close this dialog.</source>
+      <translation>Verwerp de voorbeeldbewerkingen en sluit dit dialoogvenster.</translation>
+    </message>
+    <message>
+      <location filename="../ui/dialogs/line_break_dialog.py" line="270" />
+      <source>P</source>
+      <translation>P</translation>
+    </message>
+    <message>
+      <location filename="../ui/dialogs/line_break_dialog.py" line="270" />
+      <source>L</source>
+      <translation>R</translation>
+    </message>
+    <message>
+      <location filename="../ui/dialogs/line_break_dialog.py" line="504" />
+      <location filename="../ui/dialogs/line_break_dialog.py" line="303" />
+      <source>Page break.</source>
+      <translation>Pagina breekpunt.</translation>
+    </message>
+    <message>
+      <location filename="../ui/dialogs/line_break_dialog.py" line="504" />
+      <location filename="../ui/dialogs/line_break_dialog.py" line="303" />
+      <source>Line break.</source>
+      <translation>Regel breekpunt.</translation>
+    </message>
+    <message>
+      <location filename="../ui/dialogs/line_break_dialog.py" line="344" />
+      <source>Automatic key range</source>
+      <translation>Automatisch toetsbereik</translation>
+    </message>
+    <message>
+      <location filename="../ui/dialogs/line_break_dialog.py" line="350" />
+      <source>from</source>
+      <translation>van</translation>
+    </message>
+    <message>
+      <location filename="../ui/dialogs/line_break_dialog.py" line="351" />
+      <source>to</source>
+      <translation>tot</translation>
+    </message>
+    <message>
+      <location filename="../ui/dialogs/line_break_dialog.py" line="357" />
+      <source>{prefix} key {key} ({note})</source>
+      <translation>{prefix} toets {key} ({note})</translation>
+    </message>
+    <message>
+      <location filename="../ui/dialogs/line_break_dialog.py" line="549" />
+      <source>Delete this line break.</source>
+      <translation>Deze regel/pagina-breekpunt verwijderen.</translation>
+    </message>
+    <message>
+      <location filename="../ui/dialogs/line_break_dialog.py" line="642" />
+      <source>Enter one or more positive integers separated by spaces.</source>
+      <translation>Voer een of meer positieve gehele getallen in, gescheiden door spaties.</translation>
+    </message>
+    <message>
+      <location filename="../ui/dialogs/line_break_dialog.py" line="658" />
+      <source>Could not apply measure grouping.</source>
+      <translation>Kon maatgroepering niet toepassen.</translation>
+    </message>
+    <message>
+      <location filename="../ui/dialogs/line_break_dialog.py" line="664" />
       <source>All left margins (mm):</source>
       <translation>Alle linkermarges (mm):</translation>
     </message>
     <message>
-      <location filename="../ui/dialogs/line_break_dialog.py" line="653" />
+      <location filename="../ui/dialogs/line_break_dialog.py" line="664" />
       <source>All right margins (mm):</source>
       <translation>Alle rechtermarges (mm):</translation>
     </message>
     <message>
-      <location filename="../ui/dialogs/line_break_dialog.py" line="744" />
+      <location filename="../ui/dialogs/line_break_dialog.py" line="755" />
       <source>Key range must contain two numbers.</source>
       <translation>Toetsbereik moet twee getallen bevatten.</translation>
     </message>
     <message>
-      <location filename="../ui/dialogs/line_break_dialog.py" line="747" />
+      <location filename="../ui/dialogs/line_break_dialog.py" line="758" />
       <source>Key range must stay between key 1 and key 88.</source>
       <translation>Toetsbereik moet tussen toets 1 en toets 88 blijven.</translation>
     </message>
     <message>
-      <location filename="../ui/dialogs/line_break_dialog.py" line="750" />
+      <location filename="../ui/dialogs/line_break_dialog.py" line="761" />
       <source>Key range must have 'from key' lower than 'to key'.</source>
       <translation>Toetsbereik moet een 'van toets' hebben die lager is dan 'tot toets'.</translation>
     </message>
@@ -1060,7 +1121,7 @@ other edits and Cancel discards the previewed changes.</source>
       <translation>MIDI-import mislukt</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="2758" />
+      <location filename="../ui/main_window.py" line="2774" />
       <location filename="../ui/main_window.py" line="1870" />
       <location filename="../ui/main_window.py" line="1847" />
       <source>Use 'Copy Error Log' and keep the copied traceback for debugging.</source>
@@ -1190,13 +1251,14 @@ other edits and Cancel discards the previewed changes.</source>
     <message>
       <location filename="../ui/main_window.py" line="2406" />
       <source>Recent File Missing</source>
-      <translation type="unfinished" />
+      <translation>Recent bestand ontbreekt</translation>
     </message>
     <message>
       <location filename="../ui/main_window.py" line="2407" />
       <source>This file no longer exists and was removed from Recent Files:
 {path}</source>
-      <translation type="unfinished" />
+      <translation>Dit bestand bestaat niet meer en is verwijderd uit Recente Bestanden:
+{path}</translation>
     </message>
     <message>
       <location filename="../ui/main_window.py" line="2511" />
@@ -1279,29 +1341,29 @@ other edits and Cancel discards the previewed changes.</source>
       <translation>Geen selectie om te kwantiseren</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="2755" />
+      <location filename="../ui/main_window.py" line="2771" />
       <source>Engraving failed</source>
       <translation>Graveren mislukt</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="2756" />
+      <location filename="../ui/main_window.py" line="2772" />
       <source>The engraver failed.</source>
       <translation>De engraver is mislukt.</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="2761" />
+      <location filename="../ui/main_window.py" line="2777" />
       <source>Engraving failed. See error dialog for details.</source>
       <translation>Graveren mislukt. Zie het foutvenster voor details.</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="2933" />
-      <location filename="../ui/main_window.py" line="2915" />
-      <location filename="../ui/main_window.py" line="2897" />
+      <location filename="../ui/main_window.py" line="2949" />
+      <location filename="../ui/main_window.py" line="2931" />
+      <location filename="../ui/main_window.py" line="2913" />
       <source>Playback</source>
       <translation>Afspelen</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="2899" />
+      <location filename="../ui/main_window.py" line="2915" />
       <source>External MIDI playback failed: {error}
 
 Switched automatically to {backend}.</source>
@@ -1310,7 +1372,7 @@ Switched automatically to {backend}.</source>
     Automatisch overgeschakeld naar {backend}.</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="2917" />
+      <location filename="../ui/main_window.py" line="2933" />
       <source>External MIDI playback failed: {error}
 
 Automatic fallback to {backend} also failed: {fallback_error}</source>
@@ -1319,7 +1381,7 @@ Automatic fallback to {backend} also failed: {fallback_error}</source>
     Automatische fallback naar {backend} is ook mislukt: {fallback_error}</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="2934" />
+      <location filename="../ui/main_window.py" line="2950" />
       <source>Playback failed: {error}
 
 Try '{backend}' from the Playback menu.</source>
@@ -1328,91 +1390,91 @@ Try '{backend}' from the Playback menu.</source>
     Probeer '{backend}' via het menu Afspelen.</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="3114" />
+      <location filename="../ui/main_window.py" line="3171" />
       <source>Synth FX editor removed</source>
       <translation>Synth FX-editor verwijderd</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="3136" />
+      <location filename="../ui/main_window.py" line="3193" />
       <source>Playback mode: External MIDI port</source>
       <translation>Afspeelmodus: externe MIDI-poort</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="3139" />
+      <location filename="../ui/main_window.py" line="3196" />
       <source>Playback mode: {backend}</source>
       <translation>Afspeelmodus: {backend}</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="3140" />
+      <location filename="../ui/main_window.py" line="3197" />
       <source>Playback using </source>
       <translation>Afspelen met </translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="3153" />
+      <location filename="../ui/main_window.py" line="3210" />
       <source>MIDI transport settings removed</source>
       <translation>MIDI-transportinstellingen verwijderd</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="3159" />
+      <location filename="../ui/main_window.py" line="3216" />
       <source>Test tone</source>
       <translation>Testtoon</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="3162" />
+      <location filename="../ui/main_window.py" line="3219" />
       <source>Test tone unavailable</source>
       <translation>Testtoon niet beschikbaar</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="3165" />
+      <location filename="../ui/main_window.py" line="3222" />
       <source>Audio output is selected by the active playback backend</source>
       <translation>Audio-uitvoer wordt gekozen door de actieve afspeelbackend</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="3325" />
+      <location filename="../ui/main_window.py" line="3382" />
       <source>Install required fonts</source>
       <translation>Vereiste lettertypen installeren</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="3326" />
+      <location filename="../ui/main_window.py" line="3383" />
       <source>keyTAB can install embedded fonts to your user font folder so editing and engraving match:</source>
       <translation>keyTAB kan ingebedde lettertypen in je gebruikersmap voor lettertypen installeren zodat bewerken en graveren overeenkomen:</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="3329" />
+      <location filename="../ui/main_window.py" line="3386" />
       <source>Install all missing fonts now?</source>
       <translation>Alle ontbrekende lettertypen nu installeren?</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="3360" />
+      <location filename="../ui/main_window.py" line="3417" />
       <source>Fonts installed</source>
       <translation>Lettertypen geinstalleerd</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="3361" />
+      <location filename="../ui/main_window.py" line="3418" />
       <source>The following fonts were installed. keyTAB will restart to apply them:
 </source>
       <translation>De volgende lettertypen zijn geinstalleerd. keyTAB wordt herstart om ze toe te passen:
     </translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="3372" />
+      <location filename="../ui/main_window.py" line="3429" />
       <source>Font installation failed</source>
       <translation>Installatie van lettertypen mislukt</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="3373" />
+      <location filename="../ui/main_window.py" line="3430" />
       <source>keyTAB could not install some fonts automatically:
 {details}</source>
       <translation>keyTAB kon sommige lettertypen niet automatisch installeren:
     {details}</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="3485" />
+      <location filename="../ui/main_window.py" line="3542" />
       <source>Exiting keyTAB...</source>
       <translation>keyTAB afsluiten...</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="3493" />
+      <location filename="../ui/main_window.py" line="3550" />
       <source>Saving...
 
  {path}</source>
@@ -1421,14 +1483,14 @@ Try '{backend}' from the Playback menu.</source>
      {path}</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="3495" />
+      <location filename="../ui/main_window.py" line="3552" />
       <source>Exiting in progress...</source>
       <translation>Afsluiten in uitvoering...</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="3553" />
-      <location filename="../ui/main_window.py" line="3538" />
-      <location filename="../ui/main_window.py" line="3527" />
+      <location filename="../ui/main_window.py" line="3610" />
+      <location filename="../ui/main_window.py" line="3595" />
+      <location filename="../ui/main_window.py" line="3584" />
       <source>unsaved session</source>
       <translation>niet-opgeslagen sessie</translation>
     </message>
@@ -1438,58 +1500,102 @@ Try '{backend}' from the Playback menu.</source>
     <message>
       <location filename="../ui/dialogs/midi_import_dialog.py" line="23" />
       <source>MIDI Import – Track Assignment</source>
-      <translation type="unfinished" />
+      <translation>MIDI Import – Track Toewijzing</translation>
     </message>
     <message>
       <location filename="../ui/dialogs/midi_import_dialog.py" line="42" />
       <source>Assign each MIDI track to a hand. Notes are placed in the assigned hand during import.
 Choose 'Skip' to exclude a track entirely.</source>
-      <translation type="unfinished" />
+      <translation>Wijs elke MIDI-track toe aan een hand. Noten worden tijdens het importeren in de toegewezen hand geplaatst.
+Kies 'Overslaan' om een track volledig uit te sluiten.</translation>
     </message>
     <message>
       <location filename="../ui/dialogs/midi_import_dialog.py" line="56" />
       <source>Track</source>
-      <translation type="unfinished" />
+      <translation>Track</translation>
     </message>
     <message>
       <location filename="../ui/dialogs/midi_import_dialog.py" line="57" />
       <source>Name</source>
-      <translation type="unfinished" />
+      <translation>Naam</translation>
     </message>
     <message>
       <location filename="../ui/dialogs/midi_import_dialog.py" line="58" />
       <source>Notes</source>
-      <translation type="unfinished" />
+      <translation>Noten</translation>
     </message>
     <message>
       <location filename="../ui/dialogs/midi_import_dialog.py" line="59" />
       <source>Pitch range</source>
-      <translation type="unfinished" />
+      <translation>Toonhoogtebereik</translation>
     </message>
     <message>
       <location filename="../ui/dialogs/midi_import_dialog.py" line="60" />
       <source>Hand</source>
-      <translation type="unfinished" />
+      <translation>Hand</translation>
     </message>
     <message>
       <location filename="../ui/dialogs/midi_import_dialog.py" line="128" />
       <source>Left hand</source>
-      <translation type="unfinished" />
+      <translation>Linkerhand</translation>
     </message>
     <message>
       <location filename="../ui/dialogs/midi_import_dialog.py" line="129" />
       <source>Right hand</source>
-      <translation type="unfinished" />
+      <translation>Rechterhand</translation>
     </message>
     <message>
       <location filename="../ui/dialogs/midi_import_dialog.py" line="130" />
       <source>Skip</source>
-      <translation type="unfinished" />
+      <translation>Overslaan</translation>
     </message>
     <message>
       <location filename="../ui/dialogs/midi_import_dialog.py" line="169" />
       <source>At least one track must be imported.</source>
-      <translation type="unfinished" />
+      <translation>Er moet minstens één track worden geïmporteerd.</translation>
+    </message>
+  </context>
+  <context>
+    <name>NoteTool</name>
+    <message>
+      <location filename="../editor/tool/note_tool.py" line="67" />
+      <source>Cycle arpeggio (current: {0})</source>
+      <translation>Cyclus arpeggio (stroom: {0})</translation>
+    </message>
+    <message>
+      <location filename="../editor/tool/note_tool.py" line="68" />
+      <source>Cycle arpeggio on selected chord (currently off)</source>
+      <translation>Cyclus arpeggio op geselecteerd akkoord (momenteel uit)</translation>
+    </message>
+    <message>
+      <location filename="../editor/tool/note_tool.py" line="268" />
+      <source>Click to write left hand notes (shortcut: , ).</source>
+      <translation>Klik om noten voor de linkerhand te schrijven (sneltoets: , ).</translation>
+    </message>
+    <message>
+      <location filename="../editor/tool/note_tool.py" line="274" />
+      <source>Click to write right hand notes (shortcut: . ).</source>
+      <translation>Klik om noten voor de rechterhand te schrijven (sneltoets: . ).</translation>
+    </message>
+    <message>
+      <location filename="../editor/tool/note_tool.py" line="279" />
+      <source>Set selected notes to left hand (shortcut: [ )</source>
+      <translation>Stel de geselecteerde noten in op de linkerhand (sneltoets: [ )</translation>
+    </message>
+    <message>
+      <location filename="../editor/tool/note_tool.py" line="284" />
+      <source>Set selected notes to right hand (shortcut: ] )</source>
+      <translation>Stel de geselecteerde noten in op de rechterhand (sneltoets: ] )</translation>
+    </message>
+    <message>
+      <location filename="../editor/tool/note_tool.py" line="291" />
+      <source>Velocity editing is on. Toggle on/off to edit the note velocities using the sliders on the sides of the editor.</source>
+      <translation>Volumebewerking is ingeschakeld. Schakel aan/uit om de notenvolumes te bewerken met behulp van de schuifregelaars aan de zijkanten van de editor.</translation>
+    </message>
+    <message>
+      <location filename="../editor/tool/note_tool.py" line="291" />
+      <source>Velocity editing is off. Toggle on/off to edit the note velocities using the sliders on the sides of the editor.</source>
+      <translation>Volumebewerking is uitgeschakeld. Schakel aan/uit om de notenvolumes te bewerken met behulp van de schuifregelaars aan de zijkanten van de editor.</translation>
     </message>
   </context>
   <context>
@@ -1571,6 +1677,39 @@ Choose 'Skip' to exclude a track entirely.</source>
     </message>
   </context>
   <context>
+    <name>PedalTool</name>
+    <message>
+      <location filename="../editor/tool/pedal_tool.py" line="71" />
+      <source>Insert pedal up symbol (keyTAB)</source>
+      <translation>Plaats het pedaal omhoog-symbool (keyTAB)</translation>
+    </message>
+    <message>
+      <location filename="../editor/tool/pedal_tool.py" line="78" />
+      <source>Insert pedal down symbol (keyTAB)</source>
+      <translation>Pedaal omlaag-symbool invoegen (keyTAB)</translation>
+    </message>
+    <message>
+      <location filename="../editor/tool/pedal_tool.py" line="85" />
+      <source>Insert pedal up symbol (Klavarskribo)</source>
+      <translation>Pedaal omhoog-symbool invoegen (Klavarskribo)</translation>
+    </message>
+    <message>
+      <location filename="../editor/tool/pedal_tool.py" line="92" />
+      <source>Insert pedal down symbol (Klavarskribo)</source>
+      <translation>Pedaal omlaag-symbool invoegen (Klavarskribo)</translation>
+    </message>
+    <message>
+      <location filename="../editor/tool/pedal_tool.py" line="99" />
+      <source>Insert pedal toe symbol</source>
+      <translation>Teensymbool pedaal invoegen</translation>
+    </message>
+    <message>
+      <location filename="../editor/tool/pedal_tool.py" line="106" />
+      <source>Insert pedal heel symbol</source>
+      <translation>Pedaalhielsymbool invoegen</translation>
+    </message>
+  </context>
+  <context>
     <name>PreferencesDialog</name>
     <message>
       <location filename="../ui/dialogs/preferences_dialog.py" line="38" />
@@ -1612,6 +1751,19 @@ Choose 'Skip' to exclude a track entirely.</source>
       <location filename="../ui/dialogs/preferences_dialog.py" line="128" />
       <source>Dark</source>
       <translation>Donker</translation>
+    </message>
+  </context>
+  <context>
+    <name>SlurTool</name>
+    <message>
+      <location filename="../editor/tool/slur_tool.py" line="25" />
+      <source>Slur direction: left hand</source>
+      <translation>Slur-richting: linkerhand</translation>
+    </message>
+    <message>
+      <location filename="../editor/tool/slur_tool.py" line="26" />
+      <source>Slur direction: right hand</source>
+      <translation>Slur-richting: rechterhand</translation>
     </message>
   </context>
   <context>
@@ -2531,8 +2683,27 @@ Choose 'Skip' to exclude a track entirely.</source>
       <translation>Gereedschap</translation>
     </message>
     <message>
-      <location filename="../ui/widgets/tool_selector.py" line="241" />
-      <location filename="../ui/widgets/tool_selector.py" line="239" />
+      <location filename="../ui/widgets/tool_selector.py" line="179" />
+      <source>Select a tool by clicking or scrolling through the list.
+Mouse interaction (applies to all tools):
+  • Left-click on empty space — add a new object
+  • Left-click on an existing object — edit it
+  • Right-click on an existing object — delete it
+  • You can only edit the object types that are part of the selected tool
+Some tools provide a contextual toolbar beneath the vertical black divider line.
+There you can choose the object type to place or edit; </source>
+      <translation>Selecteer een gereedschap door te klikken of te scrollen door de lijst.
+Muisinteractie (van toepassing op alle gereedschappen):
+  • Linkerklik op lege ruimte — voeg een nieuw object toe
+  • Linkerklik op een bestaand object — bewerk object
+  • Rechterklik op een bestaand object — verwijder object
+  • U kunt alleen de objecttypen bewerken die deel uitmaken van het geselecteerde gereedschap
+Sommige gereedschappen bieden een contextuele toolbar onder de verticale zwarte scheidingslijn.
+Daar kunt u het objecttype kiezen om te plaatsen of te bewerken;</translation>
+    </message>
+    <message>
+      <location filename="../ui/widgets/tool_selector.py" line="251" />
+      <location filename="../ui/widgets/tool_selector.py" line="249" />
       <source>Tool</source>
       <translation>Gereedschap</translation>
     </message>

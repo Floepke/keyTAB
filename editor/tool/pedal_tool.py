@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from PySide6 import QtCore
 from editor.tool.base_tool import BaseTool
 
 
@@ -67,42 +68,42 @@ class PedalTool(BaseTool):
                 'name': self._SYMBOL_UP_KEYTAB,
                 'icon': 'up',
                 'text': 'U-K',
-                'tooltip': 'Insert pedal up symbol (keyTAB)',
+                'tooltip': QtCore.QCoreApplication.translate('PedalTool', 'Insert pedal up symbol (keyTAB)'),
                 'active': self._symbol == self._SYMBOL_UP_KEYTAB,
             },
             {
                 'name': self._SYMBOL_DOWN_KEYTAB,
                 'icon': 'down',
                 'text': 'D-K',
-                'tooltip': 'Insert pedal down symbol (keyTAB)',
+                'tooltip': QtCore.QCoreApplication.translate('PedalTool', 'Insert pedal down symbol (keyTAB)'),
                 'active': self._symbol == self._SYMBOL_DOWN_KEYTAB,
             },
             {
                 'name': self._SYMBOL_UP_KLAVARSKRIBO,
                 'icon': 'up',
                 'text': 'U-L',
-                'tooltip': 'Insert pedal up symbol (Klavarskribo)',
+                'tooltip': QtCore.QCoreApplication.translate('PedalTool', 'Insert pedal up symbol (Klavarskribo)'),
                 'active': self._symbol == self._SYMBOL_UP_KLAVARSKRIBO,
             },
             {
                 'name': self._SYMBOL_DOWN_KLAVARSKRIBO,
                 'icon': 'down',
                 'text': 'D-L',
-                'tooltip': 'Insert pedal down symbol (Klavarskribo)',
+                'tooltip': QtCore.QCoreApplication.translate('PedalTool', 'Insert pedal down symbol (Klavarskribo)'),
                 'active': self._symbol == self._SYMBOL_DOWN_KLAVARSKRIBO,
             },
             {
                 'name': self._SYMBOL_TOE,
                 'icon': 'toe',
                 'text': 'T',
-                'tooltip': 'Insert pedal toe symbol',
+                'tooltip': QtCore.QCoreApplication.translate('PedalTool', 'Insert pedal toe symbol'),
                 'active': self._symbol == self._SYMBOL_TOE,
             },
             {
                 'name': self._SYMBOL_HEEL,
                 'icon': 'heel',
                 'text': 'H',
-                'tooltip': 'Insert pedal heel symbol',
+                'tooltip': QtCore.QCoreApplication.translate('PedalTool', 'Insert pedal heel symbol'),
                 'active': self._symbol == self._SYMBOL_HEEL,
             },
         ]

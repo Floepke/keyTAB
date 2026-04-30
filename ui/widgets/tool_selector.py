@@ -177,12 +177,13 @@ class ToolSelectorDock(QtWidgets.QDockWidget):
         self.setAllowedAreas(QtCore.Qt.DockWidgetArea.LeftDockWidgetArea | QtCore.Qt.DockWidgetArea.RightDockWidgetArea)
         self.setFeatures(QtWidgets.QDockWidget.DockWidgetFeature.NoDockWidgetFeatures)
         self.setToolTip(self.tr(
-            "Select a tool by clicking or scrolling through the list.\n\n"
+            "Select a tool by clicking or scrolling through the list.\n"
             "Mouse interaction (applies to all tools):\n"
             "  • Left-click on empty space — add a new object\n"
             "  • Left-click on an existing object — edit it\n"
-            "  • Right-click on an existing object — delete it\n\n"
-            "Some tools provide a contextual toolbar beneath the vertical divider line.\n"
+            "  • Right-click on an existing object — delete it\n"
+            "  • You can only edit the object types that are part of the selected tool\n"
+            "Some tools provide a contextual toolbar beneath the vertical black divider line.\n"
             "There you can choose the object type to place or edit; "
         ))
         # Wrap the list in a container with small margins to match Snap Size indent

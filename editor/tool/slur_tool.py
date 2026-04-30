@@ -2,6 +2,7 @@ from __future__ import annotations
 import math
 from typing import Optional, Tuple
 
+from PySide6 import QtCore
 from editor.tool.base_tool import BaseTool
 from file_model.SCORE import SCORE
 
@@ -21,8 +22,8 @@ class SlurTool(BaseTool):
     def toolbar_spec(self) -> list[dict]:
         hand = str(getattr(self._editor, 'hand_cursor', self._hand) or self._hand) if self._editor is not None else self._hand
         return [
-            {'name': 'slur_hand_left', 'icon': 'mirror:slur', 'active': hand == 'l', 'tooltip': 'Slur direction: left hand'},
-            {'name': 'slur_hand_right', 'icon': 'slur', 'active': hand == 'r', 'tooltip': 'Slur direction: right hand'},
+            {'name': 'slur_hand_left', 'icon': 'mirror:slur', 'active': hand == 'l', 'tooltip': QtCore.QCoreApplication.translate('SlurTool', 'Slur direction: left hand')},
+            {'name': 'slur_hand_right', 'icon': 'slur', 'active': hand == 'r', 'tooltip': QtCore.QCoreApplication.translate('SlurTool', 'Slur direction: right hand')},
         ]
 
     # ---- Helpers ----

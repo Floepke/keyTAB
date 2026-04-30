@@ -192,6 +192,19 @@ class LineBreakDialog(QtWidgets.QDialog):
         self.measure_grouping_edit.setText(self._measure_grouping_text)
         self.apply_grouping_btn = QtWidgets.QPushButton(self.tr("Apply Measure Grouping"), self)
         self.apply_grouping_btn.clicked.connect(self._on_apply_grouping_clicked)
+
+        grouping_tip = self.tr(
+            "Measure Grouping lets you generate line breaks by measures.\n"
+            "Enter positive integers separated by spaces (e.g. '4 6 4'). Each number\n"
+            "is the count of measures on a line; after the list is exhausted, the last\n"
+            "number repeats. Existing margins, ranges, and page/line types are reused\n"
+            "in order. Click 'Apply Measure Grouping' to generate breaks; OK saves\n"
+            "other edits and Cancel discards the previewed changes."
+        )
+        self.measure_grouping_label.setToolTip(grouping_tip)
+        self.measure_grouping_edit.setToolTip(grouping_tip)
+        self.apply_grouping_btn.setToolTip(grouping_tip)
+
         quick_row.addWidget(self.measure_grouping_label)
         quick_row.addWidget(self.measure_grouping_edit, 1)
         quick_row.addWidget(self.apply_grouping_btn)
@@ -206,6 +219,9 @@ class LineBreakDialog(QtWidgets.QDialog):
         self.edit_all_left_btn.clicked.connect(lambda: self._edit_all_margins(side="left"))
         self.edit_all_right_btn.clicked.connect(lambda: self._edit_all_margins(side="right"))
         self.set_all_key_ranges_btn.clicked.connect(self._set_all_key_ranges)
+        self.edit_all_left_btn.setToolTip(self.tr("Edit all current line/page break left margins in millimeters."))
+        self.edit_all_right_btn.setToolTip(self.tr("Edit all current line/page break right margins in millimeters."))
+        self.set_all_key_ranges_btn.setToolTip(self.tr("Set one key range for all current line/page break markers."))
         bulk_row.addWidget(self.edit_all_left_btn)
         bulk_row.addWidget(self.edit_all_right_btn)
         bulk_row.addWidget(self.set_all_key_ranges_btn)
@@ -221,12 +237,18 @@ class LineBreakDialog(QtWidgets.QDialog):
 
         # Buttons
         self.btns = QtWidgets.QDialogButtonBox(
-            QtWidgets.QDialogButtonBox.Ok | QtWidgets.QDialogButtonBox.Cancel | QtWidgets.QDialogButtonBox.Help,
+            QtWidgets.QDialogButtonBox.Ok | QtWidgets.QDialogButtonBox.Cancel,
             parent=self,
         )
         self.btns.accepted.connect(self._on_accept_clicked)
         self.btns.rejected.connect(self.reject)
-        self.btns.helpRequested.connect(self._on_help_clicked)
+
+        ok_btn = self.btns.button(QtWidgets.QDialogButtonBox.Ok)
+        if ok_btn is not None:
+            ok_btn.setToolTip(self.tr("Save your line/page break edits and close this dialog."))
+        cancel_btn = self.btns.button(QtWidgets.QDialogButtonBox.Cancel)
+        if cancel_btn is not None:
+            cancel_btn.setToolTip(self.tr("Discard previewed edits and close this dialog."))
         lay.addWidget(self.btns)
 
         self.valuesChanged.connect(self._validate_form)
@@ -634,17 +656,6 @@ class LineBreakDialog(QtWidgets.QDialog):
             self._reload_line_breaks()
         else:
             self.msg_label.setText(self.tr("Could not apply measure grouping."))
-
-    def _on_help_clicked(self) -> None:
-        msg = (
-            self.tr("Measure Grouping lets you generate line breaks by measures.\n"
-                    "Enter positive integers separated by spaces (e.g. '4 6 4'). Each number\n"
-                    "is the count of measures on a line; after the list is exhausted, the last\n"
-                    "number repeats. Existing margins, ranges, and page/line types are reused\n"
-                    "in order. Click 'Apply Measure Grouping' to generate breaks; OK saves\n"
-                    "other edits and Cancel discards the previewed changes.")
-        )
-        QtWidgets.QMessageBox.information(self, self.tr("Line Break Help"), msg)
 
     def _edit_all_margins(self, side: str) -> None:
         if side not in ("left", "right"):

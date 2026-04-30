@@ -64,8 +64,8 @@ class NoteTool(BaseTool):
     def _arpeggio_button_text(self) -> tuple[str, str]:
         current = self._current_arpeggio_type()
         if current:
-            return ("Arp", f"Cycle arpeggio (current: {current})")
-        return ("Arp", "Cycle arpeggio on selected chord (currently off)")
+            return ("Arp", QtCore.QCoreApplication.translate('NoteTool', 'Cycle arpeggio (current: {0})').format(current))
+        return ("Arp", QtCore.QCoreApplication.translate('NoteTool', 'Cycle arpeggio on selected chord (currently off)'))
 
     def _current_arpeggio_type(self) -> str | None:
         chord_notes, base_time = self._find_chord_notes()
@@ -265,30 +265,30 @@ class NoteTool(BaseTool):
                 'name': 'hand_left',
                 'icon': 'note_left',
                 'active': hand == 'l',
-                'tooltip': 'Click to write left hand notes (shortcut: , ). Double-click a notehead to set or reset a custom notehead.',
+                'tooltip': QtCore.QCoreApplication.translate('NoteTool', 'Click to write left hand notes (shortcut: , ).'),
             },
             {
                 'name': 'hand_right',
                 'icon': 'note_right',
                 'active': hand == 'r',
-                'tooltip': 'Click to write right hand notes (shortcut: . ). Double-click a notehead to set or reset a custom notehead.',
+                'tooltip': QtCore.QCoreApplication.translate('NoteTool', 'Click to write right hand notes (shortcut: . ).'),
             },
             {
                 'name': 'selection_left',
                 'icon': 'selection_left',
-                'tooltip': 'Set selected notes to left hand (shortcut: [ )',
+                'tooltip': QtCore.QCoreApplication.translate('NoteTool', 'Set selected notes to left hand (shortcut: [ )'),
             },
             {
                 'name': 'selection_right',
                 'icon': 'selection_right',
-                'tooltip': 'Set selected notes to right hand (shortcut: ] )',
+                'tooltip': QtCore.QCoreApplication.translate('NoteTool', 'Set selected notes to right hand (shortcut: ] )'),
             },
             {
                 'name': 'velocity_toggle',
                 'icon': 'velocity',
                 'text': 'Vel',
                 'active': bool(self._velocity_mode),
-                'tooltip': f"Velocity editing is {'on' if self._velocity_mode else 'off'}. Toggle on/off to edit the note velocities using the sliders on the sides of the editor.",
+                'tooltip': (QtCore.QCoreApplication.translate('NoteTool', 'Velocity editing is on. Toggle on/off to edit the note velocities using the sliders on the sides of the editor.') if self._velocity_mode else QtCore.QCoreApplication.translate('NoteTool', 'Velocity editing is off. Toggle on/off to edit the note velocities using the sliders on the sides of the editor.')),
             },
             {
                 'name': 'arpeggio_toggle',

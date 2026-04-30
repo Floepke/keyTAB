@@ -1,6 +1,6 @@
 from __future__ import annotations
 from typing import Optional, Tuple
-from PySide6 import QtWidgets, QtGui
+from PySide6 import QtCore, QtWidgets, QtGui
 
 from editor.tool.base_tool import BaseTool
 from file_model.SCORE import SCORE
@@ -51,20 +51,20 @@ class DynamicTool(BaseTool):
                 'name': self._MODE_CRESCENDO,
                 'icon': 'crescendo',
                 'text': '<',
-                'tooltip': 'Click to insert a crescendo hairpin. Drag the red handle to adjust position and length. Right-click to delete.',
+                'tooltip': QtCore.QCoreApplication.translate('DynamicTool', 'Click to insert a crescendo hairpin. Drag the red handle to adjust position and length. Right-click to delete.'),
                 'active': self._mode == self._MODE_CRESCENDO,
             },
             {
                 'name': self._MODE_DECRESCENDO,
                 'icon': 'decrescendo',
                 'text': '>',
-                'tooltip': 'Click to insert a decrescendo hairpin. Drag the red handle to adjust position and length. Right-click to delete.',
+                'tooltip': QtCore.QCoreApplication.translate('DynamicTool', 'Click to insert a decrescendo hairpin. Drag the red handle to adjust position and length. Right-click to delete.'),
                 'active': self._mode == self._MODE_DECRESCENDO,
             },
             {
                 'name': self._MODE_DYNAMIC_SYMBOL,
                 'icon': 'dynamics',
-                'tooltip': 'Click to insert or edit an existing dynamic symbol. Drag to adjust position. Right-click to delete.',
+                'tooltip': QtCore.QCoreApplication.translate('DynamicTool', 'Click to insert or edit an existing dynamic symbol. Drag to adjust position. Right-click to delete.'),
                 'active': self._mode == self._MODE_DYNAMIC_SYMBOL,
             },
         ]

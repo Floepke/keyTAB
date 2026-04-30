@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Optional
 
+from PySide6 import QtCore
 from editor.tool.base_tool import BaseTool
 from file_model.base_grid import resolve_grid_layer_offsets
 from utils.CONSTANT import QUARTER_NOTE_UNIT, SHORTEST_DURATION
@@ -24,20 +25,20 @@ class BarlineTool(BaseTool):
             {
                 "name": self._MODE_START,
                 "icon": "start_repeat",
-                "tooltip": "Insert start repeat symbol",
+                "tooltip": QtCore.QCoreApplication.translate("BarlineTool", "Insert start repeat symbol"),
                 "active": self._mode == self._MODE_START,
             },
             {
                 "name": self._MODE_END,
                 "icon": "end_repeat",
-                "tooltip": "Insert end repeat symbol",
+                "tooltip": QtCore.QCoreApplication.translate("BarlineTool", "Insert end repeat symbol"),
                 "active": self._mode == self._MODE_END,
             },
             {
                 "name": self._MODE_DOUBLE,
                 "icon": "double_bar",
                 "text": "d",
-                "tooltip": "Insert double barline symbol",
+                "tooltip": QtCore.QCoreApplication.translate("BarlineTool", "Insert double barline symbol"),
                 "active": self._mode == self._MODE_DOUBLE,
             },
         ]

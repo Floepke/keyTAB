@@ -2099,7 +2099,10 @@ class MainWindow(QtWidgets.QMainWindow):
         dlg.rejected.connect(preview.restore_original)
 
         def _persist_tab_index() -> None:
-            app_state.style_dialog_tab_index = int(dlg.current_tab_index())
+            # Always resolve app_state from the current SCORE instance.
+            # PreviewSession can replace SCORE objects while the dialog is open.
+            cur_app_state = self._current_app_state()
+            cur_app_state.style_dialog_tab_index = int(dlg.current_tab_index())
             adm = get_appdata_manager()
             adm.set('style_dialog_width', int(dlg.width()))
             adm.set('style_dialog_height', int(dlg.height()))
@@ -2138,26 +2141,23 @@ class MainWindow(QtWidgets.QMainWindow):
             on_change=preview.schedule_refresh,
         )
 
-        try:
-            adm = get_appdata_manager()
-            dlg_w = int(adm.get('line_break_dialog_width', 900) or 900)
-            dlg_h = int(adm.get('line_break_dialog_height', 700) or 700)
-            dlg.resize(max(420, dlg_w), max(320, dlg_h))
-            dlg_x = int(adm.get('line_break_dialog_x', -1) or -1)
-            dlg_y = int(adm.get('line_break_dialog_y', -1) or -1)
-            if dlg_x >= 0 and dlg_y >= 0:
-                # Avoid restoring stale off-screen positions after monitor/layout changes.
-                target = QtCore.QPoint(dlg_x, dlg_y)
-                on_screen = False
-                for screen in QtGui.QGuiApplication.screens():
-                    geo = screen.availableGeometry()
-                    if geo.contains(target):
-                        on_screen = True
-                        break
-                if on_screen:
-                    dlg.move(target)
-        except Exception:
-            pass
+        adm = get_appdata_manager()
+        dlg_w = int(adm.get('line_break_dialog_width', 900) or 900)
+        dlg_h = int(adm.get('line_break_dialog_height', 700) or 700)
+        dlg.resize(max(420, dlg_w), max(320, dlg_h))
+        dlg_x = int(adm.get('line_break_dialog_x', -1) or -1)
+        dlg_y = int(adm.get('line_break_dialog_y', -1) or -1)
+        if dlg_x >= 0 and dlg_y >= 0:
+            # Avoid restoring stale off-screen positions after monitor/layout changes.
+            target = QtCore.QPoint(dlg_x, dlg_y)
+            on_screen = False
+            for screen in QtGui.QGuiApplication.screens():
+                geo = screen.availableGeometry()
+                if geo.contains(target):
+                    on_screen = True
+                    break
+            if on_screen:
+                dlg.move(target)
 
         def _on_accept() -> None:
             preview.commit(label='line_break_edit', restore_first=False)
@@ -2166,16 +2166,13 @@ class MainWindow(QtWidgets.QMainWindow):
             preview.restore_original()
 
         def _on_finished(_result: int) -> None:
-            try:
-                adm = get_appdata_manager()
-                adm.set('line_break_dialog_width', int(dlg.width()))
-                adm.set('line_break_dialog_height', int(dlg.height()))
-                pos = dlg.pos()
-                adm.set('line_break_dialog_x', int(pos.x()))
-                adm.set('line_break_dialog_y', int(pos.y()))
-                adm.save()
-            except Exception:
-                pass
+            adm = get_appdata_manager()
+            adm.set('line_break_dialog_width', int(dlg.width()))
+            adm.set('line_break_dialog_height', int(dlg.height()))
+            pos = dlg.pos()
+            adm.set('line_break_dialog_x', int(pos.x()))
+            adm.set('line_break_dialog_y', int(pos.y()))
+            adm.save()
             if int(_result) == int(QtWidgets.QDialog.DialogCode.Accepted):
                 self.file_manager.on_model_changed()
 
@@ -2279,12 +2276,9 @@ class MainWindow(QtWidgets.QMainWindow):
 
         recent = cleaned_recent
         if recent != original_recent:
-            try:
-                if adm is not None:
-                    adm.set("recent_files", recent)
-                    adm.save()
-            except Exception:
-                pass
+            if adm is not None:
+                adm.set("recent_files", recent)
+                adm.save()
 
         if not recent:
             empty_act = QtGui.QAction(self.tr("No recent files"), self)
@@ -2390,17 +2384,15 @@ class MainWindow(QtWidgets.QMainWindow):
     def _open_recent_file(self, path: str) -> None:
         candidate = Path(str(path or "")).expanduser()
         if not candidate.is_file():
-            try:
-                adm = get_appdata_manager()
-                recent = adm.get("recent_files", []) or []
-                if not isinstance(recent, list):
-                    recent = []
-                candidate_s = str(candidate)
-                filtered = [str(p) for p in recent if str(p).strip() and str(p) != candidate_s]
-                adm.set("recent_files", filtered)
-                adm.save()
-            except Exception:
-                pass
+            adm = get_appdata_manager()
+            recent = adm.get("recent_files", []) or []
+            if not isinstance(recent, list):
+                recent = []
+            candidate_s = str(candidate)
+            filtered = [str(p) for p in recent if str(p).strip() and str(p) != candidate_s]
+            adm.set("recent_files", filtered)
+            adm.save()
+
             QtWidgets.QMessageBox.information(
                 self,
                 self.tr("Recent File Missing"),
@@ -2415,19 +2407,13 @@ class MainWindow(QtWidgets.QMainWindow):
             return
         sc = self.file_manager.open_path(str(candidate))
         if sc:
-            try:
-                self._refresh_recent_files_menu()
-            except Exception:
-                pass
+            self._refresh_recent_files_menu()
             self._after_project_loaded()
 
     def _clear_recent_files(self) -> None:
-        try:
-            adm = get_appdata_manager()
-            adm.set("recent_files", [])
-            adm.save()
-        except Exception:
-            pass
+        adm = get_appdata_manager()
+        adm.set("recent_files", [])
+        adm.save()
         self._refresh_recent_files_menu()
 
     @QtCore.Slot(int, int, float, float)
