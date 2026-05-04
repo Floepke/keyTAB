@@ -376,10 +376,10 @@ class NoteTool(BaseTool):
             if hasattr(w, 'request_overlay_refresh'):
                 w.request_overlay_refresh()
 
-    def _apply_velocity_from_cursor(self, x_px: float) -> None:
+    def _apply_velocity_from_cursor(self, x_px: float, y_px: float) -> None:
         if self._editor is None or self._velocity_target is None:
             return
-        x_mm, _ = self._cursor_mm(x_px, 0.0)
+        x_mm, _ = self._cursor_mm(x_px, y_px)
         margin = float(getattr(self._editor, 'margin', 12.0) or 12.0)
         stave_width = float(getattr(self._editor, 'stave_width', 120.0) or 120.0)
         max_len = max(2.0, margin * 0.85)
@@ -478,7 +478,7 @@ class NoteTool(BaseTool):
                 # Do not arm duration edits while dragging velocity
                 self._duration_edit_armed = False
                 self._move_pitch_time_mode = False
-                self._apply_velocity_from_cursor(x)
+                self._apply_velocity_from_cursor(x, y)
                 return
 
         # Arpeggio handle hit test (resize)
@@ -812,7 +812,7 @@ class NoteTool(BaseTool):
             self._update_arpeggio_duration_from_cursor(x, y)
             return
         if self._velocity_dragging:
-            self._apply_velocity_from_cursor(x)
+            self._apply_velocity_from_cursor(x, y)
             return
         # Update the in-progress note based on current mouse
         if self.edit_note is None:
