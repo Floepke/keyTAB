@@ -785,24 +785,30 @@ class MainWindow(QtWidgets.QMainWindow):
         select_all_act.setToolTip(tr("Select all editable events."))
         select_all_act.setShortcut(QtGui.QKeySequence.StandardKey.SelectAll)
 
+        _is_horizontal = str(get_preferences_manager().get('editor_orientation', 'vertical') or 'vertical').strip().lower() == 'horizontal'
+        _transpose_key_neg = QtCore.Qt.Key_Down if _is_horizontal else QtCore.Qt.Key_Left
+        _transpose_key_pos = QtCore.Qt.Key_Up if _is_horizontal else QtCore.Qt.Key_Right
+        _shift_key_earlier = QtCore.Qt.Key_Left if _is_horizontal else QtCore.Qt.Key_Up
+        _shift_key_later = QtCore.Qt.Key_Right if _is_horizontal else QtCore.Qt.Key_Down
+
         transpose_left_act = QtGui.QAction(tr("Transpose -1 Semitone"), self)
         transpose_left_act.setToolTip(tr("Transpose Selection Down by One Semitone."))
-        transpose_left_act.setShortcut(QtGui.QKeySequence(QtCore.Qt.Key_Left))
+        transpose_left_act.setShortcut(QtGui.QKeySequence(_transpose_key_neg))
         transpose_left_act.setShortcutContext(QtCore.Qt.ShortcutContext.WidgetShortcut)
 
         transpose_right_act = QtGui.QAction(tr("Transpose +1 Semitone"), self)
         transpose_right_act.setToolTip(tr("Transpose Selection Up by One Semitone."))
-        transpose_right_act.setShortcut(QtGui.QKeySequence(QtCore.Qt.Key_Right))
+        transpose_right_act.setShortcut(QtGui.QKeySequence(_transpose_key_pos))
         transpose_right_act.setShortcutContext(QtCore.Qt.ShortcutContext.WidgetShortcut)
 
         shift_earlier_act = QtGui.QAction(tr("Move Earlier by Snap Band"), self)
         shift_earlier_act.setToolTip(tr("Move Selection Earlier by One Snap Band."))
-        shift_earlier_act.setShortcut(QtGui.QKeySequence(QtCore.Qt.Key_Up))
+        shift_earlier_act.setShortcut(QtGui.QKeySequence(_shift_key_earlier))
         shift_earlier_act.setShortcutContext(QtCore.Qt.ShortcutContext.WidgetShortcut)
 
         shift_later_act = QtGui.QAction(tr("Move Later by Snap Band"), self)
         shift_later_act.setToolTip(tr("Move Selection Later by One Snap Band."))
-        shift_later_act.setShortcut(QtGui.QKeySequence(QtCore.Qt.Key_Down))
+        shift_later_act.setShortcut(QtGui.QKeySequence(_shift_key_later))
         shift_later_act.setShortcutContext(QtCore.Qt.ShortcutContext.WidgetShortcut)
 
         quantize_act = QtGui.QAction(tr("Quantize Starts and Ends on Snap Band"), self)

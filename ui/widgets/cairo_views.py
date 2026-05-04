@@ -535,16 +535,29 @@ class CairoEditorWidget(QtWidgets.QWidget):
                 except Exception:
                     pass
             if key in (QtCore.Qt.Key_Left, QtCore.Qt.Key_Right):
-                try:
+                if self._is_horizontal_read_direction():
+                    units = float(getattr(self._editor, 'snap_size_units', 0.0) or 0.0)
+                    if units <= 0.0:
+                        units = 1.0
+                    delta = -units if key == QtCore.Qt.Key_Left else units
+                    if self._editor.shift_selected_notes_time(delta):
+                        self.update()
+                        ev.accept()
+                        return
+                else:
                     delta = -1 if key == QtCore.Qt.Key_Left else 1
                     if self._editor.transpose_selected_notes(delta):
                         self.update()
                         ev.accept()
                         return
-                except Exception:
-                    pass
             if key in (QtCore.Qt.Key_Up, QtCore.Qt.Key_Down):
-                try:
+                if self._is_horizontal_read_direction():
+                    delta = -1 if key == QtCore.Qt.Key_Down else 1
+                    if self._editor.transpose_selected_notes(delta):
+                        self.update()
+                        ev.accept()
+                        return
+                else:
                     units = float(getattr(self._editor, 'snap_size_units', 0.0) or 0.0)
                     if units <= 0.0:
                         units = 1.0
@@ -553,8 +566,6 @@ class CairoEditorWidget(QtWidgets.QWidget):
                         self.update()
                         ev.accept()
                         return
-                except Exception:
-                    pass
             if key == QtCore.Qt.Key_Q and mods == QtCore.Qt.KeyboardModifier.NoModifier:
                 try:
                     if hasattr(self._editor, 'quantize_selected_notes') and self._editor.quantize_selected_notes('start/end'):

@@ -1,6 +1,7 @@
 from typing import Optional
 from editor.tool.base_tool import BaseTool
 from file_model.SCORE import SCORE
+from settings_manager import get_preferences
 from utils.operator import Operator
 from ui.widgets.draw_util import DrawUtil
 from utils.CONSTANT import BLACK_KEYS, QUARTER_NOTE_UNIT, SHORTEST_DURATION
@@ -260,28 +261,40 @@ class NoteTool(BaseTool):
         # Two explicit hand selectors for quick switching
         _text, _tip = self._arpeggio_button_text()
         hand = str(getattr(self._editor, 'hand_cursor', self._hand) or self._hand)
+        
+        # read editor orientation
+        preferences = get_preferences()
+        if preferences.get("editor_orientation", 'vertical') == 'horizontal':
+            editor_orientation = 'horizontal'
+        else:
+            editor_orientation = 'vertical'
+
         return [
-            {
-                'name': 'hand_left',
-                'icon': 'note_left',
-                'active': hand == 'l',
-                'tooltip': QtCore.QCoreApplication.translate('NoteTool', 'Click to write left hand notes (shortcut: , ).'),
-            },
             {
                 'name': 'hand_right',
                 'icon': 'note_right',
                 'active': hand == 'r',
                 'tooltip': QtCore.QCoreApplication.translate('NoteTool', 'Click to write right hand notes (shortcut: . ).'),
+                'rotation': 270.0 if editor_orientation == 'horizontal' else 0.0,
             },
             {
-                'name': 'selection_left',
-                'icon': 'selection_left',
-                'tooltip': QtCore.QCoreApplication.translate('NoteTool', 'Set selected notes to left hand (shortcut: [ )'),
+                'name': 'hand_left',
+                'icon': 'note_left',
+                'active': hand == 'l',
+                'tooltip': QtCore.QCoreApplication.translate('NoteTool', 'Click to write left hand notes (shortcut: , ).'),
+                'rotation': 270.0 if editor_orientation == 'horizontal' else 0.0,
             },
             {
                 'name': 'selection_right',
                 'icon': 'selection_right',
                 'tooltip': QtCore.QCoreApplication.translate('NoteTool', 'Set selected notes to right hand (shortcut: ] )'),
+                'rotation': 270.0 if editor_orientation == 'horizontal' else 0.0,
+            },
+            {
+                'name': 'selection_left',
+                'icon': 'selection_left',
+                'tooltip': QtCore.QCoreApplication.translate('NoteTool', 'Set selected notes to left hand (shortcut: [ )'),
+                'rotation': 270.0 if editor_orientation == 'horizontal' else 0.0,
             },
             {
                 'name': 'velocity_toggle',

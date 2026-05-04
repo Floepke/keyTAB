@@ -1,5 +1,6 @@
 from __future__ import annotations
 from typing import TYPE_CHECKING, cast
+from settings_manager import get_preferences
 from ui.widgets.draw_util import DrawUtil
 
 if TYPE_CHECKING:
@@ -16,8 +17,11 @@ class TempoDrawerMixin:
 
         # Layout anchors
         margin = float(self.margin or 0.0)
-        # Draw on the outer right side of the editor page
-        page_w_mm, _ = du.current_page_size_mm()
+        # Use the document page width (pitch axis) regardless of viewport rotation.
+        # du.current_page_size_mm() returns the OUTPUT size, which swaps width/height
+        # in horizontal mode — so always read from the score layout instead.
+        layout_obj = getattr(score, 'layout', None)
+        page_w_mm = float(getattr(layout_obj, 'page_width_mm', 210.0) or 210.0)
 
         # Iterate tempo events
         events = list(getattr(score.events, 'tempo', []) or [])
@@ -34,17 +38,20 @@ class TempoDrawerMixin:
         except Exception:
             font_family = 'Edwin'
 
-        try:
-            layout = getattr(score, 'layout', None)
-            scale = float(getattr(layout, 'scale', 1.0) or 1.0)
-        except Exception:
-            scale = 1.0
-
+        # read editor orientation
+        preferences = get_preferences()
+        if preferences.get("editor_orientation", 'horizontal') == 'horizontal':
+            editor_orientation = 'horizontal'
+        else:
+            editor_orientation = 'vertical'
+        
+        # metrics and styling
+        scale = float(getattr(layout_obj, 'scale', 1.0) or 1.0)
         font_size_pt = 32.0 * scale
         font_italic = False
         font_bold = True
-        bracket_dash = [.5, 1]
-        bracket_stroke = .25
+        bracket_dash = [0.5, 1]
+        bracket_stroke = 0.25
         right_outer_stave_x = float(page_w_mm) - margin - (float(self.semitone_dist or 0.0) * 2.0)
 
         for tp in events:
@@ -70,7 +77,7 @@ class TempoDrawerMixin:
             y1 = float(self.time_to_mm(t0 + du_ticks))
             if y1 < y0:
                 y0, y1 = y1, y0
-            text = str(tempo_val) + '.'
+            text = str(tempo_val)
             y_center = (y0 + y1) * 0.5
 
             x_right = float(page_w_mm) - margin * 0.5
@@ -122,8 +129,9 @@ class TempoDrawerMixin:
             hit_x_left = min(float(right_outer_stave_x), float(text_left))
             self.register_hit_rect('tempo', int(getattr(tp, '_id', 0) or 0), hit_x_left, min(y0, y1), x_right, max(y0, y1))
 
+            # draw tempo text
             du.add_text(
-                x_text_right - 2 * scale,
+                x_text_right - 2 * scale if editor_orientation == 'vertical' else x_text_right - 4.0 * scale,
                 y_center,
                 text,
                 family=font_family,
@@ -131,9 +139,9 @@ class TempoDrawerMixin:
                 italic=font_italic,
                 bold=font_bold,
                 color=draw_color,
-                anchor='e',
+                anchor='e' if editor_orientation == 'vertical' else 'n',
                 id=0,
                 tags=["tempo_text"],
                 hit_rect_mm=None,
-                angle_deg=0.0,
+                angle_deg=0.0 if editor_orientation == 'vertical' else 90.0,
             )

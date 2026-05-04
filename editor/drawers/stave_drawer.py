@@ -1,5 +1,6 @@
 from __future__ import annotations
 from file_model.SCORE import SCORE
+from settings_manager import get_preferences
 from ui.widgets.draw_util import DrawUtil
 from utils.CONSTANT import QUARTER_NOTE_UNIT
 from utils.tiny_tool import key_class_filter
@@ -18,6 +19,13 @@ class StaveDrawerMixin:
         layout = getattr(score, 'layout', None)
         if layout is None:
             return
+        
+        # read editor orientation
+        preferences = get_preferences()
+        if preferences.get("editor_orientation", 'horizontal') == 'horizontal':
+            editor_orientation = 'horizontal'
+        else:
+            editor_orientation = 'vertical'
 
         # Piano-roll vertical stave: draw vertical lines per semitone across full height
         semitone_dx = float(self.semitone_dist)
@@ -26,6 +34,7 @@ class StaveDrawerMixin:
         y1 = self.margin
         y2 = self.margin + stave_length_mm
 
+        # Draw miniature piano keyboard black keys
         for key in range(1, PIANO_KEY_AMOUNT):
             if key in key_class_filter('ACDFG'): # black keys
                 x_pos = self.pitch_to_x(key)
@@ -58,7 +67,7 @@ class StaveDrawerMixin:
                     tags=[tag]
                 )
 
-        # Draw miniature piano keyboard below the end barline.
+        # Draw piano keyboard outline and octave rectangles
         bar_width_mm = max(0.01, float(getattr(self, 'editor_line_width_global', 0.1) or 0.1))
         end_t = float(self._calc_base_grid_list_total_length())
         y_kb = float(self.time_to_mm(end_t))
@@ -116,13 +125,27 @@ class StaveDrawerMixin:
                     tags=["piano_keyboard", "piano_black_key"],
                 )
 
-        # Label A0 and every C white key.
+        # Label octave numbers
         octave_label_keys = [1] + [key for key in range(4, PIANO_KEY_AMOUNT + 1, 12)]
         for key in octave_label_keys:
             x_pos = float(self.pitch_to_x(key))
-            if kb_x1 <= x_pos <= kb_x2:
+            if kb_x1 <= x_pos <= kb_x2 and editor_orientation == 'vertical':
+                du.add_text(
+                    x_pos,
+                    y_kb + 7.5,
+                    str(octave_number(key)),
+                    family="Edwin",
+                    color=self.notation_color,
+                    anchor='center',
+                    size_pt=10.0,
+                    id=0,
+                    tags=["piano_keyboard", "piano_octave_number"],
+                )
+            else: # horizontal orientation
                 if key == 1:
                     x_pos += .15
+                if key == 88:
+                    x_pos -= 1.0
                 if key == 4:
                     x_pos -= .15
                 if key == 88:
@@ -130,8 +153,8 @@ class StaveDrawerMixin:
                 if key == 28:
                     x_pos -= .1
                 du.add_text(
-                    x_pos - .2,
-                    y_kb + 9.0,
+                    x_pos,
+                    y_kb + 8.0,
                     str(octave_number(key)),
                     family="Edwin",
                     color=self.notation_color,
@@ -139,8 +162,14 @@ class StaveDrawerMixin:
                     size_pt=10.0,
                     id=0,
                     tags=["piano_keyboard", "piano_octave_number"],
+                    angle_deg=90.0,
                 )
 
+        # Draw piano keyboard outline
+        if editor_orientation == 'vertical':
+            pass
+        else: # horizontal orientation
+            kb_x2 += 1.0
         du.add_rectangle(
             kb_x1,
             y_kb,

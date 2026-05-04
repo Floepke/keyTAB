@@ -285,6 +285,12 @@ class ToolbarHandle(QtWidgets.QSplitterHandle):
             btn.setFocusPolicy(QtCore.Qt.FocusPolicy.NoFocus)
             btn.setAutoRaise(False)
             ic = get_qicon(icon_name, size=(64, 64))
+            rotation_deg = float(d.get('rotation', 0.0) or 0.0)
+            if ic and abs(rotation_deg) > 0.1:
+                pm = ic.pixmap(64, 64)
+                transform = QtGui.QTransform().rotate(rotation_deg)
+                pm = pm.transformed(transform, QtCore.Qt.TransformationMode.SmoothTransformation)
+                ic = QtGui.QIcon(pm)
             if ic:
                 btn.setIcon(ic)
             if text:

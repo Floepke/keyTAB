@@ -1,6 +1,7 @@
 from __future__ import annotations
 from typing import TYPE_CHECKING, cast
 from PySide6 import QtCore
+from settings_manager import get_preferences
 from ui.widgets.draw_util import DrawUtil
 
 if TYPE_CHECKING:
@@ -21,9 +22,12 @@ class LineBreakDrawerMixin:
         bottom_mm = top_mm + vp_h_mm
         bleed_mm = max(2.0, float(getattr(score.app_state, 'zoom_mm_per_quarter', 25.0)) * 0.25)
 
-        # Layout anchors: place marker in the outer-left editor gutter.
-        stave_left_x = float(self.pitch_to_x(2))
-        margin = float(getattr(self, 'margin', 0.0) or 0.0)
+        # read editor orientation
+        preferences = get_preferences()
+        if preferences.get("editor_orientation", 'horizontal') == 'horizontal':
+            editor_orientation = 'horizontal'
+        else:
+            editor_orientation = 'vertical'
 
         # Font setup
         try:
@@ -71,4 +75,5 @@ class LineBreakDrawerMixin:
                 anchor='center',
                 family=font_family,
                 bold=True,
+                angle_deg=0.0 if editor_orientation == 'vertical' else 90.0,
             )
