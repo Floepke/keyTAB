@@ -281,7 +281,7 @@ class TimeSignatureTool(BaseTool):
         if score is None:
             return
 
-        click_t = float(max(0.0, self._editor.snap_time(self._editor.y_to_time(y))))
+        click_t = float(max(0.0, self._editor.snap_time(self._editor.widget_px_to_time(x, y))))
         nearest_barline, on_barline = self._nearest_barline(score, click_t)
 
         if on_barline:
@@ -305,7 +305,7 @@ class TimeSignatureTool(BaseTool):
         if score is None:
             return
 
-        click_t = float(max(0.0, self._editor.snap_time(self._editor.y_to_time(y))))
+        click_t = float(max(0.0, self._editor.snap_time(self._editor.widget_px_to_time(x, y))))
         nearest_barline, on_barline = self._nearest_barline(score, click_t)
         if on_barline:
             # Delete time-signature change if this barline is a segment start (except first segment).

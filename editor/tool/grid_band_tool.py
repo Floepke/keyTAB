@@ -318,7 +318,7 @@ class GridBandTool(BaseTool):
         self._drag_markers = {}
         self._drag_initial_durations = {}
         self._hand = hands[0] if hands else self._hand_for_x(x)
-        t_raw = float(self._editor.y_to_time(y))
+        t_raw = float(self._editor.widget_px_to_time(x, y))
         t_snap = float(self._editor.snap_time(t_raw))
 
         first_marker = None
@@ -375,7 +375,7 @@ class GridBandTool(BaseTool):
             return
         if not self._drag_markers:
             return
-        t_raw = float(self._editor.y_to_time(y))
+        t_raw = float(self._editor.widget_px_to_time(x, y))
         t_snap = float(self._editor.snap_time(t_raw))
         delta = float(t_snap) - float(self._drag_press_time)
         for hand, mk in list(self._drag_markers.items()):
@@ -436,7 +436,7 @@ class GridBandTool(BaseTool):
         hands = self._hands_for_x(x)
         
         # Use click position time and snap it.
-        t_raw = float(self._editor.y_to_time(y))
+        t_raw = float(self._editor.widget_px_to_time(x, y))
         t_snap = float(self._editor.snap_time(t_raw))
 
         changed_any = False

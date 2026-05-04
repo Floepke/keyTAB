@@ -37,6 +37,7 @@ class DynamicDrawerMixin:
         paper_color = getattr(self, 'paper_color', (1.0, 1.0, 1.0, 1.0))
         text_color = self.notation_color
         text_family = 'LelandText'
+        text_angle_deg = 90.0
 
         top_mm = float(getattr(self, '_view_y_mm_offset', 0.0) or 0.0)
         vp_h_mm = float(getattr(self, '_viewport_h_mm', 0.0) or 0.0)
@@ -75,10 +76,16 @@ class DynamicDrawerMixin:
             by = float(y_mm) - (float(yb) + (float(h) * 0.5))
             rx = bx + float(xb)
             ry = by + float(yb)
-            sym_x1 = rx - dynamic_bg_pad
-            sym_y1 = ry - dynamic_bg_pad
-            sym_x2 = rx + float(w) + dynamic_bg_pad
-            sym_y2 = ry + float(h) + dynamic_bg_pad
+            # Text is rotated 90 degrees around its center in DrawUtil. Use a
+            # swapped axis-aligned bbox so background and hit-rect stay aligned.
+            cx = rx + (float(w) * 0.5)
+            cy = ry + (float(h) * 0.5)
+            rot_w = float(h)
+            rot_h = float(w)
+            sym_x1 = cx - (rot_w * 0.5) - dynamic_bg_pad
+            sym_y1 = cy - (rot_h * 0.5) - dynamic_bg_pad
+            sym_x2 = cx + (rot_w * 0.5) + dynamic_bg_pad
+            sym_y2 = cy + (rot_h * 0.5) + dynamic_bg_pad
 
             du.add_rectangle(
                 sym_x1,
@@ -101,6 +108,7 @@ class DynamicDrawerMixin:
                 bold=False,
                 color=text_color,
                 anchor=None,
+                angle_deg=text_angle_deg,
                 id=ev_id,
                 tags=['dynamic_symbol_text_top'],
             )

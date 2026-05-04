@@ -90,8 +90,8 @@ class BaseTool:
         # Rendering is handled centrally by Editor.draw_guides().
         if self._editor is None:
             return
-        # Convert pointer Y (logical px) → time ticks (includes scroll offset)
-        t = self._editor.y_to_time(y)
+        # Convert widget coordinates to time ticks for the active orientation.
+        t = self._editor.widget_px_to_time(x, y)
         # Snap to the current snap size units
         t_snapped = self._editor.snap_time(t)
         self._editor.time_cursor = t_snapped

@@ -1,5 +1,6 @@
 from __future__ import annotations
 from typing import TYPE_CHECKING, cast
+from settings_manager import get_preferences
 from ui.widgets.draw_util import DrawUtil
 from fonts import register_font_from_bytes
 from utils.CONSTANT import QUARTER_NOTE_UNIT, SHORTEST_DURATION
@@ -48,6 +49,13 @@ class TimeSignatureDrawerMixin:
         guide_width_mm = float(getattr(layout, 'time_signature_indicator_guide_thickness_mm', 0.5) or 0.5) * float(getattr(layout, 'scale', 1.0) or 1.0)
         divider_width_mm = float(getattr(layout, 'time_signature_indicator_divide_guide_thickness_mm', 1.0) or 1.0) * float(getattr(layout, 'scale', 1.0) or 1.0)
 
+        # read editor orientation
+        preferences = get_preferences()
+        if preferences.get("editor_orientation", 'horizontal') == 'horizontal':
+            editor_orientation = 'horizontal'
+        else:
+            editor_orientation = 'vertical'
+
         # Shared layout metrics
         margin = float(self.margin or 0.0)
         stave_left_position = margin + float(self.semitone_dist or 0.0)
@@ -61,14 +69,15 @@ class TimeSignatureDrawerMixin:
             # Numerator
             du.add_text(
                 x,
-                y_mm - 3.0,
+                y_mm - 3.0 if editor_orientation == 'vertical' else y_mm - 4.0,
                 f"{int(numerator)}",
                 size_pt=classic_size,
                 color=color,
                 id=0,
                 tags=["time_signature"],
-                anchor='s',
+                anchor='s' if editor_orientation == 'vertical' else 'center',
                 family=classic_family,
+                angle_deg=0 if editor_orientation == 'vertical' else 90,
             )
             # Divider line
             du.add_line(
@@ -85,14 +94,15 @@ class TimeSignatureDrawerMixin:
             # Denominator
             du.add_text(
                 x,
-                y_mm + 3.0,
+                y_mm + 3.0 if editor_orientation == 'vertical' else y_mm + 4.0,
                 f"{int(denominator)}",
                 size_pt=classic_size,
                 color=color,
                 id=0,
                 tags=["time_signature"],
-                anchor='n',
+                anchor='n' if editor_orientation == 'vertical' else 'center',
                 family=classic_family,
+                angle_deg=0 if editor_orientation == 'vertical' else 90,
             )
 
         # Helper: draw Klavarskribo-style three-column indicator at segment boundary
@@ -175,13 +185,45 @@ class TimeSignatureDrawerMixin:
             # Middle column: reset to 1 where Grid-1 hits the beat position.
             for k, val in enumerate(mid_values, start=1):
                 y = y_mm + (k - 1) * beat_len_mm
-                du.add_text(x_mid, y, str(val), size_pt=klav_size, color=color, id=0, tags=["ts_klavars_mid"], anchor='w', family=klav_family)
-            # Final 1 at next measure barline (start of next measure)
-            du.add_text(x_mid, y_mm + measure_len_mm, "1", size_pt=klav_size, color=color, id=0, tags=["ts_klavars_mid"], anchor='w', family=klav_family)
+                du.add_text(
+                    x_mid,
+                    y,
+                    text=str(val),
+                    size_pt=klav_size,
+                    color=color,
+                    id=0,
+                    tags=["ts_klavars_mid"],
+                    anchor='w' if editor_orientation == 'vertical' else 'center',
+                    family=klav_family,
+                    angle_deg=0 if editor_orientation == 'vertical' else 90,
+                )
+                # Final 1 at next measure barline (start of next measure)
+                du.add_text(
+                    x_mid,
+                    y_mm + measure_len_mm,
+                    text="1",
+                    size_pt=klav_size,
+                    color=color,
+                    id=0,
+                    tags=["ts_klavars_mid"],
+                    anchor='w' if editor_orientation == 'vertical' else 'center',
+                    family=klav_family,
+                    angle_deg=0 if editor_orientation == 'vertical' else 90,
+                )
             # Left column: count groups up each time the middle column resets to 1.
             for gi, s in zip(group_values, group_starts):
                 y = y_mm + (s - 1) * beat_len_mm
-                du.add_text(x_left - 2.0, y, str(gi), size_pt=klav_size, color=color, id=0, tags=["ts_klavars_left"], anchor='w', family=klav_family)
+                du.add_text(
+                    x_left - 2.0,
+                    y,
+                    text=str(gi),
+                    size_pt=klav_size,
+                    color=color, id=0,
+                    tags=["ts_klavars_left"],
+                    anchor='w' if editor_orientation == 'vertical' else 'center',
+                    family=klav_family,
+                    angle_deg=0 if editor_orientation == 'vertical' else 90,
+                )
 
         # Iterate BaseGrid segments and draw based on indicator_type
         # Classical is always shown; Klavarskribo too.

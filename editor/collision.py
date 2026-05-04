@@ -52,12 +52,21 @@ class CollisionMixin:
         return matches[0][1]
 
     def _px_to_mm(self, x_px: float, y_px: float) -> tuple[float, float]:
-        """Convert logical (Qt) pixel coordinates to absolute mm."""
+        """Convert logical (Qt) pixel coordinates to absolute drawing-space mm.
+
+        Page-space mm is the unrotated drawing coordinate system used by the
+        drawers and registered hit rectangles.
+        """
+        try:
+            return self.widget_px_to_page_mm(float(x_px), float(y_px))
+        except Exception:
+            pass
         w_px_per_mm = float(getattr(self, "_widget_px_per_mm", 1.0) or 1.0)
         if w_px_per_mm <= 0:
             return 0.0, 0.0
+        scroll = float(getattr(self, "_view_y_mm_offset", 0.0) or 0.0)
         x_mm = float(x_px) / w_px_per_mm
-        y_mm = float(y_px) / w_px_per_mm + float(getattr(self, "_view_y_mm_offset", 0.0) or 0.0)
+        y_mm = float(y_px) / w_px_per_mm + scroll
         return x_mm, y_mm
 
     # ---- Hit rect backward-compatible wrappers ----

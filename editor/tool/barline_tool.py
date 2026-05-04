@@ -147,7 +147,7 @@ class BarlineTool(BaseTool):
         if self._editor is None:
             return
         score = self._editor.current_score()
-        t_click = float(self._editor.y_to_time(y))
+        t_click = float(self._editor.widget_px_to_time(x, y))
         t_bar = self._resolve_click_time(t_click)
         if t_bar is None:
             return
@@ -165,7 +165,7 @@ class BarlineTool(BaseTool):
         if self._editor is None:
             return
         score = self._editor.current_score()
-        t_click = float(self._editor.y_to_time(y))
+        t_click = float(self._editor.widget_px_to_time(x, y))
         t_bar = self._nearest_event_time(t_click)
         if t_bar is None:
             return

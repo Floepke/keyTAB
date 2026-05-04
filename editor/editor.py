@@ -122,6 +122,7 @@ class Editor(QtCore.QObject,
         self._dragging_left: bool = False
         self._dragging_right: bool = False
         self._ignore_next_left_release: bool = False
+        self._ignore_next_right_release: bool = False
         self._pending_left_double_release: bool = False
         self._pending_right_double_release: bool = False
         self._pending_left_double_pos: tuple[float, float] | None = None
@@ -513,12 +514,12 @@ class Editor(QtCore.QObject,
                 self._tool.on_left_press(x, y)
             # If Shift is held, initialize selection anchor on left press
             if self._left_selection_mode:
-                anchor_t = self.snap_time(self.y_to_time(y))
+                anchor_t = self.snap_time(self.widget_px_to_time(x, y))
                 self._sel_anchor_units = float(anchor_t)
                 self._sel_start_units = float(anchor_t)
                 ss = max(1e-6, float(self.snap_size_units))
                 self._sel_end_units = float(anchor_t + ss)
-                anchor_p = int(self.x_to_pitch(x))
+                anchor_p = int(self.widget_px_to_pitch(x, y))
                 anchor_p = max(1, min(88, anchor_p))
                 self._sel_anchor_pitch = anchor_p
                 self._sel_min_pitch = anchor_p
@@ -534,12 +535,12 @@ class Editor(QtCore.QObject,
                 self._tool.on_right_press(x, y)
             else:
                 # Initialize selection anchor at press to be robust against scrolling
-                anchor_t = self.snap_time(self.y_to_time(y))
+                anchor_t = self.snap_time(self.widget_px_to_time(x, y))
                 self._sel_anchor_units = float(anchor_t)
                 self._sel_start_units = float(anchor_t)
                 ss = max(1e-6, float(self.snap_size_units))
                 self._sel_end_units = float(anchor_t + ss)
-                anchor_p = int(self.x_to_pitch(x))
+                anchor_p = int(self.widget_px_to_pitch(x, y))
                 anchor_p = max(1, min(88, anchor_p))
                 self._sel_anchor_pitch = anchor_p
                 self._sel_min_pitch = anchor_p
@@ -568,9 +569,16 @@ class Editor(QtCore.QObject,
 
         if self._right_pressed and not right_phys_down:
             try:
+                if self._dragging_right and not self._right_selection_mode:
+                    self._tool.on_right_drag_end(x, y)
                 self._tool.on_right_unpress(x, y)
             except Exception:
                 pass
+            if self._dragging_right and self._right_selection_mode:
+                # Selection was being built; preserve it and suppress the upcoming release
+                self._ignore_next_right_release = True
+            else:
+                self._selection_active = False
             self._right_pressed = False
             self._dragging_right = False
             self._right_selection_mode = False
@@ -585,7 +593,7 @@ class Editor(QtCore.QObject,
                     self._tool.on_left_drag(x, y, dx, dy)
                 # Update selection window when Shift+Left-dragging
                 if self._left_selection_mode:
-                    cur_t = self.snap_time(self.y_to_time(y))
+                    cur_t = self.snap_time(self.widget_px_to_time(x, y))
                     anchor_t = float(self._sel_anchor_units)
                     ss = max(1e-6, float(self.snap_size_units))
                     if cur_t >= anchor_t:
@@ -594,7 +602,7 @@ class Editor(QtCore.QObject,
                     else:
                         self._sel_start_units = float(cur_t)
                         self._sel_end_units = float(anchor_t)
-                    cur_p = int(self.x_to_pitch(x))
+                    cur_p = int(self.widget_px_to_pitch(x, y))
                     cur_p = max(1, min(88, cur_p))
                     anchor_p = int(self._sel_anchor_pitch)
                     self._sel_min_pitch = int(min(anchor_p, cur_p))
@@ -611,7 +619,7 @@ class Editor(QtCore.QObject,
                     self._tool.on_right_drag(x, y, dx, dy)
                 else:
                     # Update selection window while right-dragging (selection mode)
-                    cur_t = self.snap_time(self.y_to_time(y))
+                    cur_t = self.snap_time(self.widget_px_to_time(x, y))
                     anchor_t = float(self._sel_anchor_units)
                     ss = max(1e-6, float(self.snap_size_units))
                     if cur_t >= anchor_t:
@@ -620,7 +628,7 @@ class Editor(QtCore.QObject,
                     else:
                         self._sel_start_units = float(cur_t)
                         self._sel_end_units = float(anchor_t)
-                    cur_p = int(self.x_to_pitch(x))
+                    cur_p = int(self.widget_px_to_pitch(x, y))
                     cur_p = max(1, min(88, cur_p))
                     anchor_p = int(self._sel_anchor_pitch)
                     self._sel_min_pitch = int(min(anchor_p, cur_p))
@@ -629,7 +637,7 @@ class Editor(QtCore.QObject,
                 # Skip intermediate drag snapshots
         else:
             # Update shared cursor state for guide rendering (time + mm), with snapping
-            t = self.y_to_time(y)
+            t = self.widget_px_to_time(x, y)
             t = self.snap_time(t)
             self.time_cursor = t
             # Store cursor mm relative to viewport (local mm)
@@ -637,13 +645,13 @@ class Editor(QtCore.QObject,
             self.mm_cursor = abs_mm - float(self._view_y_mm_offset or 0.0)
             # Track pitch under cursor only when X is within the piano key span.
             # This keeps the preview note hidden while the mouse is out of range.
-            x_mm = float(x) / max(1e-6, self._widget_px_per_mm)
+            x_mm, _page_y_mm = self.widget_px_to_page_mm(x, y)
             if self._x_positions is None:
                 self._rebuild_x_positions()
             min_x = float(self._x_positions[1])
             max_x = float(self._x_positions[PIANO_KEY_AMOUNT])
             if min_x <= x_mm <= max_x:
-                self.pitch_cursor = self.x_to_pitch(x)
+                self.pitch_cursor = self.widget_px_to_pitch(x, y)
             else:
                 self.pitch_cursor = None
             self._tool.on_mouse_move(x, y)
@@ -653,11 +661,8 @@ class Editor(QtCore.QObject,
             is_left_double_release = bool(self._pending_left_double_release)
             if self._ignore_next_left_release:
                 self._ignore_next_left_release = False
-                try:
-                    if not self._left_selection_mode:
-                        self._tool.on_left_unpress(x, y)
-                except Exception:
-                    pass
+                if not self._left_selection_mode:
+                    self._tool.on_left_unpress(x, y)
                 self._selection_active = False
                 self._left_pressed = False
                 self._dragging_left = False
@@ -685,6 +690,12 @@ class Editor(QtCore.QObject,
             self._dragging_left = False
             self._left_selection_mode = False
         elif button == 2:
+            if self._ignore_next_right_release:
+                self._ignore_next_right_release = False
+                self._right_pressed = False
+                self._dragging_right = False
+                self._right_selection_mode = False
+                return
             is_right_double_release = bool(self._pending_right_double_release)
             if self._dragging_right:
                 if not self._right_selection_mode:
@@ -1160,6 +1171,57 @@ class Editor(QtCore.QObject,
         x_mm = float(x_px) / max(1e-6, self._widget_px_per_mm)
         return self.x_to_pitch_mm(x_mm)
 
+    def is_horizontal_editor_orientation(self) -> bool:
+        """Return True when the editor viewport is using horizontal orientation."""
+        try:
+            pm = get_preferences_manager()
+            orientation = str(pm.get('editor_orientation', 'vertical') or 'vertical').strip().lower()
+            return orientation == 'horizontal'
+        except Exception:
+            return False
+
+    def widget_px_to_output_mm(self, x_px: float, y_px: float) -> tuple[float, float]:
+        """Convert widget-local logical pixels to output-space millimeters.
+
+        Output-space is the post-rotation coordinate system seen on screen.
+        In horizontal mode, time scroll applies along output X.
+        """
+        px_per_mm = max(1e-6, float(getattr(self, '_widget_px_per_mm', 1.0) or 1.0))
+        view_offset = float(getattr(self, '_view_y_mm_offset', 0.0) or 0.0)
+        if self.is_horizontal_editor_orientation():
+            out_x_mm = float(x_px) / px_per_mm + view_offset
+            out_y_mm = float(y_px) / px_per_mm
+            return (out_x_mm, out_y_mm)
+        out_x_mm = float(x_px) / px_per_mm
+        out_y_mm = float(y_px) / px_per_mm + view_offset
+        return (out_x_mm, out_y_mm)
+
+    def widget_px_to_page_mm(self, x_px: float, y_px: float) -> tuple[float, float]:
+        """Convert widget-local logical pixels to page-space millimeters.
+
+        Page-space is the unrotated drawing coordinate system used by drawers and
+        registered hit rectangles.
+        """
+        out_x_mm, out_y_mm = self.widget_px_to_output_mm(x_px, y_px)
+        if not self.is_horizontal_editor_orientation():
+            return (out_x_mm, out_y_mm)
+        score: SCORE | None = self.current_score()
+        lay = getattr(score, 'layout', None) if score is not None else None
+        page_w_mm = float(getattr(lay, 'page_width_mm', 210.0) or 210.0)
+        page_x_mm = page_w_mm - float(out_y_mm)
+        page_y_mm = float(out_x_mm)
+        return (page_x_mm, page_y_mm)
+
+    def widget_px_to_time(self, x_px: float, y_px: float) -> float:
+        """Convert widget-local logical pixels to time ticks for the active orientation."""
+        _page_x_mm, page_y_mm = self.widget_px_to_page_mm(float(x_px), float(y_px))
+        return self.mm_to_time(float(page_y_mm))
+
+    def widget_px_to_pitch(self, x_px: float, y_px: float) -> int:
+        """Convert widget-local logical pixels to piano key number for the active orientation."""
+        page_x_mm, _page_y_mm = self.widget_px_to_page_mm(float(x_px), float(y_px))
+        return self.x_to_pitch_mm(float(page_x_mm))
+
     def mm_to_time(self, y_mm: float) -> float:
         """Convert Y in mm to time ticks (inverse of time_to_mm)."""
         score: SCORE = self.current_score()
@@ -1198,13 +1260,15 @@ class Editor(QtCore.QObject,
         self._viewport_h_mm = max(0.0, float(h_mm))
 
     def snap_time(self, ticks: float) -> float:
-        """Snap time ticks to the start of the previous snap band.
+        """Snap time ticks to the nearest snap-band boundary.
 
-        Example: with snap size S, values in [k*S, (k+1)*S) snap to k*S.
+        Example: with snap size S, values near k*S snap to k*S, and values
+        beyond the midpoint between k*S and (k+1)*S snap to (k+1)*S.
         """
         units = max(1e-6, float(self.snap_size_units))
         ratio = float(ticks) / units
-        k = math.floor(ratio + 1e-9)  # tiny epsilon to counter floating error
+        # Nearest-band snapping (round half up) with a tiny epsilon for float stability.
+        k = math.floor(ratio + 0.5 + 1e-9)
         return k * units
 
     # ---- Editor guides (tool-agnostic overlays) ----
@@ -1241,7 +1305,7 @@ class Editor(QtCore.QObject,
                 y_mm,
                 margin,
                 y_mm,
-                color=(0, 0, 0, 1),
+                color=self.accent_color,
                 width_mm=.75,
                 dash_pattern=[0, 2],
                 id=0,
@@ -1254,7 +1318,7 @@ class Editor(QtCore.QObject,
                 y_mm,
                 margin + stave_width - 2.0,
                 y_mm,
-                color=(0, 0, 0, 1),
+                color=self.accent_color,
                 width_mm=.75,
                 dash_pattern=[0, 2.07],
                 id=0,

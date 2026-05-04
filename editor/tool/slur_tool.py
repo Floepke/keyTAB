@@ -58,12 +58,7 @@ class SlurTool(BaseTool):
         return int(offset)
 
     def _cursor_mm(self, x_px: float, y_px: float) -> Tuple[float, float]:
-        px_per_mm = float(getattr(self._editor, '_widget_px_per_mm', 1.0) or 1.0)
-        view_offset = float(getattr(self._editor, '_view_y_mm_offset', 0.0) or 0.0)
-        x_mm = float(x_px) / max(1e-6, px_per_mm)
-        y_mm_local = float(y_px) / max(1e-6, px_per_mm)
-        y_mm = y_mm_local + view_offset
-        return x_mm, y_mm
+        return self._editor.widget_px_to_page_mm(float(x_px), float(y_px))
 
     def _find_nearest_handle(self, x_mm: float, y_mm: float):
         score = self._score()
@@ -120,7 +115,7 @@ class SlurTool(BaseTool):
         if score is None:
             return None, None, None
         try:
-            t_raw = float(self._editor.y_to_time(y))
+            t_raw = float(self._editor.widget_px_to_time(x, y))
             t_snap = float(self._editor.snap_time(t_raw))
         except Exception:
             t_snap = 0.0
@@ -174,7 +169,7 @@ class SlurTool(BaseTool):
         if self._active_slur is None or self._active_handle is None:
             return
         try:
-            t_raw = float(self._editor.y_to_time(y))
+            t_raw = float(self._editor.widget_px_to_time(x, y))
             t_snap = float(self._editor.snap_time(t_raw))
         except Exception:
             t_snap = 0.0

@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING, cast
 from utils.operator import Operator as OP
 
 from ui.widgets.draw_util import DrawUtil
-from utils.CONSTANT import QUARTER_NOTE_UNIT
+from utils.CONSTANT import QUARTER_NOTE_UNIT, PIANO_KEY_AMOUNT
 
 if TYPE_CHECKING:
     from editor.editor import Editor
@@ -38,7 +38,7 @@ class SnapDrawerMixin:
     def draw_snap(self, du: DrawUtil) -> None:
         """Draw alternating light/darker snap bands along the vertical timeline.
 
-        - Pattern resets at each measure start and always begins with a light band.
+        - Pattern resets at each measure start and always begins with a dark band.
         - We only draw the darker bands; the light bands are the editor background.
         - Follows SCORE.base_grid and current zoom to convert time → mm.
         """
@@ -58,13 +58,14 @@ class SnapDrawerMixin:
 
         op = OP()
 
-        # Page and layout metrics
-        page_w_mm, _page_h_mm = du.current_page_size_mm()
+        # Layout metrics
         margin = float(self.margin)
-        
-        # Draw snap pattern across the full stave width.
-        stave_left = float(self.margin + self.semitone_dist)
-        stave_right = float(page_w_mm - self.margin - self.semitone_dist * 2.0)
+
+        # Draw snap pattern across the actual stave/key span.
+        if self._x_positions is None:
+            self._rebuild_x_positions()
+        stave_left = float(self._x_positions[2])
+        stave_right = float(self._x_positions[PIANO_KEY_AMOUNT - 2])
         left_x1 = stave_left
         right_x2 = stave_right
         zpq = float(getattr(score.app_state, 'zoom_mm_per_quarter', 25.0) or 25.0)
@@ -101,7 +102,7 @@ class SnapDrawerMixin:
             for _ in range(measure_amount):
                 sub_cursor = time_cursor_mm
                 measure_end_mm = sub_cursor + measure_len_mm
-                # Pattern starts with light segment; index 0 is light (skip), 1 is dark (draw)
+                # Pattern starts with dark segment; index 0 is dark (draw), 1 is light (skip)
                 seg_index = 0
                 while op.less(sub_cursor, measure_end_mm):
                     h = min(snap_mm, measure_end_mm - sub_cursor)

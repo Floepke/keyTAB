@@ -24,9 +24,9 @@ class BeamTool(BaseTool):
         except Exception:
             return None
 
-    def _hand_for_x(self, x: float) -> str:
+    def _hand_for_xy(self, x: float, y: float) -> str:
         try:
-            pitch = float(self._editor.x_to_pitch(x))
+            pitch = float(self._editor.widget_px_to_pitch(x, y))
         except Exception:
             pitch = getattr(self._editor, 'pitch_cursor', None)
         if pitch is None:
@@ -106,8 +106,8 @@ class BeamTool(BaseTool):
         score = self._score()
         if score is None:
             return
-        self._hand = self._hand_for_x(x)
-        t_raw = float(self._editor.y_to_time(y))
+        self._hand = self._hand_for_xy(x, y)
+        t_raw = float(self._editor.widget_px_to_time(x, y))
         t_snap = float(self._editor.snap_time(t_raw))
         markers = list(getattr(score.events, 'beam', []) or [])
         hit = self._find_hit(self._hand, t_raw, markers)
@@ -134,12 +134,7 @@ class BeamTool(BaseTool):
         mk = self._drag_marker
         if mk is None:
             return
-        try:
-            mm_local = float(getattr(self._editor, 'mm_cursor', 0.0) or 0.0)
-            mm_abs = mm_local + float(getattr(self._editor, '_view_y_mm_offset', 0.0) or 0.0)
-            t_raw = float(self._editor.mm_to_time(mm_abs))
-        except Exception:
-            t_raw = float(self._editor.y_to_time(y))
+        t_raw = float(self._editor.widget_px_to_time(x, y))
         t_snap = float(self._editor.snap_time(t_raw))
         base_duration = float(self._drag_initial_duration)
         mk.duration = max(self._min_duration(), base_duration + (t_snap - float(self._drag_press_time)))
@@ -183,15 +178,9 @@ class BeamTool(BaseTool):
         score = self._score()
         if score is None:
             return
-        hand = self._hand_for_x(x)
+        hand = self._hand_for_xy(x, y)
         markers = list(getattr(score.events, 'beam', []) or [])
-        # Use literal mm_cursor (unsnapped) for hit detection when available
-        try:
-            mm_local = float(getattr(self._editor, 'mm_cursor', 0.0) or 0.0)
-            mm_abs = mm_local + float(getattr(self._editor, '_view_y_mm_offset', 0.0) or 0.0)
-            t_raw = float(self._editor.mm_to_time(mm_abs))
-        except Exception:
-            t_raw = float(self._editor.y_to_time(y))
+        t_raw = float(self._editor.widget_px_to_time(x, y))
         target = self._find_hit(hand, t_raw, markers)
         if target is not None:
             try:

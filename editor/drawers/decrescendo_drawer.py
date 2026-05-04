@@ -212,7 +212,7 @@ class DecrescendoDrawerMixin:
                     stroke_width_mm=0.0,
                     fill_color=(.5, 0.0, 0.0, 1.0),
                     id=ev_id,
-                    tags=['decrescendo', 'decrescendo_handle'],
+                    tags=['hairpin_handle'],
                 )
                 # End handle (at the tip / bottom)
                 self.register_hit_rect(
@@ -228,6 +228,6 @@ class DecrescendoDrawerMixin:
                     stroke_width_mm=0.0,
                     fill_color=(.5, 0.0, 0.0, 1.0),
                     id=ev_id,
-                    tags=['decrescendo', 'decrescendo_handle'],
+                    tags=['hairpin_handle'],
                 )
 

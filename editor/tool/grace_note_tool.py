@@ -54,9 +54,9 @@ class GraceNoteTool(BaseTool):
         score = self._score()
         if score is None:
             return
-        t_raw = float(self._editor.y_to_time(y))
+        t_raw = float(self._editor.widget_px_to_time(x, y))
         t_snap = float(self._editor.snap_time(t_raw))
-        pitch = int(self._editor.x_to_pitch(x))
+        pitch = int(self._editor.widget_px_to_pitch(x, y))
         self._audition_pitch(pitch)
         score.new_grace_note(pitch=pitch, time=t_snap)
         try:
@@ -124,9 +124,9 @@ class GraceNoteTool(BaseTool):
                 if int(getattr(g, '_id', -1) or -1) == int(hit_id):
                     self._drag_grace = g
                     try:
-                        gp = int(getattr(g, 'pitch', self._editor.x_to_pitch(x)) or self._editor.x_to_pitch(x))
+                        gp = int(getattr(g, 'pitch', self._editor.widget_px_to_pitch(x, y)) or self._editor.widget_px_to_pitch(x, y))
                     except Exception:
-                        gp = int(self._editor.x_to_pitch(x))
+                        gp = int(self._editor.widget_px_to_pitch(x, y))
                     self._audition_pitch(gp)
                     self._suppress_click = True
                     break
@@ -141,8 +141,8 @@ class GraceNoteTool(BaseTool):
         if self._drag_grace is None:
             return
         # Update pitch and time live while dragging
-        cur_t = float(self._editor.snap_time(self._editor.y_to_time(y)))
-        cur_pitch = int(self._editor.x_to_pitch(x))
+        cur_t = float(self._editor.snap_time(self._editor.widget_px_to_time(x, y)))
+        cur_pitch = int(self._editor.widget_px_to_pitch(x, y))
         try:
             prev_pitch = int(getattr(self._drag_grace, 'pitch', cur_pitch) or cur_pitch)
             self._drag_grace.time = cur_t

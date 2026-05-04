@@ -243,7 +243,7 @@ class NoteTool(BaseTool):
             return
         base_time = float(getattr(self._arpeggio_target, 'time', self._arpeggio_drag_anchor_time) or self._arpeggio_drag_anchor_time)
         kind = str(getattr(self._arpeggio_target, 'type', 'up/starting') or 'up/starting')
-        t_raw = float(self._editor.y_to_time(y))
+        t_raw = float(self._editor.widget_px_to_time(x, y))
         t_snap = float(self._editor.snap_time(t_raw))
         step = float(max(1e-6, getattr(self._editor, 'snap_size_units', SHORTEST_DURATION)))
         if kind.endswith('ending'):
@@ -303,11 +303,7 @@ class NoteTool(BaseTool):
         return bool(self._velocity_mode)
 
     def _cursor_mm(self, x_px: float, y_px: float) -> tuple[float, float]:
-        w_px_per_mm = float(getattr(self._editor, '_widget_px_per_mm', 1.0) or 1.0)
-        x_mm = float(x_px) / max(1e-6, w_px_per_mm)
-        y_mm_local = float(y_px) / max(1e-6, w_px_per_mm)
-        y_mm = y_mm_local + float(getattr(self._editor, '_view_y_mm_offset', 0.0) or 0.0)
-        return x_mm, y_mm
+        return self._editor.widget_px_to_page_mm(float(x_px), float(y_px))
 
     def _hit_note_and_rect(self, score: SCORE, x_px: float, y_px: float):
         x_mm, y_mm = self._cursor_mm(x_px, y_px)
@@ -484,9 +480,9 @@ class NoteTool(BaseTool):
                     return
 
         # Compute raw (non-snapped) time for detection and snapped for creation
-        t_press_raw = float(self._editor.y_to_time(y))
+        t_press_raw = float(self._editor.widget_px_to_time(x, y))
         t_press_snap = float(self._editor.snap_time(t_press_raw))
-        pitch_press = int(self._editor.x_to_pitch(x))
+        pitch_press = int(self._editor.widget_px_to_pitch(x, y))
         self._hand = str(getattr(self._editor, 'hand_cursor', 'l') or 'l')
 
         # Rectangle-based hit detection for precise clickable area
@@ -811,9 +807,9 @@ class NoteTool(BaseTool):
         
         # Get note being edited and current raw/snap time and pitch
         note = self.edit_note
-        cur_t_raw = float(self._editor.y_to_time(y))
+        cur_t_raw = float(self._editor.widget_px_to_time(x, y))
         cur_t_snap = float(self._editor.snap_time(cur_t_raw))
-        cur_pitch = int(self._editor.x_to_pitch(x))
+        cur_pitch = int(self._editor.widget_px_to_pitch(x, y))
 
         # Update rules:
         # - New note: pitch-only before start; else duration adjust with min snap

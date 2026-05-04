@@ -3830,6 +3830,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                 hairpin_gap = float(_hg if _hg is not None else 5.0)
                 dynamic_symbol_font_size_pt = float(layout.get('dynamic_symbol_font_size_pt', 12.0) or 12.0)
                 dynamic_bg_pad = float(layout.get('dynamic_symbol_background_padding_mm', 0.5) or 0.5) * scale
+                dynamic_symbol_angle_deg = 90.0
 
                 def _get_dynamic_symbol_at_position(t: float, x_rpitch: int) -> dict | None:
                     """Get dynamic symbol dimensions at given time and x_rpitch."""
@@ -3853,8 +3854,11 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                             
                             return {
                                 'glyph': glyph,
-                                'width_mm': w + (2 * dynamic_bg_pad),
-                                'height_mm': h + (2 * dynamic_bg_pad),
+                                # Dynamic symbols are rendered rotated by 90°.
+                                # Swap extents so spacing/collision follows the
+                                # final rendered orientation.
+                                'width_mm': h + (2 * dynamic_bg_pad),
+                                'height_mm': w + (2 * dynamic_bg_pad),
                             }
                     
                     return None
@@ -3980,6 +3984,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                 ) * scale
                 text_family = 'LelandText'
                 text_color = notation_color
+                dynamic_symbol_angle_deg = 90.0
 
                 for ds in line_dynamic_symbols:
                     symbol = str(ds.get('symbol', '') or '')
@@ -3998,12 +4003,18 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                     by = float(y_mm) - (float(yb) + (float(h) * 0.5))
                     rx = bx + float(xb)
                     ry = by + float(yb)
+                    # Text rotates around its bbox center in DrawUtil. Use a
+                    # swapped axis-aligned bbox for the background.
+                    cx = rx + (float(w) * 0.5)
+                    cy = ry + (float(h) * 0.5)
+                    rot_w = float(h)
+                    rot_h = float(w)
 
                     du.add_rectangle(
-                        rx - dynamic_bg_pad,
-                        ry - dynamic_bg_pad,
-                        rx + float(w) + dynamic_bg_pad,
-                        ry + float(h) + dynamic_bg_pad,
+                        cx - (rot_w * 0.5) - dynamic_bg_pad,
+                        cy - (rot_h * 0.5) - dynamic_bg_pad,
+                        cx + (rot_w * 0.5) + dynamic_bg_pad,
+                        cy + (rot_h * 0.5) + dynamic_bg_pad,
                         stroke_color=None,
                         fill_color=paper_color,
                         id=int(ds.get('id', 0) or 0),
@@ -4019,6 +4030,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                         bold=False,
                         color=text_color,
                         anchor=None,
+                        angle_deg=dynamic_symbol_angle_deg,
                         id=int(ds.get('id', 0) or 0),
                         tags=['dynamic_symbol_text_top'],
                     )

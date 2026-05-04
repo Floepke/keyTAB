@@ -347,6 +347,11 @@ def get_preferences_manager() -> PreferencesManager:
             description="Focus the editor view on the playhead during playback.",
         )
         pm.register(
+            key="editor_orientation",
+            default="vertical",
+            description="Editor orientation: 'vertical' or 'horizontal'.",
+        )
+        pm.register(
             key="timestamp_format",
             default="%d-%m-%Y",
             description=(
@@ -361,12 +366,9 @@ def get_preferences_manager() -> PreferencesManager:
             raw = pm._parse_toml_dict(pm.path) if pm.path.exists() else {}
         except Exception:
             raw = {}
-        try:
-            if ("play_note_on_edit" not in raw) and ("audition_during_note_input" in raw):
-                pm.set("play_note_on_edit", bool(raw.get("audition_during_note_input", True)))
-                pm.save()
-        except Exception:
-            pass
+        if ("play_note_on_edit" not in raw) and ("audition_during_note_input" in raw):
+            pm.set("play_note_on_edit", bool(raw.get("audition_during_note_input", True)))
+            pm.save()
         _prefs_manager = pm
     return _prefs_manager
 

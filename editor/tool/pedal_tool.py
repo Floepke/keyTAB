@@ -122,11 +122,7 @@ class PedalTool(BaseTool):
     def _cursor_mm(self, x_px: float, y_px: float) -> tuple[float, float]:
         if self._editor is None:
             return (0.0, 0.0)
-        px_per_mm = float(getattr(self._editor, '_widget_px_per_mm', 1.0) or 1.0)
-        view_offset = float(getattr(self._editor, '_view_y_mm_offset', 0.0) or 0.0)
-        x_mm = float(x_px) / max(1e-6, px_per_mm)
-        y_mm = float(y_px) / max(1e-6, px_per_mm) + view_offset
-        return (x_mm, y_mm)
+        return self._editor.widget_px_to_page_mm(float(x_px), float(y_px))
 
     def _hit_pedal(self, x_px: float, y_px: float):
         if self._editor is None:
@@ -172,7 +168,7 @@ class PedalTool(BaseTool):
             return
 
         x_mm, _y_mm = self._cursor_mm(x, y)
-        t_click = float(self._editor.y_to_time(y))
+        t_click = float(self._editor.widget_px_to_time(x, y))
         t_snap = float(self._editor.snap_time(t_click))
         rpitch = int(self._x_mm_to_rpitch(x_mm))
 
@@ -219,7 +215,7 @@ class PedalTool(BaseTool):
 
         x_mm, _y_mm = self._cursor_mm(x, y)
         rpitch = int(self._x_mm_to_rpitch(x_mm))
-        t_raw = float(self._editor.y_to_time(y))
+        t_raw = float(self._editor.widget_px_to_time(x, y))
         t_snap = float(self._editor.snap_time(t_raw))
 
         try:

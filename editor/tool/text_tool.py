@@ -90,12 +90,7 @@ class TextTool(BaseTool):
         return int(round(rp))
 
     def _cursor_mm(self, x_px: float, y_px: float) -> Tuple[float, float]:
-        px_per_mm = float(getattr(self._editor, '_widget_px_per_mm', 1.0) or 1.0)
-        view_offset = float(getattr(self._editor, '_view_y_mm_offset', 0.0) or 0.0)
-        x_mm = float(x_px) / max(1e-6, px_per_mm)
-        y_mm_local = float(y_px) / max(1e-6, px_per_mm)
-        y_mm = y_mm_local + view_offset
-        return x_mm, y_mm
+        return self._editor.widget_px_to_page_mm(float(x_px), float(y_px))
 
     def _text_geom(self, ev) -> Optional[dict]:
         if ev is None:
@@ -321,7 +316,7 @@ class TextTool(BaseTool):
     def _capture_move_anchor(self, x_px: float, y_px: float, x_mm: float) -> None:
         if self._editor is None or self._active_text is None or self._active_mode != 'move':
             return
-        self._move_anchor_cursor_time = float(self._editor.y_to_time(y_px))
+        self._move_anchor_cursor_time = float(self._editor.widget_px_to_time(x_px, y_px))
         self._move_anchor_cursor_x_mm = float(x_mm)
         self._move_anchor_text_time = float(getattr(self._active_text, 'time', 0.0) or 0.0)
         self._move_anchor_text_rpitch = int(getattr(self._active_text, 'x_rpitch', 0) or 0)
@@ -400,7 +395,7 @@ class TextTool(BaseTool):
             score = self._score()
             if score is None:
                 return
-            t_raw = float(self._editor.y_to_time(y))
+            t_raw = float(self._editor.widget_px_to_time(x, y))
             t_snap = float(self._editor.snap_time(t_raw))
             rp = self.x_mm_to_relative_x(x_mm)
             df = deepcopy(getattr(score.layout, 'font_text', Font()))
@@ -444,7 +439,7 @@ class TextTool(BaseTool):
             ):
                 self._capture_move_anchor(x, y, x_mm)
 
-            t_raw = float(self._editor.y_to_time(y))
+            t_raw = float(self._editor.widget_px_to_time(x, y))
             anchor_time = float(self._move_anchor_cursor_time or t_raw)
             base_text_time = float(self._move_anchor_text_time or 0.0)
             t_snap = max(0.0, float(self._editor.snap_time(base_text_time + (t_raw - anchor_time))))

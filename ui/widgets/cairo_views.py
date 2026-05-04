@@ -104,6 +104,14 @@ class CairoEditorWidget(QtWidgets.QWidget):
     def set_scroll_step_logical_px(self, value: int) -> None:
         self._scroll_step_logical_px = max(1, int(value))
 
+    def _is_horizontal_read_direction(self) -> bool:
+        try:
+            prefs = get_preferences()
+            orientation = str(prefs.get('editor_orientation', 'vertical') or 'vertical').strip().lower()
+            return orientation == 'horizontal'
+        except Exception:
+            return False
+
     def paintEvent(self, ev: QtGui.QPaintEvent) -> None:
         # Use widget size as static viewport; do not rely on QScrollArea.
         vp = self
@@ -133,9 +141,15 @@ class CairoEditorWidget(QtWidgets.QWidget):
             # Calculate editor layout metrics (margin, stave_width, editor_height)
             self._editor._calculate_layout(page_w_mm)
             page_h_mm = float(getattr(self._editor, 'editor_height', page_h_mm) or page_h_mm)
-        # Invalidate cache when scale or page dimensions change
-        # Derive px_per_mm from the actual backing image width to avoid anisotropy
-        px_per_mm = (float(vis_w_px)) / page_w_mm
+        # Detect horizontal read direction: pitch fits the widget height, time scrolls horizontally.
+        is_horizontal = self._is_horizontal_read_direction()
+        # Derive px_per_mm:
+        #   vertical mode  – width  maps to pitch axis (page_w_mm)
+        #   horizontal mode – height maps to pitch axis (page_w_mm); width is the time viewport
+        if is_horizontal:
+            px_per_mm = float(vis_h_px) / max(1e-6, page_w_mm)
+        else:
+            px_per_mm = float(vis_w_px) / max(1e-6, page_w_mm)
         h_px_content = int(page_h_mm * px_per_mm)
         cache_params = (round(px_per_mm, 6), round(page_w_mm, 3), round(page_h_mm, 3))
         if self._last_cache_params is None or self._last_cache_params != cache_params:
@@ -159,33 +173,42 @@ class CairoEditorWidget(QtWidgets.QWidget):
 
         # Visible region equals viewport; use external scroll for offset (logical px)
         # No overscan/bleed: viewport is strictly the visible area.
-        bleed_px = 0
-        vis_h_px_bleed = vis_h_px
         scroll_val_px = int(self._scroll_logical_px)  # logical px
-        # Compute clip rectangle in mm using device px per mm (honors zoom)
+        # Compute clip rectangle in drawing-space mm:
+        #   vertical mode   – clip_y_mm = time scroll; clip_h_mm = visible time = widget height
+        #   horizontal mode – clip_y_mm = time scroll; clip_h_mm = visible time = widget width
         clip_x_mm = 0.0
         clip_y_mm = float(scroll_val_px) * dpr / max(1e-6, px_per_mm)
         clip_w_mm = page_w_mm
-        clip_h_mm = float(vis_h_px) / max(1e-6, px_per_mm)
-        # No bleed: clip is exactly the viewport size in mm
-        clip_y_mm_bleed = clip_y_mm
-        clip_h_mm_bleed = float(vis_h_px_bleed) / max(1e-6, px_per_mm)
+        if is_horizontal:
+            clip_h_mm = float(vis_w_px) / max(1e-6, px_per_mm)
+        else:
+            clip_h_mm = float(vis_h_px) / max(1e-6, px_per_mm)
 
         # Static viewport: tiling disabled and not used
 
-        # Emit metrics so a container can configure an external scrollbar
-        self.viewportMetricsChanged.emit(h_px_content, vis_h_px, px_per_mm, dpr)
+        # Emit metrics so a container can configure an external scrollbar.
+        # In horizontal mode the scrollable axis is the widget width, not height.
+        viewport_px_for_signal = vis_w_px if is_horizontal else vis_h_px
+        self.viewportMetricsChanged.emit(h_px_content, viewport_px_for_signal, px_per_mm, dpr)
         
-        # Provide view metrics to the editor for fast px↔mm/time conversions
+        # Provide view metrics to the editor for fast px↔mm/time conversions.
+        # In horizontal mode, height maps to pitch (page_w_mm), so widget_px_per_mm uses height.
         if self._editor is not None:
-            widget_px_per_mm = float(vis_w_px) / max(1e-6, page_w_mm) / max(1e-6, dpr)
+            if is_horizontal:
+                widget_px_per_mm = float(vis_h_px) / max(1e-6, page_w_mm) / max(1e-6, dpr)
+            else:
+                widget_px_per_mm = float(vis_w_px) / max(1e-6, page_w_mm) / max(1e-6, dpr)
             self._editor.set_view_metrics(px_per_mm, widget_px_per_mm, dpr)
-            # Provide current clip origin offset and viewport height in mm so drawers can cull
+            # Provide current clip origin offset and viewport height in mm so drawers can cull.
+            # clip_h_mm is the visible time range regardless of orientation.
             self._editor.set_view_offset_mm(clip_y_mm)
             self._editor.set_viewport_height_mm(clip_h_mm)
-            # Recompute cursor from last mouse position so guides follow scroll
+            # Recompute cursor from last mouse position so guides follow scroll.
+            # In horizontal mode, widget-x maps to time (was widget-y in vertical mode).
             if self._last_pos is not None and self._editor is not None:
-                t = self._editor.y_to_time(self._last_pos.y())
+                pos_for_time = self._last_pos.x() if is_horizontal else self._last_pos.y()
+                t = self._editor.y_to_time(pos_for_time)
                 t = self._editor.snap_time(t)
                 self._editor.time_cursor = t
                 abs_mm = self._editor.time_to_mm(float(t))
@@ -223,6 +246,8 @@ class CairoEditorWidget(QtWidgets.QWidget):
                 du_guides = DrawUtil()
                 du_guides.set_line_width_factor(EDITOR_LINE_WIDTH_FACTOR)
                 du_guides.set_current_page_size_mm(page_w_mm, page_h_mm)
+                if is_horizontal:
+                    du_guides.set_current_page_rotation_deg(-90.0)
                 if self._editor is not None:
                     self._editor.draw_guides(du_guides)
                 # Offscreen buffer for overlays
@@ -240,6 +265,8 @@ class CairoEditorWidget(QtWidgets.QWidget):
                     du_content = DrawUtil()
                     du_content.set_line_width_factor(EDITOR_LINE_WIDTH_FACTOR)
                     du_content.set_current_page_size_mm(page_w_mm, page_h_mm)
+                    if is_horizontal:
+                        du_content.set_current_page_rotation_deg(-90.0)
                     if self._editor is not None:
                         self._editor.draw_all(du_content)
                     # Rasterize content to cache image
@@ -263,6 +290,8 @@ class CairoEditorWidget(QtWidgets.QWidget):
                 du_guides = DrawUtil()
                 du_guides.set_line_width_factor(EDITOR_LINE_WIDTH_FACTOR)
                 du_guides.set_current_page_size_mm(page_w_mm, page_h_mm)
+                if is_horizontal:
+                    du_guides.set_current_page_rotation_deg(-90.0)
                 if self._editor is not None:
                     self._editor.draw_guides(du_guides)
                 g_img, g_surf, _g_buf = make_image_surface(vis_w_px, vis_h_px)

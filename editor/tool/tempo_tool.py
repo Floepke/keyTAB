@@ -67,7 +67,7 @@ class TempoTool(BaseTool):
         score = self._editor.current_score()
         tempo_id = self._editor.hit_test_tempo(x, y) if hasattr(self._editor, 'hit_test_tempo') else None
         existing = self._find_tempo_by_id(tempo_id) if tempo_id is not None else None
-        t = self._editor.snap_time(self._editor.y_to_time(y))
+        t = self._editor.snap_time(self._editor.widget_px_to_time(x, y))
         # If clicked on existing, edit tempo value
         if existing is not None:
             cur_tempo = int(getattr(existing, 'tempo', 60) or 60)
@@ -136,7 +136,7 @@ class TempoTool(BaseTool):
             return
         self._drag_anchor_y_px = float(y)
         try:
-            self._drag_anchor_time = float(self._editor.y_to_time(y))
+            self._drag_anchor_time = float(self._editor.widget_px_to_time(x, y))
         except Exception:
             self._drag_anchor_time = None
 
@@ -146,9 +146,9 @@ class TempoTool(BaseTool):
         score = self._editor.current_score()
         anchor_time = self._drag_anchor_time
         if anchor_time is None:
-            anchor_time = float(self._editor.y_to_time(y))
+            anchor_time = float(self._editor.widget_px_to_time(x, y))
         try:
-            cur_time = float(self._editor.y_to_time(y))
+            cur_time = float(self._editor.widget_px_to_time(x, y))
         except Exception:
             cur_time = anchor_time
         delta_time = float(cur_time - anchor_time)
@@ -188,7 +188,7 @@ class TempoTool(BaseTool):
         tempo_id = self._editor.hit_test_tempo(x, y) if hasattr(self._editor, 'hit_test_tempo') else None
         existing = self._find_tempo_by_id(tempo_id) if tempo_id is not None else None
         if existing is None:
-            t = self._editor.snap_time(self._editor.y_to_time(y))
+            t = self._editor.snap_time(self._editor.widget_px_to_time(x, y))
             existing = self._find_tempo_at_time(t)
         if existing is None:
             return
@@ -204,7 +204,7 @@ class TempoTool(BaseTool):
             return
         score = self._editor.current_score()
         tempo_id = self._editor.hit_test_tempo(x, y) if hasattr(self._editor, 'hit_test_tempo') else None
-        t = self._editor.snap_time(self._editor.y_to_time(y))
+        t = self._editor.snap_time(self._editor.widget_px_to_time(x, y))
         op = Operator(threshold=1e-6)
         lst = list(getattr(score.events, 'tempo', []) or [])
         if not lst:

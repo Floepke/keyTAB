@@ -212,7 +212,7 @@ class CrescendoDrawerMixin:
                     stroke_width_mm=0.0,
                     fill_color=(.5, 0.0, 0.0, 1.0),
                     id=ev_id,
-                    tags=['crescendo', 'crescendo_handle'],
+                    tags=['hairpin_handle'],
                 )
                 # End handle (at the open end / bottom)
                 self.register_hit_rect(
@@ -228,6 +228,6 @@ class CrescendoDrawerMixin:
                     stroke_width_mm=0.0,
                     fill_color=(.5, 0.0, 0.0, 1.0),
                     id=ev_id,
-                    tags=['crescendo', 'crescendo_handle'],
+                    tags=['hairpin_handle'],
                 )
 

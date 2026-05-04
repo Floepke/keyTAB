@@ -79,6 +79,7 @@ EDITOR_LAYERING = [
     'decrescendo_text',
     'dynamic_symbol_bg_top',
     'dynamic_symbol_text_top',
+    'hairpin_handle',
     'crescendo_handle',
     'decrescendo_handle',
     'pedal_symbol_bg',

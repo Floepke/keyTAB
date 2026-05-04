@@ -51,12 +51,9 @@ class CountLineTool(BaseTool):
         return int(round(rp))
 
     def _cursor_mm(self, x_px: float, y_px: float) -> Tuple[float, float]:
-        px_per_mm = float(getattr(self._editor, '_widget_px_per_mm', 1.0) or 1.0) if self._editor else 1.0
-        view_offset = float(getattr(self._editor, '_view_y_mm_offset', 0.0) or 0.0) if self._editor else 0.0
-        x_mm = float(x_px) / max(1e-6, px_per_mm)
-        y_mm_local = float(y_px) / max(1e-6, px_per_mm)
-        y_mm = y_mm_local + view_offset
-        return x_mm, y_mm
+        if self._editor is None:
+            return (0.0, 0.0)
+        return self._editor.widget_px_to_page_mm(float(x_px), float(y_px))
 
     def toolbar_spec(self) -> list[dict]:
         return []
@@ -69,10 +66,8 @@ class CountLineTool(BaseTool):
         if score is None:
             return
 
-        # Convert mouse to mm for hit testing
-        w_px_per_mm = float(getattr(self._editor, '_widget_px_per_mm', 1.0) or 1.0)
-        x_mm = float(x) / max(1e-6, w_px_per_mm)
-        y_mm = float(y) / max(1e-6, w_px_per_mm) + float(getattr(self._editor, '_view_y_mm_offset', 0.0) or 0.0)
+        # Convert mouse to page-space mm for hit testing.
+        x_mm, y_mm = self._cursor_mm(x, y)
 
         # Hit test handles: exact match to CountLineDrawer visual rects
         # x/y are drawn from center ± (semitone_dist * 0.7).
@@ -107,7 +102,7 @@ class CountLineTool(BaseTool):
 
         # Create a new count line at the snapped time
         x_mm, _y_mm = self._cursor_mm(x, y)
-        t_press_raw = float(self._editor.y_to_time(y))
+        t_press_raw = float(self._editor.widget_px_to_time(x, y))
         t_press_snap = float(self._editor.snap_time(t_press_raw))
         rp_press = self._x_mm_to_rpitch(x_mm)
         rp2 = rp_press + 4
@@ -135,8 +130,8 @@ class CountLineTool(BaseTool):
         if self._editor is None or self._active_line is None:
             return
         # Update time from y
-        x_mm, y_mm = self._cursor_mm(x, y)
-        t_raw = float(self._editor.y_to_time(y))
+        x_mm, _y_mm = self._cursor_mm(x, y)
+        t_raw = float(self._editor.widget_px_to_time(x, y))
         t_snap = float(self._editor.snap_time(t_raw))
         try:
             self._active_line.time = float(t_snap)
@@ -175,9 +170,7 @@ class CountLineTool(BaseTool):
             return
 
         # Delete nearest handle if clicked on it
-        w_px_per_mm = float(getattr(self._editor, '_widget_px_per_mm', 1.0) or 1.0)
-        x_mm = float(x) / max(1e-6, w_px_per_mm)
-        y_mm = float(y) / max(1e-6, w_px_per_mm) + float(getattr(self._editor, '_view_y_mm_offset', 0.0) or 0.0)
+        x_mm, y_mm = self._cursor_mm(x, y)
         handle_half = self._handle_half_extent_mm()
 
         lst = list(getattr(score.events, 'count_line', []) or [])

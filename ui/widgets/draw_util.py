@@ -601,27 +601,24 @@ class DrawUtil:
         elif rotation == 180:
             ctx.translate(float(page.width_mm), float(page.height_mm))
             ctx.rotate(math.pi)
-        # Static viewport: translate to the clip origin only; do not apply Cairo clipping.
-        # Determine viewport origin and size in mm and translate to anchor at (0,0)
-        x_o = 0.0
-        y_o = 0.0
-        vp_w_mm = page.width_mm
-        vp_h_mm = page.height_mm
-        effective_clip_rect_mm = clip_rect_mm if rotation == 0 else None
-        if effective_clip_rect_mm is not None:
-            clip_x, clip_y, w, h = effective_clip_rect_mm
-            # Translate to the viewport origin; shapes are drawn as-is.
+        # Viewport scroll: translate drawing to show the current time/pitch viewport.
+        # For rotation=0: translate the Cairo origin to the clip start (standard viewport clip).
+        # For rotation=270 (-90°, horizontal mode): after the rotation matrix, drawing-y
+        # (time) maps to device-x, so a post-rotation translate(0, -clip_y) scrolls time.
+        if rotation == 0 and clip_rect_mm is not None:
+            clip_x, clip_y, _cw, _ch = clip_rect_mm
             ctx.translate(-clip_x, -clip_y)
-            # Logical viewport dimensions
-            x_o = clip_x
-            y_o = clip_y
-            vp_w_mm = w
-            vp_h_mm = h
+        elif rotation == 270 and clip_rect_mm is not None:
+            _, clip_y_val, _, _ = clip_rect_mm
+            if abs(float(clip_y_val)) > 1e-9:
+                ctx.translate(0.0, -float(clip_y_val))
         # Do not auto-fill a white background; honor caller-supplied background
         # (e.g., explicit rectangle item or widget painter).
 
+        # Item culling: always use drawing-space clip_rect_mm so items outside the
+        # visible time/pitch window are skipped regardless of rotation.
         layering_list = list(layering) if layering is not None else list(EDITOR_LAYERING)
-        for item in self._iter_items_in_editor_order(page, effective_clip_rect_mm, layering_list):
+        for item in self._iter_items_in_editor_order(page, clip_rect_mm, layering_list):
             if isinstance(item, Line):
                 # Draw lines without trimming; rely on culling by hit-rect only.
                 self._draw_line(ctx, item)

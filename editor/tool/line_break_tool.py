@@ -80,7 +80,7 @@ class LineBreakTool(BaseTool):
         if not events:
             return None
         tol_ticks = self._time_tol_ticks()
-        click_time = float(self._editor.y_to_time(y_px))
+        click_time = float(self._editor.widget_px_to_time(x_px, y_px))
         cursor_time = getattr(self._editor, 'time_cursor', None)
         if cursor_time is not None:
             try:
@@ -88,9 +88,7 @@ class LineBreakTool(BaseTool):
             except Exception:
                 pass
         op = Operator(threshold=float(tol_ticks))
-        w_px_per_mm = float(getattr(self._editor, '_widget_px_per_mm', 1.0) or 1.0)
-        x_mm = float(x_px) / max(1e-6, w_px_per_mm)
-        y_mm = float(y_px) / max(1e-6, w_px_per_mm) + float(getattr(self._editor, '_view_y_mm_offset', 0.0) or 0.0)
+        x_mm, y_mm = self._editor.widget_px_to_page_mm(float(x_px), float(y_px))
         stave_right, marker_x = self._marker_positions_mm()
         try:
             du = self._editor.draw_util()
@@ -163,7 +161,7 @@ class LineBreakTool(BaseTool):
     def _is_time_zero(self, t: float) -> bool:
         return abs(float(t)) <= self._time_tol_ticks()
 
-    def _cursor_time(self, y: float) -> float:
+    def _cursor_time(self, x: float, y: float) -> float:
         if self._editor is None:
             return float(y)
         tc = getattr(self._editor, 'time_cursor', None)
@@ -172,14 +170,14 @@ class LineBreakTool(BaseTool):
                 return float(tc)
             except Exception:
                 pass
-        return float(self._editor.y_to_time(y))
+        return float(self._editor.widget_px_to_time(x, y))
 
     def on_left_click(self, x: float, y: float) -> None:
         super().on_left_click(x, y)
         if self._editor is None:
             return
         score = self._editor.current_score()
-        click_time = self._cursor_time(y)
+        click_time = self._cursor_time(x, y)
         hit = self._hit_test_line_break(x, y)
         if hit is not None:
             try:

@@ -82,11 +82,7 @@ class DynamicTool(BaseTool):
             return None
 
     def _cursor_mm(self, x_px: float, y_px: float) -> Tuple[float, float]:
-        px_per_mm = float(getattr(self._editor, '_widget_px_per_mm', 1.0) or 1.0)
-        view_offset = float(getattr(self._editor, '_view_y_mm_offset', 0.0) or 0.0)
-        x_mm = float(x_px) / max(1e-6, px_per_mm)
-        y_mm = float(y_px) / max(1e-6, px_per_mm) + view_offset
-        return x_mm, y_mm
+        return self._editor.widget_px_to_page_mm(float(x_px), float(y_px))
 
     def _view_width_mm(self) -> float:
         try:
@@ -104,8 +100,8 @@ class DynamicTool(BaseTool):
         offset = round((x_clamped - base_x) / dist)
         return int(max(-68, min(73, offset)))
 
-    def _snap_time(self, y_px: float) -> float:
-        t_raw = float(self._editor.y_to_time(y_px))
+    def _snap_time(self, x_px: float, y_px: float) -> float:
+        t_raw = float(self._editor.widget_px_to_time(x_px, y_px))
         return float(self._editor.snap_time(t_raw))
 
     def _snap_units(self) -> float:
@@ -142,7 +138,7 @@ class DynamicTool(BaseTool):
         score = self._score()
         if score is None:
             return None
-        t_snap = self._snap_time(y)
+        t_snap = self._snap_time(x, y)
         x_mm, _ = self._cursor_mm(x, y)
         rpitch = self._x_mm_to_rpitch(x_mm)
         return score.new_dynamic_symbol(time=float(t_snap), x_rpitch=int(rpitch), symbol=str(symbol or ''))
@@ -167,7 +163,7 @@ class DynamicTool(BaseTool):
         score = self._score()
         if score is None:
             return None
-        t_snap = self._snap_time(y)
+        t_snap = self._snap_time(x, y)
         x_mm, _ = self._cursor_mm(x, y)
         rpitch = self._x_mm_to_rpitch(x_mm)
         dur = self._snap_units()
@@ -389,7 +385,7 @@ class DynamicTool(BaseTool):
                 for hp, handle in self._hairpins_at_point(old_joint_time, old_joint_rpitch)
                 if hp is not self._active_hairpin
             ]
-            t_snap = self._snap_time(y)
+            t_snap = self._snap_time(x, y)
             try:
                 x_mm, _ = self._cursor_mm(x, y)
                 rpitch = self._x_mm_to_rpitch(x_mm)
@@ -434,7 +430,7 @@ class DynamicTool(BaseTool):
         if self._active_symbol is not None:
             if self._active_symbol is None:
                 return
-            t_snap = self._snap_time(y)
+            t_snap = self._snap_time(x, y)
             try:
                 x_mm, _ = self._cursor_mm(x, y)
                 rpitch = self._x_mm_to_rpitch(x_mm)

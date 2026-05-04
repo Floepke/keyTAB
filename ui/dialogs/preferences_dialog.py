@@ -128,6 +128,12 @@ class PreferencesDialog(QtWidgets.QDialog):
                 (self.tr("Dark"), "dark"),
             ]
             return self._build_radio_group(options, str(value)), "theme"
+        if key == "editor_orientation":
+            options = [
+                (self.tr("Vertical"), "vertical"),
+                (self.tr("Horizontal"), "horizontal"),
+            ]
+            return self._build_radio_group(options, str(value)), "editor_orientation"
         if isinstance(pref.default, bool):
             checkbox = QtWidgets.QCheckBox()
             checkbox.setChecked(bool(value))
@@ -198,7 +204,7 @@ class PreferencesDialog(QtWidgets.QDialog):
     def _apply_changes(self) -> None:
         for key, (kind, widget) in self._fields.items():
             try:
-                if kind in ("theme", "ui_language"):
+                if kind in ("theme", "ui_language", "editor_orientation"):
                     value = next(
                         (stored for btn, stored in widget._radio_data if btn.isChecked()),
                         widget._radio_data[0][1] if widget._radio_data else "",

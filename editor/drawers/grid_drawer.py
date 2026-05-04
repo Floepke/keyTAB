@@ -9,8 +9,9 @@ from typing import TYPE_CHECKING, cast
 from file_model.SCORE import SCORE
 from file_model.base_grid import resolve_grid_layer_offsets
 from ui.widgets.draw_util import DrawUtil
-from utils.CONSTANT import QUARTER_NOTE_UNIT
+from utils.CONSTANT import QUARTER_NOTE_UNIT, SHORTEST_DURATION, PIANO_KEY_AMOUNT
 from utils.operator import Operator
+from settings_manager import get_preferences
 
 if TYPE_CHECKING:
     from editor.editor import Editor
@@ -54,11 +55,18 @@ class GridDrawerMixin:
             family=family,
         )
 
-        # Page metrics (mm)
-        width_mm, _height_mm = du.current_page_size_mm()
-        margin = float(self.margin)
-        stave_left_position = margin + self.semitone_dist
-        stave_right_position = max(0.0, width_mm - margin) - self.semitone_dist * 2
+        # Stave metrics (mm) from key positions so orientation/rotation does not affect width.
+        if self._x_positions is None:
+            self._rebuild_x_positions()
+        stave_left_position = float(self._x_positions[2])
+        stave_right_position = float(self._x_positions[PIANO_KEY_AMOUNT - 2])
+
+        # read editor orientation
+        preferences = get_preferences()
+        if preferences.get("editor_orientation", 'horizontal') == 'horizontal':
+            editor_orientation = 'horizontal'
+        else:
+            editor_orientation = 'vertical'
 
         # --------------- drawing the grid lines, barlines, measure numbers ---------------
         measure_numbering_cursor = 1
@@ -103,7 +111,7 @@ class GridDrawerMixin:
         # Build collision geometry so barlines are drawn constructively around symbols.
         op = cache.get('op') if isinstance(cache, dict) else None
         if op is None:
-            op = Operator(7)
+            op = Operator(SHORTEST_DURATION)
         notes_view = list(cache.get('notes_view') or []) if isinstance(cache, dict) else []
         notes_by_hand_cache = dict(cache.get('notes_by_hand') or {}) if isinstance(cache, dict) else {}
         beam_markers = dict(cache.get('beam_by_hand') or {}) if isinstance(cache, dict) else {}
@@ -384,7 +392,7 @@ class GridDrawerMixin:
             gap = max(0.1, float(gap_mm))
             tags = ["barline", "double_barline"]
             _draw_barline_segments(float(y_mm + gap), cuts, float(width_mm), tags, int(ev_id))
-
+        
         # Draw measure numbers at each measure start except final end barline.
         for t in barline_times[:-1]:
             y_mm = float(self.time_to_mm(float(t)))
@@ -396,8 +404,9 @@ class GridDrawerMixin:
                 color=color,
                 id=0,
                 tags=["measure_number"],
-                anchor='ne',
+                anchor='ne' if editor_orientation == 'vertical' else 'nw',
                 family=meas_family,
+                angle_deg=0 if editor_orientation == 'vertical' else 90,
             )
             measure_numbering_cursor += 1
 
