@@ -1703,86 +1703,87 @@ class Editor(QtCore.QObject,
         return True
 
     def shift_selected_notes_time(self, delta_units: float) -> bool:
-        """Move selected notes/text/slurs to the nearest snap band in the requested direction.
+        """Shift selected content in time by one shared delta.
 
-        - Positive `delta_units`: move each note to the next snap band (later)
-        - Negative `delta_units`: move each note to the previous snap band (earlier)
+        This preserves the internal rhythmic structure because all selected items
+        and selection bounds are translated by the same `dt`.
         """
         score: SCORE | None = self.current_score()
         if score is None or not self._selection_active:
             return False
-        delta = float(delta_units)
-        if abs(delta) < 1e-9:
+        dt = float(delta_units)
+        if abs(dt) < 1e-9:
             return False
-        units = float(max(1e-6, getattr(self, 'snap_size_units', 0.0) or 0.0))
-        direction = 1 if delta > 0.0 else -1
-
-        def _move_to_directional_band(value: float) -> float:
-            q = float(value) / units
-            nearest_i = int(round(q))
-            on_band = math.isclose(q, float(nearest_i), abs_tol=1e-9)
-            if direction > 0:
-                if on_band:
-                    return float(nearest_i + 1) * units
-                return float(math.ceil(q)) * units
-            if on_band:
-                return max(0.0, float(nearest_i - 1) * units)
-            return max(0.0, float(math.floor(q)) * units)
 
         sel = self.detect_events_from_time_window(
             float(self._sel_start_units),
             float(self._sel_end_units) - 0.1,
         )
-        notes = self._selected_notes_from_model()
+        notes = self._selected_notes_from_model(include_grace=True)
         texts = list(sel.get('text', []) or [])
         slurs = list(sel.get('slur', []) or [])
-        if not notes and not texts and not slurs:
-            return False
 
-        updated = False
+        # Clamp only at absolute time 0 while preserving relative offsets.
+        min_time = min(
+            [float(self._sel_start_units), float(self._sel_end_units), float(self._sel_anchor_units)]
+            + [float(getattr(n, 'time', 0.0) or 0.0) for n in notes]
+            + [float(getattr(tx, 'time', 0.0) or 0.0) for tx in texts]
+            + [
+                float(getattr(sl, attr, 0.0) or 0.0)
+                for sl in slurs
+                for attr in ('y1_time', 'y2_time', 'y3_time', 'y4_time')
+            ]
+        )
+        if dt < 0.0:
+            dt = max(float(dt), -float(min_time))
+            if abs(dt) < 1e-9:
+                return False
+
+        model_updated = False
+
         for n in notes:
             t = float(getattr(n, 'time', 0.0) or 0.0)
-            new_t = _move_to_directional_band(t)
-            if not math.isclose(new_t, t):
+            new_t = max(0.0, t + dt)
+            if not math.isclose(new_t, t, abs_tol=1e-9):
                 setattr(n, 'time', new_t)
-                updated = True
+                model_updated = True
 
         for tx in texts:
             t = float(getattr(tx, 'time', 0.0) or 0.0)
-            new_t = _move_to_directional_band(t)
-            if not math.isclose(new_t, t):
+            new_t = max(0.0, t + dt)
+            if not math.isclose(new_t, t, abs_tol=1e-9):
                 setattr(tx, 'time', float(new_t))
-                updated = True
+                model_updated = True
 
-        # Keep slur shape intact by shifting all 4 handle times with one delta,
-        # derived from moving y1_time to the nearest directional snap band.
+        # Keep slur shape intact by shifting all 4 handle times with the same dt.
         for sl in slurs:
-            y1 = float(getattr(sl, 'y1_time', 0.0) or 0.0)
-            y1_new = _move_to_directional_band(y1)
-            if math.isclose(y1_new, y1):
-                continue
-            dt = float(y1_new - y1)
+            changed = False
             for attr in ('y1_time', 'y2_time', 'y3_time', 'y4_time'):
                 old_t = float(getattr(sl, attr, 0.0) or 0.0)
-                setattr(sl, attr, max(0.0, float(old_t + dt)))
-            updated = True
+                new_t = max(0.0, old_t + dt)
+                if not math.isclose(new_t, old_t, abs_tol=1e-9):
+                    setattr(sl, attr, float(new_t))
+                    changed = True
+            if changed:
+                model_updated = True
 
-        if not updated:
-            return False
+        # Shift selection window with the same delta so rectangle follows content.
+        self._sel_start_units = max(0.0, float(self._sel_start_units) + dt)
+        self._sel_end_units = max(0.0, float(self._sel_end_units) + dt)
+        self._sel_anchor_units = max(0.0, float(self._sel_anchor_units) + dt)
 
-        self._sel_start_units = _move_to_directional_band(float(self._sel_start_units))
-        self._sel_end_units = _move_to_directional_band(float(self._sel_end_units))
-        self._sel_anchor_units = _move_to_directional_band(float(self._sel_anchor_units))
-
+        units = float(max(1e-6, getattr(self, 'snap_size_units', 0.0) or 0.0))
         if self._sel_end_units <= self._sel_start_units:
             self._sel_end_units = float(self._sel_start_units) + units
 
-        self.update_score_length()
-        self._reuse_draw_cache_once = True
+        if model_updated:
+            self.update_score_length()
+            self._reuse_draw_cache_once = True
         w = getattr(self, 'widget', None)
         if w is not None and hasattr(w, 'force_full_redraw'):
             w.force_full_redraw()
-        self._queue_transpose_snapshot(label='shift_selected_notes_time')
+        if model_updated:
+            self._queue_transpose_snapshot(label='shift_selected_notes_time')
         return True
 
     def quantize_selected_notes(self, qtype: str = 'start/end') -> bool:
