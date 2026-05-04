@@ -35,7 +35,9 @@ class Layout:
     note_midinote_visible: bool = False
     note_midinote_left_color: str = '#ccc'
     note_midinote_right_color: str = '#ccc'
-    note_width_scaling: float = 1.1 # Scaling factor for the horizontal size of the noteheads, to make them wider or narrower.
+    note_width_scaling: float = 1.0 # Scaling factor for the horizontal size of the noteheads, to make them wider or narrower.
+    notehead_height_scaling: float = 1.1 # Scaling factor for the vertical size of the noteheads, relative to width.
+    notehead_tilt: float = -0.35 # Diagonal shear tilt of noteheads (0 = perfect circle/oval, higher = traditional tilted notehead, lower = traditional tilted notehead in the opposite direction).
 
     # Beam appearance
     beam_visible: bool = True
@@ -179,6 +181,8 @@ LAYOUT_FLOAT_CONFIG: dict[str, dict[str, float]] = {
     'note_stopsign_thickness_mm': {'min': 0.05, 'max': 5.0, 'step': 0.05},
     'note_continuation_dot_size_mm': {'min': 0.05, 'max': 10.0, 'step': 0.05},
     'note_width_scaling': {'min': 0.05, 'max': 2.0, 'step': 0.01},
+    'notehead_height_scaling': {'min': 0.1, 'max': 3.0, 'step': 0.01},
+    'notehead_tilt': {'min': -1.0, 'max': 1.0, 'step': 0.01},
     'beam_thickness_mm': {'min': 0.05, 'max': 5.0, 'step': 0.05},
     'beam_corner_radius_mm': {'min': 0.0, 'max': 5.0, 'step': 0.05},
     'grace_note_outline_width_mm': {'min': 0.05, 'max': 5.0, 'step': 0.05},

@@ -147,6 +147,7 @@ class Notehead(SymbolUtil):
     direction: NoteheadDirection
     filled: bool = False
     outline_width_mm_override: float | None = None
+    black_note_narrow: bool = False
 
     @property
     def pitch(self) -> int:
@@ -243,6 +244,7 @@ class Notehead(SymbolUtil):
         paper_color: tuple[float, float, float, float],
         default_black_above: bool,
         outline_width_mm_override: float | None = None,
+        black_note_narrow: bool = False,
     ) -> "Notehead":
         spec = resolve_notehead_spec(note, default_black_above=bool(default_black_above))
         return cls(
@@ -257,4 +259,5 @@ class Notehead(SymbolUtil):
             direction=spec.direction,
             filled=spec.filled,
             outline_width_mm_override=(None if outline_width_mm_override is None else float(outline_width_mm_override)),
+            black_note_narrow=bool(black_note_narrow),
         )

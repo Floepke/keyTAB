@@ -58,7 +58,7 @@ class Style:
         "notation_color": (0, 0, 30),
         "left_midi_color": (153, 179, 204),
         "right_midi_color": (204, 179, 153),
-        "snap_band": (153, 153, 153),
+        "snap_band": (170, 170, 170),
     }
 
     # Palette role → dict key mapping using the four-theme colors above.

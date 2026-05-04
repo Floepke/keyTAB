@@ -25,6 +25,8 @@ class SymbolUtil:
             val = float(self._layout_value("note_width_scaling", 1.0) or 1.0)
         except Exception:
             val = 1.0
+        if getattr(self, 'black_note_narrow', False):
+            val *= 0.75
         return max(0.05, val)
 
     @property
@@ -48,3 +50,19 @@ class SymbolUtil:
         except Exception:
             pass
         return self.note_stem_thickness_mm
+
+    @property
+    def notehead_height_scaling(self) -> float:
+        try:
+            val = float(self._layout_value("notehead_height_scaling", 1.0) or 1.0)
+        except Exception:
+            val = 1.0
+        return max(0.1, val)
+
+    @property
+    def notehead_tilt(self) -> float:
+        try:
+            val = float(self._layout_value("notehead_tilt", 0.0) or 0.0)
+        except Exception:
+            val = 0.0
+        return max(-1.0, min(1.0, val))

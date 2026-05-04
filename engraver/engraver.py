@@ -3544,22 +3544,17 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
 
                 # Problem solved: avoid duplicated heads on continuations.
                 if not continues_from_prev_line and bool(layout.get('note_head_visible', True)):
-                    notehead_layout = layout
-                    if _should_tune_under_stem_black_width(item, black_rule, line_notes, op_time):
-                        try:
-                            notehead_layout = dict(layout)
-                            notehead_layout['note_width_scaling'] = 0.75
-                        except Exception:
-                            notehead_layout = layout
+                    is_narrow = _should_tune_under_stem_black_width(item, black_rule, line_notes, op_time)
                     notehead = Notehead.from_note(
                         x_mm=float(x),
                         y_mm=float(y_start),
                         note=n,
-                        layout=notehead_layout,
+                        layout=layout,
                         semitone_space_mm=float(semitone_mm),
                         notation_color=notation_color,
                         paper_color=paper_color,
                         default_black_above=default_black_above,
+                        black_note_narrow=is_narrow,
                     )
                     tag = 'notehead_black' if bool(getattr(notehead, 'filled', False)) else 'notehead_white'
                     notehead.draw_notehead(du, item_id=int(item.get('id', 0) or 0), tags=[tag])

@@ -561,6 +561,8 @@ class StyleDialog(QtWidgets.QDialog):
             'note_midinote_left_color': self.tr('MIDI note color (left hand)'),
             'note_midinote_right_color': self.tr('MIDI note color (right hand)'),
             'note_width_scaling': self.tr('Noot width scaling (1 = Perfectly rounded)'),
+            'notehead_height_scaling': self.tr('Notehead height scaling (1.0 = square, higher = taller)'),
+            'notehead_tilt': self.tr('Notehead tilt (-1..1, 0 = circle/oval, negative = opposite direction)'),
             'beam_visible': self.tr('Beam visible'),
             'beam_thickness_mm': self.tr('Beam thickness (mm)'),
             'beam_corner_radius_mm': self.tr('Beam corner radius (mm) (rounded corners)'),
@@ -792,6 +794,8 @@ class StyleDialog(QtWidgets.QDialog):
             # Note
             'black_note_rule': 'Note',
             'note_width_scaling': 'Note',
+            'notehead_height_scaling': 'Note',
+            'notehead_tilt': 'Note',
             'note_stem_length_semitone': 'Note',
             'note_stem_thickness_mm': 'Note',
             'note_stopsign_thickness_mm': 'Note',

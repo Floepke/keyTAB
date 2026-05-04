@@ -231,16 +231,7 @@ class NoteDrawerMixin:
     def _draw_notehead(self, du: DrawUtil, n, x: float, y1: float, draw_mode: str) -> None:
         self = cast("Editor", self)
         layout = self.current_score().layout
-        layout_for_notehead = layout
-        if self._should_tune_under_stem_black_width(n, layout):
-            try:
-                if isinstance(layout, dict):
-                    layout_for_notehead = dict(layout)
-                else:
-                    layout_for_notehead = dict(vars(layout))
-                layout_for_notehead['note_width_scaling'] = 0.75
-            except Exception:
-                layout_for_notehead = layout
+        is_narrow = self._should_tune_under_stem_black_width(n, layout)
         outline_w = self._editor_line_width_mm()
         paper_r, paper_g, paper_b = Style.get_named_rgb('paper', (255, 255, 255))
         bg_fill = (paper_r / 255.0, paper_g / 255.0, paper_b / 255.0, 1.0)
@@ -248,12 +239,13 @@ class NoteDrawerMixin:
             x_mm=float(x),
             y_mm=float(y1),
             note=n,
-            layout=layout_for_notehead,
+            layout=layout,
             semitone_space_mm=float(self.semitone_dist or 0.5),
             notation_color=self.notation_color,
             paper_color=bg_fill,
             default_black_above=self._black_note_above_stem(n, layout),
             outline_width_mm_override=outline_w,
+            black_note_narrow=is_narrow,
         )
         tag = "notehead_black" if bool(getattr(notehead, 'filled', False)) else "notehead_white"
         notehead.draw_notehead(du, item_id=int(getattr(n, '_id', 0) or 0), tags=[tag], use_custom_color=True)
