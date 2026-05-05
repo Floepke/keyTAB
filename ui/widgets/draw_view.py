@@ -9,11 +9,11 @@ from engraver.engraver import do_engrave
 
 
 class RenderEmitter(QtCore.QObject):
-    rendered = QtCore.Signal(QtGui.QImage, int)
+    rendered = QtCore.Signal(QtGui.QImage, int, float)
 
 
 class RenderTask(QtCore.QRunnable):
-    def __init__(self, draw_util: DrawUtil, w_px: int, h_px: int, px_per_mm: float, dpr: float, page_index: int, emitter: RenderEmitter, score: dict | None = None, perform_engrave: bool = False):
+    def __init__(self, draw_util: DrawUtil, w_px: int, h_px: int, px_per_mm: float, dpr: float, page_index: int, emitter: RenderEmitter, score: dict | None = None, perform_engrave: bool = False, render_zoom_factor: float = 1.0):
         super().__init__()
         self.setAutoDelete(True)
         self._du = draw_util
@@ -25,6 +25,7 @@ class RenderTask(QtCore.QRunnable):
         self._emitter = emitter
         self._score = score
         self._perform_engrave = perform_engrave
+        self._render_zoom_factor = float(render_zoom_factor)
 
     def run(self) -> None:
         # Optionally run engraving to update DrawUtil from score before rendering.
@@ -42,7 +43,7 @@ class RenderTask(QtCore.QRunnable):
         # Emit back to the UI thread, but skip if the emitter is gone (e.g., view closed)
         try:
             if self._emitter is not None:
-                self._emitter.rendered.emit(final, self._page_index)
+                self._emitter.rendered.emit(final, self._page_index, self._render_zoom_factor)
         except RuntimeError:
             # Emitter already deleted; ignore
             pass
@@ -52,6 +53,7 @@ class DrawUtilView(QtWidgets.QWidget):
     def __init__(self, draw_util: DrawUtil, parent=None):
         super().__init__(parent)
         self._du = draw_util
+        self.setFocusPolicy(QtCore.Qt.FocusPolicy.StrongFocus)
         self._image: QtGui.QImage | None = None
         self._prev_image: QtGui.QImage | None = None
         self._fade_progress: float = 1.0
@@ -73,6 +75,11 @@ class DrawUtilView(QtWidgets.QWidget):
         self._last_h_px: int = 0
         self._scroll_x_px: float = 0.0
         self._scroll_y_px: float = 0.0
+        self._zoom_factor: float = 1.0
+        self._image_render_zoom_factor: float = 1.0
+        self._prev_image_render_zoom_factor: float = 1.0
+        self._zoom_step_factor: float = 1.1
+        self._max_zoom_factor: float = 8.0
         self._score: dict | None = None
         self._page_prev_cb = None
         # Playhead overlay: set by set_playhead_overlay(), drawn in paintEvent
@@ -86,6 +93,10 @@ class DrawUtilView(QtWidgets.QWidget):
         self._resize_timer.setSingleShot(True)
         self._resize_timer.setInterval(180)
         self._resize_timer.timeout.connect(self._on_resize_settle)
+        self._zoom_rerender_timer = QtCore.QTimer(self)
+        self._zoom_rerender_timer.setSingleShot(True)
+        self._zoom_rerender_timer.setInterval(150)
+        self._zoom_rerender_timer.timeout.connect(self._on_zoom_settle)
         self._suppress_fade_once: bool = False
         # Apply a dedicated background color for DrawUtil views
         try:
@@ -134,13 +145,53 @@ class DrawUtilView(QtWidgets.QWidget):
     def _fit_scale_for_page(self, page_w_mm: float, page_h_mm: float, dpr: float) -> float:
         return (max(1, self.width()) * float(dpr)) / max(1e-6, float(page_w_mm))
 
-    def _scaled_image_metrics(self, img: QtGui.QImage) -> tuple[int, int, int, int, float, float, float]:
+    def _zoom_modifiers_active(self, mods: QtCore.Qt.KeyboardModifiers) -> bool:
+        try:
+            return bool(
+                (mods & QtCore.Qt.KeyboardModifier.ControlModifier)
+                or (mods & QtCore.Qt.KeyboardModifier.MetaModifier)
+            )
+        except Exception:
+            return False
+
+    def _apply_zoom_steps(self, steps: int, anchor_pos: QtCore.QPointF | None = None) -> None:
+        if steps == 0:
+            return
+        old_zoom = float(self._zoom_factor)
+        new_zoom = float(old_zoom) * (float(self._zoom_step_factor) ** float(steps))
+        new_zoom = max(1.0, min(float(self._max_zoom_factor), float(new_zoom)))
+        if abs(new_zoom - old_zoom) <= 1e-6:
+            return
+
+        if anchor_pos is None:
+            anchor_x = float(self.width()) * 0.5
+            anchor_y = float(self.height()) * 0.5
+        else:
+            anchor_x = float(anchor_pos.x())
+            anchor_y = float(anchor_pos.y())
+
+        zoom_ratio = float(new_zoom) / max(1e-6, float(old_zoom))
+        self._scroll_x_px = max(0.0, (float(self._scroll_x_px) + anchor_x) * zoom_ratio - anchor_x)
+        self._scroll_y_px = max(0.0, (float(self._scroll_y_px) + anchor_y) * zoom_ratio - anchor_y)
+        self._zoom_factor = float(new_zoom)
+        self.update()
+        self._zoom_rerender_timer.start()
+
+    def reset_view_state(self) -> None:
+        self._zoom_factor = 1.0
+        self._scroll_x_px = 0.0
+        self._scroll_y_px = 0.0
+        self.update()
+        self._zoom_rerender_timer.start()
+
+    def _scaled_image_metrics(self, img: QtGui.QImage, render_zoom_factor: float | None = None) -> tuple[int, int, int, int, float, float, float]:
         img_w = float(img.width()) / max(1e-6, float(img.devicePixelRatio()))
         img_h = float(img.height()) / max(1e-6, float(img.devicePixelRatio()))
+        image_zoom = float(render_zoom_factor) if render_zoom_factor is not None else float(self._image_render_zoom_factor)
+        scale = max(0.05, float(self._zoom_factor) / max(1e-6, image_zoom))
         if self._resizing and img_w > 0.0 and img_h > 0.0:
-            scale = float(max(1, self.width())) / float(img_w)
-        else:
-            scale = 1.0
+            # During live resize, preserve zoom while approximating new fit-to-width.
+            scale *= float(max(1, self.width())) / float(img_w)
         tgt_w = int(round(img_w * scale))
         tgt_h = int(round(img_h * scale))
         max_scroll_x = max(0.0, float(tgt_w - self.width()))
@@ -222,7 +273,8 @@ class DrawUtilView(QtWidgets.QWidget):
         page_w_mm, page_h_mm = self._du.current_page_size_mm()
         if page_w_mm <= 0 or page_h_mm <= 0:
             return
-        px_per_mm = self._fit_scale_for_page(page_w_mm, page_h_mm, dpr)
+        render_zoom = max(1.0, float(self._zoom_factor))
+        px_per_mm = self._fit_scale_for_page(page_w_mm, page_h_mm, dpr) * render_zoom
         h_px = int(page_h_mm * px_per_mm)
         w_px = int(page_w_mm * px_per_mm)
         # Store metrics for hit-testing
@@ -231,8 +283,12 @@ class DrawUtilView(QtWidgets.QWidget):
         self._last_dpr = dpr
         self._last_w_px = w_px
         self._last_h_px = h_px
-        task = RenderTask(self._du, w_px, h_px, px_per_mm, dpr, self._page_index, self._emitter, self._score, False)
+        task = RenderTask(self._du, w_px, h_px, px_per_mm, dpr, self._page_index, self._emitter, self._score, False, render_zoom)
         self._pool.start(task)
+
+    def _on_zoom_settle(self) -> None:
+        self._suppress_fade_once = True
+        self.request_render()
 
     def _on_resize_settle(self) -> None:
         self._resizing = False
@@ -274,7 +330,11 @@ class DrawUtilView(QtWidgets.QWidget):
             def _draw_image(img: QtGui.QImage, opacity: float) -> None:
                 painter.save()
                 painter.setOpacity(opacity)
-                tgt_w, tgt_h, x, y, _scale, _max_scroll_x, _max_scroll_y = self._scaled_image_metrics(img)
+                if img is self._prev_image:
+                    img_zoom = float(self._prev_image_render_zoom_factor)
+                else:
+                    img_zoom = float(self._image_render_zoom_factor)
+                tgt_w, tgt_h, x, y, _scale, _max_scroll_x, _max_scroll_y = self._scaled_image_metrics(img, img_zoom)
                 painter.drawImage(QtCore.QRect(x, y, tgt_w, tgt_h), img)
                 painter.restore()
 
@@ -341,12 +401,28 @@ class DrawUtilView(QtWidgets.QWidget):
         painter.end()
 
     def wheelEvent(self, ev: QtGui.QWheelEvent) -> None:
+        if self._zoom_modifiers_active(ev.modifiers()):
+            angle_delta = ev.angleDelta()
+            raw = angle_delta.y() if angle_delta.y() != 0 else angle_delta.x()
+            steps = int(round(float(raw) / 120.0))
+            if steps != 0:
+                self._apply_zoom_steps(steps, ev.position())
+            ev.accept()
+            return
+
         if self._image is None:
+            ev.ignore()
             return
+
         _tgt_w, _tgt_h, _img_x, _img_y, _scale, max_scroll_x, max_scroll_y = self._scaled_image_metrics(self._image)
-        if max_scroll_x <= 0.0 and max_scroll_y <= 0.0:
+        shift_down = bool(ev.modifiers() & QtCore.Qt.KeyboardModifier.ShiftModifier)
+        use_horizontal = bool(shift_down and max_scroll_x > 0.0)
+        if not use_horizontal and max_scroll_y <= 0.0 and max_scroll_x > 0.0:
+            use_horizontal = True
+        if not use_horizontal and max_scroll_y <= 0.0:
+            ev.ignore()
             return
-        use_horizontal = bool(self._is_horizontal_read_direction() and max_scroll_x > 0.0)
+
         pixel_delta = ev.pixelDelta()
         angle_delta = ev.angleDelta()
         delta = pixel_delta.x() if use_horizontal else pixel_delta.y()
@@ -357,6 +433,7 @@ class DrawUtilView(QtWidgets.QWidget):
         if delta != 0:
             delta = delta / 2
         if delta == 0:
+            ev.ignore()
             return
         if use_horizontal:
             self._scroll_x_px = max(0.0, min(float(max_scroll_x), float(self._scroll_x_px - delta)))
@@ -364,6 +441,15 @@ class DrawUtilView(QtWidgets.QWidget):
             self._scroll_y_px = max(0.0, min(float(max_scroll_y), float(self._scroll_y_px - delta)))
         self.update()
         ev.accept()
+
+    def keyPressEvent(self, ev: QtGui.QKeyEvent) -> None:
+        if self._zoom_modifiers_active(ev.modifiers()) and ev.key() == QtCore.Qt.Key.Key_Down:
+            self._zoom_factor = 1.0
+            self.update()
+            self._zoom_rerender_timer.start()
+            ev.accept()
+            return
+        super().keyPressEvent(ev)
 
     def mousePressEvent(self, ev: QtGui.QMouseEvent) -> None:
         if ev.button() == QtCore.Qt.MouseButton.LeftButton and callable(self._page_prev_cb):
@@ -375,14 +461,15 @@ class DrawUtilView(QtWidgets.QWidget):
         if self._image is None:
             return
         # Convert from widget px to page mm
-        _tgt_w, _tgt_h, x_offset_px, y_offset_px, _scale, _max_scroll_x, _max_scroll_y = self._scaled_image_metrics(self._image)
+        _tgt_w, _tgt_h, x_offset_px, y_offset_px, view_scale, _max_scroll_x, _max_scroll_y = self._scaled_image_metrics(self._image)
         x_px = ev.position().x() - x_offset_px
         y_px = ev.position().y() - y_offset_px
         if x_px < 0 or y_px < 0 or x_px > float(_tgt_w) or y_px > float(_tgt_h):
             return
         # Use widget px per mm for conversion (since event positions are in widget px)
-        x_mm = float(x_px) / self._last_widget_px_per_mm
-        y_mm = float(y_px) / self._last_widget_px_per_mm
+        px_per_mm_widget = self._last_widget_px_per_mm * max(1e-6, float(view_scale))
+        x_mm = float(x_px) / px_per_mm_widget
+        y_mm = float(y_px) / px_per_mm_widget
         hit = self._du.hit_test_point_mm(x_mm, y_mm, self._page_index)
         if hit is not None:
             # Simple console feedback for now
@@ -411,8 +498,8 @@ class DrawUtilView(QtWidgets.QWidget):
         except Exception:
             pass
 
-    @QtCore.Slot(QtGui.QImage, int)
-    def _on_rendered(self, image: QtGui.QImage, page_index: int):
+    @QtCore.Slot(QtGui.QImage, int, float)
+    def _on_rendered(self, image: QtGui.QImage, page_index: int, render_zoom_factor: float):
         if page_index != self._page_index:
             return
         if self._suppress_fade_once:
@@ -423,6 +510,7 @@ class DrawUtilView(QtWidgets.QWidget):
             self._suppress_fade_once = False
         elif self._image is not None:
             self._prev_image = self._image
+            self._prev_image_render_zoom_factor = float(self._image_render_zoom_factor)
             self._fade_progress = 0.0
             self._fade_elapsed_ms = 0
             self._fade_timer.start()
@@ -430,6 +518,7 @@ class DrawUtilView(QtWidgets.QWidget):
             self._prev_image = None
             self._fade_progress = 1.0
         self._image = image
+        self._image_render_zoom_factor = max(1.0, float(render_zoom_factor))
         self._update_playhead_scroll()
         self.update()
 

@@ -1,6 +1,7 @@
 from __future__ import annotations
 from file_model.SCORE import SCORE
 from settings_manager import get_preferences
+from ui.style import Style
 from ui.widgets.draw_util import DrawUtil
 from utils.CONSTANT import QUARTER_NOTE_UNIT
 from utils.tiny_tool import key_class_filter
@@ -90,7 +91,8 @@ class StaveDrawerMixin:
             (52, 63),   # C5–B5
             (76, 87),   # C7–B7
         ]
-        grey_fill = (0.9, 0.9, 0.9, 1.0)
+        _sb = Style.get_named_rgb('snap_band', fallback=(230, 230, 230))
+        grey_fill = (float(_sb[0]) / 255.0, float(_sb[1]) / 255.0, float(_sb[2]) / 255.0, 1.0)
         for span_start, span_end in grey_octave_spans:
             gx1 = float(self.pitch_to_x(span_start)) - semitone_dx
             gx2 = float(self.pitch_to_x(span_end)) + semitone_dx

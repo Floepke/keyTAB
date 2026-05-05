@@ -313,7 +313,10 @@ class MainWindow(QtWidgets.QMainWindow):
                 pass
         # 'Fit' button on splitter handle triggers fit action
         self.splitter.fitRequested.connect(self._fit_print_view_to_page)
+        self.splitter.fitRequested.connect(self.print_view.reset_view_state)
         self.splitter.fitRequested.connect(self._force_redraw)
+        # Any manual splitter movement should return print-view Ctrl/Cmd zoom to idle.
+        self.splitter.splitterMoved.connect(self._on_splitter_moved)
         # Default toolbar actions
         self.splitter.nextRequested.connect(self._next_page)
         self.splitter.nextRequested.connect(self._force_redraw)
@@ -1807,6 +1810,10 @@ class MainWindow(QtWidgets.QMainWindow):
             return
         self.file_manager.new()
         self._session_restore_mode = False
+        try:
+            self.print_view.reset_view_state()
+        except Exception:
+            pass
         self._refresh_views_from_score()
         try:
             QtCore.QTimer.singleShot(1000, lambda: self.engraver.engrave(self._current_score_dict()))
@@ -1892,6 +1899,10 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def _after_project_loaded(self) -> None:
         self._session_restore_mode = False
+        try:
+            self.print_view.reset_view_state()
+        except Exception:
+            pass
         try:
             self._refresh_recent_files_menu()
         except Exception:
@@ -2715,6 +2726,9 @@ class MainWindow(QtWidgets.QMainWindow):
             splitter.setSizes([fitted_editor_w, fitted_pv_w])
             self.is_fit = True
             return
+
+    def _on_splitter_moved(self, _pos: int, _index: int) -> None:
+        self.print_view.reset_view_state()
 
     def _current_score_dict(self) -> dict:
         try:
