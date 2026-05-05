@@ -610,6 +610,28 @@ class CairoEditorWidget(QtWidgets.QWidget):
                     return
                 except Exception:
                     pass
+            # Editor-only plain-key shortcuts (no modifier): z/x/c/v
+            # These only fire while the editor canvas has focus.
+            if mods == QtCore.Qt.KeyboardModifier.NoModifier:
+                if key == QtCore.Qt.Key_Z:
+                    self._editor.undo()
+                    self.update()
+                    ev.accept()
+                    return
+                if key in (QtCore.Qt.Key_X, QtCore.Qt.Key_C, QtCore.Qt.Key_V):
+                    w = self.window()
+                    if key == QtCore.Qt.Key_X and hasattr(w, '_edit_cut'):
+                        w._edit_cut()
+                        ev.accept()
+                        return
+                    if key == QtCore.Qt.Key_C and hasattr(w, '_edit_copy'):
+                        w._edit_copy()
+                        ev.accept()
+                        return
+                    if key == QtCore.Qt.Key_V and hasattr(w, '_edit_paste'):
+                        w._edit_paste()
+                        ev.accept()
+                        return
             # Explicit per-platform shortcuts
             try:
                 is_mac = (sys.platform == "darwin")
