@@ -64,6 +64,9 @@ class CairoEditorWidget(QtWidgets.QWidget):
         # Track mouse button state to decide when overlay-only redraw is safe
         self._left_down: bool = False
         self._right_down: bool = False
+        self._middle_down: bool = False
+        self._middle_drag_start_pos: QtCore.QPointF | None = None
+        self._middle_drag_start_scroll: int = 0
         # Quick overlay repaint hint for paintEvent
         self._overlay_only_repaint: bool = False
         # Cached static layers for current viewport
@@ -103,6 +106,11 @@ class CairoEditorWidget(QtWidgets.QWidget):
 
     def set_scroll_step_logical_px(self, value: int) -> None:
         self._scroll_step_logical_px = max(1, int(value))
+
+    def _max_scroll_logical_px(self) -> int:
+        scale = max(1.0, float(self._last_dpr))
+        vp_px = int(max(1, self.size().width() * scale)) if self._is_horizontal_read_direction() else int(max(1, self.size().height() * scale))
+        return max(0, int(round((int(self._content_h_px) - vp_px) / scale)))
 
     def _is_horizontal_read_direction(self) -> bool:
         try:
@@ -361,13 +369,11 @@ class CairoEditorWidget(QtWidgets.QWidget):
             return
 
         # Default: bounded wheel scrolling using external scrollbar semantics
-        scale = max(1.0, float(self._last_dpr))
         step_logical_px = int(max(1, getattr(self, '_scroll_step_logical_px', 1) or 1))
         steps = int(round(angle / 120.0))
         delta = -steps * step_logical_px  # negative angle scrolls down visually
         new_val = max(0, int(self._scroll_logical_px + delta))
-        vp_h_px = int(max(1, self.size().height() * scale))
-        max_scroll = max(0, int(round((int(self._content_h_px) - vp_h_px) / scale)))
+        max_scroll = self._max_scroll_logical_px()
         if new_val > max_scroll:
             new_val = max_scroll
         if new_val != self._scroll_logical_px:
@@ -382,6 +388,17 @@ class CairoEditorWidget(QtWidgets.QWidget):
         self.setFocus()
         self._last_pos = ev.position()
         self._last_sent_pos = ev.position()
+        if ev.button() == QtCore.Qt.MouseButton.MiddleButton:
+            self._middle_down = True
+            self._middle_drag_start_pos = ev.position()
+            self._middle_drag_start_scroll = int(self._scroll_logical_px)
+            if self._is_horizontal_read_direction():
+                self.setCursor(QtCore.Qt.CursorShape.SizeHorCursor)
+            else:
+                self.setCursor(QtCore.Qt.CursorShape.SizeVerCursor)
+            self.grabMouse()
+            ev.accept()
+            return
         # Update modifier state on editor (Shift/Ctrl tracking)
         mods = ev.modifiers()
             
@@ -412,6 +429,19 @@ class CairoEditorWidget(QtWidgets.QWidget):
     def mouseMoveEvent(self, ev: QtGui.QMouseEvent) -> None:
         # Always record last raw position
         self._last_pos = ev.position()
+        if self._middle_down and self._middle_drag_start_pos is not None:
+            if self._is_horizontal_read_direction():
+                drag_delta = float(ev.position().x()) - float(self._middle_drag_start_pos.x())
+            else:
+                drag_delta = float(ev.position().y()) - float(self._middle_drag_start_pos.y())
+            target = int(round(float(self._middle_drag_start_scroll) - drag_delta))
+            target = max(0, min(self._max_scroll_logical_px(), target))
+            if target != self._scroll_logical_px:
+                self._scroll_logical_px = target
+                self.scrollLogicalPxChanged.emit(target)
+                self.update()
+            ev.accept()
+            return
         # Update modifier state continuously during drag/move
         mods = ev.modifiers()
         shift_down = bool(mods & QtCore.Qt.KeyboardModifier.ShiftModifier)
@@ -442,6 +472,15 @@ class CairoEditorWidget(QtWidgets.QWidget):
         super().mouseMoveEvent(ev)
 
     def mouseReleaseEvent(self, ev: QtGui.QMouseEvent) -> None:
+        if ev.button() == QtCore.Qt.MouseButton.MiddleButton:
+            self._middle_down = False
+            self._middle_drag_start_pos = None
+            self._middle_drag_start_scroll = int(self._scroll_logical_px)
+            self.unsetCursor()
+            if not (self._left_down or self._right_down):
+                self.releaseMouse()
+            ev.accept()
+            return
         # Flush any pending move before release to deliver final position
         try:
             if self._pending_move is not None:
@@ -618,7 +657,7 @@ class CairoEditorWidget(QtWidgets.QWidget):
                     self.update()
                     ev.accept()
                     return
-                if key in (QtCore.Qt.Key_X, QtCore.Qt.Key_C, QtCore.Qt.Key_V):
+                if key in (QtCore.Qt.Key_X, QtCore.Qt.Key_C, QtCore.Qt.Key_V, QtCore.Qt.Key_Y):
                     w = self.window()
                     if key == QtCore.Qt.Key_X and hasattr(w, '_edit_cut'):
                         w._edit_cut()
@@ -630,6 +669,10 @@ class CairoEditorWidget(QtWidgets.QWidget):
                         return
                     if key == QtCore.Qt.Key_V and hasattr(w, '_edit_paste'):
                         w._edit_paste()
+                        ev.accept()
+                        return
+                    if key == QtCore.Qt.Key_Y and hasattr(w, '_edit_redo'):
+                        w._edit_redo()
                         ev.accept()
                         return
             # Explicit per-platform shortcuts

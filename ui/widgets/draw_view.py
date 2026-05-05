@@ -75,6 +75,8 @@ class DrawUtilView(QtWidgets.QWidget):
         self._last_h_px: int = 0
         self._scroll_x_px: float = 0.0
         self._scroll_y_px: float = 0.0
+        self._middle_pan_active: bool = False
+        self._middle_pan_last_pos: QtCore.QPointF | None = None
         self._zoom_factor: float = 1.0
         self._image_render_zoom_factor: float = 1.0
         self._prev_image_render_zoom_factor: float = 1.0
@@ -110,9 +112,12 @@ class DrawUtilView(QtWidgets.QWidget):
             pass
 
     def set_page(self, index: int, request_render: bool = True):
-        self._page_index = index
-        self._scroll_x_px = 0.0
-        self._scroll_y_px = 0.0
+        new_index = int(index)
+        page_changed = (new_index != int(self._page_index))
+        self._page_index = new_index
+        if page_changed:
+            self._scroll_x_px = 0.0
+            self._scroll_y_px = 0.0
         if request_render:
             self.request_render()
 
@@ -452,6 +457,13 @@ class DrawUtilView(QtWidgets.QWidget):
         super().keyPressEvent(ev)
 
     def mousePressEvent(self, ev: QtGui.QMouseEvent) -> None:
+        if ev.button() == QtCore.Qt.MouseButton.MiddleButton:
+            self._middle_pan_active = True
+            self._middle_pan_last_pos = ev.position()
+            self.setCursor(QtCore.Qt.CursorShape.ClosedHandCursor)
+            self.grabMouse()
+            ev.accept()
+            return
         if ev.button() == QtCore.Qt.MouseButton.LeftButton and callable(self._page_prev_cb):
             self._page_prev_cb()
             return
@@ -479,6 +491,30 @@ class DrawUtilView(QtWidgets.QWidget):
             print(f"Hit: type={type(hit).__name__} id={hit_id} tags={hit_tags} rect_mm={hit_rect}")
         else:
             print("Hit: none")
+
+    def mouseMoveEvent(self, ev: QtGui.QMouseEvent) -> None:
+        if self._middle_pan_active:
+            if self._image is not None and self._middle_pan_last_pos is not None:
+                _tgt_w, _tgt_h, _img_x, _img_y, _scale, max_scroll_x, max_scroll_y = self._scaled_image_metrics(self._image)
+                dx = float(ev.position().x()) - float(self._middle_pan_last_pos.x())
+                dy = float(ev.position().y()) - float(self._middle_pan_last_pos.y())
+                self._scroll_x_px = max(0.0, min(float(max_scroll_x), float(self._scroll_x_px - dx)))
+                self._scroll_y_px = max(0.0, min(float(max_scroll_y), float(self._scroll_y_px - dy)))
+                self._middle_pan_last_pos = ev.position()
+                self.update()
+            ev.accept()
+            return
+        super().mouseMoveEvent(ev)
+
+    def mouseReleaseEvent(self, ev: QtGui.QMouseEvent) -> None:
+        if ev.button() == QtCore.Qt.MouseButton.MiddleButton:
+            self._middle_pan_active = False
+            self._middle_pan_last_pos = None
+            self.unsetCursor()
+            self.releaseMouse()
+            ev.accept()
+            return
+        super().mouseReleaseEvent(ev)
 
     def document_changed(self) -> None:
         # Convenience for callers after mutating the DrawUtil
