@@ -564,806 +564,806 @@ andere bewerkingen op en Annuleren verwerpt de voorbeeldwijzigingen.</translatio
       <translation>keyTAB - nieuw project (niet opgeslagen)</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="580" />
+      <location filename="../ui/main_window.py" line="583" />
       <source>&amp;File</source>
       <translation>&amp;Bestand</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="581" />
+      <location filename="../ui/main_window.py" line="584" />
       <source>&amp;Edit</source>
       <translation>&amp;Bewerken</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="582" />
+      <location filename="../ui/main_window.py" line="585" />
       <source>&amp;View</source>
       <translation>&amp;Weergave</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="583" />
+      <location filename="../ui/main_window.py" line="586" />
       <source>&amp;Selection</source>
       <translation>&amp;Selectie</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="584" />
+      <location filename="../ui/main_window.py" line="587" />
       <source>&amp;Document</source>
       <translation>&amp;Document</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="585" />
+      <location filename="../ui/main_window.py" line="588" />
       <source>&amp;Tools</source>
       <translation>H&amp;ulpmiddelen</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="586" />
+      <location filename="../ui/main_window.py" line="589" />
       <source>&amp;Playback</source>
       <translation>&amp;Afspelen</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="587" />
+      <location filename="../ui/main_window.py" line="590" />
       <source>&amp;About</source>
       <translation>&amp;Info</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="592" />
+      <location filename="../ui/main_window.py" line="595" />
       <source>New</source>
       <translation>Nieuw</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="593" />
+      <location filename="../ui/main_window.py" line="596" />
       <source>Create a new project.</source>
       <translation>Maak een nieuw project.</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="594" />
+      <location filename="../ui/main_window.py" line="597" />
       <source>Load...</source>
       <translation>Laden...</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="595" />
+      <location filename="../ui/main_window.py" line="598" />
       <source>Open an existing project file.</source>
       <translation>Open een bestaand projectbestand.</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="596" />
+      <location filename="../ui/main_window.py" line="599" />
       <source>Save</source>
       <translation>Opslaan</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="597" />
+      <location filename="../ui/main_window.py" line="600" />
       <source>Save the current project.</source>
       <translation>Sla het huidige project op.</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="598" />
+      <location filename="../ui/main_window.py" line="601" />
       <source>Save As...</source>
       <translation>Opslaan als...</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="599" />
+      <location filename="../ui/main_window.py" line="602" />
       <source>Save the current project under a new file name.</source>
       <translation>Sla het huidige project op onder een nieuwe bestandsnaam.</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="600" />
+      <location filename="../ui/main_window.py" line="603" />
       <source>Exit</source>
       <translation>Afsluiten</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="601" />
+      <location filename="../ui/main_window.py" line="604" />
       <source>Exit the application.</source>
       <translation>Sluit de applicatie.</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="617" />
+      <location filename="../ui/main_window.py" line="620" />
       <source>Recent Files</source>
       <translation>Recente bestanden</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="619" />
+      <location filename="../ui/main_window.py" line="622" />
       <source>Rename...</source>
       <translation>Hernoemen...</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="620" />
+      <location filename="../ui/main_window.py" line="623" />
       <source>Rename the currently opened file and update Recent Files.</source>
       <translation>Hernoem het geopende bestand en werk Recente bestanden bij.</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="626" />
+      <location filename="../ui/main_window.py" line="629" />
       <source>Set current style as default</source>
       <translation>Huidige stijl als standaard instellen</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="627" />
+      <location filename="../ui/main_window.py" line="630" />
       <source>Save the current style as the default for new projects.</source>
       <translation>Sla de huidige stijl op als standaard voor nieuwe projecten.</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="631" />
+      <location filename="../ui/main_window.py" line="634" />
       <source>Reset default style</source>
       <translation>Standaardstijl resetten</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="632" />
+      <location filename="../ui/main_window.py" line="635" />
       <source>Remove the custom default style and use the built-in defaults.</source>
       <translation>Verwijder de aangepaste standaardstijl en gebruik de ingebouwde standaardwaarden.</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="637" />
+      <location filename="../ui/main_window.py" line="640" />
       <source>Style...</source>
       <translation>Stijl...</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="638" />
+      <location filename="../ui/main_window.py" line="641" />
       <source>Open appearance settings for the score.</source>
       <translation>Open weergave-instellingen voor de partituur.</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="641" />
+      <location filename="../ui/main_window.py" line="644" />
       <source>Info...</source>
       <translation>Info...</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="642" />
+      <location filename="../ui/main_window.py" line="645" />
       <source>Open title and metadata settings.</source>
       <translation>Open titel- en metadata-instellingen.</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="645" />
+      <location filename="../ui/main_window.py" line="648" />
       <source>Line Breaks...</source>
       <translation>Regelafbrekingen...</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="646" />
+      <location filename="../ui/main_window.py" line="649" />
       <source>Open line break and page break settings.</source>
       <translation>Open instellingen voor regel- en pagina-afbrekingen.</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="659" />
+      <location filename="../ui/main_window.py" line="662" />
       <source>Export PDF...</source>
       <translation>PDF exporteren...</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="660" />
+      <location filename="../ui/main_window.py" line="663" />
       <source>Export the current score as a PDF document.</source>
       <translation>Exporteer de huidige partituur als PDF-document.</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="665" />
+      <location filename="../ui/main_window.py" line="668" />
       <source>Export Image PDF...</source>
       <translation>Afbeeldings-PDF exporteren...</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="666" />
+      <location filename="../ui/main_window.py" line="669" />
       <source>Export the current score as a rasterized PDF document (600 DPI).</source>
       <translation>Exporteer de huidige partituur als gerasterd PDF-document (600 DPI).</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="677" />
+      <location filename="../ui/main_window.py" line="680" />
       <source>Use the system playback backend.</source>
       <translation>Gebruik de ingebouwde afspeelbackend.</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="683" />
+      <location filename="../ui/main_window.py" line="686" />
       <source>Playback using External MIDI port</source>
       <translation>Afspelen via externe MIDI-poort</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="684" />
+      <location filename="../ui/main_window.py" line="687" />
       <source>Use an external MIDI output port for playback.</source>
       <translation>Gebruik een externe MIDI-uitvoerpoort voor afspelen.</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="691" />
+      <location filename="../ui/main_window.py" line="694" />
       <source>MIDI port</source>
       <translation>MIDI-poort</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="697" />
+      <location filename="../ui/main_window.py" line="700" />
       <source>Play Test Tone</source>
       <translation>Testtoon afspelen</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="698" />
+      <location filename="../ui/main_window.py" line="701" />
       <source>Play a short test tone.</source>
       <translation>Speel een korte testtoon af.</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="704" />
+      <location filename="../ui/main_window.py" line="707" />
       <source>Select Custom SoundFont (.sf2/.sf3) for FluidSynth</source>
       <translation>Aangepaste SoundFont (.sf2/.sf3) kiezen voor FluidSynth</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="705" />
+      <location filename="../ui/main_window.py" line="708" />
       <source>Select a custom SoundFont file for FluidSynth playback.</source>
       <translation>Kies een aangepast SoundFont-bestand voor FluidSynth-afspelen.</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="709" />
+      <location filename="../ui/main_window.py" line="712" />
       <source>Use Default FluidSynth SoundFont</source>
       <translation>Standaard FluidSynth SoundFont gebruiken</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="710" />
+      <location filename="../ui/main_window.py" line="713" />
       <source>Switch back to the default FluidSynth SoundFont.</source>
       <translation>Schakel terug naar het standaard FluidSynth SoundFont.</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="714" />
+      <location filename="../ui/main_window.py" line="717" />
       <source>FluidSynth Settings</source>
       <translation>FluidSynth Instellingen</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="715" />
+      <location filename="../ui/main_window.py" line="718" />
       <source>Configure FluidSynth playback and reverb parameters.</source>
       <translation>Configureer FluidSynth afspeel en galm parameters.</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="721" />
+      <location filename="../ui/main_window.py" line="724" />
       <source>About keyTAB</source>
       <translation>Over keyTAB</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="722" />
+      <location filename="../ui/main_window.py" line="725" />
       <source>Show information about keyTAB.</source>
       <translation>Toon informatie over keyTAB.</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="724" />
+      <location filename="../ui/main_window.py" line="727" />
       <source>About Qt</source>
       <translation>Over Qt</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="725" />
+      <location filename="../ui/main_window.py" line="728" />
       <source>Show information about the Qt framework.</source>
       <translation>Toon informatie over het Qt-framework.</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="740" />
+      <location filename="../ui/main_window.py" line="743" />
       <source>Undo</source>
       <translation>Ongedaan maken</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="741" />
+      <location filename="../ui/main_window.py" line="744" />
       <source>Undo the last editing action.</source>
       <translation>Maak de laatste bewerkingsactie ongedaan.</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="743" />
+      <location filename="../ui/main_window.py" line="746" />
       <source>Redo</source>
       <translation>Opnieuw</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="744" />
+      <location filename="../ui/main_window.py" line="747" />
       <source>Redo the last undone editing action.</source>
       <translation>Herhaal de laatst ongedaan gemaakte actie.</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="753" />
+      <location filename="../ui/main_window.py" line="756" />
       <source>Cut</source>
       <translation>Knippen</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="754" />
+      <location filename="../ui/main_window.py" line="757" />
       <source>Cut the current selection.</source>
       <translation>Knip de huidige selectie.</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="756" />
+      <location filename="../ui/main_window.py" line="759" />
       <source>Copy</source>
       <translation>Kopieren</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="757" />
+      <location filename="../ui/main_window.py" line="760" />
       <source>Copy the current selection.</source>
       <translation>Kopieer de huidige selectie.</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="759" />
+      <location filename="../ui/main_window.py" line="762" />
       <source>Paste</source>
       <translation>Plakken</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="760" />
+      <location filename="../ui/main_window.py" line="763" />
       <source>Paste clipboard content.</source>
       <translation>Plak klembordinhoud.</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="767" />
+      <location filename="../ui/main_window.py" line="770" />
       <source>Delete</source>
       <translation>Verwijderen</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="768" />
+      <location filename="../ui/main_window.py" line="771" />
       <source>Delete the current selection.</source>
       <translation>Verwijder de huidige selectie.</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="784" />
+      <location filename="../ui/main_window.py" line="787" />
       <source>Select All</source>
       <translation>Alles selecteren</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="785" />
+      <location filename="../ui/main_window.py" line="788" />
       <source>Select all editable events.</source>
       <translation>Selecteer alle bewerkbare gebeurtenissen.</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="788" />
+      <location filename="../ui/main_window.py" line="797" />
       <source>Transpose -1 Semitone</source>
       <translation>Transponeer -1 semitoon</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="789" />
+      <location filename="../ui/main_window.py" line="798" />
       <source>Transpose Selection Down by One Semitone.</source>
       <translation>Transponeer selectie omlaag met een semitoon.</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="793" />
+      <location filename="../ui/main_window.py" line="802" />
       <source>Transpose +1 Semitone</source>
       <translation>Transponeer +1 semitoon</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="794" />
+      <location filename="../ui/main_window.py" line="803" />
       <source>Transpose Selection Up by One Semitone.</source>
       <translation>Transponeer selectie omhoog met een semitoon.</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="798" />
+      <location filename="../ui/main_window.py" line="807" />
       <source>Move Earlier by Snap Band</source>
       <translation>Naar voren verplaatsen per raster-band</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="799" />
+      <location filename="../ui/main_window.py" line="808" />
       <source>Move Selection Earlier by One Snap Band.</source>
       <translation>Verplaats selectie naar voren met een raster-band.</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="803" />
+      <location filename="../ui/main_window.py" line="812" />
       <source>Move Later by Snap Band</source>
       <translation>Naar achteren verplaatsen per raster-band</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="804" />
+      <location filename="../ui/main_window.py" line="813" />
       <source>Move Selection Later by One Snap Band.</source>
       <translation>Verplaats selectie naar achteren met een raster-band.</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="808" />
+      <location filename="../ui/main_window.py" line="817" />
       <source>Quantize Starts and Ends on Snap Band</source>
       <translation>Kwantiseer begin en einde op raster-band</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="809" />
+      <location filename="../ui/main_window.py" line="818" />
       <source>Quantize Selection Starts and Ends to the Current Snap Band.</source>
       <translation>Kwantiseer begin en einde van selectie naar de huidige raster-band.</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="812" />
+      <location filename="../ui/main_window.py" line="821" />
       <source>Quantize Starts on Snap Band</source>
       <translation>Kwantiseer begin op raster-band</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="813" />
+      <location filename="../ui/main_window.py" line="822" />
       <source>Quantize Selection Starts to the Current Snap Band.</source>
       <translation>Kwantiseer begin van selectie naar de huidige raster-band.</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="814" />
+      <location filename="../ui/main_window.py" line="823" />
       <source>Quantize Ends on Snap Band</source>
       <translation>Kwantiseer einde op raster-band</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="815" />
+      <location filename="../ui/main_window.py" line="824" />
       <source>Quantize Selection Ends to the Current Snap Band.</source>
       <translation>Kwantiseer einde van selectie naar de huidige raster-band.</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="829" />
+      <location filename="../ui/main_window.py" line="838" />
       <source>Preferences...</source>
       <translation>Voorkeuren...</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="830" />
+      <location filename="../ui/main_window.py" line="839" />
       <source>Open application preferences.</source>
       <translation>Open applicatievoorkeuren.</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="835" />
+      <location filename="../ui/main_window.py" line="844" />
       <source>Zoom In</source>
       <translation>Inzoomen</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="836" />
+      <location filename="../ui/main_window.py" line="845" />
       <source>Zoom in on the editor view.</source>
       <translation>Zoom in op de editorweergave.</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="844" />
+      <location filename="../ui/main_window.py" line="853" />
       <source>Zoom Out</source>
       <translation>Uitzoomen</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="845" />
+      <location filename="../ui/main_window.py" line="854" />
       <source>Zoom out from the editor view.</source>
       <translation>Zoom uit van de editorweergave.</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="854" />
+      <location filename="../ui/main_window.py" line="863" />
       <source>Full Screen</source>
       <translation>Volledig scherm</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="855" />
+      <location filename="../ui/main_window.py" line="864" />
       <source>Toggle full screen mode.</source>
       <translation>Schakel volledig scherm in of uit.</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="867" />
+      <location filename="../ui/main_window.py" line="876" />
       <source>Language</source>
       <translation>Taal</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="1761" />
-      <location filename="../ui/main_window.py" line="872" />
+      <location filename="../ui/main_window.py" line="1770" />
+      <location filename="../ui/main_window.py" line="881" />
       <source>System</source>
       <translation>Systeem</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="873" />
+      <location filename="../ui/main_window.py" line="882" />
       <source>Use the operating system language for the user interface.</source>
       <translation>Gebruik de taal van het besturingssysteem voor de gebruikersinterface.</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="1758" />
-      <location filename="../ui/main_window.py" line="881" />
+      <location filename="../ui/main_window.py" line="1767" />
+      <location filename="../ui/main_window.py" line="890" />
       <source>English</source>
       <translation>Engels</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="882" />
+      <location filename="../ui/main_window.py" line="891" />
       <source>Use English for the user interface.</source>
       <translation>Gebruik Engels voor de gebruikersinterface.</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="1760" />
-      <location filename="../ui/main_window.py" line="890" />
+      <location filename="../ui/main_window.py" line="1769" />
+      <location filename="../ui/main_window.py" line="899" />
       <source>Dutch</source>
       <translation>Nederlands</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="891" />
+      <location filename="../ui/main_window.py" line="900" />
       <source>Use Dutch for the user interface.</source>
       <translation>Gebruik Nederlands voor de gebruikersinterface.</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="1266" />
+      <location filename="../ui/main_window.py" line="1275" />
       <source>Playback using FluidSynth</source>
       <translation>Afspelen met FluidSynth</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="1268" />
+      <location filename="../ui/main_window.py" line="1277" />
       <source>Playback using CoreMIDI</source>
       <translation>Afspelen met CoreMIDI</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="1270" />
+      <location filename="../ui/main_window.py" line="1279" />
       <source>Playback using WinMM</source>
       <translation>Afspelen met WinMM</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="1271" />
+      <location filename="../ui/main_window.py" line="1280" />
       <source>Playback using System Synth</source>
       <translation>Afspelen met systeem-synth</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="1693" />
-      <location filename="../ui/main_window.py" line="1691" />
+      <location filename="../ui/main_window.py" line="1702" />
+      <location filename="../ui/main_window.py" line="1700" />
       <source>Unsaved changes</source>
       <translation>Niet-opgeslagen wijzigingen</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="1691" />
+      <location filename="../ui/main_window.py" line="1700" />
       <source>New project</source>
       <translation>Nieuw project</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="1918" />
-      <location filename="../ui/main_window.py" line="1693" />
+      <location filename="../ui/main_window.py" line="1935" />
+      <location filename="../ui/main_window.py" line="1702" />
       <source>Saved</source>
       <translation>Opgeslagen</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="1694" />
+      <location filename="../ui/main_window.py" line="1703" />
       <source>(session.piano restored)</source>
       <translation>(session.piano hersteld)</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="1707" />
-      <location filename="../ui/main_window.py" line="1694" />
+      <location filename="../ui/main_window.py" line="1716" />
+      <location filename="../ui/main_window.py" line="1703" />
       <source>(unsaved project)</source>
       <translation>(niet-opgeslagen project)</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="1695" />
+      <location filename="../ui/main_window.py" line="1704" />
       <source>Session mode</source>
       <translation>Sessiemodus</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="1706" />
+      <location filename="../ui/main_window.py" line="1715" />
       <source>session.piano</source>
       <translation>session.piano</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="1777" />
+      <location filename="../ui/main_window.py" line="1786" />
       <source>Restart keyTAB</source>
       <translation>keyTAB herstarten</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="1778" />
+      <location filename="../ui/main_window.py" line="1787" />
       <source>Language changed to {language}. Restart now to apply it?</source>
       <translation>Taal gewijzigd naar {language}. Nu herstarten om dit toe te passen?</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="1785" />
+      <location filename="../ui/main_window.py" line="1794" />
       <source>Restarting keyTAB to apply language change...</source>
       <translation>keyTAB wordt herstart om de taalwijziging toe te passen...</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="1788" />
+      <location filename="../ui/main_window.py" line="1797" />
       <source>Language preference saved. Restart keyTAB to apply it.</source>
       <translation>Taalvoorkeur opgeslagen. Herstart keyTAB om dit toe te passen.</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="1867" />
-      <location filename="../ui/main_window.py" line="1844" />
+      <location filename="../ui/main_window.py" line="1880" />
+      <location filename="../ui/main_window.py" line="1857" />
       <source>MIDI Import failed</source>
       <translation>MIDI-import mislukt</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="2774" />
-      <location filename="../ui/main_window.py" line="1870" />
-      <location filename="../ui/main_window.py" line="1847" />
+      <location filename="../ui/main_window.py" line="2780" />
+      <location filename="../ui/main_window.py" line="1883" />
+      <location filename="../ui/main_window.py" line="1860" />
       <source>Use 'Copy Error Log' and keep the copied traceback for debugging.</source>
       <translation>Gebruik 'Foutenlog kopieren' en bewaar de gekopieerde traceback voor debugging.</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="1910" />
+      <location filename="../ui/main_window.py" line="1927" />
       <source>Opened</source>
       <translation>Geopend</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="1926" />
+      <location filename="../ui/main_window.py" line="1943" />
       <source>Saved As</source>
       <translation>Opgeslagen als</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="2216" />
-      <location filename="../ui/main_window.py" line="2211" />
-      <location filename="../ui/main_window.py" line="2199" />
-      <location filename="../ui/main_window.py" line="2194" />
+      <location filename="../ui/main_window.py" line="2230" />
+      <location filename="../ui/main_window.py" line="2225" />
+      <location filename="../ui/main_window.py" line="2213" />
+      <location filename="../ui/main_window.py" line="2208" />
       <source>Run Script</source>
       <translation>Script uitvoeren</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="2211" />
-      <location filename="../ui/main_window.py" line="2194" />
+      <location filename="../ui/main_window.py" line="2225" />
+      <location filename="../ui/main_window.py" line="2208" />
       <source>Failed to initialize scripting: {error}</source>
       <translation>Initialiseren van scripting mislukt: {error}</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="2216" />
-      <location filename="../ui/main_window.py" line="2199" />
+      <location filename="../ui/main_window.py" line="2230" />
+      <location filename="../ui/main_window.py" line="2213" />
       <source>Script failed: {error}</source>
       <translation>Script mislukt: {error}</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="2224" />
+      <location filename="../ui/main_window.py" line="2238" />
       <source>Run Script...</source>
       <translation>Script uitvoeren...</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="2225" />
+      <location filename="../ui/main_window.py" line="2239" />
       <source>Load and run a Python script with preview and cancel support.</source>
       <translation>Laad en voer een Python-script uit met preview en annuleringsondersteuning.</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="2232" />
+      <location filename="../ui/main_window.py" line="2246" />
       <source>No scripts folder found</source>
       <translation>Geen map met scripts gevonden</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="2242" />
+      <location filename="../ui/main_window.py" line="2256" />
       <source>No scripts found</source>
       <translation>Geen scripts gevonden</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="2290" />
+      <location filename="../ui/main_window.py" line="2301" />
       <source>No recent files</source>
       <translation>Geen recente bestanden</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="2300" />
+      <location filename="../ui/main_window.py" line="2311" />
       <source>Clear Recent Files</source>
       <translation>Recente bestanden wissen</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="2340" />
-      <location filename="../ui/main_window.py" line="2328" />
+      <location filename="../ui/main_window.py" line="2351" />
+      <location filename="../ui/main_window.py" line="2339" />
       <source>Rename File</source>
       <translation>Bestand hernoemen</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="2329" />
+      <location filename="../ui/main_window.py" line="2340" />
       <source>New file name:</source>
       <translation>Nieuwe bestandsnaam:</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="2340" />
+      <location filename="../ui/main_window.py" line="2351" />
       <source>Please enter only a file name, not a path.</source>
       <translation>Voer alleen een bestandsnaam in, geen pad.</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="2353" />
+      <location filename="../ui/main_window.py" line="2364" />
       <source>Renamed</source>
       <translation>Hernoemd</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="2363" />
+      <location filename="../ui/main_window.py" line="2374" />
       <source>Default Style Saved</source>
       <translation>Standaardstijl opgeslagen</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="2364" />
+      <location filename="../ui/main_window.py" line="2375" />
       <source>The current style has been set as the default for new projects.</source>
       <translation>De huidige stijl is ingesteld als standaard voor nieuwe projecten.</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="2369" />
+      <location filename="../ui/main_window.py" line="2380" />
       <source>Failed to Save Default Style</source>
       <translation>Opslaan van standaardstijl mislukt</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="2370" />
+      <location filename="../ui/main_window.py" line="2381" />
       <source>An error occurred while saving the default style: {error}</source>
       <translation>Er is een fout opgetreden bij het opslaan van de standaardstijl: {error}</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="2380" />
+      <location filename="../ui/main_window.py" line="2391" />
       <source>Default Style Reset</source>
       <translation>Standaardstijl gereset</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="2381" />
+      <location filename="../ui/main_window.py" line="2392" />
       <source>The default style has been reset to the built-in defaults.</source>
       <translation>De standaardstijl is teruggezet naar de ingebouwde standaardwaarden.</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="2386" />
+      <location filename="../ui/main_window.py" line="2397" />
       <source>Failed to Reset Default Style</source>
       <translation>Resetten van standaardstijl mislukt</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="2387" />
+      <location filename="../ui/main_window.py" line="2398" />
       <source>An error occurred while resetting the default style: {error}</source>
       <translation>Er is een fout opgetreden bij het resetten van de standaardstijl: {error}</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="2406" />
+      <location filename="../ui/main_window.py" line="2415" />
       <source>Recent File Missing</source>
       <translation>Recent bestand ontbreekt</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="2407" />
+      <location filename="../ui/main_window.py" line="2416" />
       <source>This file no longer exists and was removed from Recent Files:
 {path}</source>
       <translation>Dit bestand bestaat niet meer en is verwijderd uit Recente Bestanden:
 {path}</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="2511" />
+      <location filename="../ui/main_window.py" line="2514" />
       <source>Copied selection</source>
       <translation>Selectie gekopieerd</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="2527" />
+      <location filename="../ui/main_window.py" line="2530" />
       <source>Cut selection</source>
       <translation>Selectie geknipt</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="2543" />
+      <location filename="../ui/main_window.py" line="2546" />
       <source>Pasted selection</source>
       <translation>Selectie geplakt</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="2562" />
+      <location filename="../ui/main_window.py" line="2565" />
       <source>Deleted selection</source>
       <translation>Selectie verwijderd</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="2564" />
+      <location filename="../ui/main_window.py" line="2567" />
       <source>No selection to delete</source>
       <translation>Geen selectie om te verwijderen</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="2575" />
+      <location filename="../ui/main_window.py" line="2578" />
       <source>Selected all</source>
       <translation>Alles geselecteerd</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="2587" />
+      <location filename="../ui/main_window.py" line="2590" />
       <source>Transposed selection {semitones:+d} semitone</source>
       <translation>Selectie {semitones:+d} semitoon getransponeerd</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="2589" />
+      <location filename="../ui/main_window.py" line="2592" />
       <source>No selection to transpose</source>
       <translation>Geen selectie om te transponeren</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="2605" />
+      <location filename="../ui/main_window.py" line="2608" />
       <source>earlier</source>
       <translation>eerder</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="2605" />
+      <location filename="../ui/main_window.py" line="2608" />
       <source>later</source>
       <translation>later</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="2606" />
+      <location filename="../ui/main_window.py" line="2609" />
       <source>Moved selection {direction} by snap</source>
       <translation>Selectie {direction} verplaatst per snap</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="2608" />
+      <location filename="../ui/main_window.py" line="2611" />
       <source>No selection to move</source>
       <translation>Geen selectie om te verplaatsen</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="2622" />
+      <location filename="../ui/main_window.py" line="2625" />
       <source>Quantized selection starts to snap</source>
       <translation>Beginpunten van selectie gekwantiseerd op snap</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="2624" />
+      <location filename="../ui/main_window.py" line="2627" />
       <source>Quantized selection ends to snap</source>
       <translation>Eindpunten van selectie gekwantiseerd op snap</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="2626" />
+      <location filename="../ui/main_window.py" line="2629" />
       <source>Quantized selection starts and ends to snap</source>
       <translation>Begin- en eindpunten van selectie gekwantiseerd op snap</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="2628" />
+      <location filename="../ui/main_window.py" line="2631" />
       <source>No selection to quantize</source>
       <translation>Geen selectie om te kwantiseren</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="2771" />
+      <location filename="../ui/main_window.py" line="2777" />
       <source>Engraving failed</source>
       <translation>Graveren mislukt</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="2772" />
+      <location filename="../ui/main_window.py" line="2778" />
       <source>The engraver failed.</source>
       <translation>De engraver is mislukt.</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="2777" />
+      <location filename="../ui/main_window.py" line="2783" />
       <source>Engraving failed. See error dialog for details.</source>
       <translation>Graveren mislukt. Zie het foutvenster voor details.</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="2949" />
-      <location filename="../ui/main_window.py" line="2931" />
-      <location filename="../ui/main_window.py" line="2913" />
+      <location filename="../ui/main_window.py" line="2955" />
+      <location filename="../ui/main_window.py" line="2937" />
+      <location filename="../ui/main_window.py" line="2919" />
       <source>Playback</source>
       <translation>Afspelen</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="2915" />
+      <location filename="../ui/main_window.py" line="2921" />
       <source>External MIDI playback failed: {error}
 
 Switched automatically to {backend}.</source>
@@ -1372,7 +1372,7 @@ Switched automatically to {backend}.</source>
     Automatisch overgeschakeld naar {backend}.</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="2933" />
+      <location filename="../ui/main_window.py" line="2939" />
       <source>External MIDI playback failed: {error}
 
 Automatic fallback to {backend} also failed: {fallback_error}</source>
@@ -1381,7 +1381,7 @@ Automatic fallback to {backend} also failed: {fallback_error}</source>
     Automatische fallback naar {backend} is ook mislukt: {fallback_error}</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="2950" />
+      <location filename="../ui/main_window.py" line="2956" />
       <source>Playback failed: {error}
 
 Try '{backend}' from the Playback menu.</source>
@@ -1390,91 +1390,91 @@ Try '{backend}' from the Playback menu.</source>
     Probeer '{backend}' via het menu Afspelen.</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="3171" />
+      <location filename="../ui/main_window.py" line="3177" />
       <source>Synth FX editor removed</source>
       <translation>Synth FX-editor verwijderd</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="3193" />
+      <location filename="../ui/main_window.py" line="3199" />
       <source>Playback mode: External MIDI port</source>
       <translation>Afspeelmodus: externe MIDI-poort</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="3196" />
+      <location filename="../ui/main_window.py" line="3202" />
       <source>Playback mode: {backend}</source>
       <translation>Afspeelmodus: {backend}</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="3197" />
+      <location filename="../ui/main_window.py" line="3203" />
       <source>Playback using </source>
       <translation>Afspelen met </translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="3210" />
+      <location filename="../ui/main_window.py" line="3216" />
       <source>MIDI transport settings removed</source>
       <translation>MIDI-transportinstellingen verwijderd</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="3216" />
+      <location filename="../ui/main_window.py" line="3222" />
       <source>Test tone</source>
       <translation>Testtoon</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="3219" />
+      <location filename="../ui/main_window.py" line="3225" />
       <source>Test tone unavailable</source>
       <translation>Testtoon niet beschikbaar</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="3222" />
+      <location filename="../ui/main_window.py" line="3228" />
       <source>Audio output is selected by the active playback backend</source>
       <translation>Audio-uitvoer wordt gekozen door de actieve afspeelbackend</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="3382" />
+      <location filename="../ui/main_window.py" line="3388" />
       <source>Install required fonts</source>
       <translation>Vereiste lettertypen installeren</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="3383" />
+      <location filename="../ui/main_window.py" line="3389" />
       <source>keyTAB can install embedded fonts to your user font folder so editing and engraving match:</source>
       <translation>keyTAB kan ingebedde lettertypen in je gebruikersmap voor lettertypen installeren zodat bewerken en graveren overeenkomen:</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="3386" />
+      <location filename="../ui/main_window.py" line="3392" />
       <source>Install all missing fonts now?</source>
       <translation>Alle ontbrekende lettertypen nu installeren?</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="3417" />
+      <location filename="../ui/main_window.py" line="3423" />
       <source>Fonts installed</source>
       <translation>Lettertypen geinstalleerd</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="3418" />
+      <location filename="../ui/main_window.py" line="3424" />
       <source>The following fonts were installed. keyTAB will restart to apply them:
 </source>
       <translation>De volgende lettertypen zijn geinstalleerd. keyTAB wordt herstart om ze toe te passen:
     </translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="3429" />
+      <location filename="../ui/main_window.py" line="3435" />
       <source>Font installation failed</source>
       <translation>Installatie van lettertypen mislukt</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="3430" />
+      <location filename="../ui/main_window.py" line="3436" />
       <source>keyTAB could not install some fonts automatically:
 {details}</source>
       <translation>keyTAB kon sommige lettertypen niet automatisch installeren:
     {details}</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="3542" />
+      <location filename="../ui/main_window.py" line="3548" />
       <source>Exiting keyTAB...</source>
       <translation>keyTAB afsluiten...</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="3550" />
+      <location filename="../ui/main_window.py" line="3556" />
       <source>Saving...
 
  {path}</source>
@@ -1483,14 +1483,14 @@ Try '{backend}' from the Playback menu.</source>
      {path}</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="3552" />
+      <location filename="../ui/main_window.py" line="3558" />
       <source>Exiting in progress...</source>
       <translation>Afsluiten in uitvoering...</translation>
     </message>
     <message>
-      <location filename="../ui/main_window.py" line="3610" />
-      <location filename="../ui/main_window.py" line="3595" />
-      <location filename="../ui/main_window.py" line="3584" />
+      <location filename="../ui/main_window.py" line="3616" />
+      <location filename="../ui/main_window.py" line="3601" />
+      <location filename="../ui/main_window.py" line="3590" />
       <source>unsaved session</source>
       <translation>niet-opgeslagen sessie</translation>
     </message>
@@ -1558,42 +1558,42 @@ Kies 'Overslaan' om een track volledig uit te sluiten.</translation>
   <context>
     <name>NoteTool</name>
     <message>
-      <location filename="../editor/tool/note_tool.py" line="67" />
+      <location filename="../editor/tool/note_tool.py" line="68" />
       <source>Cycle arpeggio (current: {0})</source>
       <translation>Cyclus arpeggio (stroom: {0})</translation>
     </message>
     <message>
-      <location filename="../editor/tool/note_tool.py" line="68" />
+      <location filename="../editor/tool/note_tool.py" line="69" />
       <source>Cycle arpeggio on selected chord (currently off)</source>
       <translation>Cyclus arpeggio op geselecteerd akkoord (momenteel uit)</translation>
     </message>
     <message>
-      <location filename="../editor/tool/note_tool.py" line="268" />
-      <source>Click to write left hand notes (shortcut: , ).</source>
-      <translation>Klik om noten voor de linkerhand te schrijven (sneltoets: , ).</translation>
-    </message>
-    <message>
-      <location filename="../editor/tool/note_tool.py" line="274" />
+      <location filename="../editor/tool/note_tool.py" line="277" />
       <source>Click to write right hand notes (shortcut: . ).</source>
       <translation>Klik om noten voor de rechterhand te schrijven (sneltoets: . ).</translation>
     </message>
     <message>
-      <location filename="../editor/tool/note_tool.py" line="279" />
-      <source>Set selected notes to left hand (shortcut: [ )</source>
-      <translation>Stel de geselecteerde noten in op de linkerhand (sneltoets: [ )</translation>
+      <location filename="../editor/tool/note_tool.py" line="284" />
+      <source>Click to write left hand notes (shortcut: , ).</source>
+      <translation>Klik om noten voor de linkerhand te schrijven (sneltoets: , ).</translation>
     </message>
     <message>
-      <location filename="../editor/tool/note_tool.py" line="284" />
+      <location filename="../editor/tool/note_tool.py" line="290" />
       <source>Set selected notes to right hand (shortcut: ] )</source>
       <translation>Stel de geselecteerde noten in op de rechterhand (sneltoets: ] )</translation>
     </message>
     <message>
-      <location filename="../editor/tool/note_tool.py" line="291" />
+      <location filename="../editor/tool/note_tool.py" line="296" />
+      <source>Set selected notes to left hand (shortcut: [ )</source>
+      <translation>Stel de geselecteerde noten in op de linkerhand (sneltoets: [ )</translation>
+    </message>
+    <message>
+      <location filename="../editor/tool/note_tool.py" line="304" />
       <source>Velocity editing is on. Toggle on/off to edit the note velocities using the sliders on the sides of the editor.</source>
       <translation>Volumebewerking is ingeschakeld. Schakel aan/uit om de notenvolumes te bewerken met behulp van de schuifregelaars aan de zijkanten van de editor.</translation>
     </message>
     <message>
-      <location filename="../editor/tool/note_tool.py" line="291" />
+      <location filename="../editor/tool/note_tool.py" line="304" />
       <source>Velocity editing is off. Toggle on/off to edit the note velocities using the sliders on the sides of the editor.</source>
       <translation>Volumebewerking is uitgeschakeld. Schakel aan/uit om de notenvolumes te bewerken met behulp van de schuifregelaars aan de zijkanten van de editor.</translation>
     </message>
@@ -1751,6 +1751,16 @@ Kies 'Overslaan' om een track volledig uit te sluiten.</translation>
       <location filename="../ui/dialogs/preferences_dialog.py" line="128" />
       <source>Dark</source>
       <translation>Donker</translation>
+    </message>
+    <message>
+      <location filename="../ui/dialogs/preferences_dialog.py" line="133" />
+      <source>Vertical</source>
+      <translation>Verticaal</translation>
+    </message>
+    <message>
+      <location filename="../ui/dialogs/preferences_dialog.py" line="134" />
+      <source>Horizontal</source>
+      <translation>Horizontaal</translation>
     </message>
   </context>
   <context>
@@ -1982,551 +1992,561 @@ Kies 'Overslaan' om een track volledig uit te sluiten.</translation>
     </message>
     <message>
       <location filename="../ui/dialogs/style_dialog.py" line="564" />
+      <source>Notehead height scaling (1.0 = square, higher = taller)</source>
+      <translation>Nootkop hoogte schaling (1.0 = vierkant, hoger = hoger)</translation>
+    </message>
+    <message>
+      <location filename="../ui/dialogs/style_dialog.py" line="565" />
+      <source>Notehead tilt (-1..1, 0 = circle/oval, negative = opposite direction)</source>
+      <translation>Nootkop helling (-1..1, 0 = cirkel/ovaal, negatief = tegenovergestelde richting)</translation>
+    </message>
+    <message>
+      <location filename="../ui/dialogs/style_dialog.py" line="566" />
       <source>Beam visible</source>
       <translation>Groeperingssymbool zichtbaar</translation>
     </message>
     <message>
-      <location filename="../ui/dialogs/style_dialog.py" line="565" />
+      <location filename="../ui/dialogs/style_dialog.py" line="567" />
       <source>Beam thickness (mm)</source>
       <translation>Groeperingssymbool dikte (mm)</translation>
     </message>
     <message>
-      <location filename="../ui/dialogs/style_dialog.py" line="566" />
+      <location filename="../ui/dialogs/style_dialog.py" line="568" />
       <source>Beam corner radius (mm) (rounded corners)</source>
       <translation>Groeperingssymbool hoekradius (mm) (afgeronde hoeken)</translation>
     </message>
     <message>
-      <location filename="../ui/dialogs/style_dialog.py" line="567" />
+      <location filename="../ui/dialogs/style_dialog.py" line="569" />
       <source>Grace note visible</source>
       <translation>Voorslagnoot zichtbaar</translation>
     </message>
     <message>
-      <location filename="../ui/dialogs/style_dialog.py" line="568" />
+      <location filename="../ui/dialogs/style_dialog.py" line="570" />
       <source>Grace note outline thickness (mm)</source>
       <translation>Omtrekdikte voorslagnoot (mm)</translation>
     </message>
     <message>
-      <location filename="../ui/dialogs/style_dialog.py" line="569" />
+      <location filename="../ui/dialogs/style_dialog.py" line="571" />
       <source>Grace note scale</source>
       <translation>Voorslagnoot-schaal</translation>
     </message>
     <message>
-      <location filename="../ui/dialogs/style_dialog.py" line="570" />
+      <location filename="../ui/dialogs/style_dialog.py" line="572" />
       <source>Pedal symbol thickness (mm)</source>
       <translation>Dikte pedaalsymbool (mm)</translation>
     </message>
     <message>
-      <location filename="../ui/dialogs/style_dialog.py" line="571" />
+      <location filename="../ui/dialogs/style_dialog.py" line="573" />
       <source>Pedal background padding (mm)</source>
       <translation>Opvulling pedaalachtergrond (mm)</translation>
     </message>
     <message>
-      <location filename="../ui/dialogs/style_dialog.py" line="572" />
+      <location filename="../ui/dialogs/style_dialog.py" line="574" />
       <source>Text visible</source>
       <translation>Tekst zichtbaar</translation>
     </message>
     <message>
-      <location filename="../ui/dialogs/style_dialog.py" line="573" />
+      <location filename="../ui/dialogs/style_dialog.py" line="575" />
       <source>Text background padding (mm)</source>
       <translation>Tekstachtergrond opvulling (mm)</translation>
     </message>
     <message>
-      <location filename="../ui/dialogs/style_dialog.py" line="574" />
+      <location filename="../ui/dialogs/style_dialog.py" line="576" />
       <source>Slur visible</source>
       <translation>Legatoboog zichtbaar</translation>
     </message>
     <message>
-      <location filename="../ui/dialogs/style_dialog.py" line="575" />
+      <location filename="../ui/dialogs/style_dialog.py" line="577" />
       <source>Slur side thickness (mm)</source>
       <translation>Legatoboog zijkantdikte (mm)</translation>
     </message>
     <message>
-      <location filename="../ui/dialogs/style_dialog.py" line="576" />
+      <location filename="../ui/dialogs/style_dialog.py" line="578" />
       <source>Slur middle thickness (mm)</source>
       <translation>Legatoboog middendikte (mm)</translation>
     </message>
     <message>
-      <location filename="../ui/dialogs/style_dialog.py" line="577" />
+      <location filename="../ui/dialogs/style_dialog.py" line="579" />
       <source>Hairpin visible</source>
       <translation>Haarspeld zichtbaar</translation>
     </message>
     <message>
-      <location filename="../ui/dialogs/style_dialog.py" line="578" />
+      <location filename="../ui/dialogs/style_dialog.py" line="580" />
       <source>Hairpin line thickness (mm)</source>
       <translation>Haarspeld lijndikte (mm)</translation>
     </message>
     <message>
-      <location filename="../ui/dialogs/style_dialog.py" line="579" />
+      <location filename="../ui/dialogs/style_dialog.py" line="581" />
       <source>Hairpin width (mm)</source>
       <translation>Haarspeld breedte (mm)</translation>
     </message>
     <message>
-      <location filename="../ui/dialogs/style_dialog.py" line="580" />
+      <location filename="../ui/dialogs/style_dialog.py" line="582" />
       <source>Hairpin text gap (mm)</source>
       <translation>Haarspeld tekstafstand (mm)</translation>
     </message>
     <message>
-      <location filename="../ui/dialogs/style_dialog.py" line="581" />
+      <location filename="../ui/dialogs/style_dialog.py" line="583" />
       <source>Dynamic symbol font size (pt)</source>
       <translation>Dynamiek symbool lettergrootte (pt)</translation>
     </message>
     <message>
-      <location filename="../ui/dialogs/style_dialog.py" line="582" />
+      <location filename="../ui/dialogs/style_dialog.py" line="584" />
       <source>Dynamic symbol background padding (mm)</source>
       <translation>Dynamiek symbool achtergrondopvulling (mm)</translation>
     </message>
     <message>
-      <location filename="../ui/dialogs/style_dialog.py" line="583" />
+      <location filename="../ui/dialogs/style_dialog.py" line="585" />
       <source>Dynamic symbol visible</source>
       <translation>Dynamiek symbool zichtbaar</translation>
     </message>
     <message>
-      <location filename="../ui/dialogs/style_dialog.py" line="584" />
+      <location filename="../ui/dialogs/style_dialog.py" line="586" />
       <source>Start repeat visible</source>
       <translation>Herhaalbegin zichtbaar</translation>
     </message>
     <message>
-      <location filename="../ui/dialogs/style_dialog.py" line="585" />
+      <location filename="../ui/dialogs/style_dialog.py" line="587" />
       <source>End repeat visible</source>
       <translation>Herhaaleinde zichtbaar</translation>
     </message>
     <message>
-      <location filename="../ui/dialogs/style_dialog.py" line="586" />
+      <location filename="../ui/dialogs/style_dialog.py" line="588" />
       <source>Double barline visible</source>
       <translation>Dubbele maatstreep zichtbaar</translation>
     </message>
     <message>
-      <location filename="../ui/dialogs/style_dialog.py" line="587" />
+      <location filename="../ui/dialogs/style_dialog.py" line="589" />
       <source>Count line visible</source>
       <translation>Tellijn zichtbaar</translation>
     </message>
     <message>
-      <location filename="../ui/dialogs/style_dialog.py" line="588" />
+      <location filename="../ui/dialogs/style_dialog.py" line="590" />
       <source>Count line dash pattern</source>
       <translation>Streeppatroon tellijn</translation>
     </message>
     <message>
-      <location filename="../ui/dialogs/style_dialog.py" line="589" />
+      <location filename="../ui/dialogs/style_dialog.py" line="591" />
       <source>Count line thickness (mm)</source>
       <translation>Tellijndikte (mm)</translation>
     </message>
     <message>
-      <location filename="../ui/dialogs/style_dialog.py" line="590" />
+      <location filename="../ui/dialogs/style_dialog.py" line="592" />
       <source>Stave visible</source>
       <translation>Balk zichtbaar</translation>
     </message>
     <message>
-      <location filename="../ui/dialogs/style_dialog.py" line="591" />
+      <location filename="../ui/dialogs/style_dialog.py" line="593" />
       <source>Barline visible</source>
       <translation>Maatstreep zichtbaar</translation>
     </message>
     <message>
-      <location filename="../ui/dialogs/style_dialog.py" line="592" />
+      <location filename="../ui/dialogs/style_dialog.py" line="594" />
       <source>Grid line visible</source>
       <translation>Basis tellijn zichtbaar</translation>
     </message>
     <message>
-      <location filename="../ui/dialogs/style_dialog.py" line="593" />
+      <location filename="../ui/dialogs/style_dialog.py" line="595" />
       <source>Grid band visible</source>
       <translation>Rasterband zichtbaar</translation>
     </message>
     <message>
-      <location filename="../ui/dialogs/style_dialog.py" line="594" />
+      <location filename="../ui/dialogs/style_dialog.py" line="596" />
       <source>Grid barline thickness (mm)</source>
       <translation>Maatstreep dikte (mm)</translation>
     </message>
     <message>
-      <location filename="../ui/dialogs/style_dialog.py" line="595" />
+      <location filename="../ui/dialogs/style_dialog.py" line="597" />
       <source>Grid line thickness (mm)</source>
       <translation>Basis tellijn dikte (mm)</translation>
     </message>
     <message>
-      <location filename="../ui/dialogs/style_dialog.py" line="596" />
+      <location filename="../ui/dialogs/style_dialog.py" line="598" />
       <source>Grid line dash pattern (mm)</source>
       <translation>Basis tellijn streeppatroon (mm)</translation>
     </message>
     <message>
-      <location filename="../ui/dialogs/style_dialog.py" line="597" />
+      <location filename="../ui/dialogs/style_dialog.py" line="599" />
       <source>Grid band color</source>
       <translation>Rasterband kleur</translation>
     </message>
     <message>
-      <location filename="../ui/dialogs/style_dialog.py" line="598" />
+      <location filename="../ui/dialogs/style_dialog.py" line="600" />
       <source>Grid band start phase</source>
       <translation>Rasterband start fase</translation>
     </message>
     <message>
-      <location filename="../ui/dialogs/style_dialog.py" line="599" />
+      <location filename="../ui/dialogs/style_dialog.py" line="601" />
       <source>Time signature visible</source>
       <translation>Maatsoort indicator zichtbaar</translation>
     </message>
     <message>
-      <location filename="../ui/dialogs/style_dialog.py" line="600" />
+      <location filename="../ui/dialogs/style_dialog.py" line="602" />
       <source>Time signature indicator type</source>
       <translation>Type maatsoortindicator</translation>
     </message>
     <message>
-      <location filename="../ui/dialogs/style_dialog.py" line="601" />
+      <location filename="../ui/dialogs/style_dialog.py" line="603" />
       <source>Time signature lane width (mm)</source>
       <translation>Breedte maatsoort baan (mm)</translation>
     </message>
     <message>
-      <location filename="../ui/dialogs/style_dialog.py" line="602" />
+      <location filename="../ui/dialogs/style_dialog.py" line="604" />
       <source>Time signature guide thickness (mm)</source>
       <translation>Dikte maatsoorthulplijn (mm)</translation>
     </message>
     <message>
-      <location filename="../ui/dialogs/style_dialog.py" line="603" />
+      <location filename="../ui/dialogs/style_dialog.py" line="605" />
       <source>Time signature divider thickness (mm)</source>
       <translation>Dikte maatsoortscheiderlijn (mm)</translation>
     </message>
     <message>
-      <location filename="../ui/dialogs/style_dialog.py" line="604" />
+      <location filename="../ui/dialogs/style_dialog.py" line="606" />
       <source>Time signature classic font</source>
       <translation>Klassiek lettertype maatsoort</translation>
     </message>
     <message>
-      <location filename="../ui/dialogs/style_dialog.py" line="605" />
+      <location filename="../ui/dialogs/style_dialog.py" line="607" />
       <source>Time signature Klavarskribo font</source>
       <translation>Klavarskribo-lettertype maatsoort</translation>
     </message>
     <message>
-      <location filename="../ui/dialogs/style_dialog.py" line="606" />
+      <location filename="../ui/dialogs/style_dialog.py" line="608" />
       <source>Measure numbering guide thickness (mm)</source>
       <translation>Dikte hulplijn maat nummering (mm)</translation>
     </message>
     <message>
-      <location filename="../ui/dialogs/style_dialog.py" line="607" />
+      <location filename="../ui/dialogs/style_dialog.py" line="609" />
       <source>Measure numbering guide dash pattern (mm)</source>
       <translation>Streeppatroon hulplijn maatnummering (mm)</translation>
     </message>
     <message>
-      <location filename="../ui/dialogs/style_dialog.py" line="608" />
+      <location filename="../ui/dialogs/style_dialog.py" line="610" />
       <source>Measure numbering placement</source>
       <translation>Plaatsing maat nummering</translation>
     </message>
     <message>
-      <location filename="../ui/dialogs/style_dialog.py" line="609" />
+      <location filename="../ui/dialogs/style_dialog.py" line="611" />
       <source>Measure numbering guide visible</source>
       <translation>Hulplijn maat nummering zichtbaar</translation>
     </message>
     <message>
-      <location filename="../ui/dialogs/style_dialog.py" line="610" />
+      <location filename="../ui/dialogs/style_dialog.py" line="612" />
       <source>Measure numbers visible</source>
       <translation>Maatnummers zichtbaar</translation>
     </message>
     <message>
-      <location filename="../ui/dialogs/style_dialog.py" line="611" />
+      <location filename="../ui/dialogs/style_dialog.py" line="613" />
       <source>Tempo indicator visible</source>
       <translation>Tempo-indicator zichtbaar</translation>
     </message>
     <message>
-      <location filename="../ui/dialogs/style_dialog.py" line="612" />
+      <location filename="../ui/dialogs/style_dialog.py" line="614" />
       <source>Measure numbering font</source>
       <translation>Lettertype maat nummering</translation>
     </message>
     <message>
-      <location filename="../ui/dialogs/style_dialog.py" line="613" />
+      <location filename="../ui/dialogs/style_dialog.py" line="615" />
       <source>Text font</source>
       <translation>Tekstlettertype</translation>
     </message>
     <message>
-      <location filename="../ui/dialogs/style_dialog.py" line="614" />
+      <location filename="../ui/dialogs/style_dialog.py" line="616" />
       <source>Title font</source>
       <translation>Titellettertype</translation>
     </message>
     <message>
-      <location filename="../ui/dialogs/style_dialog.py" line="615" />
+      <location filename="../ui/dialogs/style_dialog.py" line="617" />
       <source>Composer font</source>
       <translation>Lettertype componist</translation>
     </message>
     <message>
-      <location filename="../ui/dialogs/style_dialog.py" line="616" />
+      <location filename="../ui/dialogs/style_dialog.py" line="618" />
       <source>Copyright font</source>
       <translation>Lettertype copyright</translation>
     </message>
     <message>
-      <location filename="../ui/dialogs/style_dialog.py" line="617" />
+      <location filename="../ui/dialogs/style_dialog.py" line="619" />
       <source>Arranger font</source>
       <translation>Lettertype arrangeur</translation>
     </message>
     <message>
-      <location filename="../ui/dialogs/style_dialog.py" line="618" />
+      <location filename="../ui/dialogs/style_dialog.py" line="620" />
       <source>Lyricist font</source>
       <translation>Lettertype tekstdichter</translation>
     </message>
     <message>
-      <location filename="../ui/dialogs/style_dialog.py" line="619" />
+      <location filename="../ui/dialogs/style_dialog.py" line="621" />
       <source>Stave two-line thickness (mm)</source>
       <translation>Dikte tweelijnsbalk (mm)</translation>
     </message>
     <message>
-      <location filename="../ui/dialogs/style_dialog.py" line="620" />
+      <location filename="../ui/dialogs/style_dialog.py" line="622" />
       <source>Stave three-line thickness (mm)</source>
       <translation>Dikte drielijnsbalk (mm)</translation>
     </message>
     <message>
-      <location filename="../ui/dialogs/style_dialog.py" line="621" />
+      <location filename="../ui/dialogs/style_dialog.py" line="623" />
       <source>Stave clef line thickness (mm)</source>
       <translation>Dikte sleutellijnbalk (mm)</translation>
     </message>
     <message>
-      <location filename="../ui/dialogs/style_dialog.py" line="622" />
+      <location filename="../ui/dialogs/style_dialog.py" line="624" />
       <source>Stave ledger line length (mm)</source>
       <translation>Lengte hulplijnbalk (mm)</translation>
     </message>
     <message>
-      <location filename="../ui/dialogs/style_dialog.py" line="623" />
+      <location filename="../ui/dialogs/style_dialog.py" line="625" />
       <source>Stave clef line dash pattern (mm)</source>
       <translation>Streeppatroon sleutellijnbalk (mm)</translation>
     </message>
     <message>
-      <location filename="../ui/dialogs/style_dialog.py" line="669" />
+      <location filename="../ui/dialogs/style_dialog.py" line="671" />
       <source>Style</source>
       <translation>Stijl</translation>
     </message>
     <message>
-      <location filename="../ui/dialogs/style_dialog.py" line="912" />
-      <location filename="../ui/dialogs/style_dialog.py" line="734" />
+      <location filename="../ui/dialogs/style_dialog.py" line="916" />
+      <location filename="../ui/dialogs/style_dialog.py" line="736" />
       <source>Page</source>
       <translation>Pagina</translation>
     </message>
     <message>
-      <location filename="../ui/dialogs/style_dialog.py" line="735" />
+      <location filename="../ui/dialogs/style_dialog.py" line="737" />
       <source>Stave</source>
       <translation>Notenbalk</translation>
     </message>
     <message>
-      <location filename="../ui/dialogs/style_dialog.py" line="736" />
+      <location filename="../ui/dialogs/style_dialog.py" line="738" />
       <source>Grid</source>
       <translation>Tijdraster</translation>
     </message>
     <message>
-      <location filename="../ui/dialogs/style_dialog.py" line="737" />
+      <location filename="../ui/dialogs/style_dialog.py" line="739" />
       <source>Grid band</source>
       <translation>Rasterband</translation>
     </message>
     <message>
-      <location filename="../ui/dialogs/style_dialog.py" line="738" />
+      <location filename="../ui/dialogs/style_dialog.py" line="740" />
       <source>Time signature</source>
       <translation>Maatsoort</translation>
     </message>
     <message>
-      <location filename="../ui/dialogs/style_dialog.py" line="739" />
+      <location filename="../ui/dialogs/style_dialog.py" line="741" />
       <source>Measure Numbering</source>
       <translation>Maatnummering</translation>
     </message>
     <message>
-      <location filename="../ui/dialogs/style_dialog.py" line="921" />
-      <location filename="../ui/dialogs/style_dialog.py" line="740" />
+      <location filename="../ui/dialogs/style_dialog.py" line="925" />
+      <location filename="../ui/dialogs/style_dialog.py" line="742" />
       <source>Fonts</source>
       <translation>Lettertypen</translation>
     </message>
     <message>
-      <location filename="../ui/dialogs/style_dialog.py" line="741" />
+      <location filename="../ui/dialogs/style_dialog.py" line="743" />
       <source>Note</source>
       <translation>Noot</translation>
     </message>
     <message>
-      <location filename="../ui/dialogs/style_dialog.py" line="742" />
+      <location filename="../ui/dialogs/style_dialog.py" line="744" />
       <source>Grace note</source>
       <translation>Voorslagnoot</translation>
     </message>
     <message>
-      <location filename="../ui/dialogs/style_dialog.py" line="743" />
+      <location filename="../ui/dialogs/style_dialog.py" line="745" />
       <source>Beam</source>
       <translation>Noot Groepering</translation>
     </message>
     <message>
-      <location filename="../ui/dialogs/style_dialog.py" line="744" />
+      <location filename="../ui/dialogs/style_dialog.py" line="746" />
       <source>Dynamic</source>
       <translation>Dynamiek</translation>
     </message>
     <message>
-      <location filename="../ui/dialogs/style_dialog.py" line="745" />
+      <location filename="../ui/dialogs/style_dialog.py" line="747" />
       <source>Slur</source>
       <translation>Legatoboog</translation>
     </message>
     <message>
-      <location filename="../ui/dialogs/style_dialog.py" line="746" />
+      <location filename="../ui/dialogs/style_dialog.py" line="748" />
       <source>Text</source>
       <translation>Tekst</translation>
     </message>
     <message>
-      <location filename="../ui/dialogs/style_dialog.py" line="747" />
+      <location filename="../ui/dialogs/style_dialog.py" line="749" />
       <source>Countline</source>
       <translation>Tellijn</translation>
     </message>
     <message>
-      <location filename="../ui/dialogs/style_dialog.py" line="748" />
+      <location filename="../ui/dialogs/style_dialog.py" line="750" />
       <source>Pedal</source>
       <translation>Pedaal</translation>
     </message>
     <message>
-      <location filename="../ui/dialogs/style_dialog.py" line="749" />
+      <location filename="../ui/dialogs/style_dialog.py" line="751" />
       <source>Visibility</source>
       <translation>Zichtbaarheid</translation>
     </message>
     <message>
-      <location filename="../ui/dialogs/style_dialog.py" line="1257" />
-      <location filename="../ui/dialogs/style_dialog.py" line="931" />
+      <location filename="../ui/dialogs/style_dialog.py" line="1261" />
+      <location filename="../ui/dialogs/style_dialog.py" line="935" />
       <source>Save Style</source>
       <translation>Stijl opslaan</translation>
     </message>
     <message>
-      <location filename="../ui/dialogs/style_dialog.py" line="932" />
+      <location filename="../ui/dialogs/style_dialog.py" line="936" />
       <source>Load…</source>
       <translation>Laden…</translation>
     </message>
     <message>
-      <location filename="../ui/dialogs/style_dialog.py" line="933" />
+      <location filename="../ui/dialogs/style_dialog.py" line="937" />
       <source>Load into current tab</source>
       <translation>In huidig tabblad laden</translation>
     </message>
     <message>
-      <location filename="../ui/dialogs/style_dialog.py" line="1098" />
+      <location filename="../ui/dialogs/style_dialog.py" line="1102" />
       <source>Portrait</source>
       <translation>Staand</translation>
     </message>
     <message>
-      <location filename="../ui/dialogs/style_dialog.py" line="1099" />
+      <location filename="../ui/dialogs/style_dialog.py" line="1103" />
       <source>Landscape</source>
       <translation>Liggend</translation>
     </message>
     <message>
-      <location filename="../ui/dialogs/style_dialog.py" line="1100" />
+      <location filename="../ui/dialogs/style_dialog.py" line="1104" />
       <source>Vertical</source>
       <translation>Verticaal</translation>
     </message>
     <message>
-      <location filename="../ui/dialogs/style_dialog.py" line="1101" />
+      <location filename="../ui/dialogs/style_dialog.py" line="1105" />
       <source>Horizontal</source>
       <translation>Horizontaal</translation>
     </message>
     <message>
-      <location filename="../ui/dialogs/style_dialog.py" line="1102" />
+      <location filename="../ui/dialogs/style_dialog.py" line="1106" />
       <source>Above stem (Klavarskribo)</source>
       <translation>Boven nootstok (Klavarskribo)</translation>
     </message>
     <message>
-      <location filename="../ui/dialogs/style_dialog.py" line="1103" />
+      <location filename="../ui/dialogs/style_dialog.py" line="1107" />
       <source>Below stem</source>
       <translation>Onder nootstok</translation>
     </message>
     <message>
-      <location filename="../ui/dialogs/style_dialog.py" line="1104" />
+      <location filename="../ui/dialogs/style_dialog.py" line="1108" />
       <source>Above stem if collision</source>
       <translation>Boven nootstok als overlapping</translation>
     </message>
     <message>
-      <location filename="../ui/dialogs/style_dialog.py" line="1105" />
+      <location filename="../ui/dialogs/style_dialog.py" line="1109" />
       <source>Above stem if chord and white note</source>
       <translation>Boven nootstok als akkoord en witte noot</translation>
     </message>
     <message>
-      <location filename="../ui/dialogs/style_dialog.py" line="1106" />
+      <location filename="../ui/dialogs/style_dialog.py" line="1110" />
       <source>Above stem if chord and white note same hand</source>
       <translation>Boven nootstok als akkoord en witte noot dezelfde hand</translation>
     </message>
     <message>
-      <location filename="../ui/dialogs/style_dialog.py" line="1107" />
+      <location filename="../ui/dialogs/style_dialog.py" line="1111" />
       <source>Dark</source>
       <translation>Donker</translation>
     </message>
     <message>
-      <location filename="../ui/dialogs/style_dialog.py" line="1108" />
+      <location filename="../ui/dialogs/style_dialog.py" line="1112" />
       <source>Light</source>
       <translation>Licht</translation>
     </message>
     <message>
-      <location filename="../ui/dialogs/style_dialog.py" line="1109" />
+      <location filename="../ui/dialogs/style_dialog.py" line="1113" />
       <source>Classical</source>
       <translation>Klassiek</translation>
     </message>
     <message>
-      <location filename="../ui/dialogs/style_dialog.py" line="1110" />
+      <location filename="../ui/dialogs/style_dialog.py" line="1114" />
       <source>Klavarskribo</source>
       <translation>Klavarskribo</translation>
     </message>
     <message>
-      <location filename="../ui/dialogs/style_dialog.py" line="1111" />
+      <location filename="../ui/dialogs/style_dialog.py" line="1115" />
       <source>Classical and Klavarskribo</source>
       <translation>Klassiek en Klavarskribo</translation>
     </message>
     <message>
-      <location filename="../ui/dialogs/style_dialog.py" line="1123" />
+      <location filename="../ui/dialogs/style_dialog.py" line="1127" />
       <source>Place measure numbering on top of every system</source>
       <translation>Plaats maat nummering boven elk systeem</translation>
     </message>
     <message>
-      <location filename="../ui/dialogs/style_dialog.py" line="1124" />
+      <location filename="../ui/dialogs/style_dialog.py" line="1128" />
       <source>Place measure numbering on every barline</source>
       <translation>Plaats maat nummering op elke maatstreep</translation>
     </message>
     <message>
-      <location filename="../ui/dialogs/style_dialog.py" line="1202" />
+      <location filename="../ui/dialogs/style_dialog.py" line="1206" />
       <source>Apply family to all fonts</source>
       <translation>Familie op alle lettertypen toepassen</translation>
     </message>
     <message>
-      <location filename="../ui/dialogs/style_dialog.py" line="1257" />
+      <location filename="../ui/dialogs/style_dialog.py" line="1261" />
       <source>Enter your custom style name here:</source>
       <translation>Voer hier je aangepaste stijlnaam in:</translation>
     </message>
     <message>
-      <location filename="../ui/dialogs/style_dialog.py" line="1262" />
+      <location filename="../ui/dialogs/style_dialog.py" line="1266" />
       <source>Style name cannot be empty.</source>
       <translation>Stijlnaam mag niet leeg zijn.</translation>
     </message>
     <message>
-      <location filename="../ui/dialogs/style_dialog.py" line="1267" />
+      <location filename="../ui/dialogs/style_dialog.py" line="1271" />
       <source>Name contains invalid characters.</source>
       <translation>Naam bevat ongeldige tekens.</translation>
     </message>
     <message>
-      <location filename="../ui/dialogs/style_dialog.py" line="1277" />
+      <location filename="../ui/dialogs/style_dialog.py" line="1281" />
       <source>Saved style to {name}.</source>
       <translation>Stijl opgeslagen als {name}.</translation>
     </message>
     <message>
-      <location filename="../ui/dialogs/style_dialog.py" line="1279" />
+      <location filename="../ui/dialogs/style_dialog.py" line="1283" />
       <source>Failed to save style.</source>
       <translation>Stijl opslaan mislukt.</translation>
     </message>
     <message>
-      <location filename="../ui/dialogs/style_dialog.py" line="1283" />
+      <location filename="../ui/dialogs/style_dialog.py" line="1287" />
       <source>keyTAB Default</source>
       <translation>keyTAB Standaard</translation>
     </message>
     <message>
-      <location filename="../ui/dialogs/style_dialog.py" line="1289" />
+      <location filename="../ui/dialogs/style_dialog.py" line="1293" />
       <source>Browse…</source>
       <translation>Bladeren…</translation>
     </message>
     <message>
-      <location filename="../ui/dialogs/style_dialog.py" line="1310" />
+      <location filename="../ui/dialogs/style_dialog.py" line="1314" />
       <source>Load Style</source>
       <translation>Stijl Laden</translation>
     </message>
     <message>
-      <location filename="../ui/dialogs/style_dialog.py" line="1312" />
+      <location filename="../ui/dialogs/style_dialog.py" line="1316" />
       <source>Style Files (*.pstyle)</source>
       <translation>Stijl Bestanden (*.pstyle)</translation>
     </message>
     <message>
-      <location filename="../ui/dialogs/style_dialog.py" line="1331" />
-      <location filename="../ui/dialogs/style_dialog.py" line="1323" />
+      <location filename="../ui/dialogs/style_dialog.py" line="1335" />
+      <location filename="../ui/dialogs/style_dialog.py" line="1327" />
       <source>Loaded style '{name}'.</source>
       <translation>Stijl '{name}' geladen.</translation>
     </message>
     <message>
-      <location filename="../ui/dialogs/style_dialog.py" line="1333" />
-      <location filename="../ui/dialogs/style_dialog.py" line="1325" />
+      <location filename="../ui/dialogs/style_dialog.py" line="1337" />
+      <location filename="../ui/dialogs/style_dialog.py" line="1329" />
       <source>Failed to load style.</source>
       <translation>Stijl laden mislukt.</translation>
     </message>
     <message>
-      <location filename="../ui/dialogs/style_dialog.py" line="1365" />
+      <location filename="../ui/dialogs/style_dialog.py" line="1369" />
       <source>Invalid layout values.</source>
       <translation>Ongeldige layout waarden.</translation>
     </message>
