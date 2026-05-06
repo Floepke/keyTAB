@@ -13,6 +13,14 @@ def _build_restart_command() -> list[str]:
 
     exe = str(sys.executable or "").strip()
     if getattr(sys, "frozen", False):
+        # AppImage builds must restart via the outer AppImage launcher.
+        # Restarting the inner mounted executable can fail once the old
+        # runtime unmounts the squashfs during shutdown.
+        appimage = str(os.environ.get("APPIMAGE", "") or "").strip()
+        if os.name == "posix" and appimage:
+            appimage_path = Path(appimage).expanduser()
+            if appimage_path.exists() and os.access(str(appimage_path), os.X_OK):
+                return [str(appimage_path), *argv[1:]]
         if exe:
             return [exe, *argv[1:]]
         return argv

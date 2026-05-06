@@ -49,20 +49,17 @@ def draw_circle_notehead(
     stroke_color = stroke_color_override if stroke_color_override is not None else symbol.notation_color
     fill_color = fill_color_override if fill_color_override is not None else symbol.notation_color
     tilt = float(symbol.notehead_tilt)
-    note_obj = getattr(symbol, "note", None)
+    note_obj: Note = getattr(symbol, "note", None)
     if note_obj is not None:
+        # set tilt
         if isinstance(note_obj, dict):
             hand = str(note_obj.get("hand", "") or "").lower()
-            pitch = int(note_obj.get("pitch", 0) or 0)
         else:
             hand = str(getattr(note_obj, "hand", "") or "").lower()
-            pitch = int(getattr(note_obj, "pitch", 0) or 0)
-
-        # set tilt
-        if hand == "r" and str(direction) == "down":
+        if hand == "r":
             tilt = -tilt
-        elif hand == "l" and str(direction) == "up":
-            tilt = -tilt
+        else:
+            tilt = tilt
 
     if abs(tilt) <= 1e-9:
         if filled:
@@ -90,6 +87,7 @@ def draw_circle_notehead(
                 tags=list(tags),
             )
     else:
+        # draw tilted notehead with polygon points
         cx = float(x_mm)
         cy = top_y + full_h / 2.0
         pts = _sheared_oval_points(cx, cy, half_w, full_h / 2.0, tilt)

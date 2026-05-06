@@ -500,8 +500,8 @@ class NoteTool(BaseTool):
 
         # Rectangle-based hit detection for precise clickable area
         found, hit_rect, y_mm_abs = self._hit_note_and_rect(score, x, y)
-
-        if found:
+        mode = "existing" if found else "new"
+        if mode == "existing" and found is not None and found.pitch == self._editor.pitch_cursor:
             # Edit existing note
             self.edit_note = found
             self._editing_existing = True

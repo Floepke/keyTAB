@@ -7,7 +7,7 @@ Bump policy (Semantic Versioning):
   PATCH - bug fixes only
 """
 
-__version__ = "1.0.6"
+__version__ = "1.0.7"
 APP_NAME    = "keyTAB"
 
 change_log = '''
@@ -50,7 +50,7 @@ change_log = '''
 - implemented miniature piano keyboard in editor below the end barline, showing the full range of keys with octave numbers. This is a visual aid for users to understand the pitch layout of the piano-roll stave.
 - fit page to window works correctly if page orientation is landscape now
 
-1.0.6beta (2026-05-05)
+1.0.6 (2026-05-05)
 - expanded horizontal read/orientation support with multiple engraving/layout fixes (including tempo marker rotation/placement and general horizontal mode behavior)
 - print view playhead implemented and stabilized for horizontal read mode
 - fit/viewport behavior refined: fit-to-window in landscape corrected and splitter fit handle behavior improved
@@ -59,4 +59,7 @@ change_log = '''
 - added single-key shortcuts `z`, `x`, `c`, `v` for undo/cut/copy/paste in addition to existing standard shortcuts
 - added middle-mouse drag panning for editor and print view, plus Ctrl/Cmd+scroll zoom in print view
 - translation updates and general polish/fixes across the release cycle
+
+1.0.7 (2026-06-01)
+- fix: the app now restarts correctly on Linux AppImage builds without crashing
 '''

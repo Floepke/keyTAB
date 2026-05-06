@@ -350,29 +350,48 @@ class CairoEditorWidget(QtWidgets.QWidget):
         self.update()
 
     def wheelEvent(self, ev: QtGui.QWheelEvent) -> None:
-        # Ctrl+Wheel: adjust vertical zoom via SCORE.app_state.zoom_mm_per_quarter
-        angle = ev.angleDelta().y()
-        if angle == 0:
-            ev.accept()
-            return
+        # Determine effective scroll delta, preferring the axis that matches the
+        # editor orientation.  On macOS trackpads pixelDelta gives smooth values;
+        # angleDelta is used as fallback (traditional mice / momentum events).
+        is_horizontal = self._is_horizontal_read_direction()
+
+        pixel_delta = ev.pixelDelta()
+        angle_delta = ev.angleDelta()
+
+        # Pick the axis that drives scrolling in the current orientation.
+        if is_horizontal:
+            raw_pixel = pixel_delta.x()
+            raw_angle = angle_delta.x() if angle_delta.x() != 0 else angle_delta.y()
+        else:
+            raw_pixel = pixel_delta.y()
+            raw_angle = angle_delta.y() if angle_delta.y() != 0 else angle_delta.x()
+
+        # Ctrl+Wheel/pinch: zoom — use any non-zero angle axis
+        zoom_angle = angle_delta.y() if angle_delta.y() != 0 else angle_delta.x()
         mods = ev.modifiers()
         try:
             ctrl_down = bool(mods & QtCore.Qt.KeyboardModifier.ControlModifier)
         except Exception:
             ctrl_down = False
-
-        if ctrl_down and self._editor is not None:
-            steps = int(round(angle / 120.0))
+        if ctrl_down and self._editor is not None and zoom_angle != 0:
+            steps = int(round(zoom_angle / 120.0))
             if steps != 0:
                 self.apply_zoom_steps(steps)
             ev.accept()
             return
 
-        # Default: bounded wheel scrolling using external scrollbar semantics
-        step_logical_px = int(max(1, getattr(self, '_scroll_step_logical_px', 1) or 1))
-        steps = int(round(angle / 120.0))
-        delta = -steps * step_logical_px  # negative angle scrolls down visually
-        new_val = max(0, int(self._scroll_logical_px + delta))
+        # Use pixel delta when available (smooth trackpad), otherwise angle delta.
+        if raw_pixel != 0:
+            delta_logical = -raw_pixel
+        elif raw_angle != 0:
+            step_logical_px = int(max(1, getattr(self, '_scroll_step_logical_px', 1) or 1))
+            steps = int(round(raw_angle / 120.0))
+            delta_logical = -steps * step_logical_px
+        else:
+            ev.accept()
+            return
+
+        new_val = max(0, int(self._scroll_logical_px + delta_logical))
         max_scroll = self._max_scroll_logical_px()
         if new_val > max_scroll:
             new_val = max_scroll

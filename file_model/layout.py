@@ -26,16 +26,16 @@ class Layout:
     accidental_visible: bool = True
     chord_connect_visible: bool = True
     note_stop_visible: bool = True
-    note_stem_length_semitone: int = 6
+    note_stem_length_semitone: int = 7
     note_stem_thickness_mm: float = 0.8 # Thickness of the stem as well the notehead outline width
     note_stopsign_thickness_mm: float = 1.0
     note_leftdot_visible: bool = False
     note_continuation_dot_visible: bool = True
     note_continuation_dot_size_mm: float = 2.5
-    note_midinote_visible: bool = False
+    note_midinote_visible: bool = True
     note_midinote_left_color: str = '#ccc'
     note_midinote_right_color: str = '#ccc'
-    note_width_scaling: float = 1 # Scaling factor for the horizontal size of the noteheads, to make them wider or narrower.
+    note_width_scaling: float = 0.95 # Scaling factor for the horizontal size of the noteheads, to make them wider or narrower.
     notehead_height_scaling: float = 1.2 # Scaling factor for the vertical size of the noteheads, relative to width.
     notehead_tilt: float = 0.30 # Diagonal shear tilt of noteheads (0 = perfect circle/oval, higher = traditional tilted notehead, lower = traditional tilted notehead in the opposite direction).
 

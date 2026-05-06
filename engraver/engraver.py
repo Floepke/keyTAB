@@ -1817,6 +1817,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                         cur_mid += 1
                     mid_values.append(cur_mid)
 
+                # guides
                 guide_half_len = ts_indicator_half_span
                 guide_width_mm = guide_thickness
                 for k in range(1, int(numerator) + 1):
@@ -1844,6 +1845,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                     dash_pattern=None,
                 )
 
+                # middle column
                 for k, val in enumerate(mid_values, start=1):
                     y = y_mm + (k - 1) * beat_len_mm
                     du.add_text(
@@ -1854,7 +1856,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                         color=color,
                         id=0,
                         tags=["ts_klavarskribo"],
-                        anchor='w',
+                        anchor='center',
                         family=klav_family,
                         bold=klav_bold,
                         italic=klav_italic,
@@ -1868,13 +1870,14 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                     color=color,
                     id=0,
                     tags=["ts_klavarskribo"],
-                    anchor='w',
+                    anchor='center',
                     family=klav_family,
                     bold=klav_bold,
                     italic=klav_italic,
                     angle_deg=klav_text_angle,
                 )
 
+                # left column
                 for gi, s in zip(group_values, group_starts):
                     y = y_mm + (s - 1) * beat_len_mm
                     du.add_text(
@@ -1885,7 +1888,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                         color=color,
                         id=0,
                         tags=["ts_klavarskribo"],
-                        anchor='w',
+                        anchor='center',
                         family=klav_family,
                         bold=klav_bold,
                         italic=klav_italic,

@@ -3,12 +3,14 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
+from file_model.layout import Layout
+
 
 @dataclass
 class SymbolUtil:
     """Shared layout/style context for symbol drawing helpers."""
 
-    layout: Any
+    layout: Layout
     semitone_space_mm: float
     notation_color: tuple[float, float, float, float]
     paper_color: tuple[float, float, float, float]
