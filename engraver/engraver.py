@@ -2849,7 +2849,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                 num_txt = str(int(mw.get('number', 0) or 0))
                 if not num_txt:
                     continue
-                _raw_w, _raw_h, text_w_mm, text_h_eff_mm = _measure_text_metrics_mm(num_txt)
+                _raw_w, raw_h_mm, text_w_mm, text_h_eff_mm = _measure_text_metrics_mm(num_txt)
                 t0 = m_start
                 t1 = min(float(line['time_end']), m_start + (text_h_eff_mm * tick_per_mm))
                 y_text = _time_to_y(t0) + 1.0
@@ -2870,9 +2870,9 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                 if horizontal_read_direction:
                     # Horizontal read mode: after +90° text rotation, the
                     # effective bbox height maps to drawing-space X progression.
-                    # Shift right by one rotated text-height to match intended
-                    # final-page placement.
-                    x_pos += float(text_h_eff_mm)
+                    # Use unrotated text height for X placement to avoid
+                    # digit-width-dependent horizontal jumps (e.g. 9 -> 10).
+                    x_pos += float(raw_h_mm)
                 x0 = x_pos
                 x1 = x_pos + text_w_mm
                 step = text_w_mm + measure_pad
@@ -3101,6 +3101,11 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                         xl = x_left
                         xr = x_left + symbol_width
                         _tries += 1
+                if horizontal_read_direction:
+                    # Horizontal read mode is page-rotated in final output.
+                    # Align repeat symbols by compensating one symbol width
+                    # along drawing-space X so they do not land too far upward.
+                    x_left -= symbol_width
                 x_right = x_left + symbol_width
                 dot_x1 = x_left + (symbol_width * 0.25)
                 dot_x2 = x_left + (symbol_width * 0.75)
