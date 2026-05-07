@@ -35,7 +35,7 @@ class StaveDrawerMixin:
         y1 = self.margin
         y2 = self.margin + stave_length_mm
 
-        # Draw miniature piano keyboard black keys
+        '''Draw stave lines'''
         for key in range(1, PIANO_KEY_AMOUNT):
             if key in key_class_filter('ACDFG'): # black keys
                 x_pos = self.pitch_to_x(key)
@@ -68,7 +68,7 @@ class StaveDrawerMixin:
                     tags=[tag]
                 )
 
-        # Draw piano keyboard outline and octave rectangles
+        '''Draw piano keyboard below stave'''
         bar_width_mm = max(0.01, float(getattr(self, 'editor_line_width_global', 0.1) or 0.1))
         end_t = float(self._calc_base_grid_list_total_length())
         y_kb = float(self.time_to_mm(end_t))

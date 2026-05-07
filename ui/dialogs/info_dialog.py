@@ -9,6 +9,16 @@ from file_model.SCORE import SCORE, MetaData
 
 
 class InfoDialog(QtWidgets.QDialog):
+    @staticmethod
+    def _pitch_to_text(pitch_value: int) -> str:
+        pitch = int(pitch_value or 0)
+        if pitch <= 0:
+            return ""
+        midi_note = 20 + pitch
+        note_names = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
+        octave = (midi_note // 12) - 1
+        return f"{note_names[midi_note % 12]}{octave}"
+
     def __init__(self, score: SCORE, parent=None) -> None:
         super().__init__(parent)
         self.setWindowFlag(QtCore.Qt.WindowType.WindowMinMaxButtonsHint, True)
@@ -82,6 +92,10 @@ class InfoDialog(QtWidgets.QDialog):
             ("pages", self.tr("Pages:")),
             ("measures", self.tr("Measures:")),
             ("lines", self.tr("Lines:")),
+            ("hand_balance", self.tr("Hand balance:")),
+            ("avg_frequency_hz", self.tr("Average frequency:")),
+            ("pitch_range", self.tr("Pitch range:")),
+            ("most_used_pitch", self.tr("Most used pitch:")),
         ):
             label = QtWidgets.QLabel(self)
             label.setText("")
@@ -136,6 +150,37 @@ class InfoDialog(QtWidgets.QDialog):
                 value = None
             if key == "pages" and (value is None or value <= 0):
                 text = self.tr("Not engraved yet")
+            elif key == "hand_balance":
+                left_count = int(getattr(analysis_snapshot, "left_hand_notes", 0) or 0)
+                right_count = int(getattr(analysis_snapshot, "right_hand_notes", 0) or 0)
+                total = left_count + right_count
+                if total <= 0:
+                    text = self.tr("—")
+                else:
+                    left_pct = (100.0 * float(left_count)) / float(total)
+                    right_pct = (100.0 * float(right_count)) / float(total)
+                    text = self.tr("Left {left_pct:.0f}% / Right {right_pct:.0f}% ({left}/{right})").format(
+                        left_pct=left_pct,
+                        right_pct=right_pct,
+                        left=left_count,
+                        right=right_count,
+                    )
+            elif key == "avg_frequency_hz":
+                freq_value = float(value or 0.0)
+                text = self.tr("—") if freq_value <= 0.0 else self.tr("{value:.6f} Hz").format(value=freq_value)
+            elif key == "pitch_range":
+                low_pitch = int(getattr(analysis_snapshot, "pitch_range_low", 0) or 0)
+                high_pitch = int(getattr(analysis_snapshot, "pitch_range_high", 0) or 0)
+                if low_pitch <= 0 or high_pitch <= 0:
+                    text = self.tr("—")
+                else:
+                    low_text = self._pitch_to_text(low_pitch)
+                    high_text = self._pitch_to_text(high_pitch)
+                    span = max(0, high_pitch - low_pitch)
+                    text = self.tr("{low} to {high} ({span} semitones)").format(low=low_text, high=high_text, span=span)
+            elif key == "most_used_pitch":
+                pitch_value = int(value or 0)
+                text = self.tr("—") if pitch_value <= 0 else self._pitch_to_text(pitch_value)
             else:
                 text = str(value if value is not None else 0)
             label.setText(text)
