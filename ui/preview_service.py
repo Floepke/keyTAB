@@ -40,6 +40,20 @@ class PreviewSession:
     def _restore_snapshot(self, dirty_state: bool | None = None) -> None:
         sc = SCORE.from_dict(copy.deepcopy(self._snapshot))
         self._file_manager.replace_current(sc)
+        # Bust the editor's note-time render cache so stale Python object
+        # references from the replaced SCORE instance are not reused.  The
+        # cache key only hashes time/duration/pitch/_id, so fields like 'hand'
+        # that changed during preview would survive a snapshot restore undetected.
+        # Also clear _draw_cache: detect_events_from_time_window reads
+        # cache['notes_view'] which holds references to the old score's note
+        # objects; if not cleared, selection-based mutations hit those stale
+        # objects instead of the freshly restored score's notes.
+        try:
+            self._editor._note_time_cache_key = None
+            self._editor._note_time_cache_values = None
+            self._editor._draw_cache = None
+        except Exception:
+            pass
         if dirty_state is not None:
             if dirty_state:
                 self._file_manager.mark_dirty()

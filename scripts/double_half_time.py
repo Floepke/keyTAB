@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import fields, is_dataclass
+from PySide6 import QtCore
 
 from scripting import ActionButtonField, DialogSpec, LabelField
 
@@ -14,18 +15,20 @@ def build_dialog(ctx):
     # Keep per-dialog cumulative scale state on the shared context.
     setattr(ctx, _CTX_MULTIPLIER_ATTR, 1.0)
     return DialogSpec(
-        title="Half Time / Double Time",
+        title=QtCore.QCoreApplication.translate("DoubleHalfTimeAction", "Half Time / Double Time"),
         fields=[
             LabelField(
-                text="Preview by clicking below. You can click multiple times to stack changes.",
+                text=QtCore.QCoreApplication.translate(
+                    "DoubleHalfTimeAction", "Preview by clicking below. You can click multiple times to stack changes."
+                ),
             ),
             ActionButtonField(
                 name=ACTION_HALF,
-                label="half time (÷2)",
+                label=QtCore.QCoreApplication.translate("DoubleHalfTimeAction", "half time (÷2)"),
             ),
             ActionButtonField(
                 name=ACTION_DOUBLE,
-                label="double time (×2)",
+                label=QtCore.QCoreApplication.translate("DoubleHalfTimeAction", "double time (×2)"),
             ),
         ],
     )

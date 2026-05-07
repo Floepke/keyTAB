@@ -51,15 +51,31 @@ class ScriptEngine:
         self._builtins = [
             {
                 "id": "double_half_time",
+                "tr_context": "DoubleHalfTimeAction",
                 "label": "Half Time / Double Time",
                 "tooltip": "Scale the full score timing with preview and cancel recovery.",
                 "module": "scripts.double_half_time",
             },
             {
-                "id": "transpose",
-                "label": "Transpose Notes",
-                "tooltip": "Transpose notes with preview and cancel recovery.",
-                "module": "scripts.transpose",
+                "id": "mirror_pitch_selection",
+                "tr_context": "MirrorPitchSelectionAction",
+                "label": "Mirror Pitch",
+                "tooltip": "Mirror note pitches between lowest and highest. Applies to selection, or entire file if no selection.",
+                "module": "scripts.mirror_pitch",
+            },
+            {
+                "id": "reverse_selection",
+                "tr_context": "ReverseSelectionAction",
+                "label": "Reverse",
+                "tooltip": "Reverse events in time as if playback were going backwards. Applies to selection, or entire file if no selection.",
+                "module": "scripts.reverse",
+            },
+            {
+                "id": "switch_hands_selection",
+                "tr_context": "SwitchHandsSelectionAction",
+                "label": "Switch Hands",
+                "tooltip": "Switch hand assignment (left ↔ right) for notes and beams. Applies to selection, or entire file if no selection.",
+                "module": "scripts.switch_hands",
             },
         ]
 

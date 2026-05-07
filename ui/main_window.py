@@ -2282,11 +2282,14 @@ class MainWindow(QtWidgets.QMainWindow):
 
         for action in actions:
             action_id = str(action.get("id", "") or "")
+            tr_context = str(action.get("tr_context", "MainWindow") or "MainWindow")
             label = str(action.get("label", action_id) or action_id)
             tooltip = str(action.get("tooltip", "") or "")
-            act = QtGui.QAction(self.tr(label), self)
+            act_label = QtCore.QCoreApplication.translate(tr_context, label)
+            act = QtGui.QAction(act_label, self)
             if tooltip:
-                act.setToolTip(self.tr(tooltip))
+                act_tooltip = QtCore.QCoreApplication.translate(tr_context, tooltip)
+                act.setToolTip(act_tooltip)
             act.triggered.connect(lambda _checked=False, aid=action_id: self._run_tool_action(aid))
             menu.addAction(act)
 
