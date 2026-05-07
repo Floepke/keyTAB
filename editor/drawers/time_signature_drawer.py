@@ -13,12 +13,12 @@ if TYPE_CHECKING:
 
 class TimeSignatureDrawerMixin:
     def draw_time_signature(self, du: DrawUtil) -> None:
-        self = cast("Editor", self)
+        self = cast('Editor', self)
         score = self.current_score()
         if score is None:
             return
-        tool = getattr(self, "_tool", None)
-        tool_name = getattr(tool, "TOOL_NAME", "")
+        tool = getattr(self, '_tool', None)
+        tool_name = getattr(tool, 'TOOL_NAME', '')
         # Read global indicator type from Layout
         layout = score.layout
         indicator_type = getattr(layout, 'time_signature_indicator_type', 'classical')
@@ -51,7 +51,7 @@ class TimeSignatureDrawerMixin:
 
         # read editor orientation
         preferences = get_preferences()
-        if preferences.get("editor_orientation", 'horizontal') == 'horizontal':
+        if preferences.get('editor_orientation', 'horizontal') == 'horizontal':
             editor_orientation = 'horizontal'
         else:
             editor_orientation = 'vertical'
@@ -70,11 +70,11 @@ class TimeSignatureDrawerMixin:
             du.add_text(
                 x,
                 y_mm - 3.0 if editor_orientation == 'vertical' else y_mm - 4.0,
-                f"{int(numerator)}",
+                f'{int(numerator)}',
                 size_pt=classic_size,
                 color=color,
                 id=0,
-                tags=["time_signature"],
+                tags=['time_signature'],
                 anchor='s' if editor_orientation == 'vertical' else 'center',
                 family=classic_family,
                 angle_deg=0 if editor_orientation == 'vertical' else 90,
@@ -88,18 +88,18 @@ class TimeSignatureDrawerMixin:
                 color=color,
                 width_mm=divider_width_mm,
                 id=0,
-                tags=["time_signature"],
+                tags=['time_signature'],
                 dash_pattern=None,
             )
             # Denominator
             du.add_text(
                 x,
                 y_mm + 3.0 if editor_orientation == 'vertical' else y_mm + 4.0,
-                f"{int(denominator)}",
+                f'{int(denominator)}',
                 size_pt=classic_size,
                 color=color,
                 id=0,
-                tags=["time_signature"],
+                tags=['time_signature'],
                 anchor='n' if editor_orientation == 'vertical' else 'center',
                 family=classic_family,
                 angle_deg=0 if editor_orientation == 'vertical' else 90,
@@ -175,51 +175,69 @@ class TimeSignatureDrawerMixin:
                 # if not full_group and val != 1:
                 #     continue
                 y = y_mm + (k - 1) * beat_len_mm
-                du.add_line(x_right - guide_half_len, y, x_right + guide_half_len, y,
-                            color=color, width_mm=guide_width_mm, id=0, tags=["ts_klavars_guide"], dash_pattern=None)
+                du.add_line(
+                    x_right - guide_half_len,
+                    y,
+                    x_right + guide_half_len,
+                    y,
+                    color=color,
+                    width_mm=guide_width_mm,
+                    id=0,
+                    tags=['ts_klavars_guide'],
+                    dash_pattern=None
+                )
             
             # Final guide at start of next measure
-            du.add_line(x_right - guide_half_len, y_mm + measure_len_mm, x_right + guide_half_len, y_mm + measure_len_mm,
-                        color=color, width_mm=guide_width_mm, id=0, tags=["ts_klavars_guide"], dash_pattern=None)
+            du.add_line(
+                x_right - guide_half_len,
+                y_mm + measure_len_mm,
+                x_right + guide_half_len,
+                y_mm + measure_len_mm,
+                color=color,
+                width_mm=guide_width_mm,
+                id=0,
+                tags=['ts_klavars_guide'],
+                dash_pattern=None
+            )
 
             # Middle column: reset to 1 where Grid-1 hits the beat position.
             for k, val in enumerate(mid_values, start=1):
                 y = y_mm + (k - 1) * beat_len_mm
                 du.add_text(
-                    x_mid,
+                    x_mid + 1.0,
                     y,
                     text=str(val),
                     size_pt=klav_size,
                     color=color,
                     id=0,
-                    tags=["ts_klavars_mid"],
+                    tags=['ts_klavars_mid'],
                     anchor='w' if editor_orientation == 'vertical' else 'center',
                     family=klav_family,
                     angle_deg=0 if editor_orientation == 'vertical' else 90,
                 )
-                # Final 1 at next measure barline (start of next measure)
-                du.add_text(
-                    x_mid,
-                    y_mm + measure_len_mm,
-                    text="1",
-                    size_pt=klav_size,
-                    color=color,
-                    id=0,
-                    tags=["ts_klavars_mid"],
-                    anchor='w' if editor_orientation == 'vertical' else 'center',
-                    family=klav_family,
-                    angle_deg=0 if editor_orientation == 'vertical' else 90,
-                )
+            # Final 1 at next measure barline (start of next measure)
+            du.add_text(
+                x_mid + 1.0,
+                y_mm + measure_len_mm,
+                text='1',
+                size_pt=klav_size,
+                color=color,
+                id=0,
+                tags=['ts_klavars_mid'],
+                anchor='w' if editor_orientation == 'vertical' else 'center',
+                family=klav_family,
+                angle_deg=0 if editor_orientation == 'vertical' else 90,
+            )
             # Left column: count groups up each time the middle column resets to 1.
             for gi, s in zip(group_values, group_starts):
                 y = y_mm + (s - 1) * beat_len_mm
                 du.add_text(
-                    x_left - 2.0,
+                    x_left - 1.0,
                     y,
                     text=str(gi),
                     size_pt=klav_size,
                     color=color, id=0,
-                    tags=["ts_klavars_left"],
+                    tags=['ts_klavars_left'],
                     anchor='w' if editor_orientation == 'vertical' else 'center',
                     family=klav_family,
                     angle_deg=0 if editor_orientation == 'vertical' else 90,
