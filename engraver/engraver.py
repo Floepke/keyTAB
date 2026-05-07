@@ -177,6 +177,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
             'x_offset_mm': float(t.get('x_offset_mm', 0.0) or 0.0),
             'y_offset_mm': float(t.get('y_offset_mm', 0.0) or 0.0),
             'text': str(t.get('text', '') or ''),
+            'alignment': str(t.get('alignment', 'left') or 'left'),
             'font': t.get('font', None),
             'use_custom_font': bool(t.get('use_custom_font', False)),
             'text_background_width_offset_mm': float(t.get('text_background_width_offset_mm', 0.0) or 0.0),
@@ -1614,11 +1615,10 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
             shared_band_intervals: list[tuple[float, float]] = []
             grid_band_dark_intervals: dict[str, list[tuple[float, float]]] = {'left': shared_band_intervals, 'right': shared_band_intervals}
 
-            def _text_bbox(text_val: str, family: str, size_pt: float, italic: bool, bold: bool, angle_deg: float, padding_mm: float, corner_radius_mm: float, width_offset_mm: float) -> tuple[float, float, float, list[tuple[float, float]], list[tuple[float, float]]]:
-                xb, yb, ink_w_mm, ink_h_mm = du._get_text_extents_mm(text_val, family, size_pt, italic, bold)
+            def _text_bbox(content_w_mm: float, content_h_mm: float, angle_deg: float, padding_mm: float, corner_radius_mm: float, width_offset_mm: float) -> tuple[float, float, float, list[tuple[float, float]], list[tuple[float, float]]]:
                 pad = max(0.0, float(padding_mm))
-                base_w_mm = max(0.0, float(ink_w_mm) + (pad * 2.0))
-                h_mm = max(0.0, float(ink_h_mm) + (pad * 2.0))
+                base_w_mm = max(0.0, float(content_w_mm) + (pad * 2.0))
+                h_mm = max(0.0, float(content_h_mm) + (pad * 2.0))
                 base_hw = base_w_mm * 0.5
                 hh = h_mm * 0.5
                 x0 = -base_hw
@@ -4066,6 +4066,55 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                     underline = bool(fnt.get('underline', default_font.get('underline', False)))
                     return family, size_pt, italic, bold, underline
 
+                def _prepare_text_layout(
+                    txt_raw: str,
+                    family: str,
+                    size_pt: float,
+                    italic: bool,
+                    bold: bool,
+                ) -> dict:
+                    raw = str(txt_raw or '').replace('\r\n', '\n').replace('\r', '\n')
+                    raw = raw.replace('\\n', '\n').replace('\\t', '\t')
+                    fallback = '(no text set)'
+                    paragraph_strs = raw.split('\n') if raw.strip() else [fallback]
+                    line_entries: list[dict] = []
+                    max_w = 0.0
+                    line_h_mm = 0.0
+                    for para in paragraph_strs:
+                        measure = para if para.strip() else ' '
+                        _, _, w, h = du._get_text_extents_mm(measure, family, size_pt, italic, bold)
+                        w_mm = float(max(0.0, w)) if para.strip() else 0.0
+                        h_mm = float(max(0.1, h))
+                        line_entries.append({'text': para, 'width_mm': w_mm, 'height_mm': h_mm})
+                        if w_mm > max_w:
+                            max_w = w_mm
+                        if h_mm > line_h_mm:
+                            line_h_mm = h_mm
+                    if not line_entries:
+                        _, _, w, h = du._get_text_extents_mm(fallback, family, size_pt, italic, bold)
+                        line_entries = [{'text': fallback, 'width_mm': float(max(0.0, w)), 'height_mm': float(max(0.1, h))}]
+                        max_w = float(max(0.0, w))
+                        line_h_mm = float(max(0.1, h))
+                    line_y_gap_mm = line_h_mm * 0.1
+                    line_block_h_mm = line_h_mm + line_y_gap_mm * 2.0
+                    return {
+                        'lines': line_entries,
+                        'line_height_mm': line_h_mm,
+                        'line_y_gap_mm': line_y_gap_mm,
+                        'line_block_height_mm': line_block_h_mm,
+                        'content_width_mm': max_w,
+                        'content_height_mm': line_block_h_mm * len(line_entries),
+                        'draw_width_mm': max_w,
+                    }
+
+                def _line_alignment_x(alignment: str, content_w_mm: float, line_w_mm: float) -> float:
+                    mode = str(alignment or 'left').lower()
+                    if mode == 'center':
+                        return 0.0
+                    if mode == 'right':
+                        return (content_w_mm * 0.5) - (line_w_mm * 0.5)
+                    return (-content_w_mm * 0.5) + (line_w_mm * 0.5)
+
                 for tx in line_texts:
                     t_time = float(tx.get('time', 0.0) or 0.0)
                     x_rp = float(tx.get('x_rpitch', 0) or 0)
@@ -4073,14 +4122,34 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                     x_off = float(tx.get('x_offset_mm', 0.0) or 0.0)
                     y_off = float(tx.get('y_offset_mm', 0.0) or 0.0)
                     txt_raw = str(tx.get('text', '') or '')
-                    display_txt = txt_raw if txt_raw.strip() else "(no text set)"
+                    alignment = str(tx.get('alignment', 'left') or 'left').lower()
                     family, size_pt_raw, italic, bold, underline = _resolve_font(tx)
                     size_pt = float(size_pt_raw) * ENGRAVER_FRACTIONAL_TEXT_SCALING_CORRECTION * (scale / 0.3333333333333333)
                     width_off_mm = float(tx.get('text_background_width_offset_mm', 0.0) or 0.0)
                     y_mm = _time_to_y(t_time) + y_off
                     x_mm = rpitch_to_x(x_rp) + x_off
+                    layout_info = _prepare_text_layout(
+                        txt_raw,
+                        family,
+                        size_pt,
+                        italic,
+                        bold,
+                    )
+                    lines = list(layout_info.get('lines', []))
+                    content_w_mm = float(layout_info.get('content_width_mm', 0.0) or 0.0)
+                    line_h_mm = float(layout_info.get('line_height_mm', 0.0) or 0.0)
+                    line_y_gap_mm = float(layout_info.get('line_y_gap_mm', 0.0) or 0.0)
+                    line_block_h_mm = float(layout_info.get('line_block_height_mm', line_h_mm) or line_h_mm)
+                    content_h_mm = float(layout_info.get('content_height_mm', 0.0) or 0.0)
                     try:
-                        w_mm, h_mm, offset_down, rot_corners, rot_poly = _text_bbox(display_txt, family, size_pt, italic, bold, angle, pad_mm, pad_mm, width_off_mm)
+                        w_mm, h_mm, offset_down, rot_corners, rot_poly = _text_bbox(
+                            content_w_mm,
+                            content_h_mm,
+                            angle,
+                            pad_mm,
+                            pad_mm,
+                            width_off_mm,
+                        )
                     except Exception:
                         continue
                     cy = y_mm + offset_down
@@ -4092,41 +4161,61 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                         id=int(tx.get('id', 0) or 0),
                         tags=['text_bg'],
                     )
-                    du.add_text(
-                        x_mm,
-                        cy,
-                        display_txt,
-                        family=family,
-                        size_pt=size_pt,
-                        italic=italic,
-                        bold=bold,
-                        color=notation_color,
-                        anchor='center',
-                        angle_deg=angle,
-                        id=int(tx.get('id', 0) or 0),
-                        tags=['text'],
-                    )
-                    if underline:
-                        xb_mm, yb_mm, ink_w_mm, ink_h_mm = du._get_text_extents_mm(display_txt, family, size_pt, italic, bold)
-                        ul_y_local = -ink_h_mm / 2.0 - yb_mm + max(0.2, size_pt * 0.025)
-                        half_w = ink_w_mm / 2.0
-                        ang_rad = math.radians(angle)
-                        cos_a = math.cos(ang_rad)
-                        sin_a = math.sin(ang_rad)
-                        ul_x1 = x_mm + (-half_w) * cos_a - ul_y_local * sin_a
-                        ul_y1 = cy + (-half_w) * sin_a + ul_y_local * cos_a
-                        ul_x2 = x_mm + half_w * cos_a - ul_y_local * sin_a
-                        ul_y2 = cy + half_w * sin_a + ul_y_local * cos_a
-                        du.add_line(
-                            ul_x1,
-                            ul_y1,
-                            ul_x2,
-                            ul_y2,
-                            color=notation_color,
-                            width_mm=max(0.2, size_pt * (0.04 if bold else 0.02)),
-                            tags=['text_underline'],
-                            id=int(tx.get('id', 0) or 0),
-                        )
+                    ang_rad = math.radians(angle)
+                    cos_a = math.cos(ang_rad)
+                    sin_a = math.sin(ang_rad)
+                    total_h = line_block_h_mm * max(1, len(lines))
+
+                    def _to_world(local_x: float, local_y: float) -> tuple[float, float]:
+                        wx = x_mm + (local_x * cos_a) - (local_y * sin_a)
+                        wy = cy + (local_x * sin_a) + (local_y * cos_a)
+                        return wx, wy
+
+                    for idx_line, text_line in enumerate(lines):
+                        line_text = str(text_line.get('text', ''))
+                        line_w_mm = float(text_line.get('width_mm', 0.0) or 0.0)
+                        line_y_local = (-total_h * 0.5) + (line_block_h_mm * idx_line) + line_y_gap_mm + (line_h_mm * 0.5)
+                        line_x_local = _line_alignment_x(alignment, content_w_mm, line_w_mm)
+
+                        if line_text:
+                            if alignment == 'right':
+                                draw_x, draw_y = _to_world(content_w_mm * 0.5, line_y_local)
+                                text_anchor = 'e'
+                            else:
+                                draw_x, draw_y = _to_world(line_x_local, line_y_local)
+                                text_anchor = 'center'
+                            du.add_text(
+                                draw_x,
+                                draw_y,
+                                line_text,
+                                family=family,
+                                size_pt=size_pt,
+                                italic=italic,
+                                bold=bold,
+                                color=notation_color,
+                                anchor=text_anchor,
+                                angle_deg=angle,
+                                id=int(tx.get('id', 0) or 0),
+                                tags=['text'],
+                            )
+
+                        if underline and line_text:
+                            xb_mm, yb_mm, ink_w_mm, ink_h_mm = du._get_text_extents_mm(line_text, family, size_pt, italic, bold)
+                            ul_y_local = -ink_h_mm / 2.0 - yb_mm + max(0.2, size_pt * 0.025)
+                            if alignment == 'right':
+                                ul_x1, ul_y1 = _to_world(content_w_mm * 0.5 - ink_w_mm, line_y_local + ul_y_local)
+                                ul_x2, ul_y2 = _to_world(content_w_mm * 0.5, line_y_local + ul_y_local)
+                            else:
+                                half_w = ink_w_mm * 0.5
+                                ul_x1, ul_y1 = _to_world(line_x_local - half_w, line_y_local + ul_y_local)
+                                ul_x2, ul_y2 = _to_world(line_x_local + half_w, line_y_local + ul_y_local)
+                            du.add_line(
+                                ul_x1, ul_y1, ul_x2, ul_y2,
+                                color=notation_color,
+                                width_mm=max(0.2, size_pt * (0.04 if bold else 0.02)),
+                                tags=['text_underline'],
+                                id=int(tx.get('id', 0) or 0),
+                            )
 
             if bool(layout.get('slur_visible', True)) and (
                     line_slurs or line_slur_continuations

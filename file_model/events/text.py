@@ -8,7 +8,9 @@ class Text:
     '''
         Represents a time bounded text element to be rendered on the score.
     '''
+    # text and layout
     text: str = 'myText'
+    alignment: Literal['left', 'center', 'right'] = 'left'
 
     # position and rotation
     time: float = 0.0 # y coordinate uses time units (e.g., quarter note = 256.0)
@@ -23,6 +25,7 @@ class Text:
         size_pt=12.0,
         bold=False,
         italic=True,
+        underline=False,
     ))
     use_custom_font: bool = False
     text_background_width_offset_mm: float = 0.0

@@ -11,11 +11,12 @@ from ui.dialogs.style_dialog import FontPicker, FloatSliderEdit
 class TextDialog(QtWidgets.QDialog):
     valueChanged = QtCore.Signal()
 
-    def _add_labeled_row(self, form: QtWidgets.QFormLayout, label_text: str, field: QtWidgets.QWidget, tooltip: str) -> None:
+    def _add_labeled_row(self, form: QtWidgets.QFormLayout, label_text: str, field: QtWidgets.QWidget, tooltip: str) -> QtWidgets.QLabel:
         label = QtWidgets.QLabel(label_text, self)
         label.setToolTip(tooltip)
         field.setToolTip(tooltip)
         form.addRow(label, field)
+        return label
 
     def __init__(self, ev, default_font: Font | None, parent=None) -> None:
         super().__init__(parent)
@@ -30,9 +31,34 @@ class TextDialog(QtWidgets.QDialog):
 
         layout = QtWidgets.QFormLayout(self)
 
-        self.txt_edit = QtWidgets.QLineEdit(self)
-        self.txt_edit.setText(str(getattr(ev, "text", "")))
+        self.txt_edit = QtWidgets.QPlainTextEdit(self)
+        self.txt_edit.setPlainText(str(getattr(ev, "text", "")))
+        self.txt_edit.setTabChangesFocus(False)
+        self.txt_edit.setMinimumHeight(90)
         self._add_labeled_row(layout, self.tr("Text"), self.txt_edit, self.tr("Edit the displayed text content."))
+
+        self._alignment_group = QtWidgets.QButtonGroup(self)
+        self.align_left_radio = QtWidgets.QRadioButton(self.tr("Left"), self)
+        self.align_center_radio = QtWidgets.QRadioButton(self.tr("Center"), self)
+        self.align_right_radio = QtWidgets.QRadioButton(self.tr("Right"), self)
+        self._alignment_group.addButton(self.align_left_radio)
+        self._alignment_group.addButton(self.align_center_radio)
+        self._alignment_group.addButton(self.align_right_radio)
+        alignment = str(getattr(ev, "alignment", "left") or "left").lower()
+        if alignment == "center":
+            self.align_center_radio.setChecked(True)
+        elif alignment == "right":
+            self.align_right_radio.setChecked(True)
+        else:
+            self.align_left_radio.setChecked(True)
+        alignment_row = QtWidgets.QWidget(self)
+        alignment_layout = QtWidgets.QHBoxLayout(alignment_row)
+        alignment_layout.setContentsMargins(0, 0, 0, 0)
+        alignment_layout.addWidget(self.align_left_radio)
+        alignment_layout.addWidget(self.align_center_radio)
+        alignment_layout.addWidget(self.align_right_radio)
+        alignment_layout.addStretch(1)
+        self._add_labeled_row(layout, self.tr("Alignment"), alignment_row, self.tr("Align each line within the text block."))
 
         self.x_off_edit = FloatSliderEdit(float(getattr(ev, "x_offset_mm", 0.0) or 0.0), -25.0, 25.0, 0.1, self)
         self._add_labeled_row(layout, self.tr("X offset (mm)"), self.x_off_edit, self.tr("Shift text horizontally in millimeters."))
@@ -72,7 +98,10 @@ class TextDialog(QtWidgets.QDialog):
         btns.accepted.connect(self.accept)
         btns.rejected.connect(self.reject)
 
-        self.txt_edit.textChanged.connect(lambda _t: self.valueChanged.emit())
+        self.txt_edit.textChanged.connect(self.valueChanged.emit)
+        self.align_left_radio.toggled.connect(lambda _v: self.valueChanged.emit())
+        self.align_center_radio.toggled.connect(lambda _v: self.valueChanged.emit())
+        self.align_right_radio.toggled.connect(lambda _v: self.valueChanged.emit())
         self.x_off_edit.valueChanged.connect(lambda _v: self.valueChanged.emit())
         self.y_off_edit.valueChanged.connect(lambda _v: self.valueChanged.emit())
         self.width_off_edit.valueChanged.connect(lambda _v: self.valueChanged.emit())
@@ -103,6 +132,7 @@ class TextDialog(QtWidgets.QDialog):
     def snapshot_from_event(ev) -> dict:
         return {
             "text": getattr(ev, "text", ""),
+            "alignment": str(getattr(ev, "alignment", "left") or "left"),
             "use_custom_font": bool(getattr(ev, "use_custom_font", False)),
             "font": deepcopy(getattr(ev, "font", None)),
             "text_background_width_offset_mm": float(getattr(ev, "text_background_width_offset_mm", 0.0) or 0.0),
@@ -119,7 +149,16 @@ class TextDialog(QtWidgets.QDialog):
             ev.use_custom_font = False
             ev.font = deepcopy(self._default_font)
         ev.text_background_width_offset_mm = float(self.width_off_edit.value())
-        ev.text = self.txt_edit.text()
+        txt = str(self.txt_edit.toPlainText() or "")
+        txt = txt.replace("\r\n", "\n").replace("\r", "\n")
+        txt = txt.replace("\\n", "\n").replace("\\t", "\t")
+        ev.text = txt
+        if self.align_center_radio.isChecked():
+            ev.alignment = "center"
+        elif self.align_right_radio.isChecked():
+            ev.alignment = "right"
+        else:
+            ev.alignment = "left"
         ev.x_offset_mm = float(self.x_off_edit.value())
         ev.y_offset_mm = float(self.y_off_edit.value())
         try:
@@ -130,6 +169,7 @@ class TextDialog(QtWidgets.QDialog):
     @staticmethod
     def restore_event(ev, snapshot: dict) -> None:
         ev.text = snapshot["text"]
+        ev.alignment = str(snapshot.get("alignment", "left") or "left")
         ev.use_custom_font = snapshot["use_custom_font"]
         ev.font = deepcopy(snapshot["font"])
         ev.text_background_width_offset_mm = float(snapshot["text_background_width_offset_mm"])

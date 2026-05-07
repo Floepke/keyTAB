@@ -10,7 +10,58 @@ if TYPE_CHECKING:
 
 
 class TextDrawerMixin:
-    def _text_bbox(self, du: DrawUtil, text: str, family: str, size_pt: float, italic: bool, bold: bool, angle_deg: float, padding_mm: float, width_offset_mm: float) -> Tuple[float, float, float, list[tuple[float, float]], list[tuple[float, float]]]:
+    def _line_alignment_x(self, alignment: str, content_w_mm: float, line_w_mm: float) -> float:
+        mode = str(alignment or "left").lower()
+        if mode == "center":
+            return 0.0
+        if mode == "right":
+            return (content_w_mm * 0.5) - (line_w_mm * 0.5)
+        return (-content_w_mm * 0.5) + (line_w_mm * 0.5)
+
+    def _text_layout(
+        self,
+        du: DrawUtil,
+        text: str,
+        family: str,
+        size_pt: float,
+        italic: bool,
+        bold: bool,
+    ) -> dict:
+        raw = str(text or "").replace("\r\n", "\n").replace("\r", "\n")
+        raw = raw.replace("\\n", "\n").replace("\\t", "\t")
+        fallback = "(no text set)"
+        paragraph_strs = raw.split("\n") if raw.strip() else [fallback]
+        line_entries: list[dict] = []
+        max_w = 0.0
+        line_h_mm = 0.0
+        for para in paragraph_strs:
+            measure = para if para.strip() else " "
+            _, _, w, h = du._get_text_extents_mm(measure, family, size_pt, italic, bold)
+            w_mm = float(max(0.0, w)) if para.strip() else 0.0
+            h_mm = float(max(0.1, h))
+            line_entries.append({"text": para, "width_mm": w_mm, "height_mm": h_mm})
+            if w_mm > max_w:
+                max_w = w_mm
+            if h_mm > line_h_mm:
+                line_h_mm = h_mm
+        if not line_entries:
+            _, _, w, h = du._get_text_extents_mm(fallback, family, size_pt, italic, bold)
+            line_entries = [{"text": fallback, "width_mm": float(max(0.0, w)), "height_mm": float(max(0.1, h))}]
+            max_w = float(max(0.0, w))
+            line_h_mm = float(max(0.1, h))
+        line_y_gap_mm = line_h_mm * 0.1
+        line_block_h_mm = line_h_mm + line_y_gap_mm * 2.0
+        return {
+            "lines": line_entries,
+            "line_height_mm": line_h_mm,
+            "line_y_gap_mm": line_y_gap_mm,
+            "line_block_height_mm": line_block_h_mm,
+            "content_width_mm": max_w,
+            "content_height_mm": line_block_h_mm * len(line_entries),
+            "draw_width_mm": max_w,
+        }
+
+    def _text_bbox(self, content_w_mm: float, content_h_mm: float, angle_deg: float, padding_mm: float, width_offset_mm: float) -> Tuple[float, float, float, list[tuple[float, float]], list[tuple[float, float]]]:
         """Return (width_mm, height_mm, offset_down_mm, rotated_corners, rounded_polygon).
 
         - width/height are axis-aligned (unrotated) text extents with padding applied.
@@ -18,10 +69,9 @@ class TextDrawerMixin:
         - rotated_corners are the four axis-aligned corners after rotation (for handles).
         - rounded_polygon is a rotated list of points approximating rounded corners.
         """
-        _, _, ink_w_mm, ink_h_mm = du._get_text_extents_mm(text, family, size_pt, italic, bold)
         pad = max(0.0, float(padding_mm))
-        base_w_mm = max(0.0, float(ink_w_mm) + (pad * 2.0))
-        h_mm = max(0.0, float(ink_h_mm) + (pad * 2.0))
+        base_w_mm = max(0.0, float(content_w_mm) + (pad * 2.0))
+        h_mm = max(0.0, float(content_h_mm) + (pad * 2.0))
         base_hw = base_w_mm * 0.5
         hh = h_mm * 0.5
 
@@ -120,7 +170,6 @@ class TextDrawerMixin:
             rp = int(getattr(ev, 'x_rpitch', 0) or 0)
             angle = float(getattr(ev, 'rotation', 0.0) or 0.0)
             txt = str(getattr(ev, 'text', ''))
-            display_txt = txt if txt.strip() else "(no text set)"
             use_custom = bool(getattr(ev, 'use_custom_font', False))
             font = _coerce_font(getattr(ev, 'font', None), getattr(score.layout, 'font_text', None))
             if (not use_custom) or font is None:
@@ -134,6 +183,7 @@ class TextDrawerMixin:
             width_offset_mm = float(getattr(ev, 'text_background_width_offset_mm', 0.0) or 0.0)
             x_off = float(getattr(ev, 'x_offset_mm', 0.0) or 0.0)
             y_off = float(getattr(ev, 'y_offset_mm', 0.0) or 0.0)
+            alignment = str(getattr(ev, 'alignment', 'left') or 'left').lower()
 
             y_mm = float(self.time_to_mm(t) + y_off)
             if y_mm < (top_mm - bleed_mm) or y_mm > (bottom_mm + bleed_mm):
@@ -141,7 +191,21 @@ class TextDrawerMixin:
 
             x_mm = float(self.relative_c4pitch_to_x(rp)) + x_off
 
-            w_mm, _, offset_down, _, rot_poly = self._text_bbox(du, display_txt, family, size_pt, italic, bold, angle, pad_mm, width_offset_mm)
+            layout_info = self._text_layout(du, txt, family, size_pt, italic, bold)
+            lines = list(layout_info.get("lines", []))
+            content_w_mm = float(layout_info.get("content_width_mm", 0.0) or 0.0)
+            line_h_mm = float(layout_info.get("line_height_mm", 0.0) or 0.0)
+            line_y_gap_mm = float(layout_info.get("line_y_gap_mm", 0.0) or 0.0)
+            line_block_h_mm = float(layout_info.get("line_block_height_mm", line_h_mm) or line_h_mm)
+            content_h_mm = float(layout_info.get("content_height_mm", 0.0) or 0.0)
+
+            w_mm, _, offset_down, _, rot_poly = self._text_bbox(
+                content_w_mm,
+                content_h_mm,
+                angle,
+                pad_mm,
+                width_offset_mm,
+            )
 
             cy = y_mm + offset_down
             # Build rotated polygon in absolute coords
@@ -160,40 +224,61 @@ class TextDrawerMixin:
                 tags=["text_bg"],
             )
 
-            # Text itself (center anchor, rotated)
-            du.add_text(
-                x_mm,
-                cy,
-                display_txt,
-                family=family,
-                size_pt=size_pt,
-                italic=italic,
-                bold=bold,
-                color=self.notation_color,
-                anchor='center',
-                angle_deg=angle,
-                id=int(getattr(ev, '_id', 0) or 0),
-                tags=["text"],
-            )
-            if underline:
-                xb_mm, yb_mm, ink_w_mm, ink_h_mm = du._get_text_extents_mm(display_txt, family, size_pt, italic, bold)
-                # ul_y_local: y offset from text center (cy) to underline, in unrotated space
-                ul_y_local = -ink_h_mm / 2.0 - yb_mm + max(0.2, size_pt * 0.025)
-                half_w = ink_w_mm / 2.0
-                ang_rad = math.radians(angle)
-                cos_a = math.cos(ang_rad)
-                sin_a = math.sin(ang_rad)
-                ul_x1 = x_mm + (-half_w) * cos_a - ul_y_local * sin_a
-                ul_y1 = cy + (-half_w) * sin_a + ul_y_local * cos_a
-                ul_x2 = x_mm + half_w * cos_a - ul_y_local * sin_a
-                ul_y2 = cy + half_w * sin_a + ul_y_local * cos_a
-                du.add_line(
-                    ul_x1, ul_y1, ul_x2, ul_y2,
-                    color=self.notation_color,
-                    width_mm=max(0.2, size_pt * (0.04 if bold else 0.02)),
-                    tags=["text_underline"],
-                    id=int(getattr(ev, '_id', 0) or 0),
-                )
+            ang_rad = math.radians(angle)
+            cos_a = math.cos(ang_rad)
+            sin_a = math.sin(ang_rad)
+            total_h = line_block_h_mm * max(1, len(lines))
+
+            def _to_world(local_x: float, local_y: float) -> tuple[float, float]:
+                wx = x_mm + (local_x * cos_a) - (local_y * sin_a)
+                wy = cy + (local_x * sin_a) + (local_y * cos_a)
+                return wx, wy
+
+            for idx_line, line in enumerate(lines):
+                line_text = str(line.get("text", ""))
+                line_w_mm = float(line.get("width_mm", 0.0) or 0.0)
+                line_y_local = (-total_h * 0.5) + (line_block_h_mm * idx_line) + line_y_gap_mm + (line_h_mm * 0.5)
+                line_x_local = self._line_alignment_x(alignment, content_w_mm, line_w_mm)
+
+                if line_text:
+                    if alignment == 'right':
+                        draw_x, draw_y = _to_world(content_w_mm * 0.5, line_y_local)
+                        text_anchor = 'e'
+                    else:
+                        draw_x, draw_y = _to_world(line_x_local, line_y_local)
+                        text_anchor = 'center'
+                    du.add_text(
+                        draw_x,
+                        draw_y,
+                        line_text,
+                        family=family,
+                        size_pt=size_pt,
+                        italic=italic,
+                        bold=bold,
+                        color=self.notation_color,
+                        anchor=text_anchor,
+                        angle_deg=angle,
+                        id=int(getattr(ev, '_id', 0) or 0),
+                        tags=["text"],
+                    )
+
+                if underline and line_text:
+                    xb_mm, yb_mm, ink_w_mm, ink_h_mm = du._get_text_extents_mm(line_text, family, size_pt, italic, bold)
+                    ul_y_local = -ink_h_mm / 2.0 - yb_mm + max(0.2, size_pt * 0.025)
+                    if alignment == 'right':
+                        ul_x1, ul_y1 = _to_world(content_w_mm * 0.5 - ink_w_mm, line_y_local + ul_y_local)
+                        ul_x2, ul_y2 = _to_world(content_w_mm * 0.5, line_y_local + ul_y_local)
+                    else:
+                        half_w = ink_w_mm * 0.5
+                        ul_x1, ul_y1 = _to_world(line_x_local - half_w, line_y_local + ul_y_local)
+                        ul_x2, ul_y2 = _to_world(line_x_local + half_w, line_y_local + ul_y_local)
+                    du.add_line(
+                        ul_x1, ul_y1, ul_x2, ul_y2,
+                        color=self.notation_color,
+                        width_mm=max(0.2, size_pt * (0.04 if bold else 0.02)),
+                        tags=["text_underline"],
+                        id=int(getattr(ev, '_id', 0) or 0),
+                    )
             self.register_hit_rect('text', int(getattr(ev, '_id', 0) or 0), min_x, min_y, max_x, max_y, kind='body')
 
             if show_handles:

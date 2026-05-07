@@ -426,7 +426,8 @@ class TextTool(BaseTool):
             cx, cy = self._cached_center if self._cached_center else (x_mm, y_mm)
             ang = (math.degrees(math.atan2(y_mm - cy, x_mm - cx)) + 360.0) % 360.0
             ctrl_down = bool(getattr(self._editor, '_ctrl_down', False)) if self._editor else False
-            if self._rotation_steps and self._rotation_steps > 0 and not ctrl_down:
+            shift_down = bool(QtWidgets.QApplication.keyboardModifiers() & QtCore.Qt.ShiftModifier)
+            if self._rotation_steps and self._rotation_steps > 0 and not ctrl_down and not shift_down:
                 step = 360.0 / float(self._rotation_steps)
                 ang = round(ang / step) * step
             self._active_text.rotation = float(ang)

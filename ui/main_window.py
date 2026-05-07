@@ -8,6 +8,7 @@ from datetime import datetime
 from file_model.appstate import AppState
 from file_model.file_manager import FileManager
 from file_model.analysis import Analysis
+from file_model.layout import Layout
 from ui.widgets.toolbar_splitter import ToolbarSplitter
 from ui.widgets.cairo_views import CairoEditorWidget
 from ui.widgets.editor_scrollbar import EditorScrollBar
@@ -200,10 +201,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self._startup_status_message = str(status_msg or "")
 
         self._update_title()
-        try:
-            self._refresh_recent_files_menu()
-        except Exception:
-            pass
+        self._refresh_recent_files_menu()
 
         # Build a container with the canvas and external scrollbar.
         # Orientation is applied dynamically so horizontal editor mode places
@@ -222,28 +220,22 @@ class MainWindow(QtWidgets.QMainWindow):
         self.setCentralWidget(self.splitter)
         # Status bar for lightweight app messages and default path/dirty info
         self._status_default_text = ""
-        try:
-            self._statusbar = QtWidgets.QStatusBar(self)
-            self.setStatusBar(self._statusbar)
-            try:
-                self._statusbar.messageChanged.connect(self._on_status_message_changed)
-            except Exception:
-                pass
-            self._show_status_default()
-            try:
-                if self._startup_status_message:
-                    self._status(self._startup_status_message, 7000)
-            except Exception:
-                pass
-        except Exception:
-            self._statusbar = None
+        self._statusbar = QtWidgets.QStatusBar(self)
+        self.setStatusBar(self._statusbar)
+        self._statusbar.messageChanged.connect(self._on_status_message_changed)
+        # H/V read-direction toggle button on the far right of the statusbar
+        self._direction_btn = QtWidgets.QPushButton("V", self._statusbar)
+        self._direction_btn.setFixedSize(22, 20)
+        self._direction_btn.setToolTip(self.tr("Toggle read direction  (H = horizontal, V = vertical)"))
+        self._direction_btn.clicked.connect(lambda _checked=False: self._toggle_read_direction())
+        self._statusbar.addPermanentWidget(self._direction_btn)
+        self._show_status_default()
+        if self._startup_status_message:
+            self._status(self._startup_status_message, 7000)
         # Ensure the editor is the main focus target
-        try:
-            self.setFocusPolicy(QtCore.Qt.FocusPolicy.StrongFocus)
-            self.setFocusProxy(self.editor_canvas)
-            self.editor_canvas.setFocus()
-        except Exception:
-            pass
+        self.setFocusPolicy(QtCore.Qt.FocusPolicy.StrongFocus)
+        self.setFocusProxy(self.editor_canvas)
+        self.editor_canvas.setFocus()
         # Keep separators slim but clickable so left dock width can be adjusted
         self.setStyleSheet(
             "QMainWindow::separator { width: 6px; height: 6px; background: transparent; margin: 0px; }\n"
@@ -1240,10 +1232,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def _restore_app_state_from_score(self) -> None:
         self._is_restoring_app_state = True
-        try:
-            score = self.file_manager.current()
-        except Exception:
-            score = None
+        score = self.file_manager.current()
         try:
             app_state = getattr(score, 'app_state', None)
         except Exception:
@@ -1262,14 +1251,11 @@ class MainWindow(QtWidgets.QMainWindow):
         # Scroll restore (used when metrics arrive)
         self._pending_scroll_restore = int(app_state.editor_scroll_pos or 0)
         # Apply immediately on load; keep pending as a fallback if metrics update later.
-        try:
-            min_v = int(self.editor_vscroll.minimum())
-            max_v = int(self.editor_vscroll.maximum())
-            target = max(min_v, min(int(self._pending_scroll_restore), max_v))
-            self.editor_vscroll.setValue(target)
-            self.editor_canvas.set_scroll_logical_px(target)
-        except Exception:
-            pass
+        min_v = int(self.editor_vscroll.minimum())
+        max_v = int(self.editor_vscroll.maximum())
+        target = max(min_v, min(int(self._pending_scroll_restore), max_v))
+        self.editor_vscroll.setValue(target)
+        self.editor_canvas.set_scroll_logical_px(target)
         # Print page restore
         self._page_counter = max(0, int(getattr(app_state, 'print_view_page_index', 0) or 0))
         self._set_page_index(self._page_counter)
@@ -1756,21 +1742,50 @@ class MainWindow(QtWidgets.QMainWindow):
         self._status(f"{action} • {label}", timeout_ms)
 
     def _show_status_default(self, force: bool = False) -> None:
-        try:
-            sb = self.statusBar() if hasattr(self, 'statusBar') else None
-            if sb is not None:
-                new_default = self._status_default_message()
-                current = str(sb.currentMessage() or "")
-                previous_default = str(getattr(self, '_status_default_text', "") or "")
-                if bool(force) or not current or current == previous_default:
-                    sb.showMessage(new_default, 0)
-                    self._status_default_text = new_default
-        except Exception:
-            pass
+        sb = self.statusBar() if hasattr(self, 'statusBar') else None
+        if sb is not None:
+            new_default = self._status_default_message()
+            current = str(sb.currentMessage() or "")
+            previous_default = str(getattr(self, '_status_default_text', "") or "")
+            if bool(force) or not current or current == previous_default:
+                sb.showMessage(new_default, 0)
+                self._status_default_text = new_default
 
     def _on_status_message_changed(self, msg: str) -> None:
         if not msg:
             self._show_status_default()
+
+    def _toggle_read_direction(self) -> None:
+        print("Toggling read direction...")
+        score = self.file_manager.current()
+        layout: Layout = getattr(score, 'layout', None)
+        if layout is None:
+            return
+        current = str(getattr(layout, 'read_direction', 'vertical') or 'vertical').strip().lower()
+        new_direction = 'horizontal' if current == 'vertical' else 'vertical'
+        setattr(layout, 'read_direction', new_direction)
+        self._update_direction_button()
+        self.file_manager.on_model_changed()
+        self._refresh_views_from_score()
+        self.print_view.reset_view_state()
+        self._status(
+            self.tr('Read direction: {direction}').format(
+                direction=('H' if new_direction == 'horizontal' else 'V')
+            ),
+            1500,
+        )
+
+    def _update_direction_button(self) -> None:
+        try:
+            btn = getattr(self, '_direction_btn', None)
+            if btn is None:
+                return
+            score = self.file_manager.current()
+            layout = getattr(score, 'layout', None)
+            rd = str(getattr(layout, 'read_direction', 'vertical') or 'vertical').strip().lower()
+            btn.setText('H' if rd == 'horizontal' else 'V')
+        except Exception:
+            pass
 
     def _open_preferences(self) -> None:
         # Ensure preferences file exists and open in system editor
@@ -1984,6 +1999,7 @@ class MainWindow(QtWidgets.QMainWindow):
         except Exception:
             sc_dict = {}
         self.print_view.set_score(sc_dict)
+        self._update_direction_button()
         # Request engraving via Engraver; render happens on engraved signal
         if delay_engrave_ms and delay_engrave_ms > 0:
             def _delayed_engrave() -> None:
@@ -3620,22 +3636,30 @@ class MainWindow(QtWidgets.QMainWindow):
         saved_progress_path = str(self.file_manager.path() or self.tr("unsaved session"))
 
         if not restarting and not save_on_exit:
-            decision = self.file_manager.confirm_close_decision()
-            if decision == "cancel":
-                ev.ignore()
-                return
-            if decision == "saved":
-                restore_saved = bool(self.file_manager.path() is not None)
-                restore_path = str(self.file_manager.path() or "")
-                did_save_project = restore_saved
-                saved_progress_path = str(self.file_manager.path() or self.tr("unsaved session"))
-            elif decision == "discarded":
-                # User chose to discard edits: reopen the current file path on next startup.
-                restore_saved = bool(self.file_manager.path() is not None)
-                restore_path = str(self.file_manager.path() or "")
-            else:  # proceed (e.g. not dirty)
-                restore_saved = bool(self.file_manager.path() is not None)
-                restore_path = str(self.file_manager.path() or "")
+            if self.file_manager.path() is None:
+                # Unsaved/new project: always keep session restore state and skip
+                # the save/discard prompt when save_on_exit is disabled.
+                self.file_manager.autosave_current()
+                restore_saved = False
+                restore_path = ""
+            else:
+                # Saved files keep existing behavior.
+                decision = self.file_manager.confirm_close_decision()
+                if decision == "cancel":
+                    ev.ignore()
+                    return
+                if decision == "saved":
+                    restore_saved = bool(self.file_manager.path() is not None)
+                    restore_path = str(self.file_manager.path() or "")
+                    did_save_project = restore_saved
+                    saved_progress_path = str(self.file_manager.path() or self.tr("unsaved session"))
+                elif decision == "discarded":
+                    # User chose to discard edits: reopen the current file path on next startup.
+                    restore_saved = bool(self.file_manager.path() is not None)
+                    restore_path = str(self.file_manager.path() or "")
+                else:  # proceed (e.g. not dirty)
+                    restore_saved = bool(self.file_manager.path() is not None)
+                    restore_path = str(self.file_manager.path() or "")
         else:
             # save_on_exit=True or controlled restart: persist via FileManager.
             self.file_manager.autosave_current()

@@ -131,6 +131,8 @@ def _all_score_events(ctx) -> list:
         else:
             field_names = list(getattr(events_obj, "__dict__", {}).keys())
         for name in field_names:
+            if name in ("tempo", "line_break", "pedal"):
+                continue
             lst = getattr(events_obj, name, None)
             if not isinstance(lst, list):
                 continue
