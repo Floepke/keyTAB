@@ -8,7 +8,7 @@ QM_FILE="$I18N_DIR/keytab_nl.qm"
 
 if [[ ! -f "$TS_FILE" ]]; then
   echo "Missing TS file: $TS_FILE"
-  echo "Run scripts/update_translations.sh first."
+  echo "Run utils/update_translations.sh first."
   exit 1
 fi
 

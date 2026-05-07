@@ -1,16 +1,12 @@
 from __future__ import annotations
 
 import copy
-import importlib.util
+import importlib
 import inspect
-import time
-import traceback
-from pathlib import Path
 from typing import Any, Callable
 
-from PySide6 import QtCore, QtWidgets
+from PySide6 import QtCore
 
-from appdata_manager import get_appdata_manager
 from file_model.SCORE import SCORE
 from scripting.dialog import ScriptDialog
 from scripting.spec import DialogSpec
@@ -52,52 +48,43 @@ class ScriptEngine:
         self._editor = editor
         self._parent = parent
         self._open_dialogs: list[ScriptDialog] = []
-        self._last_dir = Path.home()
-        try:
-            adm = get_appdata_manager()
-            last = str(adm.get("last_script_dir", "") or "")
-            if last:
-                self._last_dir = Path(last)
-        except Exception:
-            pass
+        self._builtins = [
+            {
+                "id": "double_half_time",
+                "label": "Half Time / Double Time",
+                "tooltip": "Scale the full score timing with preview and cancel recovery.",
+                "module": "scripts.double_half_time",
+            },
+            {
+                "id": "transpose",
+                "label": "Transpose Notes",
+                "tooltip": "Transpose notes with preview and cancel recovery.",
+                "module": "scripts.transpose",
+            },
+        ]
 
-    def choose_and_run(self) -> None:
-        start = str(self._last_dir)
-        fname, _ = QtWidgets.QFileDialog.getOpenFileName(
-            self._parent,
-            "Run Script",
-            start,
-            "Python Scripts (*.py);;All Files (*)",
-        )
-        if not fname:
-            return
-        path = Path(fname)
-        self._last_dir = path.parent
-        try:
-            adm = get_appdata_manager()
-            adm.set("last_script_dir", str(self._last_dir))
-            adm.save()
-        except Exception:
-            pass
-        self.run_script(path)
+    def list_actions(self) -> list[dict[str, str]]:
+        return [dict(item) for item in self._builtins]
 
-    def run_script(self, path: Path) -> None:
-        try:
-            if path is None:
-                raise ValueError("No script path provided")
-            module = self._load_module(Path(path))
-            self._run_module(module, path)
-        except Exception as exc:
-            self._show_error("Script error", exc)
+    def run_action(self, action_id: str) -> None:
+        action_key = str(action_id or "").strip().lower()
+        action = next((a for a in self._builtins if str(a.get("id", "")).lower() == action_key), None)
+        if action is None:
+            raise ValueError(f"Unknown tool action: {action_id}")
+        module_name = str(action.get("module", "") or "")
+        if not module_name:
+            raise ValueError(f"No module configured for action: {action_id}")
+        module = importlib.import_module(module_name)
+        self._run_module(module, action_key)
 
-    def _run_module(self, module, path: Path) -> None:
+    def _run_module(self, module, action_key: str) -> None:
         ctx = ScriptContext(self._file_manager, self._editor, parent=self._parent)
         dialog_factory = getattr(module, "build_dialog", None)
         dialog_spec = getattr(module, "DIALOG_SPEC", None)
         apply_fn = getattr(module, "apply", None)
         preview_fn = getattr(module, "preview", None)
         run_fn = getattr(module, "run", None) or getattr(module, "main", None)
-        label = f"script:{path.stem}" if path else "script:custom"
+        label = f"tool_action:{action_key}"
 
         if callable(dialog_factory) or isinstance(dialog_spec, DialogSpec):
             spec = dialog_spec if isinstance(dialog_spec, DialogSpec) else dialog_factory(ctx)
@@ -116,7 +103,7 @@ class ScriptEngine:
             session.commit(label=label, mutator=lambda: self._invoke(apply_fn, ctx, None), restore_first=True)
             return
 
-        raise ValueError("Script must define build_dialog(), apply(), preview(), run(), or main().")
+        raise ValueError("Tool action module must define build_dialog(), apply(), preview(), run(), or main().")
 
     def _run_with_dialog(
         self,
@@ -178,25 +165,7 @@ class ScriptEngine:
             return
         fn(ctx, values)
 
-    def _load_module(self, path: Path):
-        if not path.exists():
-            raise FileNotFoundError(f"Script not found: {path}")
-        name = f"user_script_{path.stem}_{int(time.time() * 1000)}"
-        spec = importlib.util.spec_from_file_location(name, str(path))
-        if spec is None or spec.loader is None:
-            raise ImportError(f"Unable to load script: {path}")
-        module = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(module)
-        return module
+ToolActionEngine = ScriptEngine
+ToolActionContext = ScriptContext
 
-    def _show_error(self, title: str, exc: Exception) -> None:
-        msg = QtWidgets.QMessageBox(self._parent)
-        msg.setIcon(QtWidgets.QMessageBox.Critical)
-        msg.setWindowTitle(title)
-        detail = "".join(traceback.format_exception(type(exc), exc, exc.__traceback__))
-        msg.setText(str(exc))
-        msg.setDetailedText(detail)
-        msg.exec()
-
-
-__all__ = ["ScriptEngine", "ScriptContext"]
+__all__ = ["ScriptEngine", "ScriptContext", "ToolActionEngine", "ToolActionContext"]

@@ -288,7 +288,7 @@ class MainWindow(QtWidgets.QMainWindow):
         except Exception:
             pass
 
-        self.script_engine = ScriptEngine(self.file_manager, self.editor_controller, parent=self)
+        self.tool_action_engine = ScriptEngine(self.file_manager, self.editor_controller, parent=self)
 
         # Coalesce model-change engrave requests so input handlers return quickly.
         self._score_change_engrave_timer = QtCore.QTimer(self)
@@ -2234,70 +2234,60 @@ class MainWindow(QtWidgets.QMainWindow):
         dlg.finished.connect(_on_finished)
         dlg.show()
 
-    def _run_script_dialog(self) -> None:
-        engine = getattr(self, "script_engine", None)
+    def _ensure_tool_action_engine(self):
+        engine = getattr(self, "tool_action_engine", None)
         if engine is None:
-            try:
-                self.script_engine = ScriptEngine(self.file_manager, self.editor_controller, parent=self)
-                engine = self.script_engine
-            except Exception as exc:
-                self._show_error_dialog(self.tr("Run Script"), self.tr("Failed to initialize scripting: {error}").format(error=exc), details=self._format_exception_details(exc))
-                return
-        try:
-            engine.choose_and_run()
-        except Exception as exc:
-            self._show_error_dialog(self.tr("Run Script"), self.tr("Script failed: {error}").format(error=exc), details=self._format_exception_details(exc))
+            self.tool_action_engine = ScriptEngine(self.file_manager, self.editor_controller, parent=self)
+            engine = self.tool_action_engine
+        return engine
 
-    def _scripts_dir(self) -> Path:
-        return Path(__file__).resolve().parent.parent / "scripts"
-
-    def _run_script_path(self, script_path: str) -> None:
-        engine = getattr(self, "script_engine", None)
-        if engine is None:
-            try:
-                self.script_engine = ScriptEngine(self.file_manager, self.editor_controller, parent=self)
-                engine = self.script_engine
-            except Exception as exc:
-                self._show_error_dialog(self.tr("Run Script"), self.tr("Failed to initialize scripting: {error}").format(error=exc), details=self._format_exception_details(exc))
-                return
+    def _run_tool_action(self, action_id: str) -> None:
         try:
-            engine.run_script(Path(script_path))
+            engine = self._ensure_tool_action_engine()
         except Exception as exc:
-            self._show_error_dialog(self.tr("Run Script"), self.tr("Script failed: {error}").format(error=exc), details=self._format_exception_details(exc))
+            self._show_error_dialog(
+                self.tr("Tools"),
+                self.tr("Failed to initialize tool actions: {error}").format(error=exc),
+                details=self._format_exception_details(exc),
+            )
+            return
+        try:
+            engine.run_action(action_id)
+        except Exception as exc:
+            self._show_error_dialog(
+                self.tr("Tools"),
+                self.tr("Tool action failed: {error}").format(error=exc),
+                details=self._format_exception_details(exc),
+            )
 
     def _rebuild_tools_menu(self) -> None:
         menu = getattr(self, "_tools_menu", None)
         if menu is None:
             return
         menu.clear()
+        try:
+            engine = self._ensure_tool_action_engine()
+            actions = list(engine.list_actions() or [])
+        except Exception as exc:
+            error_act = QtGui.QAction(self.tr("Tool actions unavailable: {error}").format(error=exc), self)
+            error_act.setEnabled(False)
+            menu.addAction(error_act)
+            return
 
-        run_script_act = QtGui.QAction(self.tr("Run Script..."), self)
-        run_script_act.setToolTip(self.tr("Load and run a Python script with preview and cancel support."))
-        run_script_act.triggered.connect(self._run_script_dialog)
-        menu.addAction(run_script_act)
-        menu.addSeparator()
-
-        scripts_dir = self._scripts_dir()
-        if not scripts_dir.exists() or not scripts_dir.is_dir():
-            empty_act = QtGui.QAction(self.tr("No scripts folder found"), self)
+        if not actions:
+            empty_act = QtGui.QAction(self.tr("No tool actions available"), self)
             empty_act.setEnabled(False)
             menu.addAction(empty_act)
             return
 
-        script_files = sorted(
-            [p for p in scripts_dir.glob("*.py") if p.is_file()],
-            key=lambda p: p.name.lower(),
-        )
-        if not script_files:
-            empty_act = QtGui.QAction(self.tr("No scripts found"), self)
-            empty_act.setEnabled(False)
-            menu.addAction(empty_act)
-            return
-
-        for script_file in script_files:
-            act = QtGui.QAction(script_file.stem, self)
-            act.setToolTip(str(script_file))
-            act.triggered.connect(lambda _checked=False, p=str(script_file): self._run_script_path(p))
+        for action in actions:
+            action_id = str(action.get("id", "") or "")
+            label = str(action.get("label", action_id) or action_id)
+            tooltip = str(action.get("tooltip", "") or "")
+            act = QtGui.QAction(self.tr(label), self)
+            if tooltip:
+                act.setToolTip(self.tr(tooltip))
+            act.triggered.connect(lambda _checked=False, aid=action_id: self._run_tool_action(aid))
             menu.addAction(act)
 
     def _refresh_recent_files_menu(self) -> None:

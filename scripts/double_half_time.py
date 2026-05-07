@@ -7,14 +7,17 @@ from scripting import ActionButtonField, DialogSpec, LabelField
 
 ACTION_HALF = "half"
 ACTION_DOUBLE = "double"
+_CTX_MULTIPLIER_ATTR = "_double_half_time_multiplier"
 
 
 def build_dialog(ctx):
+    # Keep per-dialog cumulative scale state on the shared context.
+    setattr(ctx, _CTX_MULTIPLIER_ATTR, 1.0)
     return DialogSpec(
         title="Half Time / Double Time",
         fields=[
             LabelField(
-                text="Preview directly by clicking one of the actions below.",
+                text="Preview by clicking below. You can click multiple times to stack changes.",
             ),
             ActionButtonField(
                 name=ACTION_HALF,
@@ -86,17 +89,40 @@ def _factor_from_values(values: dict | None) -> float | None:
     return None
 
 
+def _get_cumulative_multiplier(ctx) -> float:
+    try:
+        value = float(getattr(ctx, _CTX_MULTIPLIER_ATTR, 1.0) or 1.0)
+    except Exception:
+        value = 1.0
+    if value <= 0.0:
+        return 1.0
+    return value
+
+
+def _set_cumulative_multiplier(ctx, value: float) -> None:
+    setattr(ctx, _CTX_MULTIPLIER_ATTR, float(value))
+
+
+def _update_cumulative_multiplier(ctx, values: dict | None) -> float | None:
+    step_factor = _factor_from_values(values)
+    if step_factor is None:
+        return None
+    cumulative = _get_cumulative_multiplier(ctx) * float(step_factor)
+    _set_cumulative_multiplier(ctx, cumulative)
+    return cumulative
+
+
 def preview(ctx, values):
-    factor = _factor_from_values(values)
-    if factor is None:
+    cumulative_factor = _update_cumulative_multiplier(ctx, values)
+    if cumulative_factor is None:
         return
-    _apply_scale(ctx, factor)
+    _apply_scale(ctx, cumulative_factor)
     ctx.refresh()
 
 
 def apply(ctx, values):
-    factor = _factor_from_values(values)
-    if factor is None:
+    cumulative_factor = _get_cumulative_multiplier(ctx)
+    if abs(float(cumulative_factor) - 1.0) <= 1e-12:
         return
-    _apply_scale(ctx, factor)
+    _apply_scale(ctx, cumulative_factor)
     ctx.refresh()
