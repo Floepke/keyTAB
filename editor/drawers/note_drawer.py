@@ -8,7 +8,7 @@ from utils.tiny_tool import key_class_filter
 from utils.operator import Operator
 from typing import Tuple
 from ui.style import Style
-from symbol_design.noteheads import Notehead, resolve_notehead_spec
+from symbol_design.noteheads import Notehead, normalize_notehead_literal, resolve_notehead_spec
 
 if TYPE_CHECKING:
     from editor.editor import Editor
@@ -492,6 +492,15 @@ class NoteDrawerMixin:
         rule = str(getattr(layout, 'black_note_rule', 'below_stem') or 'below_stem').strip().lower()
         if rule not in ('under_stem', 'below_stem'):
             return False
+
+        # Custom noteheads that explicitly point above the stem should not be
+        # narrowed by the under-stem collision rule.
+        custom_notehead = normalize_notehead_literal(getattr(n, 'notehead', 'auto'))
+        if custom_notehead != 'auto':
+            custom_spec = resolve_notehead_spec(n, default_black_above=False)
+            if bool(getattr(custom_spec, 'is_up', False)):
+                return False
+
         p0 = int(getattr(n, 'pitch', 0) or 0)
         if p0 not in BLACK_KEYS:
             return False

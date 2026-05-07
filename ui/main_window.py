@@ -205,14 +205,17 @@ class MainWindow(QtWidgets.QMainWindow):
         except Exception:
             pass
 
-        # Build a container with the canvas and external vertical scrollbar
-        editor_container = QtWidgets.QWidget()
-        editor_layout = QtWidgets.QHBoxLayout(editor_container)
-        editor_layout.setContentsMargins(0, 0, 0, 0)
-        editor_layout.setSpacing(0)
-        editor_layout.addWidget(self.editor_canvas, stretch=1)
-        editor_layout.addWidget(self.editor_vscroll, stretch=0)
-        self.splitter.addWidget(editor_container)
+        # Build a container with the canvas and external scrollbar.
+        # Orientation is applied dynamically so horizontal editor mode places
+        # the scrollbar at the bottom of the widget.
+        self.editor_container = QtWidgets.QWidget()
+        self.editor_layout = QtWidgets.QBoxLayout(QtWidgets.QBoxLayout.Direction.LeftToRight, self.editor_container)
+        self.editor_layout.setContentsMargins(0, 0, 0, 0)
+        self.editor_layout.setSpacing(0)
+        self.editor_layout.addWidget(self.editor_canvas, stretch=1)
+        self.editor_layout.addWidget(self.editor_vscroll, stretch=0)
+        self._apply_editor_scrollbar_orientation()
+        self.splitter.addWidget(self.editor_container)
         self.splitter.addWidget(self.print_view)
         self.splitter.setStretchFactor(0, 3)
         self.splitter.setStretchFactor(1, 2)
@@ -961,16 +964,49 @@ class MainWindow(QtWidgets.QMainWindow):
     def _configure_editor_scrollbar(self) -> None:
         extent = int(self.style().pixelMetric(QtWidgets.QStyle.PixelMetric.PM_ScrollBarExtent))
         width = max(12, int(extent * 2))
-        self.editor_vscroll.setStyleSheet(
-            "QScrollBar:vertical {"
-            f"width: {width}px;"
-            "}"
-        )
-        self.editor_vscroll.setFixedWidth(int(width))
+        is_horizontal = self._editor_orientation_is_horizontal()
+        if is_horizontal:
+            self.editor_vscroll.setStyleSheet(
+                "QScrollBar:horizontal {"
+                f"height: {width}px;"
+                "}"
+            )
+            self.editor_vscroll.setFixedHeight(int(width))
+            self.editor_vscroll.setMinimumWidth(0)
+            self.editor_vscroll.setMaximumWidth(16777215)
+        else:
+            self.editor_vscroll.setStyleSheet(
+                "QScrollBar:vertical {"
+                f"width: {width}px;"
+                "}"
+            )
+            self.editor_vscroll.setFixedWidth(int(width))
+            self.editor_vscroll.setMinimumHeight(0)
+            self.editor_vscroll.setMaximumHeight(16777215)
         self.editor_vscroll.setToolTip("Editor scrollbar. Drag to scroll. Click outside the scrollbar handle to jump. Hover outside the scrollbar handle to preview the current destination measure.")
         self.editor_vscroll.set_tooltip_provider(self._editor_scrollbar_tooltip_text)
         self.editor_vscroll.set_measure_index_provider(self._editor_scrollbar_measure_index_for_predicted_top)
         self.editor_vscroll.set_jump_target_provider(self._editor_scrollbar_jump_target_for_predicted_top)
+
+    def _editor_orientation_is_horizontal(self) -> bool:
+        try:
+            orientation = str(get_preferences_manager().get('editor_orientation', 'vertical') or 'vertical').strip().lower()
+            return orientation == 'horizontal'
+        except Exception:
+            return False
+
+    def _apply_editor_scrollbar_orientation(self) -> None:
+        is_horizontal = self._editor_orientation_is_horizontal()
+        desired_orientation = QtCore.Qt.Orientation.Horizontal if is_horizontal else QtCore.Qt.Orientation.Vertical
+        if self.editor_vscroll.orientation() != desired_orientation:
+            self.editor_vscroll.setOrientation(desired_orientation)
+
+        if hasattr(self, 'editor_layout') and self.editor_layout is not None:
+            desired_direction = QtWidgets.QBoxLayout.Direction.TopToBottom if is_horizontal else QtWidgets.QBoxLayout.Direction.LeftToRight
+            if self.editor_layout.direction() != desired_direction:
+                self.editor_layout.setDirection(desired_direction)
+
+        self._configure_editor_scrollbar()
 
     def _score_measure_starts_units(self) -> list[float]:
         ed = self.editor_controller if hasattr(self, 'editor_controller') else None
@@ -2436,6 +2472,7 @@ class MainWindow(QtWidgets.QMainWindow):
     @QtCore.Slot(int, int, float, float)
     def _on_editor_metrics(self, content_px: int, viewport_px: int, px_per_mm: float, dpr: float) -> None:
         # External QScrollBar works in logical pixels
+        self._apply_editor_scrollbar_orientation()
         scale = max(1.0, dpr)
         self._editor_metric_px_per_mm = float(px_per_mm)
         self._editor_metric_dpr = float(dpr)

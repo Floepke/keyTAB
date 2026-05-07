@@ -69,9 +69,14 @@ class EditorScrollBar(QtWidgets.QScrollBar):
 
         tip_w = int(self._measure_popup.width())
         tip_h = int(self._measure_popup.height())
-        scrollbar_left_global_x = self.mapToGlobal(QtCore.QPoint(0, 0)).x()
-        tip_x = int(scrollbar_left_global_x - tip_w - 2)
-        tip_y = int(global_pos.y() - (tip_h // 2))
+        if self.orientation() == QtCore.Qt.Orientation.Vertical:
+            scrollbar_left_global_x = self.mapToGlobal(QtCore.QPoint(0, 0)).x()
+            tip_x = int(scrollbar_left_global_x - tip_w - 2)
+            tip_y = int(global_pos.y() - (tip_h // 2))
+        else:
+            scrollbar_top_global_y = self.mapToGlobal(QtCore.QPoint(0, 0)).y()
+            tip_x = int(global_pos.x() - (tip_w // 2))
+            tip_y = int(scrollbar_top_global_y - tip_h - 2)
         self._measure_popup.move(tip_x, tip_y)
         self._measure_popup.show()
 

@@ -13,7 +13,7 @@ from file_model.base_grid import resolve_grid_layer_offsets
 from file_model.info import Info
 from file_model.analysis import Analysis
 from ui.style import Style
-from symbol_design.noteheads import Notehead, resolve_notehead_spec
+from symbol_design.noteheads import Notehead, normalize_notehead_literal, resolve_notehead_spec
 from symbol_design.pedal import draw_pedal_symbol
 from file_model.events.note import Note
 
@@ -871,6 +871,17 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
         rule_norm = str(rule or 'below_stem').strip().lower()
         if rule_norm not in ('under_stem', 'below_stem'):
             return False
+
+        raw_note = item.get('raw', item)
+        if isinstance(raw_note, dict):
+            custom_notehead = normalize_notehead_literal(raw_note.get('notehead', 'auto'))
+        else:
+            custom_notehead = normalize_notehead_literal(getattr(raw_note, 'notehead', 'auto'))
+        if custom_notehead != 'auto':
+            custom_spec = resolve_notehead_spec(raw_note, default_black_above=False)
+            if bool(getattr(custom_spec, 'is_up', False)):
+                return False
+
         p0 = int(item.get('pitch', 0) or 0)
         if p0 not in BLACK_KEYS:
             return False
