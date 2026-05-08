@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from PySide6 import QtCore
 
-from scripting import ActionButtonField, DialogSpec, LabelField
+from scripting.spec import ActionButtonField, DialogSpec, LabelField
 
 
 ACTION_SWITCH = "switch_hands"

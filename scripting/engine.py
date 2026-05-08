@@ -1,12 +1,19 @@
 from __future__ import annotations
 
 import copy
-import importlib
 import inspect
+import logging
+from types import ModuleType
 from typing import Any, Callable
+
+_log = logging.getLogger(__name__)
 
 from PySide6 import QtCore
 
+import scripts.double_half_time as double_half_time_script
+import scripts.mirror_pitch as mirror_pitch_script
+import scripts.reverse as reverse_script
+import scripts.switch_hands as switch_hands_script
 from file_model.SCORE import SCORE
 from scripting.dialog import ScriptDialog
 from scripting.spec import DialogSpec
@@ -54,30 +61,56 @@ class ScriptEngine:
                 "tr_context": "DoubleHalfTimeAction",
                 "label": "Half Time / Double Time",
                 "tooltip": "Scale the full score timing with preview and cancel recovery.",
-                "module": "scripts.double_half_time",
             },
             {
                 "id": "mirror_pitch_selection",
                 "tr_context": "MirrorPitchSelectionAction",
                 "label": "Mirror Pitch",
                 "tooltip": "Mirror note pitches between lowest and highest. Applies to selection, or entire file if no selection.",
-                "module": "scripts.mirror_pitch",
             },
             {
                 "id": "reverse_selection",
                 "tr_context": "ReverseSelectionAction",
                 "label": "Reverse",
                 "tooltip": "Reverse events in time as if playback were going backwards. Applies to selection, or entire file if no selection.",
-                "module": "scripts.reverse",
             },
             {
                 "id": "switch_hands_selection",
                 "tr_context": "SwitchHandsSelectionAction",
                 "label": "Switch Hands",
                 "tooltip": "Switch hand assignment (left ↔ right) for notes and beams. Applies to selection, or entire file if no selection.",
-                "module": "scripts.switch_hands",
             },
         ]
+        self._builtin_modules: dict[str, ModuleType] = {
+            "double_half_time": double_half_time_script,
+            "mirror_pitch_selection": mirror_pitch_script,
+            "reverse_selection": reverse_script,
+            "switch_hands_selection": switch_hands_script,
+        }
+        self._validate_builtin_modules()
+
+    def _validate_builtin_modules(self) -> None:
+        for action in self._builtins:
+            action_id = str(action.get("id", "") or "")
+            module = self._builtin_modules.get(action_id)
+            if module is None:
+                _log.error("[ScriptEngine] action '%s' has no module in registry", action_id)
+                continue
+            has_entry = (
+                callable(getattr(module, "build_dialog", None))
+                or isinstance(getattr(module, "DIALOG_SPEC", None), DialogSpec)
+                or callable(getattr(module, "apply", None))
+                or callable(getattr(module, "preview", None))
+                or callable(getattr(module, "run", None))
+                or callable(getattr(module, "main", None))
+            )
+            if not has_entry:
+                _log.error(
+                    "[ScriptEngine] action '%s' module '%s' exposes no entry point "
+                    "(expected build_dialog, DIALOG_SPEC, apply, preview, run, or main)",
+                    action_id,
+                    module.__name__,
+                )
 
     def list_actions(self) -> list[dict[str, str]]:
         return [dict(item) for item in self._builtins]
@@ -87,10 +120,9 @@ class ScriptEngine:
         action = next((a for a in self._builtins if str(a.get("id", "")).lower() == action_key), None)
         if action is None:
             raise ValueError(f"Unknown tool action: {action_id}")
-        module_name = str(action.get("module", "") or "")
-        if not module_name:
+        module = self._builtin_modules.get(action_key)
+        if module is None:
             raise ValueError(f"No module configured for action: {action_id}")
-        module = importlib.import_module(module_name)
         self._run_module(module, action_key)
 
     def _run_module(self, module, action_key: str) -> None:

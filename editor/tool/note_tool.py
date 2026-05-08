@@ -417,6 +417,7 @@ class NoteTool(BaseTool):
         end_t = float(start_t + max(0.0, float(candidate_duration)))
         pitch = int(getattr(note, 'pitch', 0) or 0)
         note_id = int(getattr(note, '_id', -1) or -1)
+        op = self._arp_op
 
         for other in getattr(score.events, 'note', []) or []:
             other_id = int(getattr(other, '_id', -2) or -2)
@@ -426,7 +427,7 @@ class NoteTool(BaseTool):
             if other_pitch != pitch:
                 continue
             other_start = float(getattr(other, 'time', 0.0) or 0.0)
-            if start_t < other_start < end_t:
+            if op.less(start_t, other_start) and op.less(other_start, end_t):
                 return False
         return True
 
@@ -438,6 +439,7 @@ class NoteTool(BaseTool):
         start_t = float(max(0.0, candidate_time))
         duration = float(max(0.0, self._orig_duration))
         end_t = float(start_t + duration)
+        op = self._arp_op
 
         for other in getattr(score.events, 'note', []) or []:
             other_id = int(getattr(other, '_id', -2) or -2)
@@ -448,7 +450,7 @@ class NoteTool(BaseTool):
             other_start = float(getattr(other, 'time', 0.0) or 0.0)
             other_duration = float(getattr(other, 'duration', 0.0) or 0.0)
             other_end = float(other_start + max(0.0, other_duration))
-            if start_t < other_end and other_start < end_t:
+            if op.less(start_t, other_end) and op.less(other_start, end_t):
                 return False
         return True
 

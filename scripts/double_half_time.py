@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import fields, is_dataclass
 from PySide6 import QtCore
 
-from scripting import ActionButtonField, DialogSpec, LabelField
+from scripting.spec import ActionButtonField, DialogSpec, LabelField
 
 
 ACTION_HALF = "half"

@@ -239,7 +239,10 @@ class DrawUtilView(QtWidgets.QWidget):
         if self._image is None:
             return
 
-        # Compute the playhead midpoint in output pixels, then adjust scroll to center it if possible.
+        # Compute the playhead midpoint in output pixels, then center the viewport
+        # on it in *both* axes whenever the page overflows the viewport in that axis.
+        # This handles zoomed-in views where the page is wider/taller than the widget,
+        # and works the same way for both vertical and horizontal read directions.
         tgt_w, tgt_h, _img_x, _img_y, _scale, max_scroll_x, max_scroll_y = self._scaled_image_metrics(self._image)
         page_w_mm, page_h_mm = self._du.current_page_size_mm()
         ppm_x = float(tgt_w) / max(1e-6, float(page_w_mm))
@@ -250,18 +253,16 @@ class DrawUtilView(QtWidgets.QWidget):
             return
         mid_x_px, mid_y_px = midpoint_px
         changed = False
-        if self._is_horizontal_read_direction():
-            if max_scroll_x > 0.0:
-                target_scroll_x = max(0.0, min(float(max_scroll_x), float(mid_x_px - (self.width() * 0.5))))
-                if abs(float(self._scroll_x_px) - float(target_scroll_x)) > 0.5:
-                    self._scroll_x_px = float(target_scroll_x)
-                    changed = True
-        else:
-            if max_scroll_y > 0.0:
-                target_scroll_y = max(0.0, min(float(max_scroll_y), float(mid_y_px - (self.height() * 0.5))))
-                if abs(float(self._scroll_y_px) - float(target_scroll_y)) > 0.5:
-                    self._scroll_y_px = float(target_scroll_y)
-                    changed = True
+        if max_scroll_x > 0.0:
+            target_scroll_x = max(0.0, min(float(max_scroll_x), float(mid_x_px) - float(self.width()) * 0.5))
+            if abs(float(self._scroll_x_px) - float(target_scroll_x)) > 0.5:
+                self._scroll_x_px = float(target_scroll_x)
+                changed = True
+        if max_scroll_y > 0.0:
+            target_scroll_y = max(0.0, min(float(max_scroll_y), float(mid_y_px) - float(self.height()) * 0.5))
+            if abs(float(self._scroll_y_px) - float(target_scroll_y)) > 0.5:
+                self._scroll_y_px = float(target_scroll_y)
+                changed = True
         if changed:
             self.update()
 
