@@ -60,10 +60,10 @@ class TextDialog(QtWidgets.QDialog):
         alignment_layout.addStretch(1)
         self._add_labeled_row(layout, self.tr("Alignment"), alignment_row, self.tr("Align each line within the text block."))
 
-        self.x_off_edit = FloatSliderEdit(float(getattr(ev, "x_offset_mm", 0.0) or 0.0), -25.0, 25.0, 0.1, self)
+        self.x_off_edit = FloatSliderEdit(float(getattr(ev, "x_offset_mm", 0.0) or 0.0), -100.0, 100.0, 0.1, self)
         self._add_labeled_row(layout, self.tr("X offset (mm)"), self.x_off_edit, self.tr("Shift text horizontally in millimeters."))
 
-        self.y_off_edit = FloatSliderEdit(float(getattr(ev, "y_offset_mm", 0.0) or 0.0), -25.0, 25.0, 0.1, self)
+        self.y_off_edit = FloatSliderEdit(float(getattr(ev, "y_offset_mm", 0.0) or 0.0), -100.0, 100.0, 0.1, self)
         self._add_labeled_row(layout, self.tr("Y offset (mm)"), self.y_off_edit, self.tr("Shift text vertically in millimeters."))
 
         self.width_off_edit = FloatSliderEdit(float(getattr(ev, "text_background_width_offset_mm", 0.0) or 0.0), -20.0, 20.0, 0.05, self)

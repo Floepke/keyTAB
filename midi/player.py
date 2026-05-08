@@ -180,7 +180,12 @@ def fluidsynth_available() -> bool:
 def fluidsynth_unavailable_reason() -> str:
     return str(_FLUIDSYNTH_IMPORT_ERROR or "FluidSynth not available.")
 
-from utils.CONSTANT import QUARTER_NOTE_UNIT
+from utils.CONSTANT import QUARTER_NOTE_UNIT, SHORTEST_DURATION
+from utils.operator import Operator
+
+# Threshold-aware time comparisons: treats values within one shortest-duration
+# unit as equal. Prevents spurious note triggers from triplet floating-point drift.
+_time_op = Operator(SHORTEST_DURATION)
 
 
 class _Backend:
@@ -1052,7 +1057,7 @@ class Player:
             for seg_start, seg_end, seg_sec_start in timed_segments:
                 ov_start = max(note_start, seg_start)
                 ov_end = min(note_end, seg_end)
-                if ov_end <= ov_start:
+                if not _time_op.greater(ov_end, ov_start):
                     continue
                 on_t = seg_sec_start + self._seconds_between(seg_start, ov_start, segs)
                 off_t = seg_sec_start + self._seconds_between(seg_start, ov_end, segs)
@@ -1105,14 +1110,14 @@ class Player:
             app_pitch = int(getattr(n, 'pitch', 0))
             midi_pitch = max(0, min(127, app_pitch + self._pitch_offset))
             vel = int(getattr(n, 'velocity', 64) or 64)
-            if end <= su:
+            if not _time_op.greater(end, su):
                 continue
-            if start < su < end:
+            if _time_op.less(start, su) and _time_op.greater(end, su):
                 events.append(('on', 0.0, midi_pitch, vel))
                 off_t = self._seconds_between(su, end, segs)
                 off_t = max(0.0, float(off_t) - float(self._off_epsilon_sec))
                 events.append(('off', float(off_t), midi_pitch, 0))
-            elif start >= su:
+            elif not _time_op.less(start, su):
                 on_t = self._seconds_between(su, start, segs)
                 dur_t = self._seconds_between(start, end, segs)
                 events.append(('on', float(on_t), midi_pitch, vel))
