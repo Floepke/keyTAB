@@ -62,4 +62,13 @@ change_log = '''
 
 1.0.7 (2026-06-01)
 - fix: the app now restarts correctly on Linux AppImage builds without crashing
+- fix: repeat symbol positioning corrected in horizontal editor mode
+- scrollbar is now at the bottom in horizontal editor mode
+- finetuned Klavarskribo time signature indicator positioning in horizontal editor mode
+- analysis: added avg_frequency, pitch range, most used pitch, and left/right balance metrics
+- new scripts: reverse, mirror pitch, and updated double/half time script
+- improved text rendering in engraver and editor, with text dialog enhancements, you can now form a multiline text rectangle by using the build-in multiline widget from qt
+- fix: note editing no longer triggers overlap guard unwantedly when working with triplets/antisymetric figures
+- print view: playhead focus now correctly targets both X and Y viewport axes
+- fix: midi player no longer makes timing/duration mistakes with fine floating-point note values, midi player overall enhanced
 '''

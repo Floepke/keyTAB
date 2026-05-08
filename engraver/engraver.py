@@ -3113,10 +3113,9 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                         xr = x_left + symbol_width
                         _tries += 1
                 if horizontal_read_direction:
-                    # Horizontal read mode is page-rotated in final output.
-                    # Align repeat symbols by compensating one symbol width
-                    # along drawing-space X so they do not land too far upward.
-                    x_left -= symbol_width
+                    # some finetuning to avoid colliding with measure numbers in horizontal read mode
+                    if is_on_barline:
+                        x_left -= symbol_width/2
                 x_right = x_left + symbol_width
                 dot_x1 = x_left + (symbol_width * 0.25)
                 dot_x2 = x_left + (symbol_width * 0.75)
