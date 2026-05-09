@@ -1592,6 +1592,7 @@ class Editor(QtCore.QObject,
         b = float(max(self._sel_start_units, self._sel_end_units)) - 0.1
         min_p = max(1, min(88, int(getattr(self, '_sel_min_pitch', 1))))
         max_p = max(1, min(88, int(getattr(self, '_sel_max_pitch', 88))))
+        op = Operator(SHORTEST_DURATION)
         out = []
         event_lists = [list(getattr(score.events, 'note', []) or [])]
         if bool(include_grace):
@@ -1604,7 +1605,7 @@ class Editor(QtCore.QObject,
                     p0 = int(getattr(n, 'pitch', 0) or 0)
                 except Exception:
                     continue
-                if a <= t0 <= b and min_p <= p0 <= max_p:
+                if op.ge(t0, a) and t0 <= b and min_p <= p0 <= max_p:
                     out.append(n)
         return out
 
@@ -1899,6 +1900,7 @@ class Editor(QtCore.QObject,
         b = float(max(self._sel_start_units, self._sel_end_units)) - 0.1
         min_p = max(1, min(88, int(getattr(self, '_sel_min_pitch', 1))))
         max_p = max(1, min(88, int(getattr(self, '_sel_max_pitch', 88))))
+        op = Operator(SHORTEST_DURATION)
 
         cache = getattr(self, '_draw_cache', None) or {}
         sel_sig = (round(a, 6), round(b, 6), int(min_p), int(max_p))
@@ -1924,7 +1926,7 @@ class Editor(QtCore.QObject,
                 continue
             if sid <= 0:
                 continue
-            if a <= st <= b and min_p <= sp <= max_p:
+            if op.ge(st, a) and st <= b and min_p <= sp <= max_p:
                 ids.add(sid)
 
         if isinstance(cache, dict):
@@ -1943,6 +1945,7 @@ class Editor(QtCore.QObject,
             return {}
         a = float(min(start_units, end_units))
         b = float(max(start_units, end_units))
+        op = Operator(SHORTEST_DURATION)
         # Pitch range constraints (inclusive)
         min_p = max(1, min(88, int(getattr(self, '_sel_min_pitch', 1))))
         max_p = max(1, min(88, int(getattr(self, '_sel_max_pitch', 88))))
@@ -2006,12 +2009,12 @@ class Editor(QtCore.QObject,
                     anchor_idx = min(endpoint_indices, key=lambda i: (times_h[i], i))
                     anchor_time = float(times_h[anchor_idx])
                     anchor_key = max(1, min(88, 40 + int(rpitches[anchor_idx])))
-                    if (min_p <= anchor_key <= max_p) and (a <= anchor_time <= b):
+                    if (min_p <= anchor_key <= max_p) and (op.ge(anchor_time, a) and anchor_time <= b):
                         out[name].append(ev)
             else:
                 for ev in lst:
                     t0 = start_time(ev)
-                    if a <= t0 <= b and pitch_ok(ev):
+                    if op.ge(t0, a) and t0 <= b and pitch_ok(ev):
                         out[name].append(ev)
         return out
 

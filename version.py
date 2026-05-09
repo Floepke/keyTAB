@@ -71,4 +71,7 @@ change_log = '''
 - fix: note editing no longer triggers overlap guard unwantedly when working with triplets/antisymetric figures
 - print view: playhead focus now correctly targets both X and Y viewport axes
 - fix: midi player no longer makes timing/duration mistakes with fine floating-point note values, midi player overall enhanced
+
+1.0.8 (2026-06-15)
+- fix: on some configurations, the selection rectangle didn't detect underlying note time correctly
 '''
