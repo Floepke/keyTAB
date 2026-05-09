@@ -438,52 +438,42 @@
       <translation>Regel/Pagina breekpunt markers</translation>
     </message>
     <message>
-      <location filename="../ui/dialogs/line_break_dialog.py" line="161" />
+      <location filename="../ui/dialogs/line_break_dialog.py" line="163" />
       <source>Line/Page break markers:</source>
       <translation>Regel/Pagina breekpunt markers:</translation>
     </message>
     <message>
-      <location filename="../ui/dialogs/line_break_dialog.py" line="166" />
+      <location filename="../ui/dialogs/line_break_dialog.py" line="169" />
       <source> Start Measure </source>
       <translation> Startmaat </translation>
     </message>
     <message>
-      <location filename="../ui/dialogs/line_break_dialog.py" line="167" />
+      <location filename="../ui/dialogs/line_break_dialog.py" line="170" />
       <source> Type </source>
       <translation> Type </translation>
     </message>
     <message>
-      <location filename="../ui/dialogs/line_break_dialog.py" line="168" />
-      <source> Left margin </source>
-      <translation> Linkermarge </translation>
-    </message>
-    <message>
-      <location filename="../ui/dialogs/line_break_dialog.py" line="169" />
-      <source> Right margin </source>
-      <translation> Rechtermarge </translation>
-    </message>
-    <message>
-      <location filename="../ui/dialogs/line_break_dialog.py" line="170" />
+      <location filename="../ui/dialogs/line_break_dialog.py" line="173" />
       <source> Key range </source>
       <translation> Toetsbereik </translation>
     </message>
     <message>
-      <location filename="../ui/dialogs/line_break_dialog.py" line="189" />
+      <location filename="../ui/dialogs/line_break_dialog.py" line="192" />
       <source>Measure Grouping:</source>
       <translation>Maatgroepering:</translation>
     </message>
     <message>
-      <location filename="../ui/dialogs/line_break_dialog.py" line="191" />
+      <location filename="../ui/dialogs/line_break_dialog.py" line="194" />
       <source>e.g. 4 6 4</source>
       <translation>bijv. 4 6 4</translation>
     </message>
     <message>
-      <location filename="../ui/dialogs/line_break_dialog.py" line="193" />
+      <location filename="../ui/dialogs/line_break_dialog.py" line="196" />
       <source>Apply Measure Grouping</source>
       <translation>Maatgroepering toepassen</translation>
     </message>
     <message>
-      <location filename="../ui/dialogs/line_break_dialog.py" line="196" />
+      <location filename="../ui/dialogs/line_break_dialog.py" line="199" />
       <source>Measure Grouping lets you generate line breaks by measures.
 Enter positive integers separated by spaces (e.g. '4 6 4'). Each number
 is the count of measures on a line; after the list is exhausted, the last
@@ -498,126 +488,135 @@ in volgorde. Klik op 'Pas maatgroepering toe' om breuken te genereren; OK slaat
 andere bewerkingen op en Annuleren verwerpt de voorbeeldwijzigingen.</translation>
     </message>
     <message>
-      <location filename="../ui/dialogs/line_break_dialog.py" line="663" />
-      <location filename="../ui/dialogs/line_break_dialog.py" line="216" />
-      <source>Edit All Left Margins</source>
-      <translation>Alle linkermarges bewerken</translation>
-    </message>
-    <message>
-      <location filename="../ui/dialogs/line_break_dialog.py" line="663" />
-      <location filename="../ui/dialogs/line_break_dialog.py" line="217" />
-      <source>Edit All Right Margins</source>
-      <translation>Alle rechtermarges bewerken</translation>
-    </message>
-    <message>
-      <location filename="../ui/dialogs/line_break_dialog.py" line="218" />
+      <location filename="../ui/dialogs/line_break_dialog.py" line="221" />
       <source>Set All Key Ranges</source>
       <translation>Alle toetsbereiken instellen</translation>
     </message>
     <message>
-      <location filename="../ui/dialogs/line_break_dialog.py" line="222" />
-      <source>Edit all current line/page break left margins in millimeters.</source>
-      <translation>Bewerk alle huidige regel/pagina-breekpunt linkermarges in millimeters.</translation>
-    </message>
-    <message>
-      <location filename="../ui/dialogs/line_break_dialog.py" line="223" />
-      <source>Edit all current line/page break right margins in millimeters.</source>
-      <translation>Bewerk alle huidige regel/pagina-breekpunt rechtermarges in millimeters.</translation>
-    </message>
-    <message>
-      <location filename="../ui/dialogs/line_break_dialog.py" line="224" />
+      <location filename="../ui/dialogs/line_break_dialog.py" line="227" />
       <source>Set one key range for all current line/page break markers.</source>
       <translation>Stel één toetsbereik in voor alle huidige regel/pagina-breekpunten.</translation>
     </message>
     <message>
-      <location filename="../ui/dialogs/line_break_dialog.py" line="248" />
+      <location filename="../ui/dialogs/line_break_dialog.py" line="251" />
       <source>Save your line/page break edits and close this dialog.</source>
       <translation>Sla uw regel/pagina-breekpunt bewerkingen op en sluit dit dialoogvenster.</translation>
     </message>
     <message>
-      <location filename="../ui/dialogs/line_break_dialog.py" line="251" />
+      <location filename="../ui/dialogs/line_break_dialog.py" line="254" />
       <source>Discard previewed edits and close this dialog.</source>
       <translation>Verwerp de voorbeeldbewerkingen en sluit dit dialoogvenster.</translation>
     </message>
     <message>
-      <location filename="../ui/dialogs/line_break_dialog.py" line="270" />
+      <location filename="../ui/dialogs/line_break_dialog.py" line="273" />
       <source>P</source>
       <translation>P</translation>
     </message>
     <message>
-      <location filename="../ui/dialogs/line_break_dialog.py" line="270" />
+      <location filename="../ui/dialogs/line_break_dialog.py" line="273" />
       <source>L</source>
       <translation>R</translation>
     </message>
     <message>
-      <location filename="../ui/dialogs/line_break_dialog.py" line="504" />
-      <location filename="../ui/dialogs/line_break_dialog.py" line="303" />
+      <location filename="../ui/dialogs/line_break_dialog.py" line="277" />
+      <source>Bottom margin</source>
+      <translation>Onder marge</translation>
+    </message>
+    <message>
+      <location filename="../ui/dialogs/line_break_dialog.py" line="277" />
+      <source>Left margin</source>
+      <translation>Linkermarge</translation>
+    </message>
+    <message>
+      <location filename="../ui/dialogs/line_break_dialog.py" line="278" />
+      <source>Top margin</source>
+      <translation>Boven marge</translation>
+    </message>
+    <message>
+      <location filename="../ui/dialogs/line_break_dialog.py" line="278" />
+      <source>Right margin</source>
+      <translation>Rechtermarge</translation>
+    </message>
+    <message>
+      <location filename="../ui/dialogs/line_break_dialog.py" line="294" />
+      <location filename="../ui/dialogs/line_break_dialog.py" line="285" />
+      <source>Edit All {side}</source>
+      <translation>Alles {side} bewerken</translation>
+    </message>
+    <message>
+      <location filename="../ui/dialogs/line_break_dialog.py" line="289" />
+      <source>Edit all current line/page break left-side margins in millimeters.</source>
+      <translation>Bewerk alle huidige regel/pagina-breekpunt linkermarges in millimeters.</translation>
+    </message>
+    <message>
+      <location filename="../ui/dialogs/line_break_dialog.py" line="290" />
+      <source>Edit all current line/page break right-side margins in millimeters.</source>
+      <translation>Bewerk alle huidige regel/pagina-breekpunt rechtermarges in millimeters.</translation>
+    </message>
+    <message>
+      <location filename="../ui/dialogs/line_break_dialog.py" line="295" />
+      <source>All {side} (mm):</source>
+      <translation>Alle {side} (mm):</translation>
+    </message>
+    <message>
+      <location filename="../ui/dialogs/line_break_dialog.py" line="530" />
+      <location filename="../ui/dialogs/line_break_dialog.py" line="329" />
       <source>Page break.</source>
       <translation>Pagina breekpunt.</translation>
     </message>
     <message>
-      <location filename="../ui/dialogs/line_break_dialog.py" line="504" />
-      <location filename="../ui/dialogs/line_break_dialog.py" line="303" />
+      <location filename="../ui/dialogs/line_break_dialog.py" line="530" />
+      <location filename="../ui/dialogs/line_break_dialog.py" line="329" />
       <source>Line break.</source>
       <translation>Regel breekpunt.</translation>
     </message>
     <message>
-      <location filename="../ui/dialogs/line_break_dialog.py" line="344" />
+      <location filename="../ui/dialogs/line_break_dialog.py" line="370" />
       <source>Automatic key range</source>
       <translation>Automatisch toetsbereik</translation>
     </message>
     <message>
-      <location filename="../ui/dialogs/line_break_dialog.py" line="350" />
+      <location filename="../ui/dialogs/line_break_dialog.py" line="376" />
       <source>from</source>
       <translation>van</translation>
     </message>
     <message>
-      <location filename="../ui/dialogs/line_break_dialog.py" line="351" />
+      <location filename="../ui/dialogs/line_break_dialog.py" line="377" />
       <source>to</source>
       <translation>tot</translation>
     </message>
     <message>
-      <location filename="../ui/dialogs/line_break_dialog.py" line="357" />
+      <location filename="../ui/dialogs/line_break_dialog.py" line="383" />
       <source>{prefix} key {key} ({note})</source>
       <translation>{prefix} toets {key} ({note})</translation>
     </message>
     <message>
-      <location filename="../ui/dialogs/line_break_dialog.py" line="549" />
+      <location filename="../ui/dialogs/line_break_dialog.py" line="575" />
       <source>Delete this line break.</source>
       <translation>Deze regel/pagina-breekpunt verwijderen.</translation>
     </message>
     <message>
-      <location filename="../ui/dialogs/line_break_dialog.py" line="642" />
+      <location filename="../ui/dialogs/line_break_dialog.py" line="668" />
       <source>Enter one or more positive integers separated by spaces.</source>
       <translation>Voer een of meer positieve gehele getallen in, gescheiden door spaties.</translation>
     </message>
     <message>
-      <location filename="../ui/dialogs/line_break_dialog.py" line="658" />
+      <location filename="../ui/dialogs/line_break_dialog.py" line="684" />
       <source>Could not apply measure grouping.</source>
       <translation>Kon maatgroepering niet toepassen.</translation>
     </message>
     <message>
-      <location filename="../ui/dialogs/line_break_dialog.py" line="664" />
-      <source>All left margins (mm):</source>
-      <translation>Alle linkermarges (mm):</translation>
-    </message>
-    <message>
-      <location filename="../ui/dialogs/line_break_dialog.py" line="664" />
-      <source>All right margins (mm):</source>
-      <translation>Alle rechtermarges (mm):</translation>
-    </message>
-    <message>
-      <location filename="../ui/dialogs/line_break_dialog.py" line="755" />
+      <location filename="../ui/dialogs/line_break_dialog.py" line="780" />
       <source>Key range must contain two numbers.</source>
       <translation>Toetsbereik moet twee getallen bevatten.</translation>
     </message>
     <message>
-      <location filename="../ui/dialogs/line_break_dialog.py" line="758" />
+      <location filename="../ui/dialogs/line_break_dialog.py" line="783" />
       <source>Key range must stay between key 1 and key 88.</source>
       <translation>Toetsbereik moet tussen toets 1 en toets 88 blijven.</translation>
     </message>
     <message>
-      <location filename="../ui/dialogs/line_break_dialog.py" line="761" />
+      <location filename="../ui/dialogs/line_break_dialog.py" line="786" />
       <source>Key range must have 'from key' lower than 'to key'.</source>
       <translation>Toetsbereik moet een 'van toets' hebben die lager is dan 'tot toets'.</translation>
     </message>

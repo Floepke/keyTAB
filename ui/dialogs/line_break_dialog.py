@@ -154,6 +154,8 @@ class LineBreakDialog(QtWidgets.QDialog):
         self._measure_resolver = measure_resolver
         self._on_change_cb = on_change
         self._layout = getattr(score, 'layout', None) if score is not None else None
+        read_direction = str(getattr(self._layout, 'read_direction', 'vertical') or 'vertical').strip().lower()
+        self._horizontal_read_direction = read_direction == 'horizontal'
         self._measure_grouping_text = str(getattr(self._layout, 'measure_grouping', "") or "") if self._layout is not None else ""
         self._measure_starts_mm: list[float] = self._build_measure_starts()
         self._suppress_measure_change: bool = False
@@ -161,12 +163,13 @@ class LineBreakDialog(QtWidgets.QDialog):
         list_label = QtWidgets.QLabel(self.tr("Line/Page break markers:"), self)
         self.break_table = QtWidgets.QTableWidget(self)
         self.break_table.setColumnCount(6)
+        left_label, right_label = self._margin_side_labels()
         self.break_table.setHorizontalHeaderLabels([
             " ",
             self.tr(" Start Measure "),
             self.tr(" Type "),
-            self.tr(" Left margin "),
-            self.tr(" Right margin "),
+            f" {left_label} ",
+            f" {right_label} ",
             self.tr(" Key range "),
         ])
         self.break_table.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectionBehavior.SelectRows)
@@ -213,14 +216,14 @@ class LineBreakDialog(QtWidgets.QDialog):
         bulk_row = QtWidgets.QHBoxLayout()
         bulk_row.setContentsMargins(0, 0, 0, 0)
         bulk_row.setSpacing(6)
-        self.edit_all_left_btn = QtWidgets.QPushButton(self.tr("Edit All Left Margins"), self)
-        self.edit_all_right_btn = QtWidgets.QPushButton(self.tr("Edit All Right Margins"), self)
+        self.edit_all_left_btn = QtWidgets.QPushButton(self._edit_all_margins_button_text("left"), self)
+        self.edit_all_right_btn = QtWidgets.QPushButton(self._edit_all_margins_button_text("right"), self)
         self.set_all_key_ranges_btn = QtWidgets.QPushButton(self.tr("Set All Key Ranges"), self)
         self.edit_all_left_btn.clicked.connect(lambda: self._edit_all_margins(side="left"))
         self.edit_all_right_btn.clicked.connect(lambda: self._edit_all_margins(side="right"))
         self.set_all_key_ranges_btn.clicked.connect(self._set_all_key_ranges)
-        self.edit_all_left_btn.setToolTip(self.tr("Edit all current line/page break left margins in millimeters."))
-        self.edit_all_right_btn.setToolTip(self.tr("Edit all current line/page break right margins in millimeters."))
+        self.edit_all_left_btn.setToolTip(self._edit_all_margins_tooltip("left"))
+        self.edit_all_right_btn.setToolTip(self._edit_all_margins_tooltip("right"))
         self.set_all_key_ranges_btn.setToolTip(self.tr("Set one key range for all current line/page break markers."))
         bulk_row.addWidget(self.edit_all_left_btn)
         bulk_row.addWidget(self.edit_all_right_btn)
@@ -268,6 +271,29 @@ class LineBreakDialog(QtWidgets.QDialog):
     def _marker_label(self, is_page: bool) -> str:
         # Keep marker glyphs localizable (e.g. Dutch uses R for "Regel").
         return self.tr("P") if is_page else self.tr("L")
+
+    def _margin_side_label(self, side: str) -> str:
+        if side == "left":
+            return self.tr("Bottom margin") if self._horizontal_read_direction else self.tr("Left margin")
+        return self.tr("Top margin") if self._horizontal_read_direction else self.tr("Right margin")
+
+    def _margin_side_labels(self) -> tuple[str, str]:
+        return (self._margin_side_label("left"), self._margin_side_label("right"))
+
+    def _edit_all_margins_button_text(self, side: str) -> str:
+        side_label = self._margin_side_label(side)
+        return self.tr("Edit All {side}").format(side=side_label)
+
+    def _edit_all_margins_tooltip(self, side: str) -> str:
+        if side == "left":
+            return self.tr("Edit all current line/page break left-side margins in millimeters.")
+        return self.tr("Edit all current line/page break right-side margins in millimeters.")
+
+    def _edit_all_margins_prompt(self, side: str) -> tuple[str, str]:
+        side_label = self._margin_side_label(side)
+        title = self.tr("Edit All {side}").format(side=side_label)
+        label = self.tr("All {side} (mm):").format(side=side_label.lower())
+        return title, label
 
     def _focus_first(self) -> None:
         try:
@@ -660,8 +686,7 @@ class LineBreakDialog(QtWidgets.QDialog):
     def _edit_all_margins(self, side: str) -> None:
         if side not in ("left", "right"):
             return
-        title = self.tr("Edit All Left Margins") if side == "left" else self.tr("Edit All Right Margins")
-        label = self.tr("All left margins (mm):") if side == "left" else self.tr("All right margins (mm):")
+        title, label = self._edit_all_margins_prompt(side)
         val = self._prompt_margin_value(title, label, 5.0)
         if val is None:
             return
