@@ -233,6 +233,7 @@ class Editor(QtCore.QObject,
         self._sel_anchor_pitch: int = 1
         # Clipboard for cut/copy/paste of detected events
         self.clipboard: dict | None = None
+        self._clipboard_start_units: float | None = None
         # Modifier state
         self._shift_down: bool = False
         self._ctrl_down: bool = False
@@ -2026,6 +2027,7 @@ class Editor(QtCore.QObject,
         # Deep copy so later edits (e.g., transpose via arrow keys) do not mutate the clipboard
         safe_copy = copy.deepcopy(sel)
         self.clipboard = safe_copy
+        self._clipboard_start_units = float(min(self._sel_start_units, self._sel_end_units))
         return safe_copy
 
     def cut_selection(self) -> dict | None:
@@ -2085,8 +2087,10 @@ class Editor(QtCore.QObject,
             return
         import dataclasses
 
-        # Determine alignment offset: selection start -> cursor
-        a = float(min(self._sel_start_units, self._sel_end_units))
+        # Determine alignment offset from the copied selection, not the live selection.
+        a = self._clipboard_start_units
+        if a is None:
+            a = float(min(self._sel_start_units, self._sel_end_units))
         target = float(self.time_cursor)
         delta = float(target - a)
 
