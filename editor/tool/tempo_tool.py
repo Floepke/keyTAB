@@ -2,7 +2,7 @@ from __future__ import annotations
 from PySide6 import QtCore, QtWidgets
 from typing import Optional
 from editor.tool.base_tool import BaseTool
-from utils.CONSTANT import QUARTER_NOTE_UNIT
+from utils.CONSTANT import QUARTER_NOTE_UNIT, SHORTEST_DURATION
 from utils.operator import Operator
 
 
@@ -26,6 +26,7 @@ class TempoTool(BaseTool):
         if self._editor is None:
             return (4, 4)
         score = self._editor.current_score()
+        op = Operator(float(SHORTEST_DURATION))
         cur_t = 0.0
         for bg in getattr(score, 'base_grid', []) or []:
             numer = int(getattr(bg, 'numerator', 4) or 4)
@@ -33,7 +34,7 @@ class TempoTool(BaseTool):
             measure_len = float(numer) * (4.0 / float(denom)) * float(QUARTER_NOTE_UNIT)
             count = int(getattr(bg, 'measure_amount', 1) or 1)
             seg_len = float(count) * measure_len
-            if t < cur_t + seg_len:
+            if op.lt(t, cur_t + seg_len):
                 return (numer, denom)
             cur_t += seg_len
         return (4, 4)
@@ -46,7 +47,7 @@ class TempoTool(BaseTool):
         if self._editor is None:
             return None
         score = self._editor.current_score()
-        op = Operator(threshold=1e-6)
+        op = Operator(float(SHORTEST_DURATION))
         for ev in list(getattr(score.events, 'tempo', []) or []):
             if op.equal(float(getattr(ev, 'time', 0.0) or 0.0), float(t)):
                 return ev
@@ -205,7 +206,7 @@ class TempoTool(BaseTool):
         score = self._editor.current_score()
         tempo_id = self._editor.hit_test_tempo(x, y) if hasattr(self._editor, 'hit_test_tempo') else None
         t = self._editor.snap_time(self._editor.widget_px_to_time(x, y))
-        op = Operator(threshold=1e-6)
+        op = Operator(float(SHORTEST_DURATION))
         lst = list(getattr(score.events, 'tempo', []) or [])
         if not lst:
             return

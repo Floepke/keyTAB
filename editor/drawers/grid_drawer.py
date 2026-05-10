@@ -125,14 +125,15 @@ class GridDrawerMixin:
         beam_collision_pad = max(0.2, float(getattr(layout, 'beam_thickness_mm', 1.0) or 1.0) * style_scale * 0.7) if layout is not None else 0.2
         barline_symbol_gap_mm = max(0.0, semitone_mm)
         barline_time_eps = 1e-4
+        barline_time_op = Operator(float(SHORTEST_DURATION))
 
         def _barline_time_eq(a: float, b: float) -> bool:
-            return abs(float(a) - float(b)) <= float(barline_time_eps)
+            return barline_time_op.eq(float(a), float(b))
 
         def _barline_time_in_range(t: float, t0: float, t1: float) -> bool:
             lo = float(min(t0, t1)) - float(barline_time_eps)
             hi = float(max(t0, t1)) + float(barline_time_eps)
-            return lo <= float(t) <= hi
+            return barline_time_op.ge(float(t), lo) and barline_time_op.le(float(t), hi)
 
         def _norm_hand_key(v: str) -> str:
             return 'l' if v == 'l' else 'r'

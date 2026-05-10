@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from PySide6 import QtCore
 from editor.tool.base_tool import BaseTool
+from utils.CONSTANT import SHORTEST_DURATION
+from utils.operator import Operator
 
 
 class PedalTool(BaseTool):
@@ -48,6 +50,7 @@ class PedalTool(BaseTool):
         opposite = self._opposite_symbol(active_symbol)
         if not opposite:
             return None
+        op = Operator(float(SHORTEST_DURATION))
 
         active_id = self._ev_id(active_ev)
         for ev in list(getattr(score.events, 'pedal', []) or []):
@@ -57,7 +60,7 @@ class PedalTool(BaseTool):
                 continue
             if int(getattr(ev, 'rpitch', 0) or 0) != int(rpitch):
                 continue
-            if float(getattr(ev, 'time', 0.0) or 0.0) != float(time_val):
+            if not op.eq(float(getattr(ev, 'time', 0.0) or 0.0), float(time_val)):
                 continue
             return ev
         return None

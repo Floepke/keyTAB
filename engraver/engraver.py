@@ -312,6 +312,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
 
     pedal_segments: list[dict] = []
     if norm_pedals:
+        pedal_time_op = Operator(SHORTEST_DURATION)
         pedal_down_time: float | None = None
         pedal_down_id: int = 0
         for pe in norm_pedals:
@@ -322,7 +323,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                     pedal_down_time = p_t
                     pedal_down_id = int(pe.get('id', 0) or 0)
             else:
-                if pedal_down_time is not None and p_t >= pedal_down_time:
+                if pedal_down_time is not None and pedal_time_op.ge(p_t, pedal_down_time):
                     pedal_segments.append({
                         'start': float(pedal_down_time),
                         'end': float(p_t),
@@ -809,7 +810,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
     for i, lb in enumerate(line_breaks):
         lb_time = float(lb.get('time', 0.0) or 0.0)
         next_time = float(line_breaks[i + 1].get('time', total_ticks) or total_ticks) if i + 1 < len(line_breaks) else total_ticks
-        if next_time < lb_time:
+        if op_time.lt(next_time, lb_time):
             next_time = lb_time
         margin_mm = list(lb.get('margin_mm', [10.0, 10.0]) or [10.0, 10.0])
         if len(margin_mm) < 2:
@@ -3531,12 +3532,13 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
 
                 def _get_dynamic_symbol_at_position(t: float, x_rpitch: int) -> dict | None:
                     """Get dynamic symbol dimensions at given time and x_rpitch."""
+                    dyn_op = Operator(float(SHORTEST_DURATION))
                     for ds in line_dynamic_symbols:
                         ds_time = float(ds.get('time', 0.0) or 0.0)
                         ds_rpitch = int(ds.get('x_rpitch', 0) or 0)
                         
                         # Check if symbol is at same time and x position
-                        if abs(ds_time - t) < 0.1 and ds_rpitch == x_rpitch:
+                        if dyn_op.eq(ds_time, t) and ds_rpitch == x_rpitch:
                             glyph = str(ds.get('symbol', '') or '')
                             if not glyph:
                                 return None

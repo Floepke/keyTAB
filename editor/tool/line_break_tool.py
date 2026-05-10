@@ -5,7 +5,7 @@ from PySide6 import QtWidgets
 
 from editor.tool.base_tool import BaseTool
 from file_model.events.line_break import LineBreak
-from utils.CONSTANT import QUARTER_NOTE_UNIT
+from utils.CONSTANT import QUARTER_NOTE_UNIT, SHORTEST_DURATION
 from utils.operator import Operator
 
 
@@ -16,6 +16,7 @@ class LineBreakTool(BaseTool):
         super().__init__()
         self._drag_target: Optional[LineBreak] = None
         self._dialog_open: bool = False
+        self._time_op = Operator(float(SHORTEST_DURATION))
 
     def toolbar_spec(self) -> list[dict]:
         return [
@@ -144,7 +145,7 @@ class LineBreakTool(BaseTool):
             except Exception:
                 continue
             dt = abs(click_time - t0)
-            if dt <= tol_ticks and (nearest_dt is None or dt < nearest_dt):
+            if self._time_op.le(dt, tol_ticks) and (nearest_dt is None or dt < nearest_dt):
                 nearest = lb
                 nearest_dt = dt
         return nearest
@@ -159,7 +160,7 @@ class LineBreakTool(BaseTool):
             pass
 
     def _is_time_zero(self, t: float) -> bool:
-        return abs(float(t)) <= self._time_tol_ticks()
+        return self._time_op.eq(float(t), 0.0)
 
     def _cursor_time(self, x: float, y: float) -> float:
         if self._editor is None:
@@ -294,7 +295,7 @@ class LineBreakTool(BaseTool):
                 if lb is self._drag_target:
                     continue
                 t0 = float(getattr(lb, 'time', 0.0) or 0.0)
-                if abs(new_time - t0) <= tol_ticks:
+                if self._time_op.eq(float(new_time), float(t0)):
                     return
         except Exception:
             pass

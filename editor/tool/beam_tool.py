@@ -1,7 +1,8 @@
 from typing import Optional, Tuple
 from editor.tool.base_tool import BaseTool
 from file_model.SCORE import SCORE
-from utils.CONSTANT import QUARTER_NOTE_UNIT
+from utils.CONSTANT import QUARTER_NOTE_UNIT, SHORTEST_DURATION
+from utils.operator import Operator
 
 
 class BeamTool(BaseTool):
@@ -60,35 +61,36 @@ class BeamTool(BaseTool):
     def _override_window(self, t: float, dur: float, barlines: list[float]) -> Tuple[float, float]:
         if not barlines:
             return (t, t + max(0.0, dur))
+        op = Operator(float(SHORTEST_DURATION))
         start_bar = barlines[0]
         for b in barlines:
-            if t >= b:
+            if op.ge(t, b):
                 start_bar = b
             else:
                 break
         end_target = t + max(0.0, dur)
         end_bar = barlines[-1]
         for b in barlines:
-            if b > end_target:
+            if op.gt(b, end_target):
                 end_bar = b
                 break
-        if end_bar <= start_bar and len(barlines) > 1:
+        if op.le(end_bar, start_bar) and len(barlines) > 1:
             for b in barlines:
-                if b > start_bar:
+                if op.gt(b, start_bar):
                     end_bar = b
                     break
         return (float(start_bar), float(end_bar))
 
     def _find_hit(self, hand: str, t_raw: float, markers: list):
-        eps = 1e-6
+        op = Operator(float(SHORTEST_DURATION))
         for mk in markers:
             if str(getattr(mk, 'hand', 'l')) != hand:
                 continue
             mt = float(getattr(mk, 'time', 0.0) or 0.0)
             dur = float(getattr(mk, 'duration', 0.0) or 0.0)
             end = mt + max(0.0, dur)
-            # Inside when raw time is within [mt, end); allow small eps at start only
-            if (mt - eps) <= t_raw < (end - eps):
+            # Inside when raw time is within [mt, end) using thresholded comparator.
+            if op.ge(t_raw, mt) and op.lt(t_raw, end):
                 return mk
         return None
 

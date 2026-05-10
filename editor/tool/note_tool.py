@@ -523,7 +523,9 @@ class NoteTool(BaseTool):
             self._duration_edit_armed = False
             if hit_rect is not None:
                 note_start_mm = float(self._editor.time_to_mm(float(getattr(found, 'time', 0.0) or 0.0)))
-                notehead_len_mm = float(getattr(self._editor, 'semitone_dist', 0.0) or 0.0) * 2.0
+                layout = score.layout if score else None
+                notehead_height_scaling = float(getattr(layout, 'notehead_height_scaling', 1.2) or 1.2) if layout else 1.2
+                notehead_len_mm = float(getattr(self._editor, 'semitone_dist', 0.0) or 0.0) * 2.0 * notehead_height_scaling
                 notehead_end_mm = note_start_mm + notehead_len_mm
                 self._move_pitch_time_mode = bool(notehead_len_mm > 0.0 and y_mm_abs <= notehead_end_mm)
         else:
@@ -801,7 +803,9 @@ class NoteTool(BaseTool):
 
     def _notehead_vertical_bounds_mm(self, score: SCORE, note: Note) -> tuple[float, float]:
         note_start_mm = float(self._editor.time_to_mm(float(getattr(note, 'time', 0.0) or 0.0)))
-        notehead_h_mm = float(getattr(self._editor, 'semitone_dist', 0.5) or 0.5) * 2.0
+        layout = score.layout if score else None
+        notehead_height_scaling = float(getattr(layout, 'notehead_height_scaling', 1.2) or 1.2) if layout else 1.2
+        notehead_h_mm = float(getattr(self._editor, 'semitone_dist', 0.5) or 0.5) * 2.0 * notehead_height_scaling
         spec = resolve_notehead_spec(note, default_black_above=self._black_note_above_stem(score, note))
         if bool(getattr(spec, 'is_up', False)):
             return (float(note_start_mm - notehead_h_mm), float(note_start_mm))
@@ -968,9 +972,10 @@ class NoteTool(BaseTool):
         if start_t is None or end_t is None:
             return False
         notes = list(getattr(score.events, 'note', []) or [])
+        op = Operator(float(SHORTEST_DURATION))
         for n in notes:
             t = float(getattr(n, 'time', 0.0) or 0.0)
-            if start_t <= t < end_t:
+            if op.ge(t, start_t) and op.lt(t, end_t):
                 return True
         return False
 

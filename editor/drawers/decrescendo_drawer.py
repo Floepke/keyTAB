@@ -2,6 +2,8 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, cast
 from ui.widgets.draw_util import DrawUtil
 from editor.editor_defaults import SCALE, HAIRPIN_LINE_WIDTH_MM, HAIRPIN_WIDTH_MM, DYNAMIC_SYMBOL_FONT_SIZE_PT, DYNAMIC_SYMBOL_BACKGROUND_PADDING_MM, HAIRPIN_TEXT_GAP_MM
+from utils.CONSTANT import SHORTEST_DURATION
+from utils.operator import Operator
 
 if TYPE_CHECKING:
     from editor.editor import Editor
@@ -20,13 +22,14 @@ class DecrescendoDrawerMixin:
         
         layout = getattr(score, 'layout', None)
         dynamic_symbols = list(getattr(score.events, 'dynamic_symbol', []) or [])
+        op = Operator(float(SHORTEST_DURATION))
         
         for sym in dynamic_symbols:
             sym_time = float(getattr(sym, 'time', 0.0) or 0.0)
             sym_rpitch = int(getattr(sym, 'x_rpitch', 0) or 0)
             
             # Check if symbol is at same time and x position
-            if abs(sym_time - t) < 0.1 and sym_rpitch == x_rpitch:
+            if op.eq(sym_time, t) and sym_rpitch == x_rpitch:
                 glyph = str(getattr(sym, 'symbol', '') or '')
                 if not glyph:
                     return None

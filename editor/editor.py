@@ -51,6 +51,7 @@ from utils.CONSTANT import PIANO_KEY_AMOUNT, BLACK_KEYS
 from utils.operator import Operator
 from editor.collision import CollisionMixin
 from ui.widgets.draw_util import DrawUtil
+from midi.player import Player
 
 if TYPE_CHECKING:
     from editor.tool.base_tool import BaseTool
@@ -228,7 +229,7 @@ class Editor(QtCore.QObject,
         self._left_selection_mode: bool = False
         self._right_selection_mode: bool = False
         # Optional player for auditioning
-        self.player = None
+        self.player: Player = None
 
     # ---- Drawing via mixins ----
     def draw_background_gray(self, du) -> None:
@@ -495,11 +496,12 @@ class Editor(QtCore.QObject,
         new_time = float(getattr(note_entry, 'time', 0.0) or 0.0)
         new_duration = float(getattr(note_entry, 'duration', 0.0) or 0.0)
         new_pitch = int(getattr(note_entry, 'pitch', 0) or 0)
+        op_time = Operator(float(SHORTEST_DURATION))
         insert_idx = bisect.bisect_left(old_starts, new_time)
         while insert_idx < len(old_starts):
-            if old_starts[insert_idx] > new_time:
+            if op_time.gt(old_starts[insert_idx], new_time):
                 break
-            if old_starts[insert_idx] == new_time and int(getattr(old_notes_sorted[insert_idx], 'pitch', 0) or 0) > new_pitch:
+            if op_time.eq(old_starts[insert_idx], new_time) and int(getattr(old_notes_sorted[insert_idx], 'pitch', 0) or 0) > new_pitch:
                 break
             insert_idx += 1
 

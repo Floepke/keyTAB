@@ -61,7 +61,8 @@ class SelectionMixin:
         cur_t = self.snap_time(self.widget_px_to_time(x, y))
         anchor_t = float(self._sel_anchor_units)
         snap_units = max(1e-6, float(self.snap_size_units))
-        if cur_t >= anchor_t:
+        op = Operator(float(SHORTEST_DURATION))
+        if op.ge(cur_t, anchor_t):
             self._sel_start_units = float(anchor_t)
             self._sel_end_units = float(cur_t + snap_units)
         else:
@@ -156,7 +157,7 @@ class SelectionMixin:
                     p0 = int(getattr(note, 'pitch', 0) or 0)
                 except Exception:
                     continue
-                if op.ge(t0, a) and t0 <= b and min_p <= p0 <= max_p:
+                if op.ge(t0, a) and op.le(t0, b) and min_p <= p0 <= max_p:
                     out.append(note)
         return out
 
@@ -508,12 +509,12 @@ class SelectionMixin:
                     anchor_idx = min(endpoint_indices, key=lambda i: (times_h[i], i))
                     anchor_time = float(times_h[anchor_idx])
                     anchor_key = max(1, min(88, 40 + int(rpitches[anchor_idx])))
-                    if (min_p <= anchor_key <= max_p) and (op.ge(anchor_time, a) and anchor_time <= b):
+                    if (min_p <= anchor_key <= max_p) and (op.ge(anchor_time, a) and op.le(anchor_time, b)):
                         out[name].append(event)
             else:
                 for event in event_list:
                     t0 = start_time(event)
-                    if op.ge(t0, a) and t0 <= b and pitch_ok(event):
+                    if op.ge(t0, a) and op.le(t0, b) and pitch_ok(event):
                         out[name].append(event)
         return out
 

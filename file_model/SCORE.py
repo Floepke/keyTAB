@@ -27,7 +27,7 @@ from file_model.layout import Layout
 from file_model.font import Font
 from file_model.info import Info
 from file_model.analysis import Analysis
-from utils.CONSTANT import GRACENOTE_THRESHOLD, QUARTER_NOTE_UNIT
+from utils.CONSTANT import GRACENOTE_THRESHOLD, QUARTER_NOTE_UNIT, SHORTEST_DURATION
 from file_model.base_grid import BaseGrid
 from file_model.appstate import AppState
 from file_model.old_file_conversion import convert_legacy_piano_data
@@ -475,7 +475,8 @@ class SCORE:
 			measure_len = float(numer) * (4.0 / float(denom)) * float(QUARTER_NOTE_UNIT)
 			beat_len = measure_len / max(1, int(numer))
 			# Check if any tempo at time 0 exists
-			at_zero = any(float(getattr(tp, 'time', 0.0) or 0.0) == 0.0 for tp in self.events.tempo)
+			op_load = Operator(float(SHORTEST_DURATION))
+			at_zero = any(op_load.eq(float(getattr(tp, 'time', 0.0) or 0.0), 0.0) for tp in self.events.tempo)
 			if not at_zero:
 				self.new_tempo(time=0.0, duration=float(beat_len))
 		except Exception:
@@ -598,8 +599,8 @@ class SCORE:
 		if not lb_list:
 			self.new_line_break(time=0.0)
 			return
-		tol = 1e-6
-		if not any(abs(float(getattr(lb, 'time', 0.0) or 0.0)) <= tol for lb in lb_list):
+		op_load = Operator(float(SHORTEST_DURATION))
+		if not any(op_load.eq(float(getattr(lb, 'time', 0.0) or 0.0), 0.0) for lb in lb_list):
 			self.new_line_break(time=0.0)
 		self.events.line_break.sort(key=lambda lb: float(getattr(lb, 'time', 0.0) or 0.0))
 
@@ -607,6 +608,7 @@ class SCORE:
 		"""Normalize event fields after parsing and convert short notes to grace notes."""
 		converted_grace: List[GraceNote] = []
 		remaining_notes: List[Note] = []
+		op_load = Operator(float(SHORTEST_DURATION))
 		for n in getattr(self.events, 'note', []) or []:
 			# hand
 			h = str(getattr(n, 'hand', 'l') or 'l').strip()
@@ -640,7 +642,6 @@ class SCORE:
 		# Replace original notes with remaining valid notes and add converted grace notes.
 		# De-duplicate notes that start at effectively the same time (with a small load-time threshold),
 		# share the same pitch, and are in the same hand. Keep the shortest duration note among duplicates.
-		op_load = Operator(0.1)
 		remaining_notes.sort(
 			key=lambda n: (
 				int(getattr(n, 'pitch', 0) or 0),
@@ -704,10 +705,35 @@ class SCORE:
 		for g in converted_grace:
 			self.new_grace_note(pitch=int(g.pitch), time=float(g.time), notehead=str(getattr(g, 'notehead', 'auto') or 'auto'))
 
+		# De-duplicate grace notes that share effectively the same time and exact pitch.
+		grace_items = list(getattr(self.events, 'grace_note', []) or [])
+		grace_items.sort(
+			key=lambda g: (
+				int(getattr(g, 'pitch', 0) or 0),
+				float(getattr(g, 'time', 0.0) or 0.0),
+			)
+		)
+		deduped_grace: List[GraceNote] = []
+		for g in grace_items:
+			if not deduped_grace:
+				deduped_grace.append(g)
+				continue
+			prev = deduped_grace[-1]
+			prev_pitch = int(getattr(prev, 'pitch', 0) or 0)
+			prev_time = float(getattr(prev, 'time', 0.0) or 0.0)
+			cur_pitch = int(getattr(g, 'pitch', 0) or 0)
+			cur_time = float(getattr(g, 'time', 0.0) or 0.0)
+			if cur_pitch == prev_pitch and op_load.eq(cur_time, prev_time):
+				continue
+			deduped_grace.append(g)
+		grace_deduped_removed = max(0, len(grace_items) - len(deduped_grace))
+		self.events.grace_note = deduped_grace
+
 		self._last_load_checks_report = {
 			'deduped_removed': int(deduped_removed),
 			'shortened_overlaps': int(shortened_overlaps),
 			'converted_to_grace': int(len(converted_grace)),
+			'grace_deduped_removed': int(grace_deduped_removed),
 		}
 	
 		# Normalize beam hand values as well.

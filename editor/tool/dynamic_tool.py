@@ -5,7 +5,8 @@ from PySide6 import QtCore, QtWidgets, QtGui
 from editor.tool.base_tool import BaseTool
 from file_model.SCORE import SCORE
 from ui.dialogs.dynamic_menu import DynamicSymbolMenu
-from utils.CONSTANT import QUARTER_NOTE_UNIT
+from utils.CONSTANT import QUARTER_NOTE_UNIT, SHORTEST_DURATION
+from utils.operator import Operator
 
 
 class DynamicTool(BaseTool):
@@ -28,6 +29,7 @@ class DynamicTool(BaseTool):
     def __init__(self) -> None:
         super().__init__()
         self._mode: str = self._MODE_CRESCENDO
+        self._time_op = Operator(float(SHORTEST_DURATION))
         self._active_hairpin = None          # current event object being dragged
         self._active_type: Optional[str] = None   # 'crescendo' or 'decrescendo'
         self._active_handle: Optional[str] = None # 'start' or 'end'
@@ -187,7 +189,7 @@ class DynamicTool(BaseTool):
         for symbol in (getattr(score.events, 'dynamic_symbol', []) or []):
             symbol_time = float(getattr(symbol, 'time', 0.0) or 0.0)
             symbol_rpitch = int(getattr(symbol, 'x_rpitch', 0) or 0)
-            if abs(symbol_time - endpoint_time) < 0.1 and symbol_rpitch == endpoint_rpitch:
+            if self._time_op.eq(symbol_time, endpoint_time) and symbol_rpitch == endpoint_rpitch:
                 return symbol
         return None
 
@@ -199,7 +201,7 @@ class DynamicTool(BaseTool):
         for symbol in (getattr(score.events, 'dynamic_symbol', []) or []):
             symbol_time = float(getattr(symbol, 'time', 0.0) or 0.0)
             symbol_rpitch = int(getattr(symbol, 'x_rpitch', 0) or 0)
-            if abs(symbol_time - float(point_time)) < 0.1 and symbol_rpitch == int(point_rpitch):
+            if self._time_op.eq(symbol_time, float(point_time)) and symbol_rpitch == int(point_rpitch):
                 out.append(symbol)
         return out
 
@@ -209,7 +211,7 @@ class DynamicTool(BaseTool):
             endpoint_rpitch = int(getattr(hp, 'x_rpitch', 0) or 0)
             for handle in ('start', 'end'):
                 endpoint_time = self._hairpin_endpoint_time(hp, handle)
-                if abs(float(endpoint_time) - float(point_time)) < 0.1 and endpoint_rpitch == int(point_rpitch):
+                if self._time_op.eq(float(endpoint_time), float(point_time)) and endpoint_rpitch == int(point_rpitch):
                     out.append((hp, handle))
         return out
 

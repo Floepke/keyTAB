@@ -76,11 +76,13 @@ class GraceNoteDrawerMixin:
             tag = "grace_note_black" if bool(getattr(notehead, 'filled', False)) else "grace_note_white"
             notehead.draw_notehead(du, item_id=int(getattr(g, '_id', 0) or 0), tags=[tag], use_custom_color=False)
 
-            # Hit rectangle uses unscaled notehead size for predictable picking
+            # Hit rectangle uses notehead size scaled by notehead_height_scaling for predictable picking
             hit_w = semitone_dist
+            notehead_height_scaling = float(getattr(layout, 'notehead_height_scaling', 1.2) or 1.2)
+            hit_h = semitone_dist * notehead_height_scaling
             y_center = float(y_top + semitone_scaled)
             self.register_hit_rect(
                 'note', int(getattr(g, '_id', 0) or 0),
-                float(x - hit_w), float(y_center - hit_w),
-                float(x + hit_w), float(y_center + hit_w),
+                float(x - hit_w), float(y_center - hit_h),
+                float(x + hit_w), float(y_center + hit_h),
             )

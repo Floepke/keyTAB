@@ -56,7 +56,7 @@ class TimeSignatureTool(BaseTool):
             return None
         for seg in segs:
             _idx, _bg, start, end, _mlen = seg
-            if start <= t < end:
+            if self._op.ge(t, start) and self._op.lt(t, end):
                 return seg
         return segs[-1]
 
@@ -82,12 +82,15 @@ class TimeSignatureTool(BaseTool):
             return float(ticks), False
         t = float(ticks)
         nearest = min(bars, key=lambda v: abs(float(v) - t))
-        return float(nearest), abs(float(nearest) - t) <= self._barline_hit_tolerance()
+        return float(nearest), self._op.le(abs(float(nearest) - t), self._barline_hit_tolerance())
 
     def _measure_start_for_time(self, score: SCORE, seg_start: float, seg_end: float, ticks: float) -> float:
         bars = self._all_barlines(score)
         t = float(ticks)
-        in_segment = [b for b in bars if float(seg_start) - 1e-6 <= float(b) <= float(seg_end) + 1e-6 and float(b) <= t + 1e-6]
+        in_segment = [
+            b for b in bars
+            if self._op.ge(float(b), float(seg_start)) and self._op.le(float(b), float(seg_end)) and self._op.le(float(b), t)
+        ]
         if in_segment:
             return float(max(in_segment))
         return float(seg_start)

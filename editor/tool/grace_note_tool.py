@@ -3,6 +3,8 @@ from editor.tool.base_tool import BaseTool
 from file_model.SCORE import SCORE
 from ui.dialogs.notehead_dialog import NoteheadDialog
 from PySide6 import QtWidgets
+from utils.CONSTANT import SHORTEST_DURATION
+from utils.operator import Operator
 
 
 class GraceNoteTool(BaseTool):
@@ -15,6 +17,7 @@ class GraceNoteTool(BaseTool):
         self._suppress_click = False
         self._last_audition_pitch: int | None = None
         self._pending_grace_notehead_id: int | None = None
+        self._time_op = Operator(float(SHORTEST_DURATION))
 
     _GRACE_NOTEHEAD_CHOICES: list[tuple[str, str]] = [
         ("auto", "Auto"),
@@ -43,12 +46,9 @@ class GraceNoteTool(BaseTool):
     def _audition_pitch(self, pitch: int) -> None:
         if not self._play_note_on_edit_enabled():
             return
-        try:
-            if hasattr(self._editor, 'player') and self._editor.player is not None:
-                self._editor.player.audition_note(pitch=int(pitch))
-                self._last_audition_pitch = int(pitch)
-        except Exception:
-            pass
+        if hasattr(self._editor, 'player') and self._editor.player is not None:
+            self._editor.player.audition_note(pitch=int(pitch))
+            self._last_audition_pitch = int(pitch)
 
     def _add_grace_note(self, x: float, y: float) -> None:
         score = self._score()
@@ -59,33 +59,38 @@ class GraceNoteTool(BaseTool):
         pitch = int(self._editor.widget_px_to_pitch(x, y))
         self._audition_pitch(pitch)
         grace = score.new_grace_note(pitch=pitch, time=t_snap)
-        try:
-            self._editor.update_score_length(grace)
-        except Exception:
-            pass
-        try:
-            self._editor._snapshot_if_changed(coalesce=True, label='grace_note_add')
-        except Exception:
-            pass
+        self._editor.update_score_length(grace)
+        self._editor._snapshot_if_changed(coalesce=True, label='grace_note_add')
         try:
             self._editor.force_redraw_from_model()
         except Exception:
             self._editor.draw_frame()
 
+    def _cursor_pitch_and_time(self, x: float, y: float) -> tuple[int, float]:
+        pitch_cursor = getattr(self._editor, 'pitch_cursor', None)
+        if pitch_cursor is None:
+            pitch_cursor = self._editor.widget_px_to_pitch(x, y)
+        t_raw = float(self._editor.widget_px_to_time(x, y))
+        t_snap = float(self._editor.snap_time(t_raw))
+        return int(pitch_cursor), float(t_snap)
+
+    def _grace_matches_cursor(self, grace, x: float, y: float) -> bool:
+        cursor_pitch, cursor_time = self._cursor_pitch_and_time(x, y)
+        grace_pitch = int(getattr(grace, 'pitch', cursor_pitch) or cursor_pitch)
+        grace_time = float(getattr(grace, 'time', cursor_time) or cursor_time)
+        return bool(grace_pitch == cursor_pitch and self._time_op.eq(grace_time, cursor_time))
+
+    def _find_grace_at_cursor(self, score: SCORE, x: float, y: float):
+        for g in (getattr(score.events, 'grace_note', []) or []):
+            if self._grace_matches_cursor(g, x, y):
+                return g
+        return None
+
     def _delete_grace_note(self, x: float, y: float) -> None:
         score = self._score()
         if score is None:
             return
-        target = None
-        hit_id = None
-        hit_test = getattr(self._editor, 'hit_test_note_id', None)
-        if callable(hit_test):
-            hit_id = hit_test(x, y)
-        if hit_id is not None:
-            for g in getattr(score.events, 'grace_note', []) or []:
-                if int(getattr(g, '_id', -1) or -1) == int(hit_id):
-                    target = g
-                    break
+        target = self._find_grace_at_cursor(score, x, y)
         if target is None:
             return
         lst = getattr(score.events, 'grace_note', None)
@@ -95,10 +100,7 @@ class GraceNoteTool(BaseTool):
             except ValueError:
                 tid = int(getattr(target, '_id', -2) or -2)
                 score.events.grace_note = [m for m in lst if int(getattr(m, '_id', -2) or -2) != tid]
-        try:
-            self._editor.update_score_length()
-        except Exception:
-            pass
+        self._editor.update_score_length()
 
     def on_left_press(self, x: float, y: float) -> None:
         super().on_left_press(x, y)
@@ -107,29 +109,19 @@ class GraceNoteTool(BaseTool):
         self._drag_started = False
         self._suppress_click = False
         # Hide guides/overlay cursor during grace edit for clarity
-        try:
-            if self._editor is not None:
-                self._editor.guides_active = False
-        except Exception:
-            pass
+        if self._editor is not None:
+            self._editor.guides_active = False
         score = self._score()
         if score is None:
             return
-        hit_id = None
-        hit_test = getattr(self._editor, 'hit_test_note_id', None)
-        if callable(hit_test):
-            hit_id = hit_test(x, y)
-        if hit_id is not None:
-            for g in getattr(score.events, 'grace_note', []) or []:
-                if int(getattr(g, '_id', -1) or -1) == int(hit_id):
-                    self._drag_grace = g
-                    try:
-                        gp = int(getattr(g, 'pitch', self._editor.widget_px_to_pitch(x, y)) or self._editor.widget_px_to_pitch(x, y))
-                    except Exception:
-                        gp = int(self._editor.widget_px_to_pitch(x, y))
-                    self._audition_pitch(gp)
-                    self._suppress_click = True
-                    break
+        self._drag_grace = self._find_grace_at_cursor(score, x, y)
+        if self._drag_grace is not None:
+            try:
+                gp = int(getattr(self._drag_grace, 'pitch', self._editor.widget_px_to_pitch(x, y)) or self._editor.widget_px_to_pitch(x, y))
+            except Exception:
+                gp = int(self._editor.widget_px_to_pitch(x, y))
+            self._audition_pitch(gp)
+            self._suppress_click = True
 
     def on_left_drag_start(self, x: float, y: float) -> None:
         super().on_left_drag_start(x, y)
@@ -143,30 +135,19 @@ class GraceNoteTool(BaseTool):
         # Update pitch and time live while dragging
         cur_t = float(self._editor.snap_time(self._editor.widget_px_to_time(x, y)))
         cur_pitch = int(self._editor.widget_px_to_pitch(x, y))
-        try:
-            prev_pitch = int(getattr(self._drag_grace, 'pitch', cur_pitch) or cur_pitch)
-            self._drag_grace.time = cur_t
-            self._drag_grace.pitch = cur_pitch
-            if cur_pitch != prev_pitch and cur_pitch != self._last_audition_pitch:
-                self._audition_pitch(cur_pitch)
-        except Exception:
-            pass
-        try:
-            self._editor.draw_frame()
-        except Exception:
-            pass
+        prev_pitch = int(getattr(self._drag_grace, 'pitch', cur_pitch) or cur_pitch)
+        self._drag_grace.time = cur_t
+        self._drag_grace.pitch = cur_pitch
+        if cur_pitch != prev_pitch and cur_pitch != self._last_audition_pitch:
+            self._audition_pitch(cur_pitch)
+
+        self._editor.draw_frame()
 
     def on_left_drag_end(self, x: float, y: float) -> None:
         super().on_left_drag_end(x, y)
         if self._drag_grace is not None:
-            try:
-                self._editor.update_score_length(self._drag_grace)
-            except Exception:
-                pass
-            try:
-                self._editor._snapshot_if_changed(coalesce=True, label='grace_note_move')
-            except Exception:
-                pass
+            self._editor.update_score_length(self._drag_grace)
+            self._editor._snapshot_if_changed(coalesce=True, label='grace_note_move')
             try:
                 self._editor.force_redraw_from_model()
             except Exception:
@@ -177,11 +158,8 @@ class GraceNoteTool(BaseTool):
         # If we dragged an existing note, suppress creation on click path
         self._suppress_click = True
         # Restore guides after editing session ends
-        try:
-            if self._editor is not None:
-                self._editor.guides_active = True
-        except Exception:
-            pass
+        if self._editor is not None:
+            self._editor.guides_active = True
 
     def on_left_click(self, x: float, y: float) -> None:
         super().on_left_click(x, y)
@@ -189,11 +167,8 @@ class GraceNoteTool(BaseTool):
             return
         self._add_grace_note(x, y)
         # Re-enable guides after add to keep overlay consistent
-        try:
-            if self._editor is not None:
-                self._editor.guides_active = True
-        except Exception:
-            pass
+        if self._editor is not None:
+            self._editor.guides_active = True
 
     def on_right_click(self, x: float, y: float) -> None:
         super().on_right_click(x, y)
@@ -205,16 +180,9 @@ class GraceNoteTool(BaseTool):
         score = self._score()
         if score is None:
             return
-        hit_id = None
-        hit_test = getattr(self._editor, 'hit_test_note_id', None)
-        if callable(hit_test):
-            hit_id = hit_test(x, y)
-        if hit_id is None:
-            return
-        for g in getattr(score.events, 'grace_note', []) or []:
-            if int(getattr(g, '_id', -1) or -1) == int(hit_id):
-                self._pending_grace_notehead_id = int(hit_id)
-                break
+        target = self._find_grace_at_cursor(score, x, y)
+        if target is not None:
+            self._pending_grace_notehead_id = int(getattr(target, '_id', -1) or -1)
 
     def on_left_double_unpress(self, x: float, y: float) -> None:
         super().on_left_double_unpress(x, y)

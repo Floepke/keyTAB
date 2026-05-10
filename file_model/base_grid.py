@@ -1,7 +1,8 @@
 from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import List
-from utils.CONSTANT import QUARTER_NOTE_UNIT
+from utils.CONSTANT import QUARTER_NOTE_UNIT, SHORTEST_DURATION
+from utils.operator import Operator
 
 LEGACY_MODE_MAX_VALUE: int = 8
 MIN_TIME_GRID_TICKS: int = int(round(float(QUARTER_NOTE_UNIT) * (4.0 / 32.0)))
@@ -75,6 +76,7 @@ def resolve_grid_layer_offsets(beat_grouping: List[float], numerator: int, denom
     seq = [float(v) for v in (beat_grouping or []) if isinstance(v, (int, float))]
     if not seq:
         return [], []
+    op = Operator(float(SHORTEST_DURATION))
 
     # Legacy full sequence mode
     if _is_legacy_group_sequence(seq, numer):
@@ -102,14 +104,14 @@ def resolve_grid_layer_offsets(beat_grouping: List[float], numerator: int, denom
     uniq_times: list[float] = []
     for val in seq:
         t = float(val)
-        if t > 0.0 and t < float(MIN_TIME_GRID_TICKS):
+        if op.gt(t, 0.0) and op.lt(t, float(MIN_TIME_GRID_TICKS)):
             continue
-        if t < 0.0 or t >= measure_len_ticks:
+        if op.lt(t, 0.0) or op.ge(t, measure_len_ticks):
             continue
-        if any(abs(t - existing) < 1e-6 for existing in uniq_times):
+        if any(op.eq(t, existing) for existing in uniq_times):
             continue
         uniq_times.append(t)
     uniq_times = sorted(uniq_times)
-    bar_offsets = [0.0] if any(abs(t) < 1e-6 for t in uniq_times) else []
-    grid_offsets = [float(t) for t in uniq_times if abs(t) >= 1e-6]
+    bar_offsets = [0.0] if any(op.eq(t, 0.0) for t in uniq_times) else []
+    grid_offsets = [float(t) for t in uniq_times if not op.eq(t, 0.0)]
     return bar_offsets, grid_offsets
