@@ -58,9 +58,9 @@ class GraceNoteTool(BaseTool):
         t_snap = float(self._editor.snap_time(t_raw))
         pitch = int(self._editor.widget_px_to_pitch(x, y))
         self._audition_pitch(pitch)
-        score.new_grace_note(pitch=pitch, time=t_snap)
+        grace = score.new_grace_note(pitch=pitch, time=t_snap)
         try:
-            self._editor.update_score_length()
+            self._editor.update_score_length(grace)
         except Exception:
             pass
         try:
@@ -160,7 +160,7 @@ class GraceNoteTool(BaseTool):
         super().on_left_drag_end(x, y)
         if self._drag_grace is not None:
             try:
-                self._editor.update_score_length()
+                self._editor.update_score_length(self._drag_grace)
             except Exception:
                 pass
             try:

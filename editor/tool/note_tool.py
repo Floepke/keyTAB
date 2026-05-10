@@ -552,6 +552,8 @@ class NoteTool(BaseTool):
 
     def on_left_unpress(self, x: float, y: float) -> None:
         super().on_left_unpress(x, y)
+        if hasattr(self._editor, 'clear_single_note_timing_dirty'):
+            self._editor.clear_single_note_timing_dirty()
         if self._suppress_note_edit_until_release:
             self._suppress_note_edit_until_release = False
             self._notehead_dialog_active = False
@@ -687,6 +689,8 @@ class NoteTool(BaseTool):
         return
 
     def _cancel_active_note_edit(self, redraw: bool) -> None:
+        if hasattr(self._editor, 'clear_single_note_timing_dirty'):
+            self._editor.clear_single_note_timing_dirty()
         self._velocity_dragging = False
         self._velocity_target = None
         self._velocity_targets = []
@@ -816,12 +820,13 @@ class NoteTool(BaseTool):
         if self._velocity_dragging:
             self._apply_velocity_from_cursor(x, y)
             return
-        # Update the in-progress note based on current mouse
         if self.edit_note is None:
             return
         
-        # Get note being edited and current raw/snap time and pitch
+        # Update the in-progress note based on current mouse
         note = self.edit_note
+        prev_time = float(getattr(note, 'time', 0.0) or 0.0)
+        prev_duration = float(getattr(note, 'duration', 0.0) or 0.0)
         cur_t_raw = float(self._editor.widget_px_to_time(x, y))
         cur_t_snap = float(self._editor.snap_time(cur_t_raw))
         cur_pitch = int(self._editor.widget_px_to_pitch(x, y))
@@ -833,7 +838,7 @@ class NoteTool(BaseTool):
         units = float(max(1e-6, getattr(self._editor, 'snap_size_units', 8.0)))
         snapped_end = float(max(cur_t_snap, start_t + units))
         # Thresholded comparator to avoid floating-point jitter around band boundaries
-        op = Operator(7)
+        op = Operator(SHORTEST_DURATION)
 
         if not self._editing_existing:
             # Creating a new note: original behavior
@@ -861,10 +866,14 @@ class NoteTool(BaseTool):
                     self._audition_pitch(cur_pitch)
                 note.time = candidate_time
                 note.duration = float(max(0.0, self._orig_duration))
+                if (not Operator(SHORTEST_DURATION).eq(prev_time, float(getattr(note, 'time', 0.0) or 0.0))) or (not Operator(SHORTEST_DURATION).eq(prev_duration, float(getattr(note, 'duration', 0.0) or 0.0))):
+                    if hasattr(self._editor, 'mark_single_note_timing_dirty'):
+                        self._editor.mark_single_note_timing_dirty(note, prev_time, prev_duration)
+                    self._editor.update_score_length(note)
                 return
 
             # Editing existing note:
-            # - Before start: pitch-only
+            # - Mouse before start time: pitch-only
             # - Until we cross one snap unit past start, do pitch-only and do not alter duration
             # - Once we cross into the second snap band, arm duration editing. From then on:
             #   * If back inside first band: set duration to exactly one snap unit
@@ -884,6 +893,12 @@ class NoteTool(BaseTool):
                     candidate = float(max(units, snapped_end - start_t))
                     if self._can_apply_duration(note, candidate):
                         note.duration = candidate
+
+        if (not op.eq(prev_time, float(getattr(note, 'time', 0.0) or 0.0))) or (not op.eq(prev_duration, float(getattr(note, 'duration', 0.0) or 0.0))):
+            # Fast path: only the actively edited note changed.
+            if hasattr(self._editor, 'mark_single_note_timing_dirty'):
+                self._editor.mark_single_note_timing_dirty(note, prev_time, prev_duration)
+            self._editor.update_score_length(note)
 
     def on_left_drag_end(self, x: float, y: float) -> None:
         super().on_left_drag_end(x, y)
@@ -906,9 +921,6 @@ class NoteTool(BaseTool):
         self._duration_edit_armed = False
         self._last_audition_pitch = None
         self._move_pitch_time_mode = False
-        
-        # Ensure the music/base_grid covers latest note end
-        self._editor.update_score_length()
 
     def on_right_press(self, x: float, y: float) -> None:
         super().on_right_press(x, y)

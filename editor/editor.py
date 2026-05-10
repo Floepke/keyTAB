@@ -1,8 +1,9 @@
 from __future__ import annotations
 from typing import Literal, Optional, Tuple, Dict, Type, TYPE_CHECKING
-import math, bisect, copy, heapq
+import math, bisect, heapq
 from PySide6 import QtCore, QtGui
 
+from editor.selection import SelectionMixin
 from editor.tool.base_tool import BaseTool
 from editor.tool_manager import ToolManager
 # Import tool templates
@@ -47,9 +48,9 @@ from editor.drawers.decrescendo_drawer import DecrescendoDrawerMixin
 from editor.drawers.time_signature_drawer import TimeSignatureDrawerMixin
 from editor.drawers.arpeggio_drawer import ArpeggioDrawerMixin
 from utils.CONSTANT import PIANO_KEY_AMOUNT, BLACK_KEYS
-from utils.tiny_tool import key_class_filter
 from utils.operator import Operator
 from editor.collision import CollisionMixin
+from ui.widgets.draw_util import DrawUtil
 
 if TYPE_CHECKING:
     from editor.tool.base_tool import BaseTool
@@ -58,6 +59,7 @@ if TYPE_CHECKING:
 
 class Editor(QtCore.QObject,
              CollisionMixin,
+             SelectionMixin,
              StaveDrawerMixin,
              SnapDrawerMixin,
              GridBandDrawerMixin,
@@ -194,12 +196,6 @@ class Editor(QtCore.QObject,
         # Playhead position (app time units). When set, draws a red line overlay.
         self.playhead_time: Optional[float] = None
 
-        # Debounced snapshot for fast transpose bursts
-        self._transpose_timer = QtCore.QTimer(self)
-        self._transpose_timer.setSingleShot(True)
-        self._transpose_timer.timeout.connect(self._finalize_transpose_snapshot)
-        self._pending_snapshot_label: str = 'transpose_notes'
-
         # Per-frame shared render cache (built at draw_all)
         self._draw_cache: dict | None = None
         # One-shot hint to reuse the current draw cache on the next frame
@@ -221,19 +217,10 @@ class Editor(QtCore.QObject,
         self.tiny_mode_stage: int = 0
         self.tiny_mode_alpha: float = 1.0
 
-        # Selection window state (time-based, tool-agnostic)
-        self._selection_active: bool = False
-        self._sel_start_units: float = 0.0
-        self._sel_end_units: float = 0.0
-        # Anchor time for selection (absolute ticks, unaffected by scroll)
-        self._sel_anchor_units: float = 0.0
-        # Pitch-constrained selection (1..88)
-        self._sel_min_pitch: int = 1
-        self._sel_max_pitch: int = 88
-        self._sel_anchor_pitch: int = 1
-        # Clipboard for cut/copy/paste of detected events
-        self.clipboard: dict | None = None
-        self._clipboard_start_units: float | None = None
+        self._init_selection_state()
+        self._cached_furthest_music_end: float = 0.0
+        self._score_length_cache_valid: bool = False
+        self._single_note_timing_dirty: dict | None = None
         # Modifier state
         self._shift_down: bool = False
         self._ctrl_down: bool = False
@@ -309,7 +296,6 @@ class Editor(QtCore.QObject,
         Useful for immediate feedback from tools (e.g., updating hit rects/cache) before
         the widget triggers a repaint.
         """
-        from ui.widgets.draw_util import DrawUtil
         du = DrawUtil()
         if du is not None:
             # Derive page size from SCORE layout; fall back to A4
@@ -337,23 +323,14 @@ class Editor(QtCore.QObject,
         elif w is not None and hasattr(w, 'update'):
             w.update()
 
-    def _queue_transpose_snapshot(self, delay_ms: int = 200, label: str = 'transpose_notes') -> None:
-        """Debounce transpose snapshots to avoid heavy work on every keypress."""
-        if self._transpose_timer.isActive():
-            self._transpose_timer.stop()
-        self._pending_snapshot_label = str(label or 'transpose_notes')
-        self._transpose_timer.start(int(max(1, delay_ms)))
-
-    def _finalize_transpose_snapshot(self) -> None:
-        label = getattr(self, '_pending_snapshot_label', 'transpose_notes')
-        self._snapshot_if_changed(coalesce=True, label=str(label or 'transpose_notes'))
-
     def _calculate_layout(self, view_width_mm: float) -> None:
-        """Compute editor-specific layout based on the current view width.
+        """Compute editor-specific layout based on the current view dimensions.
+        The drawing is programmed in vertical orientation and rotated afterwards
+        if the editor orientation == 'horizontal'.
 
         - margin: 1/6 of the width
         - stave width: width - 2 * margin
-        - semitone spacing: stave width / (PIANO_KEY_AMOUNT - 1)
+        - semitone spacing: stave width / physical semitone range (101 semitones from A0 to C8 including BE gaps)
         """
         self.margin = view_width_mm / 6
         physical_semitone_spaces = 101
@@ -362,7 +339,9 @@ class Editor(QtCore.QObject,
         self.editor_height = self._calc_editor_height()
         self._rebuild_x_positions()
 
-    # ---- Note lookup ----
+    '''
+        ---- Note lookup ----
+    '''
 
     def get_note_by_id(self, note_id: int):
         """Return the note event for id, preferring current viewport cache.
@@ -398,10 +377,11 @@ class Editor(QtCore.QObject,
         return max(1, int(i + 1))
 
     def _rebuild_x_positions(self) -> None:
-        """Precompute x positions for keys 1..88 with BE gap after a b or e key."""
+        """Precompute x positions for keys 1..88 with BE gap after a B or E key."""
         be_set = set(BE_KEYS)
+        # to start at the margin for key 1 (A0), we initialize one semitone before the margin and then step forward
         x_pos = self.margin - self.semitone_dist
-        xs = [x_pos]
+        x_positions = [x_pos]
 
         for n in range(1, PIANO_KEY_AMOUNT + 1):
             # Apply extra gap AFTER B/E, i.e., when stepping from (n-1) -> n
@@ -409,9 +389,9 @@ class Editor(QtCore.QObject,
                 x_pos += self.semitone_dist
             # Normal semitone step
             x_pos += self.semitone_dist
-            xs.append(x_pos)
+            x_positions.append(x_pos)
 
-        self._x_positions = xs
+        self._x_positions = x_positions
 
     def set_tool_by_name(self, name: str) -> None:
         cls = self._tool_classes.get(name)
@@ -426,6 +406,7 @@ class Editor(QtCore.QObject,
     def set_score(self, score):
         # Set an explicit score model when not using FileManager
         self._score = score
+        self._invalidate_score_length_cache()
 
     # Model provider for undo snapshots
     def set_file_manager(self, fm) -> None:
@@ -441,6 +422,102 @@ class Editor(QtCore.QObject,
         if self._file_manager is not None:
             return self._file_manager.current()
         return getattr(self, "_score", None)
+
+    def _invalidate_score_length_cache(self) -> None:
+        self._cached_furthest_music_end = 0.0
+        self._score_length_cache_valid = False
+        self._single_note_timing_dirty = None
+
+    def mark_single_note_timing_dirty(self, note, previous_time: float, previous_duration: float) -> None:
+        note_id = int(getattr(note, '_id', 0) or 0)
+        if note_id <= 0:
+            self._single_note_timing_dirty = None
+            return
+        self._single_note_timing_dirty = {
+            'note_id': note_id,
+            'note': note,
+            'previous_time': float(previous_time),
+            'previous_duration': float(previous_duration),
+        }
+
+    def clear_single_note_timing_dirty(self) -> None:
+        self._single_note_timing_dirty = None
+
+    def _apply_single_note_timing_cache_update(self, notes: list) -> tuple[list, list[float], list[float], list[tuple[float, int]], list[float]] | None:
+        dirty = getattr(self, '_single_note_timing_dirty', None)
+        cached = self._note_time_cache_values
+        if not dirty or cached is None:
+            return None
+        notes_sorted, starts, ends, end_pairs, end_values = cached
+        if len(notes_sorted) != len(notes):
+            return None
+
+        note_id = int(dirty.get('note_id', 0) or 0)
+        note = dirty.get('note')
+        if note is None or int(getattr(note, '_id', 0) or 0) != note_id:
+            return None
+
+        old_idx = -1
+        for idx, existing in enumerate(notes_sorted):
+            if int(getattr(existing, '_id', 0) or 0) == note_id:
+                old_idx = idx
+                break
+        if old_idx < 0:
+            return None
+
+        old_notes_sorted = list(notes_sorted)
+        old_starts = list(starts)
+        old_ends = list(ends)
+        old_end_pairs = list(end_pairs)
+        old_end_values = list(end_values)
+
+        note_entry = old_notes_sorted.pop(old_idx)
+        old_starts.pop(old_idx)
+        old_ends.pop(old_idx)
+
+        pair_pos = -1
+        for idx, (_end_value, pair_idx) in enumerate(old_end_pairs):
+            if int(pair_idx) == old_idx:
+                pair_pos = idx
+                break
+        if pair_pos < 0:
+            return None
+        old_end_pairs.pop(pair_pos)
+        old_end_values.pop(pair_pos)
+
+        adjusted_end_pairs: list[tuple[float, int]] = []
+        for end_value, pair_idx in old_end_pairs:
+            new_pair_idx = int(pair_idx)
+            if new_pair_idx > old_idx:
+                new_pair_idx -= 1
+            adjusted_end_pairs.append((float(end_value), new_pair_idx))
+
+        new_time = float(getattr(note_entry, 'time', 0.0) or 0.0)
+        new_duration = float(getattr(note_entry, 'duration', 0.0) or 0.0)
+        new_pitch = int(getattr(note_entry, 'pitch', 0) or 0)
+        insert_idx = bisect.bisect_left(old_starts, new_time)
+        while insert_idx < len(old_starts):
+            if old_starts[insert_idx] > new_time:
+                break
+            if old_starts[insert_idx] == new_time and int(getattr(old_notes_sorted[insert_idx], 'pitch', 0) or 0) > new_pitch:
+                break
+            insert_idx += 1
+
+        old_notes_sorted.insert(insert_idx, note_entry)
+        old_starts.insert(insert_idx, new_time)
+        new_end = new_time + new_duration
+        old_ends.insert(insert_idx, new_end)
+
+        rebased_end_pairs: list[tuple[float, int]] = []
+        for end_value, pair_idx in adjusted_end_pairs:
+            new_pair_idx = int(pair_idx)
+            if new_pair_idx >= insert_idx:
+                new_pair_idx += 1
+            rebased_end_pairs.append((float(end_value), new_pair_idx))
+        end_insert_idx = bisect.bisect_right(old_end_values, new_end)
+        old_end_values.insert(end_insert_idx, new_end)
+        rebased_end_pairs.insert(end_insert_idx, (new_end, insert_idx))
+        return (old_notes_sorted, old_starts, old_ends, rebased_end_pairs, old_end_values)
 
     def _snapshot_if_changed(self, coalesce: bool = False, label: str = "") -> None:
         if self._file_manager is None:
@@ -470,6 +547,7 @@ class Editor(QtCore.QObject,
             snap = self._ctlz.undo()
         if snap is not None:
             self._file_manager.replace_current(snap)
+            self._invalidate_score_length_cache()
             # The SCORE instance was replaced; clear caches that may hold old object references.
             self._draw_cache = None
             self._reuse_draw_cache_once = False
@@ -488,6 +566,7 @@ class Editor(QtCore.QObject,
             snap = self._ctlz.redo()
         if snap is not None:
             self._file_manager.replace_current(snap)
+            self._invalidate_score_length_cache()
             # The SCORE instance was replaced; clear caches that may hold old object references.
             self._draw_cache = None
             self._reuse_draw_cache_once = False
@@ -515,17 +594,7 @@ class Editor(QtCore.QObject,
                 self._tool.on_left_press(x, y)
             # If Shift is held, initialize selection anchor on left press
             if self._left_selection_mode:
-                anchor_t = self.snap_time(self.widget_px_to_time(x, y))
-                self._sel_anchor_units = float(anchor_t)
-                self._sel_start_units = float(anchor_t)
-                ss = max(1e-6, float(self.snap_size_units))
-                self._sel_end_units = float(anchor_t + ss)
-                anchor_p = int(self.widget_px_to_pitch(x, y))
-                anchor_p = max(1, min(88, anchor_p))
-                self._sel_anchor_pitch = anchor_p
-                self._sel_min_pitch = anchor_p
-                self._sel_max_pitch = anchor_p
-                self._selection_active = True
+                self._begin_selection_drag(x, y)
         elif button == 2:
             self._right_pressed = True
             self._dragging_right = False
@@ -536,17 +605,7 @@ class Editor(QtCore.QObject,
                 self._tool.on_right_press(x, y)
             else:
                 # Initialize selection anchor at press to be robust against scrolling
-                anchor_t = self.snap_time(self.widget_px_to_time(x, y))
-                self._sel_anchor_units = float(anchor_t)
-                self._sel_start_units = float(anchor_t)
-                ss = max(1e-6, float(self.snap_size_units))
-                self._sel_end_units = float(anchor_t + ss)
-                anchor_p = int(self.widget_px_to_pitch(x, y))
-                anchor_p = max(1, min(88, anchor_p))
-                self._sel_anchor_pitch = anchor_p
-                self._sel_min_pitch = anchor_p
-                self._sel_max_pitch = anchor_p
-                self._selection_active = True
+                self._begin_selection_drag(x, y)
 
     def mouse_move(self, x: float, y: float, dx: float, dy: float) -> None:
         # Recover from stale press state (e.g., modal dialogs interrupt release events).
@@ -559,22 +618,16 @@ class Editor(QtCore.QObject,
             right_phys_down = self._right_pressed
 
         if self._left_pressed and not left_phys_down:
-            try:
-                if not self._left_selection_mode:
-                    self._tool.on_left_unpress(x, y)
-            except Exception:
-                pass
+            if not self._left_selection_mode:
+                self._tool.on_left_unpress(x, y)
             self._left_pressed = False
             self._dragging_left = False
             self._left_selection_mode = False
 
         if self._right_pressed and not right_phys_down:
-            try:
-                if self._dragging_right and not self._right_selection_mode:
-                    self._tool.on_right_drag_end(x, y)
-                self._tool.on_right_unpress(x, y)
-            except Exception:
-                pass
+            if self._dragging_right and not self._right_selection_mode:
+                self._tool.on_right_drag_end(x, y)
+            self._tool.on_right_unpress(x, y)
             if self._dragging_right and self._right_selection_mode:
                 # Selection was being built; preserve it and suppress the upcoming release
                 self._ignore_next_right_release = True
@@ -594,21 +647,7 @@ class Editor(QtCore.QObject,
                     self._tool.on_left_drag(x, y, dx, dy)
                 # Update selection window when Shift+Left-dragging
                 if self._left_selection_mode:
-                    cur_t = self.snap_time(self.widget_px_to_time(x, y))
-                    anchor_t = float(self._sel_anchor_units)
-                    ss = max(1e-6, float(self.snap_size_units))
-                    if cur_t >= anchor_t:
-                        self._sel_start_units = float(anchor_t)
-                        self._sel_end_units = float(cur_t + ss)
-                    else:
-                        self._sel_start_units = float(cur_t)
-                        self._sel_end_units = float(anchor_t)
-                    cur_p = int(self.widget_px_to_pitch(x, y))
-                    cur_p = max(1, min(88, cur_p))
-                    anchor_p = int(self._sel_anchor_pitch)
-                    self._sel_min_pitch = int(min(anchor_p, cur_p))
-                    self._sel_max_pitch = int(max(anchor_p, cur_p))
-                    self._selection_active = True
+                    self._update_selection_drag(x, y)
                 # Do not capture multiple intermediate drag snapshots
         elif self._right_pressed:
             if not self._dragging_right and (abs(dx) > self.DRAG_THRESHOLD or abs(dy) > self.DRAG_THRESHOLD):
@@ -620,21 +659,7 @@ class Editor(QtCore.QObject,
                     self._tool.on_right_drag(x, y, dx, dy)
                 else:
                     # Update selection window while right-dragging (selection mode)
-                    cur_t = self.snap_time(self.widget_px_to_time(x, y))
-                    anchor_t = float(self._sel_anchor_units)
-                    ss = max(1e-6, float(self.snap_size_units))
-                    if cur_t >= anchor_t:
-                        self._sel_start_units = float(anchor_t)
-                        self._sel_end_units = float(cur_t + ss)
-                    else:
-                        self._sel_start_units = float(cur_t)
-                        self._sel_end_units = float(anchor_t)
-                    cur_p = int(self.widget_px_to_pitch(x, y))
-                    cur_p = max(1, min(88, cur_p))
-                    anchor_p = int(self._sel_anchor_pitch)
-                    self._sel_min_pitch = int(min(anchor_p, cur_p))
-                    self._sel_max_pitch = int(max(anchor_p, cur_p))
-                    self._selection_active = True
+                    self._update_selection_drag(x, y)
                 # Skip intermediate drag snapshots
         else:
             # Update shared cursor state for guide rendering (time + mm), with snapping
@@ -750,10 +775,7 @@ class Editor(QtCore.QObject,
                 self._pending_left_double_release = False
                 self._pending_left_double_pos = None
                 if not self._shift_down:
-                    try:
-                        self._tool.on_left_double_unpress(float(pos[0]), float(pos[1]))
-                    except Exception:
-                        pass
+                    self._tool.on_left_double_unpress(float(pos[0]), float(pos[1]))
                 return
 
             if not self._pending_right_double_release:
@@ -764,16 +786,14 @@ class Editor(QtCore.QObject,
             pos = self._pending_right_double_pos or self._press_pos
             self._pending_right_double_release = False
             self._pending_right_double_pos = None
-            try:
-                self._tool.on_right_double_unpress(float(pos[0]), float(pos[1]))
-            except Exception:
-                pass
+            self._tool.on_right_double_unpress(float(pos[0]), float(pos[1]))
 
         QtCore.QTimer.singleShot(0, _try_dispatch)
 
     '''
         ---- Editor drawer mixin helper methods ----
     '''
+    
     def _calc_base_grid_list_total_length(self) -> int:
         """Return the total length of the current SCORE in ticks."""
         score: SCORE = self.current_score()
@@ -799,7 +819,7 @@ class Editor(QtCore.QObject,
         height_mm = max(10.0, stave_length_mm + top_bottom_mm)
         return height_mm
 
-    def update_score_length(self) -> None:
+    def update_score_length(self, edited_event=None) -> None:
         """Ensure measures cover all music exactly, adding or trimming as needed.
 
         - Finds the furthest note end (time + duration).
@@ -813,6 +833,73 @@ class Editor(QtCore.QObject,
         if score is None or not getattr(score, 'base_grid', None):
             return
 
+        current_end = float(self._calc_base_grid_list_total_length())
+        bg_list = score.base_grid
+
+        # update only last BaseGrid
+        last_bg: BaseGrid = bg_list[-1]
+        num = float(getattr(last_bg, 'numerator', 4) or 4)
+        den = float(getattr(last_bg, 'denominator', 4) or 4)
+        measure_len = num * (4.0 / den) * float(QUARTER_NOTE_UNIT)
+
+        # Keep at least one trailing measure segment and allow both extend/trim.
+        last_measures = int(getattr(last_bg, 'measure_amount', 1) or 1)
+        prefix_len = float(current_end - (measure_len * float(max(1, last_measures))))
+        min_total_end = float(prefix_len + measure_len)
+
+        def _fit_last_segment_to_end(target_end: float, grace_times: list[float] | None = None) -> float:
+            target = max(float(target_end), float(min_total_end))
+            needed_last_measures = int(max(1, math.ceil((target - prefix_len) / max(1e-6, measure_len))))
+            fitted_end = float(prefix_len + (measure_len * float(needed_last_measures)))
+            if grace_times:
+                if any(float(gt) >= fitted_end - 1e-6 for gt in grace_times):
+                    needed_last_measures += 1
+                    fitted_end = float(prefix_len + (measure_len * float(needed_last_measures)))
+            last_bg.measure_amount = int(max(1, needed_last_measures))
+            return fitted_end
+
+        if edited_event is not None:
+            event_time = float(getattr(edited_event, 'time', 0.0) or 0.0)
+            duration = getattr(edited_event, 'duration', None)
+            event_end = event_time + float(duration or 0.0) if duration is not None else event_time
+            is_grace_like = duration is None
+
+            prev_end = None
+            dirty = getattr(self, '_single_note_timing_dirty', None)
+            if isinstance(dirty, dict):
+                dirty_id = int(dirty.get('note_id', 0) or 0)
+                event_id = int(getattr(edited_event, '_id', 0) or 0)
+                if dirty_id > 0 and event_id > 0 and dirty_id == event_id:
+                    prev_time = float(dirty.get('previous_time', event_time) or event_time)
+                    prev_duration = float(dirty.get('previous_duration', 0.0) or 0.0)
+                    prev_end = float(prev_time + prev_duration)
+
+            shrink_may_affect_end = False
+            if (self._score_length_cache_valid and prev_end is not None
+                and prev_end >= float(self._cached_furthest_music_end or 0.0) - 1e-6
+                and event_end < prev_end - 1e-6):
+                shrink_may_affect_end = True
+
+            if (not shrink_may_affect_end
+                and event_end <= current_end
+                and not (is_grace_like and event_end >= current_end - 1e-6)):
+                if self._score_length_cache_valid:
+                    self._cached_furthest_music_end = max(float(self._cached_furthest_music_end or 0.0), event_end)
+                return
+
+            # Fast extend path remains cheap. Potential shrink of the previous max
+            # intentionally falls through to the full recompute below.
+            if not shrink_may_affect_end:
+                furthest_end = float(event_end)
+                if is_grace_like and event_end >= current_end - 1e-6:
+                    furthest_end = max(furthest_end, current_end + measure_len)
+                _fit_last_segment_to_end(furthest_end)
+                # Keep this cache as "true furthest musical event end" (not barline-fitted end)
+                # so shrink detection on subsequent drag updates remains correct.
+                self._cached_furthest_music_end = float(furthest_end)
+                self._score_length_cache_valid = True
+                return
+
         # Furthest musical time (notes: end time; grace: start time only)
         furthest_end = 0.0
         grace_times: list[float] = []
@@ -822,33 +909,12 @@ class Editor(QtCore.QObject,
             furthest_end = max(furthest_end, t + dur)
         for g in getattr(score.events, 'grace_note', []) or []:
             t = float(getattr(g, 'time', 0.0) or 0.0)
-            grace_times.append(t)
             furthest_end = max(furthest_end, t)
-        
-        # Current score end (sum of segment lengths)
-        base_grid_total_length = float(self._calc_base_grid_list_total_length())
-        bg_list = score.base_grid
-        
-        # update only last BaseGrid
-        last_bg: BaseGrid = bg_list[-1]
-        num = last_bg.numerator
-        den = last_bg.denominator
-        measure_len = num * (4.0 / den) * float(QUARTER_NOTE_UNIT)
-        current_end = base_grid_total_length
+            grace_times.append(t)
 
-        # If any grace starts on/after the current end barline, force one more measure.
-        grace_hits_barline = any(gt >= current_end - 1e-6 for gt in grace_times)
-        if grace_hits_barline:
-            furthest_end = max(furthest_end, current_end + measure_len)
-
-        # extend last segment
-        needed_length = furthest_end - current_end
-        needed_measures = int((needed_length + measure_len - 1) // measure_len)
-        last_bg.measure_amount += needed_measures
-        
-        # reset to 1 measure if < 1 to prevent zero-measure segments
-        if last_bg.measure_amount < 1:
-            last_bg.measure_amount = 1
+        fitted_end = _fit_last_segment_to_end(furthest_end, grace_times)
+        self._cached_furthest_music_end = float(furthest_end)
+        self._score_length_cache_valid = True
         return
 
     # ---- Shared render cache ----
@@ -913,18 +979,24 @@ class Editor(QtCore.QObject,
 
         # Notes sorted/indexed by timing. Reuse persistent cache when note data is unchanged.
         notes = list(getattr(score.events, 'note', []) or [])
-        note_cache_key = self._compute_note_time_cache_key(notes)
-        if self._note_time_cache_key == note_cache_key and self._note_time_cache_values is not None:
-            notes_sorted, starts, ends, end_pairs, end_values = self._note_time_cache_values
+        patched_values = self._apply_single_note_timing_cache_update(notes)
+        if patched_values is not None:
+            notes_sorted, starts, ends, end_pairs, end_values = patched_values
+            self._note_time_cache_values = patched_values
+            self._note_time_cache_key = None
         else:
-            notes_sorted = sorted(notes, key=lambda n: (float(n.time), int(n.pitch)))
-            starts = [float(n.time) for n in notes_sorted]
-            ends = [float(n.time + n.duration) for n in notes_sorted]
-            # End-sorted pairs are reused across frames for end-window queries.
-            end_pairs = sorted(((ends[i], i) for i in range(len(ends))), key=lambda p: p[0])
-            end_values = [p[0] for p in end_pairs]
-            self._note_time_cache_key = note_cache_key
-            self._note_time_cache_values = (notes_sorted, starts, ends, end_pairs, end_values)
+            note_cache_key = self._compute_note_time_cache_key(notes)
+            if self._note_time_cache_key == note_cache_key and self._note_time_cache_values is not None:
+                notes_sorted, starts, ends, end_pairs, end_values = self._note_time_cache_values
+            else:
+                notes_sorted = sorted(notes, key=lambda n: (float(n.time), int(n.pitch)))
+                starts = [float(n.time) for n in notes_sorted]
+                ends = [float(n.time + n.duration) for n in notes_sorted]
+                # End-sorted pairs are reused across frames for end-window queries.
+                end_pairs = sorted(((ends[i], i) for i in range(len(ends))), key=lambda p: p[0])
+                end_values = [p[0] for p in end_pairs]
+                self._note_time_cache_key = note_cache_key
+                self._note_time_cache_values = (notes_sorted, starts, ends, end_pairs, end_values)
 
         # Collect arpeggio member note IDs for quick skip in note drawer
         arpeggio_note_ids: set[int] = set()
@@ -1447,14 +1519,15 @@ class Editor(QtCore.QObject,
                 view_right = max(0.0, margin + stave_width + margin)
                 max_len = max(2.0, margin * 0.85)
                 handle_r = max(1.5, float(self.semitone_dist or 2.5) * 0.45)
-                for n in getattr(score.events, 'note', []) or []:
-                    try:
-                        y_mm = float(self.time_to_mm(float(getattr(n, 'time', 0.0) or 0.0)))
-                        hand = str(getattr(n, 'hand', 'l') or 'l')
-                        nid = int(getattr(n, '_id', 0) or 0)
-                        vel = int(getattr(n, 'velocity', 64) or 0)
-                    except Exception:
-                        continue
+                cache = getattr(self, '_draw_cache', None) or {}
+                candidate_notes = list(cache.get('notes_view') or []) if isinstance(cache, dict) else []
+                if not candidate_notes:
+                    candidate_notes = list(getattr(score.events, 'note', []) or [])
+                for n in candidate_notes:
+                    y_mm = float(self.time_to_mm(float(getattr(n, 'time', 0.0) or 0.0)))
+                    hand = str(getattr(n, 'hand', 'l') or 'l')
+                    nid = int(getattr(n, '_id', 0) or 0)
+                    vel = int(getattr(n, 'velocity', 64) or 0)
                     if y_mm < (top_mm - bleed_mm) or y_mm > (bottom_mm + bleed_mm):
                         continue
                     slider_color = self.accent_color if nid in selected_note_ids else velocity_color
@@ -1518,348 +1591,7 @@ class Editor(QtCore.QObject,
                                     tags=['velocity_slider_value'],
                                 )
 
-        # --- Selection window overlay (always visible when active) ---
-        if self._selection_active:
-            # Compute absolute selection bounds in mm
-            y1_mm = float(self.time_to_mm(float(self._sel_start_units)))
-            y2_mm = float(self.time_to_mm(float(self._sel_end_units)))
-            sel_top_mm = min(y1_mm, y2_mm)
-            sel_bottom_mm = max(y1_mm, y2_mm)
-            # Clamp to current viewport to allow selection beyond the visible area
-            vp_top = float(self._view_y_mm_offset or 0.0)
-            vp_bottom = vp_top + float(self._viewport_h_mm or 0.0)
-            draw_top = max(sel_top_mm, vp_top)
-            draw_bottom = min(sel_bottom_mm, vp_bottom)
-            if draw_bottom > draw_top:
-                # Horizontal extent: span between selected pitch range
-                min_p = max(1, min(88, int(self._sel_min_pitch)))
-                max_p = max(1, min(88, int(self._sel_max_pitch)))
-                x_left = float(self.pitch_to_x(min_p))
-                x_right = float(self.pitch_to_x(max_p))
-                x2 = min(x_left, x_right)
-                x1 = max(x_left, x_right)
-                du.add_rectangle(
-                    x2,
-                    draw_top,
-                    x1,
-                    draw_bottom,
-                    stroke_color=None,
-                    fill_color=self.selection_color,
-                    id=0,
-                    tags=['selection_rect'],
-                )
-
-    # ---- Selection detection & clipboard ----
-    def set_selection_window(self, start_units: float, end_units: float, active: bool = True) -> None:
-        """Programmatically set the selection window in ticks and toggle its visibility."""
-        self._sel_start_units = float(start_units)
-        self._sel_end_units = float(end_units)
-        self._selection_active = bool(active)
-
-    def clear_selection(self) -> None:
-        """Clear selection window and clipboard."""
-        self._selection_active = False
-        self._sel_start_units = 0.0
-        self._sel_end_units = 0.0
-        self._sel_anchor_units = 0.0
-        self._sel_min_pitch = 1
-        self._sel_max_pitch = 88
-        self._sel_anchor_pitch = 1
-        # Persistent clipboard is not cleared here
-
-    def select_all(self) -> None:
-        """Select the full score range and all pitches."""
-        total_len = float(self._calc_base_grid_list_total_length())
-        ss = max(1e-6, float(getattr(self, 'snap_size_units', 1.0) or 1.0))
-        end_units = float(total_len) if total_len > ss else float(ss)
-        self._sel_anchor_units = 0.0
-        self._sel_start_units = 0.0
-        self._sel_end_units = end_units
-        self._sel_anchor_pitch = 1
-        self._sel_min_pitch = 1
-        self._sel_max_pitch = 88
-        self._selection_active = True
-
-    def _selected_notes_from_model(self, include_grace: bool = False) -> list:
-        """Return selected pitch events resolved from the live SCORE model.
-
-        By default this returns regular notes only. When `include_grace=True`,
-        grace notes are included as well.
-        """
-        score: SCORE | None = self.current_score()
-        if score is None or not self._selection_active:
-            return []
-        a = float(min(self._sel_start_units, self._sel_end_units))
-        b = float(max(self._sel_start_units, self._sel_end_units)) - 0.1
-        min_p = max(1, min(88, int(getattr(self, '_sel_min_pitch', 1))))
-        max_p = max(1, min(88, int(getattr(self, '_sel_max_pitch', 88))))
-        op = Operator(SHORTEST_DURATION)
-        out = []
-        event_lists = [list(getattr(score.events, 'note', []) or [])]
-        if bool(include_grace):
-            event_lists.append(list(getattr(score.events, 'grace_note', []) or []))
-
-        for lst in event_lists:
-            for n in lst:
-                try:
-                    t0 = float(getattr(n, 'time', 0.0) or 0.0)
-                    p0 = int(getattr(n, 'pitch', 0) or 0)
-                except Exception:
-                    continue
-                if op.ge(t0, a) and t0 <= b and min_p <= p0 <= max_p:
-                    out.append(n)
-        return out
-
-    def _transpose_step_units_for_anchor_key(self, anchor_key: int, direction: int) -> int:
-        """Return editor X-step units for one semitone at `anchor_key`.
-
-        Notes use a widened horizontal step when crossing B->C / E->F gaps.
-        Slur/text x_rpitch is linear in semitone units, so we emulate that
-        widened step by adding an extra unit whenever a gap is crossed.
-        """
-        key_now = max(1, min(88, int(anchor_key)))
-        if direction == 0:
-            return 0
-        be_gap_keys = set(int(k) for k in key_class_filter('be'))
-        if direction > 0:
-            extra = 1 if key_now in be_gap_keys else 0
-            return 1 + extra
-        extra = 1 if (key_now - 1) in be_gap_keys else 0
-        return -(1 + extra)
-
-    def _shift_relative_pitch_with_gaps(self, rpitch: float, delta_semitones: int) -> float:
-        """Shift a C4-relative pitch offset while honoring stave gap crossings."""
-        delta = int(delta_semitones)
-        if delta == 0:
-            return float(rpitch)
-
-        rp_base = int(round(float(rpitch)))
-        rp_frac = float(rpitch) - float(rp_base)
-        anchor_key = max(1, min(88, 40 + rp_base))
-
-        units = 0
-        step_dir = 1 if delta > 0 else -1
-        steps = abs(delta)
-        key_cursor = int(anchor_key)
-        for _ in range(steps):
-            units += self._transpose_step_units_for_anchor_key(key_cursor, step_dir)
-            key_cursor = max(1, min(88, key_cursor + step_dir))
-
-        return float(rp_base + units) + rp_frac
-
-    def transpose_selected_notes(self, delta_semitones: int) -> bool:
-        """Move selected notes and selected slur/text X by semitone steps.
-
-        Returns True if any notes were updated.
-        """
-        score: SCORE | None = self.current_score()
-        if score is None or not self._selection_active:
-            return False
-        delta = int(delta_semitones)
-        if delta == 0:
-            return False
-        sel = self.detect_events_from_time_window(
-            float(self._sel_start_units),
-            float(self._sel_end_units) - 0.1,
-        )
-        notes = self._selected_notes_from_model(include_grace=True)
-        updated = False
-
-        # Notes: regular semitone transpose in piano-key space.
-        for n in notes:
-            p = int(getattr(n, 'pitch', 0) or 0)
-            if p <= 0:
-                continue
-            np = max(1, min(88, p + delta))
-            if np != p:
-                setattr(n, 'pitch', int(np))
-                updated = True
-
-        # Slurs: shift all 4 rpitch handles with gap-aware horizontal stepping.
-        for sl in list(sel.get('slur', []) or []):
-            for attr in ('x1_rpitch', 'x2_rpitch', 'x3_rpitch', 'x4_rpitch'):
-                old_rp = float(getattr(sl, attr, 0) or 0)
-                new_rp = int(round(self._shift_relative_pitch_with_gaps(old_rp, delta)))
-                if new_rp != int(round(old_rp)):
-                    setattr(sl, attr, int(new_rp))
-                    updated = True
-
-        # Text: shift x_rpitch while preserving fractional part if present.
-        for tx in list(sel.get('text', []) or []):
-            old_rp = float(getattr(tx, 'x_rpitch', 0) or 0)
-            new_rp = self._shift_relative_pitch_with_gaps(old_rp, delta)
-            if not math.isclose(new_rp, old_rp, abs_tol=1e-9):
-                setattr(tx, 'x_rpitch', float(new_rp))
-                updated = True
-
-        if not updated:
-            return False
-        self._sel_min_pitch = max(1, min(88, int(self._sel_min_pitch) + delta))
-        self._sel_max_pitch = max(1, min(88, int(self._sel_max_pitch) + delta))
-        self._sel_anchor_pitch = max(1, min(88, int(self._sel_anchor_pitch) + delta))
-        # Lightweight redraw now; snapshot is debounced to avoid lag on key repeat
-        w = getattr(self, 'widget', None)
-        if w is not None and hasattr(w, 'force_full_redraw'):
-            w.force_full_redraw()
-        self._queue_transpose_snapshot()
-        return True
-
-    def shift_selected_notes_time(self, delta_units: float) -> bool:
-        """Shift selected content in time by one shared delta.
-
-        This preserves the internal rhythmic structure because all selected items
-        and selection bounds are translated by the same `dt`.
-        """
-        score: SCORE | None = self.current_score()
-        if score is None or not self._selection_active:
-            return False
-        dt = float(delta_units)
-        if abs(dt) < 1e-9:
-            return False
-
-        sel = self.detect_events_from_time_window(
-            float(self._sel_start_units),
-            float(self._sel_end_units) - 0.1,
-        )
-        notes = self._selected_notes_from_model(include_grace=True)
-        texts = list(sel.get('text', []) or [])
-        slurs = list(sel.get('slur', []) or [])
-
-        # Clamp only at absolute time 0 while preserving relative offsets.
-        min_time = min(
-            [float(self._sel_start_units), float(self._sel_end_units), float(self._sel_anchor_units)]
-            + [float(getattr(n, 'time', 0.0) or 0.0) for n in notes]
-            + [float(getattr(tx, 'time', 0.0) or 0.0) for tx in texts]
-            + [
-                float(getattr(sl, attr, 0.0) or 0.0)
-                for sl in slurs
-                for attr in ('y1_time', 'y2_time', 'y3_time', 'y4_time')
-            ]
-        )
-        if dt < 0.0:
-            dt = max(float(dt), -float(min_time))
-            if abs(dt) < 1e-9:
-                return False
-
-        model_updated = False
-
-        for n in notes:
-            t = float(getattr(n, 'time', 0.0) or 0.0)
-            new_t = max(0.0, t + dt)
-            if not math.isclose(new_t, t, abs_tol=1e-9):
-                setattr(n, 'time', new_t)
-                model_updated = True
-
-        for tx in texts:
-            t = float(getattr(tx, 'time', 0.0) or 0.0)
-            new_t = max(0.0, t + dt)
-            if not math.isclose(new_t, t, abs_tol=1e-9):
-                setattr(tx, 'time', float(new_t))
-                model_updated = True
-
-        # Keep slur shape intact by shifting all 4 handle times with the same dt.
-        for sl in slurs:
-            changed = False
-            for attr in ('y1_time', 'y2_time', 'y3_time', 'y4_time'):
-                old_t = float(getattr(sl, attr, 0.0) or 0.0)
-                new_t = max(0.0, old_t + dt)
-                if not math.isclose(new_t, old_t, abs_tol=1e-9):
-                    setattr(sl, attr, float(new_t))
-                    changed = True
-            if changed:
-                model_updated = True
-
-        # Shift selection window with the same delta so rectangle follows content.
-        self._sel_start_units = max(0.0, float(self._sel_start_units) + dt)
-        self._sel_end_units = max(0.0, float(self._sel_end_units) + dt)
-        self._sel_anchor_units = max(0.0, float(self._sel_anchor_units) + dt)
-
-        units = float(max(1e-6, getattr(self, 'snap_size_units', 0.0) or 0.0))
-        if self._sel_end_units <= self._sel_start_units:
-            self._sel_end_units = float(self._sel_start_units) + units
-
-        if model_updated:
-            self.update_score_length()
-            self._reuse_draw_cache_once = True
-        w = getattr(self, 'widget', None)
-        if w is not None and hasattr(w, 'force_full_redraw'):
-            w.force_full_redraw()
-        if model_updated:
-            self._queue_transpose_snapshot(label='shift_selected_notes_time')
-        return True
-
-    def quantize_selected_notes(self, qtype: str = 'start/end') -> bool:
-        """Quantize selected notes to current snap size.
-
-        Supported `qtype` values:
-        - 'start/end': quantize note start and note end
-        - 'start': quantize note start only
-        - 'end': quantize note end only
-        """
-        score: SCORE | None = self.current_score()
-        if score is None or not self._selection_active:
-            return False
-        mode = str(qtype or 'start/end').strip().lower()
-        if mode not in ('start/end', 'start', 'end'):
-            mode = 'start/end'
-        units = float(max(1e-6, getattr(self, 'snap_size_units', 0.0) or 0.0))
-        notes = self._selected_notes_from_model()
-        if not notes:
-            return False
-
-        def _q(value: float) -> float:
-            return float(round(float(value) / units) * units)
-
-        updated = False
-        op = Operator(1.0)
-        for n in notes:
-            t0 = float(getattr(n, 'time', 0.0) or 0.0)
-            dur = float(getattr(n, 'duration', 0.0) or 0.0)
-            t1 = t0 + max(0.0, dur)
-
-            qt0 = max(0.0, _q(t0)) if mode in ('start/end', 'start') else t0
-            qt1 = max(0.0, _q(t1)) if mode in ('start/end', 'end') else t1
-            if qt1 <= qt0:
-                qt1 = qt0 + units
-            qdur = max(units, qt1 - qt0)
-
-            if (not op.eq(qt0, t0)) or (not op.eq(qdur, dur)):
-                setattr(n, 'time', float(qt0))
-                setattr(n, 'duration', float(qdur))
-                updated = True
-
-        if not updated:
-            return False
-
-        self.update_score_length()
-        self._snapshot_if_changed(coalesce=True, label='quantize_selected_notes')
-        return True
-
-    def set_selected_notes_hand(self, hand: str) -> bool:
-        """Assign selected notes to a hand and snapshot the change.
-
-        Returns True if any notes were updated.
-        """
-        score: SCORE | None = self.current_score()
-        if score is None or not self._selection_active:
-            return False
-        h = str(hand)
-        if h not in ('l', 'r'):
-            return False
-        notes = self._selected_notes_from_model()
-        if not notes:
-            return False
-        updated = False
-        for n in notes:
-            note_hand = str(getattr(n, 'hand', '') or '')
-            note_color = str(getattr(n, 'color', '') or '')
-            if note_hand != h or note_color != 'auto':
-                setattr(n, 'hand', h)
-                setattr(n, 'color', 'auto')
-                updated = True
-        if updated:
-            self._snapshot_if_changed(coalesce=True, label='set_note_hand')
-        return updated
+        self._draw_selection_overlay(du)
 
     # ---- Modifier updates ----
     def set_shift_down(self, down: bool) -> None:
@@ -1867,278 +1599,4 @@ class Editor(QtCore.QObject,
 
     def set_ctrl_down(self, down: bool) -> None:
         self._ctrl_down = bool(down)
-
-    # Convenience properties for external access
-    @property
-    def selection_window_start(self) -> float:
-        return float(self._sel_start_units)
-
-    @selection_window_start.setter
-    def selection_window_start(self, v: float) -> None:
-        self._sel_start_units = float(v)
-        self._sel_anchor_units = float(v)
-    @property
-    def selection_window_end(self) -> float:
-        return float(self._sel_end_units)
-
-    @selection_window_end.setter
-    def selection_window_end(self, v: float) -> None:
-        self._sel_end_units = float(v)
-
-    def get_selected_note_ids_cached(self, score: SCORE | None = None) -> set[int]:
-        """Return selected note IDs using draw-cache data when possible.
-
-        The cache key is the current selection time/pitch signature.
-        """
-        if not bool(getattr(self, '_selection_active', False)):
-            return set()
-        if score is None:
-            score = self.current_score()
-        if score is None:
-            return set()
-
-        a = float(min(self._sel_start_units, self._sel_end_units))
-        b = float(max(self._sel_start_units, self._sel_end_units)) - 0.1
-        min_p = max(1, min(88, int(getattr(self, '_sel_min_pitch', 1))))
-        max_p = max(1, min(88, int(getattr(self, '_sel_max_pitch', 88))))
-        op = Operator(SHORTEST_DURATION)
-
-        cache = getattr(self, '_draw_cache', None) or {}
-        sel_sig = (round(a, 6), round(b, 6), int(min_p), int(max_p))
-        cached_sig = cache.get('selected_note_ids_sig') if isinstance(cache, dict) else None
-        cached_ids = cache.get('selected_note_ids') if isinstance(cache, dict) else None
-        if cached_sig == sel_sig and isinstance(cached_ids, set):
-            return cached_ids
-
-        t_begin = float(cache.get('time_begin', float('inf'))) if isinstance(cache, dict) else float('inf')
-        t_end = float(cache.get('time_end', float('-inf'))) if isinstance(cache, dict) else float('-inf')
-        if a >= t_begin and b <= t_end and isinstance(cache, dict):
-            candidates = list(cache.get('notes_view') or [])
-        else:
-            candidates = list(getattr(score.events, 'note', []) or [])
-
-        ids: set[int] = set()
-        for sn in candidates:
-            try:
-                st = float(getattr(sn, 'time', 0.0) or 0.0)
-                sp = int(getattr(sn, 'pitch', 0) or 0)
-                sid = int(getattr(sn, '_id', 0) or 0)
-            except Exception:
-                continue
-            if sid <= 0:
-                continue
-            if op.ge(st, a) and st <= b and min_p <= sp <= max_p:
-                ids.add(sid)
-
-        if isinstance(cache, dict):
-            cache['selected_note_ids_sig'] = sel_sig
-            cache['selected_note_ids'] = ids
-        return ids
-
-    def detect_events_from_time_window(self, start_units: float, end_units: float) -> dict:
-        """Scan the SCORE and return a dict of events whose start time falls within [start_units, end_units].
-
-        The returned dict keys are derived dynamically from `score.events` fields,
-        so newly added event types in the SCORE model are handled automatically.
-        """
-        score: SCORE | None = self.current_score()
-        if score is None:
-            return {}
-        a = float(min(start_units, end_units))
-        b = float(max(start_units, end_units))
-        op = Operator(SHORTEST_DURATION)
-        # Pitch range constraints (inclusive)
-        min_p = max(1, min(88, int(getattr(self, '_sel_min_pitch', 1))))
-        max_p = max(1, min(88, int(getattr(self, '_sel_max_pitch', 88))))
-
-        import dataclasses
-
-        event_fields = [f.name for f in dataclasses.fields(type(score.events))]
-        # Exclude tempo and line_break from selection rectangle detection
-        event_fields = [n for n in event_fields if n not in ('tempo', 'line_break')]
-
-        out: dict[str, list] = {name: [] for name in event_fields}
-
-        def start_time(ev) -> float:
-            # Prefer 'time' if present; else use the minimum of any '*_time' fields
-            if hasattr(ev, 'time'):
-                return float(getattr(ev, 'time', 0.0) or 0.0)
-            d = dataclasses.asdict(ev)
-            times = [float(v or 0.0) for k, v in d.items() if k.endswith('_time')]
-            if times:
-                return float(min(times))
-            return 0.0
-
-        def pitch_ok(ev) -> bool:
-            # Apply pitch range only for events that have a 'pitch' attribute
-            if hasattr(ev, 'pitch'):
-                p = int(getattr(ev, 'pitch', 0) or 0)
-                return (p and (min_p <= p <= max_p))
-            return True
-
-        cached_notes_view = None
-        cache = getattr(self, '_draw_cache', None) or {}
-        t_begin = float(cache.get('time_begin', float('inf')))
-        t_end = float(cache.get('time_end', float('-inf')))
-        if a >= t_begin and b <= t_end:
-            cached_notes_view = cache.get('notes_view') or []
-
-        # Generic filtering across all event lists
-        for name in event_fields:
-            if name == 'note' and cached_notes_view is not None:
-                lst = list(cached_notes_view)
-            else:
-                lst = getattr(score.events, name, []) or []
-            if name == 'slur':
-                # Special-case: use a single deterministic slur endpoint for selection.
-                # Rule: only start/end points (1 or 4) are eligible; choose the one
-                # with the lower time value (tie -> start point).
-                for ev in lst:
-                    rpitches = [
-                        int(getattr(ev, 'x1_rpitch', 0) or 0),
-                        int(getattr(ev, 'x2_rpitch', 0) or 0),
-                        int(getattr(ev, 'x3_rpitch', 0) or 0),
-                        int(getattr(ev, 'x4_rpitch', 0) or 0),
-                    ]
-                    times_h = [
-                        float(getattr(ev, 'y1_time', 0.0) or 0.0),
-                        float(getattr(ev, 'y2_time', 0.0) or 0.0),
-                        float(getattr(ev, 'y3_time', 0.0) or 0.0),
-                        float(getattr(ev, 'y4_time', 0.0) or 0.0),
-                    ]
-                    endpoint_indices = (0, 3)
-                    anchor_idx = min(endpoint_indices, key=lambda i: (times_h[i], i))
-                    anchor_time = float(times_h[anchor_idx])
-                    anchor_key = max(1, min(88, 40 + int(rpitches[anchor_idx])))
-                    if (min_p <= anchor_key <= max_p) and (op.ge(anchor_time, a) and anchor_time <= b):
-                        out[name].append(ev)
-            else:
-                for ev in lst:
-                    t0 = start_time(ev)
-                    if op.ge(t0, a) and t0 <= b and pitch_ok(ev):
-                        out[name].append(ev)
-        return out
-
-    def copy_selection(self) -> dict | None:
-        """Copy current selection window events into the editor clipboard and return it."""
-        if not self._selection_active:
-            return None
-        sel = self.detect_events_from_time_window(self._sel_start_units, self._sel_end_units - 0.1) # slight epsilon to not detect next event at end
-        # Deep copy so later edits (e.g., transpose via arrow keys) do not mutate the clipboard
-        safe_copy = copy.deepcopy(sel)
-        self.clipboard = safe_copy
-        self._clipboard_start_units = float(min(self._sel_start_units, self._sel_end_units))
-        return safe_copy
-
-    def cut_selection(self) -> dict | None:
-        """Cut current selection window events: copy to clipboard, then remove from SCORE."""
-        score: SCORE | None = self.current_score()
-        if score is None:
-            return None
-        sel = self.copy_selection()
-        if not sel:
-            return None
-        # Ensure clipboard holds the cut selection
-        self.clipboard = sel
-        # Remove selected instances from each list
-        for key in sel:
-            lst = getattr(score.events, key, None)
-            if isinstance(lst, list):
-                remain = [ev for ev in lst if ev not in sel[key]]
-                setattr(score.events, key, remain)
-        # Keep base grid length aligned to remaining notes.
-        self.update_score_length()
-        # Snapshot change
-        self._snapshot_if_changed(coalesce=True, label='cut_selection')
-        self.score_changed.emit()
-        return sel
-
-    def delete_selection(self) -> bool:
-        """Delete current selection window events without copying to clipboard.
-
-        Returns True if deletion occurred, False otherwise. Clears selection overlay.
-        """
-        score: SCORE | None = self.current_score()
-        if score is None or not self._selection_active:
-            return False
-        sel = self.detect_events_from_time_window(self._sel_start_units, self._sel_end_units - 0.1) # slight epsilon to not detect next event.
-        deleted_any = False
-        for key in sel:
-            lst = getattr(score.events, key, None)
-            if isinstance(lst, list) and sel[key]:
-                remain = [ev for ev in lst if ev not in sel[key]]
-                if len(remain) != len(lst):
-                    deleted_any = True
-                setattr(score.events, key, remain)
-        if deleted_any:
-            self.update_score_length()
-            self._snapshot_if_changed(coalesce=True, label='delete_selection')
-            self.score_changed.emit()
-        # Clear selection window and clipboard after delete
-        self.clear_selection()
-        return deleted_any
-
-    def paste_selection_at_cursor(self) -> None:
-        """Paste events from clipboard so that the earliest selection start aligns to `self.time_cursor`."""
-        score: SCORE | None = self.current_score()
-        if score is None or self.clipboard is None:
-            return
-        if self.time_cursor is None:
-            return
-        import dataclasses
-
-        # Determine alignment offset from the copied selection, not the live selection.
-        a = self._clipboard_start_units
-        if a is None:
-            a = float(min(self._sel_start_units, self._sel_end_units))
-        target = float(self.time_cursor)
-        delta = float(target - a)
-
-        # Track furthest end time to extend timeline if needed
-        furthest_end = float(self._calc_base_grid_list_total_length())
-
-        # Iterate types from clipboard dynamically
-        for ev_type, items in (self.clipboard.items() if isinstance(self.clipboard, dict) else []):
-            if not items:
-                continue
-            if ev_type == 'arpeggio':
-                # Arpeggios reference note ids; skip pasting to avoid dangling references.
-                continue
-            ctor = getattr(score, f"new_{ev_type}", None)
-            if ctor is None:
-                continue
-            for ev in items:
-                d = dataclasses.asdict(ev)
-                # Remove id; it will be assigned by the constructor
-                d.pop('_id', None)
-                # Shift all time-related fields
-                for k in list(d.keys()):
-                    if k == 'time' or k.endswith('_time'):
-                        d[k] = float(d.get(k, 0.0)) + delta
-                # Create the new event
-                ctor(**d)
-                # Compute end time generically: max of all time fields, plus duration if applicable
-                time_fields = [float(v or 0.0) for kk, v in d.items() if kk == 'time' or kk.endswith('_time')]
-                t_end = max(time_fields) if time_fields else float(d.get('time', 0.0) or 0.0)
-                dur = float(d.get('duration', 0.0) or 0.0)
-                if dur > 0.0 and 'time' in d:
-                    t_end = float(d.get('time', 0.0) or 0.0) + dur
-                furthest_end = max(furthest_end, float(t_end))
-        # Extend timeline if pasted content exceeds current end barline
-        cur_end = float(self._calc_base_grid_list_total_length())
-        if furthest_end > cur_end:
-            bg_list = list(getattr(score, 'base_grid', []) or [])
-            if bg_list:
-                last_bg = bg_list[-1]
-                num = float(getattr(last_bg, 'numerator', 4) or 4)
-                den = float(getattr(last_bg, 'denominator', 4) or 4)
-                measure_len = num * (4.0 / den) * float(QUARTER_NOTE_UNIT)
-                extra_measures = int(max(1, math.ceil((furthest_end - cur_end) / max(1e-6, measure_len))))
-                last_bg.measure_amount = int(getattr(last_bg, 'measure_amount', 1) or 1) + extra_measures
-        self.update_score_length()
-        # Snapshot change
-        self._snapshot_if_changed(coalesce=True, label='paste_selection')
-        self.score_changed.emit()
-        # Stop drawing selection overlay after paste (clipboard stays)
-        self._selection_active = False
 

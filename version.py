@@ -7,7 +7,7 @@ Bump policy (Semantic Versioning):
   PATCH - bug fixes only
 """
 
-__version__ = "1.0.7"
+__version__ = "1.0.8"
 APP_NAME    = "keyTAB"
 
 change_log = '''
@@ -74,4 +74,5 @@ change_log = '''
 
 1.0.8 (2026-06-15)
 - fix: on some configurations, the selection rectangle didn't detect underlying note time correctly
+- fix: enhance clipboard functionality by tracking start units for better alignment during cut/copy operations
 '''
