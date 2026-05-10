@@ -16,6 +16,17 @@ from ui.style import Style
 from symbol_design.noteheads import Notehead, normalize_notehead_literal, resolve_notehead_spec
 from symbol_design.pedal import draw_pedal_symbol
 from file_model.events.note import Note
+from engraver.helpers import (
+    allow_font_registry as _allow_font_registry,
+    black_note_above_stem as _black_note_above_stem,
+    build_grid_band_dark_intervals as _build_grid_band_dark_intervals,
+    group_by_beam_markers as _group_by_beam_markers,
+    is_light_paper as _is_light_paper,
+    normalize_hex_color as _normalize_hex_color,
+    resolve_font_family_name as _resolve_font_family,
+    scaled_dash_pattern_with_default as _scaled_dash_pattern_with_default,
+    should_tune_under_stem_black_width as _should_tune_under_stem_black_width,
+)
 
 _MP_CONTEXT = mp.get_context("spawn")
 
@@ -59,13 +70,6 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
         # PDF export must stay pure black ink on white paper and preserve raw MIDI colors.
         notation_color = (0.0, 0.0, 0.0, 1.0)
         paper_color = (1.0, 1.0, 1.0, 1.0)
-
-    def _is_light_paper(rgb_tuple: tuple[int, int, int]) -> bool:
-        r = float(rgb_tuple[0]) / 255.0
-        g = float(rgb_tuple[1]) / 255.0
-        b = float(rgb_tuple[2]) / 255.0
-        lum = 0.2126 * r + 0.7152 * g + 0.0722 * b
-        return lum >= 0.5
 
     def _midi_fill_from_rgb(rgb_tuple: tuple[int, int, int]) -> tuple[float, float, float, float]:
         if pdf_export:
@@ -392,29 +396,6 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
     stave_clef_w = float(layout.get('stave_clef_line_thickness_mm', 0.5) or 0.5) * scale
     stave_ledger_len = float(layout.get('stave_ledger_line_length_mm', 7.0) or 7.0) * scale
 
-    def _scaled_dash_pattern_with_default(raw_value, fallback_mm: list[float], local_scale: float) -> list[float] | None:
-        parsed: list[float] = []
-        try:
-            if isinstance(raw_value, str):
-                tokens = [p.strip() for p in str(raw_value).split(',') if p.strip() != '']
-                parsed = [float(v) for v in tokens]
-            elif isinstance(raw_value, (list, tuple)):
-                parsed = [float(v) for v in raw_value]
-            elif raw_value is not None:
-                parsed = [float(raw_value)]
-        except Exception:
-            parsed = []
-
-        valid_mm = [float(v) for v in parsed if float(v) > 0.0]
-        if not valid_mm:
-            try:
-                valid_mm = [float(v) for v in (fallback_mm or []) if float(v) > 0.0]
-            except Exception:
-                valid_mm = []
-        if not valid_mm:
-            valid_mm = [3.0]
-        return [float(v) * float(local_scale) for v in valid_mm]
-
     default_clef_dash_mm = list(getattr(Layout(), 'stave_clef_line_dash_pattern_mm', [3.0]) or [3.0])
     default_grid_dash_mm = list(getattr(Layout(), 'grid_gridline_dash_pattern_mm', [2.5, 4.0]) or [2.5, 4.0])
     clef_dash = _scaled_dash_pattern_with_default(
@@ -458,113 +439,6 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
         list(dict.fromkeys(round(float(t), 6) for t in group_boundary_times))
     )
     all_barlines = sorted(list(dict.fromkeys([0.0] + [float(v) for v in barline_positions] + [float(cur_bar)])))
-
-    # Build grid-band dark intervals with the same rules as editor drawer:
-    # - barline resets to dark,
-    # - marker start resets phase boundaries,
-    # - marker start preserves current color,
-    # - marker range truncates at next marker start.
-    def _build_grid_band_dark_intervals(markers: list, bars: list[float], total_len: float, starts_dark: bool = True) -> list[tuple[float, float]]:
-        op = Operator()
-        if op.le(float(total_len), 0.0):
-            return []
-        if not markers:
-            return []
-
-        bar_times = [
-            float(b)
-            for b in (bars or [])
-            if op.ge(float(b), 0.0) and op.le(float(b), float(total_len))
-        ]
-        bar_times = sorted(list(dict.fromkeys(round(float(v), 6) for v in bar_times)))
-        if not bar_times or op.not_equal(float(bar_times[0]), 0.0):
-            bar_times = [0.0] + bar_times
-        if op.not_equal(float(bar_times[-1]), float(total_len)):
-            bar_times.append(float(total_len))
-
-        track: list[tuple[float, float, int]] = []
-        for mk in markers:
-            try:
-                if isinstance(mk, dict):
-                    mt = float(mk.get('time', 0.0) or 0.0)
-                    dur = float(mk.get('duration', 0.0) or 0.0)
-                    mid = int(mk.get('_id', mk.get('id', 0)) or 0)
-                else:
-                    mt = float(getattr(mk, 'time', 0.0) or 0.0)
-                    dur = float(getattr(mk, 'duration', 0.0) or 0.0)
-                    mid = int(getattr(mk, '_id', getattr(mk, 'id', 0)) or 0)
-            except Exception:
-                continue
-            if op.lt(dur, 0.0):
-                continue
-            if op.ge(mt, float(total_len)):
-                continue
-            track.append((max(0.0, mt), dur, mid))
-
-        if not track:
-            return []
-        track.sort(key=lambda x: (float(x[0]), int(x[2])))
-
-        segments: list[tuple[float, float, float]] = []
-        for i, (start, step, _mid) in enumerate(track):
-            end = float(track[i + 1][0]) if (i + 1) < len(track) else float(total_len)
-            if op.le(end, start):
-                continue
-            segments.append((float(start), float(end), float(step)))
-
-        if not segments:
-            return []
-
-        out: list[tuple[float, float]] = []
-        for bi in range(len(bar_times) - 1):
-            bar_start = float(bar_times[bi])
-            bar_end = float(bar_times[bi + 1])
-            if op.le(bar_end, bar_start):
-                continue
-
-            is_dark = bool(starts_dark)
-            for seg_start_raw, seg_end_raw, step in segments:
-                if op.le(seg_end_raw, bar_start):
-                    continue
-                if op.ge(seg_start_raw, bar_end):
-                    break
-
-                seg_start = max(float(seg_start_raw), float(bar_start))
-                seg_end = min(float(seg_end_raw), float(bar_end))
-                if op.le(seg_end, seg_start):
-                    continue
-
-                # duration == 0 means stop engraving bands for this segment.
-                if op.le(step, 0.0):
-                    # OFF marker: next resumed segment should start with configured phase.
-                    is_dark = bool(starts_dark)
-                    continue
-
-                t0 = float(seg_start)
-                color = bool(is_dark)
-                while op.lt(t0, seg_end):
-                    t1 = min(float(seg_end), float(t0 + step))
-                    if color and op.gt(t1, t0):
-                        out.append((float(t0), float(t1)))
-                    t0 = float(t1)
-                    color = not color
-
-                is_dark = bool(color)
-
-        if not out:
-            return []
-
-        out.sort(key=lambda x: (float(x[0]), float(x[1])))
-        merged: list[list[float]] = []
-        for s, e in out:
-            fs = float(s)
-            fe = float(e)
-            if (not merged) or op.gt(fs, float(merged[-1][1])):
-                merged.append([fs, fe])
-            elif op.gt(fe, float(merged[-1][1])):
-                merged[-1][1] = fe
-
-        return [(a, b) for a, b in merged if op.gt(float(b), float(a))]
 
     # Get grid band track from layout and precompute dark intervals for efficient lookup during engraving.
     grid_bands = list(layout.get('grid_band_track', []) or [])
@@ -644,37 +518,6 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
             m_idx += 1
             cur_m += measure_len
 
-    def _normalize_hex_color(value: str | None) -> str | None:
-        """Normalize hex color strings."""
-        if value is None:
-            return None
-        txt = str(value).strip()
-        if not txt:
-            return None
-        if not txt.startswith('#'):
-            txt = f"#{txt}"
-        hex_part = txt[1:]
-        if len(hex_part) not in (3, 6, 8):
-            return None
-        if not all(c in '0123456789abcdefABCDEF' for c in hex_part):
-            return None
-        if len(hex_part) == 3:
-            hex_part = ''.join(c * 2 for c in hex_part)
-        if len(hex_part) == 8:
-            hex_part = hex_part[:6]
-        return f"#{hex_part}"
-
-    def _allow_font_registry() -> bool:
-        """Return True when it is safe to access QFontDatabase (GUI process only)."""
-        return mp.current_process().name == "MainProcess"
-
-    def _resolve_font_family(family: str) -> str:
-        """Resolve a font family name with the font registry if available."""
-        if not _allow_font_registry():
-            return family
-        from fonts import resolve_font_family
-        return str(resolve_font_family(family))
-
     def _layout_font(key: str, fallback_family: str, fallback_size: float) -> tuple[str, float, bool, bool, bool]:
         """Fetch a layout font entry from the layout dict with fallback values."""
         raw = layout.get(key, {}) if isinstance(layout, dict) else {}
@@ -712,225 +555,6 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
         x_off = float(raw_font.get('x_offset', 0.0) or 0.0)
         y_off = float(raw_font.get('y_offset', 0.0) or 0.0)
         return family, size_pt, bold, italic, underline, x_off, y_off
-
-    def _note_has_continuation_dot_in_beam_window(note: dict, notes_sorted: list[dict], barlines: list[float], t0: float, t1: float) -> bool:
-        """Return True when note would render a continuation dot within [t0, t1)."""
-        n_start = float(note.get('time', 0.0) or 0.0)
-        n_end = float(note.get('end', n_start + float(note.get('duration', 0.0) or 0.0)) or 0.0)
-        if not (op_time.lt(n_start, float(t0)) and op_time.gt(n_end, float(t0))):
-            return False
-
-        note_idx = int(note.get('idx', note.get('id', 0)) or 0)
-        note_hand = str(note.get('hand', 'l') or 'l')
-
-        # Dot at other note starts/ends inside this note duration.
-        for other in notes_sorted:
-            other_idx = int(other.get('idx', other.get('id', 0)) or 0)
-            if other_idx == note_idx:
-                continue
-            if str(other.get('hand', 'l') or 'l') != note_hand:
-                continue
-            s = float(other.get('time', 0.0) or 0.0)
-            e = float(other.get('end', s + float(other.get('duration', 0.0) or 0.0)) or 0.0)
-            if op_time.gt(s, n_start) and op_time.lt(s, n_end) and op_time.ge(s, float(t0)) and op_time.lt(s, float(t1)):
-                return True
-            if op_time.gt(e, n_start) and op_time.lt(e, n_end) and op_time.ge(e, float(t0)) and op_time.lt(e, float(t1)):
-                return True
-
-        # Dot at crossed barlines inside this note duration.
-        for bt in barlines:
-            bt = float(bt)
-            if op_time.gt(bt, n_start) and op_time.lt(bt, n_end) and op_time.ge(bt, float(t0)) and op_time.lt(bt, float(t1)):
-                return True
-
-        return False
-
-    def _assign_groups(notes_sorted: list[dict], windows: list[tuple[float, float]]) -> list[list[dict]]:
-        """Assign notes to time windows by overlap and preserve start-time order.
-
-        Problem solved: beam grouping must be stable even when notes straddle
-        a window boundary; this uses overlap tests plus de-duplication.
-        """
-        if not notes_sorted or not windows:
-            return []
-        starts = [float(n.get('time', 0.0) or 0.0) for n in notes_sorted]
-        ends = [float(n.get('end', 0.0) or 0.0) for n in notes_sorted]
-        result: list[list[dict]] = []
-        j = 0
-        barlines = [float(v) for v in (all_barlines or [])]
-        for (t0, t1) in windows:
-            j = bisect.bisect_left(starts, float(t0) - float(op_time.threshold), j)
-            group: list[dict] = []
-            k = j
-            while k < len(starts):
-                s = starts[k]
-                if op_time.ge(s, float(t1) + float(op_time.threshold)):
-                    break
-                e = ends[k]
-                if op_time.gt(e, float(t0)) and op_time.lt(s, float(t1)):
-                    group.append(notes_sorted[k])
-                k += 1
-            b = j - 1
-            while b >= 0:
-                s = starts[b]
-                e = ends[b]
-                if op_time.gt(e, float(t0)) and op_time.lt(s, float(t1)):
-                    n = notes_sorted[b]
-                    if _note_has_continuation_dot_in_beam_window(n, notes_sorted, barlines, float(t0), float(t1)):
-                        group.append(n)
-                b -= 1
-            if group:
-                keyed: dict[int, dict] = {}
-                for m in group:
-                    key_id = int(m.get('idx', m.get('id', 0)) or 0)
-                    keyed[key_id] = m
-                group = sorted(keyed.values(), key=lambda n: float(n.get('time', 0.0) or 0.0))
-            result.append(group)
-        return result
-
-    def _build_grid_windows(a: float, b: float) -> list[tuple[float, float]]:
-        """Build time windows using base grid beat grouping between a and b.
-
-        Problem solved: derive beam groups from musical beat grouping, not
-        from raw timestamps, so the visual grouping matches the score grid.
-        """
-        windows: list[tuple[float, float]] = []
-        cur = 0.0
-        for bg in base_grid:
-            numer = int(bg.get('numerator', 4) or 4)
-            denom = int(bg.get('denominator', 4) or 4)
-            measures = int(bg.get('measure_amount', 1) or 1)
-            seq = list(bg.get('beat_grouping', []) or [])
-            measure_len = float(numer) * (4.0 / float(max(1, denom))) * float(QUARTER_NOTE_UNIT)
-            _bar_offsets, grid_offsets = resolve_grid_layer_offsets(seq, numer, denom)
-            for _ in range(int(measures)):
-                m_start = float(cur)
-                m_end = float(cur + measure_len)
-                if op_time.lt(m_end, float(a)):
-                    cur = m_end
-                    continue
-                if op_time.gt(m_start, float(b)):
-                    cur = m_end
-                    continue
-                boundaries = [0.0] + [float(v) for v in grid_offsets if 0.0 < float(v) < measure_len] + [float(measure_len)]
-                boundaries = sorted(dict.fromkeys(round(v, 6) for v in boundaries))
-                if len(boundaries) < 2:
-                    boundaries = [0.0, float(measure_len)]
-                for idx in range(len(boundaries) - 1):
-                    w0 = m_start + float(boundaries[idx])
-                    w1 = m_start + float(boundaries[idx + 1])
-                    w0 = max(float(a), w0)
-                    w1 = min(float(b), w1)
-                    if op_time.lt(w0, w1):
-                        windows.append((w0, w1))
-                cur = m_end
-        return windows
-
-    def _process_beam_marker_override(default_windows: list[tuple[float, float]], markers: list[dict]) -> list[tuple[float, float]]:
-        """Replace default windows with marker spans where they overlap.
-
-        - Start from time-signature (grid) windows.
-        - For each marker, drop any default window that overlaps its span and add the marker span.
-        - Non-positive duration markers only remove overlapping defaults.
-        """
-        if not default_windows:
-            return []
-        if not markers:
-            return default_windows
-        windows = sorted(default_windows, key=lambda w: float(w[0]))
-        for mk in sorted(markers, key=lambda m: float(m.get('time', 0.0))):
-            mt = float(mk.get('time', 0.0) or 0.0)
-            dur = float(mk.get('duration', 0.0) or 0.0)
-            end = mt + max(0.0, dur)
-            filtered: list[tuple[float, float]] = []
-            for (w0, w1) in windows:
-                # Keep windows that do NOT overlap the marker span
-                if op_time.ge(w0, end) or op_time.le(w1, mt):
-                    filtered.append((w0, w1))
-            if dur > 0.0:
-                filtered.append((mt, end))
-            windows = sorted(filtered, key=lambda w: float(w[0]))
-        return windows
-
-    def _group_by_beam_markers(notes: list[dict], markers: list[dict], start: float, end: float) -> tuple[list[list[dict]], list[tuple[float, float]]]:
-        """Split notes into beam groups using grid windows with marker overrides."""
-        notes_sorted = sorted(notes, key=lambda n: float(n.get('time', 0.0) or 0.0)) if notes else []
-        default_windows = _build_grid_windows(start, end)
-        windows = _process_beam_marker_override(default_windows, markers)
-        groups = _assign_groups(notes_sorted, windows) if notes_sorted else []
-        return groups, windows
-
-    def _black_note_above_stem(item: dict, rule: str, notes: list[dict], op: Operator) -> bool:
-        if rule == 'above_stem':
-            return True
-        p0 = int(item.get('pitch', 0) or 0)
-        t0 = float(item.get('time', 0.0) or 0.0)
-        idx0 = int(item.get('idx', -1) or -1)
-        if rule == 'above_stem_if_collision':
-            for n in notes:
-                if int(n.get('idx', -2) or -2) == idx0:
-                    continue
-                if not op.eq(float(n.get('time', 0.0) or 0.0), t0):
-                    continue
-                if abs(int(n.get('pitch', 0) or 0) - p0) == 1:
-                    return True
-            return False
-        if rule == 'above_stem_if_chord_and_white_note':
-            for n in notes:
-                if int(n.get('idx', -2) or -2) == idx0:
-                    continue
-                if not op.eq(float(n.get('time', 0.0) or 0.0), t0):
-                    continue
-                np = int(n.get('pitch', 0) or 0)
-                if np not in BLACK_KEYS and np != p0:
-                    return True
-            return False
-        if rule != 'above_stem_if_chord_and_white_note_same_hand':
-            return False
-        hand0 = str(item.get('hand', 'l') or 'l')
-        for n in notes:
-            if int(n.get('idx', -2) or -2) == idx0:
-                continue
-            if not op.eq(float(n.get('time', 0.0) or 0.0), t0):
-                continue
-            if str(n.get('hand', 'l') or 'l') != hand0:
-                continue
-            np = int(n.get('pitch', 0) or 0)
-            if np not in BLACK_KEYS and np != p0:
-                return True
-        return False
-
-    def _should_tune_under_stem_black_width(item: dict, rule: str, notes: list[dict], op: Operator) -> bool:
-        '''if a black note is under the stem and a white note directly next to it
-        this method returns True, which means the black note should be tuned to be narrower 
-        to form a small second symbol with the white note.'''
-        rule_norm = str(rule or 'below_stem').strip().lower()
-        if rule_norm not in ('under_stem', 'below_stem'):
-            return False
-
-        raw_note = item.get('raw', item)
-        if isinstance(raw_note, dict):
-            custom_notehead = normalize_notehead_literal(raw_note.get('notehead', 'auto'))
-        else:
-            custom_notehead = normalize_notehead_literal(getattr(raw_note, 'notehead', 'auto'))
-        if custom_notehead != 'auto':
-            custom_spec = resolve_notehead_spec(raw_note, default_black_above=False)
-            if bool(getattr(custom_spec, 'is_up', False)):
-                return False
-
-        p0 = int(item.get('pitch', 0) or 0)
-        if p0 not in BLACK_KEYS:
-            return False
-        t0 = float(item.get('time', 0.0) or 0.0)
-        idx0 = int(item.get('idx', -1) or -1)
-        for n in notes:
-            if int(n.get('idx', -2) or -2) == idx0:
-                continue
-            if not op.eq(float(n.get('time', 0.0) or 0.0), t0):
-                continue
-            if abs(int(n.get('pitch', 0) or 0) - p0) == 1:
-                return True
-        return False
 
     def _has_followed_rest(item: dict) -> bool:
         """Return True when a note has no immediate following note in its hand.
@@ -2030,7 +1654,14 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                     if ('l' if str(n.get('hand', 'l') or 'l') == 'l' else 'r') == hand_norm
                 ]
                 markers_for_hand = beam_by_hand.get(hand_norm, [])
-                groups, windows = _group_by_beam_markers(notes_for_hand, markers_for_hand, line_start_ticks_local, line_end_ticks_local)
+                groups, windows = _group_by_beam_markers(
+                    notes_for_hand,
+                    markers_for_hand,
+                    line_start_ticks_local,
+                    line_end_ticks_local,
+                    base_grid,
+                    all_barlines,
+                )
                 for idx, grp in enumerate(groups):
                     if not grp or idx >= len(windows):
                         continue
@@ -2586,7 +2217,14 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
             for hand_norm in ('r', 'l'):
                 notes_for_hand = notes_by_hand_line.get(hand_norm, [])
                 markers_for_hand = beam_by_hand.get(hand_norm, [])
-                groups, windows = _group_by_beam_markers(notes_for_hand, markers_for_hand, line_start, line_end)
+                groups, windows = _group_by_beam_markers(
+                    notes_for_hand,
+                    markers_for_hand,
+                    line_start,
+                    line_end,
+                    base_grid,
+                    all_barlines,
+                )
                 beam_groups_by_hand[hand_norm] = (groups, windows)
 
             stem_len_units = float(layout.get('note_stem_length_semitone', 3) or 3)
@@ -2782,7 +2420,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                     hand_key = str(item.get('hand', 'l') or 'l')
 
                     y_start = _time_to_y(n_t)
-                    default_black_above = p in BLACK_KEYS and _black_note_above_stem(item, black_rule, line_notes, op_time)
+                    default_black_above = p in BLACK_KEYS and _black_note_above_stem(item, black_rule, line_notes)
                     spec = resolve_notehead_spec(item.get('raw', {}) or {}, default_black_above=default_black_above)
                     note_y = y_start
                     if bool(getattr(spec, 'is_up', False)):
@@ -2834,7 +2472,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                             if abs(other_pitch - int(p)) == 1:
                                 other_black_above = (
                                     other_pitch in BLACK_KEYS
-                                    and _black_note_above_stem(other, black_rule, line_notes, op_time)
+                                    and _black_note_above_stem(other, black_rule, line_notes)
                                 )
                                 if other_black_above:
                                     continue
@@ -3411,7 +3049,14 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                 for hand_norm in ('r', 'l'):
                     notes_for_hand = notes_by_hand_line.get(hand_norm, [])
                     markers_for_hand = beam_by_hand.get(hand_norm, [])
-                    groups, windows = _group_by_beam_markers(notes_for_hand, markers_for_hand, line_start, line_end)
+                    groups, windows = _group_by_beam_markers(
+                        notes_for_hand,
+                        markers_for_hand,
+                        line_start,
+                        line_end,
+                        base_grid,
+                        all_barlines,
+                    )
                     for idx, grp in enumerate(groups):
                         if not grp:
                             continue
@@ -3554,7 +3199,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                 if y_end < y_start:
                     y_start, y_end = y_end, y_start
                 w = semitone_mm
-                default_black_above = p in BLACK_KEYS and _black_note_above_stem(item, black_rule, line_notes, op_time)
+                default_black_above = p in BLACK_KEYS and _black_note_above_stem(item, black_rule, line_notes)
                 spec = resolve_notehead_spec(n, default_black_above=default_black_above)
                 note_y = y_start
                 if bool(getattr(spec, 'is_up', False)):
@@ -3597,7 +3242,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
 
                 # Problem solved: avoid duplicated heads on continuations.
                 if not continues_from_prev_line and bool(layout.get('note_head_visible', True)):
-                    is_narrow = _should_tune_under_stem_black_width(item, black_rule, line_notes, op_time)
+                    is_narrow = _should_tune_under_stem_black_width(item, black_rule, line_notes)
                     notehead = Notehead.from_note(
                         x_mm=float(x),
                         y_mm=float(y_start),
@@ -3788,7 +3433,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                                 # with the default continuation-dot position.
                                 other_black_above = (
                                     other_pitch in BLACK_KEYS
-                                    and _black_note_above_stem(n, black_rule, line_notes, op_time)
+                                    and _black_note_above_stem(n, black_rule, line_notes)
                                 )
                                 if other_black_above:
                                     continue
