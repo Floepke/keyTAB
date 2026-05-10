@@ -41,6 +41,9 @@ class SnapSizeSelector(QtWidgets.QWidget):
             "The snap size is visual as snap bands in the editor and the edit cursor will snap to these divisions when moving or placing elements. "
             "The snap size is also the editor scroll step when using the mouse wheel over the editor."
         ))
+        # Use itemClicked instead of itemSelectionChanged to handle clicks on already-selected items
+        self.list.itemClicked.connect(self._on_list_item_clicked)
+        # Also keep itemSelectionChanged for programmatic selection changes
         self.list.itemSelectionChanged.connect(self._emit_changed)
         layout.addWidget(self.list)
         # State (set before populating to avoid early signal using unset fields)
@@ -251,6 +254,16 @@ class SnapSizeSelector(QtWidgets.QWidget):
             self._divide = 1
             self._update_ui()
         self.snapChanged.emit(self._base, self._divide)
+
+    def _on_list_item_clicked(self, item: QtWidgets.QListWidgetItem) -> None:
+        """Handle list item clicks to reset divider, even for already-selected items."""
+        if item:
+            base = int(item.data(QtCore.Qt.ItemDataRole.UserRole))
+            self._base = base
+            # Clicking any base note item always resets tuplet divider to 1
+            self._divide = 1
+            self._update_ui()
+            self.snapChanged.emit(self._base, self._divide)
 
     def _dec_divide(self) -> None:
         if self._divide > 1:

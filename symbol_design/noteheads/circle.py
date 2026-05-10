@@ -69,7 +69,7 @@ def draw_circle_notehead(
                 float(x_mm) + half_w,
                 top_y + full_h,
                 stroke_color=stroke_color,
-                stroke_width_mm=max(0.05, float(symbol.notehead_outline_width_mm) * 0.5),
+                stroke_width_mm=max(0.05, float(symbol.notehead_outline_width_mm)),
                 fill_color=fill_color,
                 id=int(item_id),
                 tags=list(tags),
@@ -100,7 +100,7 @@ def draw_circle_notehead(
             du.add_polygon(
                 pts,
                 stroke_color=stroke_color,
-                stroke_width_mm=max(0.05, float(symbol.notehead_outline_width_mm) * 0.5),
+                stroke_width_mm=max(0.05, float(symbol.notehead_outline_width_mm)),
                 fill_color=fill_color,
                 id=int(item_id),
                 tags=list(tags),

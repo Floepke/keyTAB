@@ -28,7 +28,11 @@ class SymbolUtil:
         except Exception:
             val = 1.0
         if getattr(self, 'black_note_narrow', False):
-            val *= 0.75
+            try:
+                narrow_scale = float(getattr(self, 'black_note_narrow_width_percent', 0.75) or 0.75)
+            except Exception:
+                narrow_scale = 0.75
+            val *= max(0.05, narrow_scale)
         return max(0.05, val)
 
     @property

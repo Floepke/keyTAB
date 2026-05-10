@@ -51,7 +51,7 @@ class GraceNoteDrawerMixin:
         grace_scale = float(getattr(layout, 'grace_note_scale', 0.75) or 0.75)
         semitone_scaled = semitone_dist * max(0.05, grace_scale)
         style_scale = float(getattr(layout, 'scale', 1.0) or 1.0)
-        outline_w = float(getattr(layout, 'grace_note_outline_width_mm', getattr(layout, 'grace_note_outline_width', 0.3)) or 0.3) * style_scale
+        outline_w = float(getattr(layout, 'note_stem_thickness_mm', 0.5) or 0.5) * style_scale * 2
         paper_r, paper_g, paper_b = Style.get_named_rgb('paper', (255, 255, 255))
         paper_color = (paper_r / 255.0, paper_g / 255.0, paper_b / 255.0, 1.0)
 
@@ -66,7 +66,7 @@ class GraceNoteDrawerMixin:
                 x_mm=float(x),
                 y_mm=float(y_top),
                 note=g,
-                layout=layout,
+                layout=self._grace_layout_no_tilt(layout),
                 semitone_space_mm=float(semitone_scaled),
                 notation_color=notation_color,
                 paper_color=paper_color,
@@ -86,3 +86,10 @@ class GraceNoteDrawerMixin:
                 float(x - hit_w), float(y_center - hit_h),
                 float(x + hit_w), float(y_center + hit_h),
             )
+
+    def _grace_layout_no_tilt(self, layout):
+        """Return layout copy with notehead_tilt set to 0 for grace notes visual contrast."""
+        import copy
+        layout_copy = copy.copy(layout)
+        layout_copy.notehead_tilt = 0.0
+        return layout_copy

@@ -30,6 +30,12 @@ from engraver.helpers import (
 
 _MP_CONTEXT = mp.get_context("spawn")
 
+def _grace_layout_no_tilt(layout: dict) -> dict:
+    """Return layout dict copy with notehead_tilt set to 0 for grace notes visual contrast."""
+    layout_copy = dict(layout)
+    layout_copy['notehead_tilt'] = 0.0
+    return layout_copy
+
 def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = False) -> None:
     """Compute a full print layout and draw commands into DrawUtil.
 
@@ -374,23 +380,6 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
         page_top = user_page_top
         page_bottom = user_page_bottom
 
-    header_height = max(0.0, float(layout.get('header_height_mm', 0.0) or 0.0))
-    footer_height = max(0.0, float(layout.get('footer_height_mm', 0.0) or 0.0))
-    if horizontal_read_direction:
-        # Horizontal mode: reserve footer on the left on every page.
-        # Header reserve is applied only on page 1 where title/composer are drawn.
-        line_axis_left_reserve_default = float(footer_height)
-        line_axis_right_reserve_default = 0.0
-    else:
-        line_axis_left_reserve_default = 0.0
-        line_axis_right_reserve_default = 0.0
-
-    def _line_axis_reserves_for_page(page_index: int) -> tuple[float, float]:
-        left_reserve = float(line_axis_left_reserve_default)
-        right_reserve = float(line_axis_right_reserve_default)
-        if horizontal_read_direction and page_index == 0:
-            right_reserve += float(header_height)
-        return left_reserve, right_reserve
     scale = float(layout.get('scale', 1.0) or 1.0)
     stave_two_w = float(layout.get('stave_two_line_thickness_mm', 0.5) or 0.5) * scale
     stave_three_w = float(layout.get('stave_three_line_thickness_mm', 0.5) or 0.5) * scale
@@ -556,6 +545,48 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
         x_off = float(raw_font.get('x_offset', 0.0) or 0.0)
         y_off = float(raw_font.get('y_offset', 0.0) or 0.0)
         return family, size_pt, bold, italic, underline, x_off, y_off
+
+    # Problem solved: calculate header and footer heights automatically based on text extents.
+    # Header contains title and composer; footer contains page/title/copyright info.
+    def _calculate_text_height_mm(font_size_pt: float, padding_mm: float = 0.5) -> float:
+        """Calculate text height in mm from font size in points with padding.
+        Approximate: 1 point ≈ 0.352778 mm, add padding for spacing.
+        """
+        height_mm = (font_size_pt * 0.35278) + padding_mm
+        return max(0.0, float(height_mm))
+    
+    # Retrieve font sizes for automatic height calculation
+    _, title_size, _, _, _, _, _ = _info_font('font_title', 'Courier', 12.0)
+    title_size = title_size * scale
+    _, composer_size, _, _, _, _, _ = _info_font('font_composer', 'Courier', 10.0)
+    composer_size = composer_size * scale
+    _, footer_size, _, _, _, _, _ = _info_font('font_copyright', 'Courier', 8.0)
+    footer_size = footer_size * scale
+    
+    # Calculate header height as space for title + composer with spacing
+    title_height_mm = _calculate_text_height_mm(title_size, 0.3)
+    composer_height_mm = _calculate_text_height_mm(composer_size, 0.3)
+    header_height = max(0.0, title_height_mm + composer_height_mm + 1.0)  # 1.0 mm gap between title and composer
+    
+    # Calculate footer height as space for page/title/copyright line
+    footer_height_mm = _calculate_text_height_mm(footer_size, 0.3)
+    footer_height = max(0.0, footer_height_mm + 1.0)  # 1.0 mm padding for footer
+    
+    if horizontal_read_direction:
+        # Horizontal mode: reserve footer on the left on every page.
+        # Header reserve is applied only on page 1 where title/composer are drawn.
+        line_axis_left_reserve_default = float(footer_height)
+        line_axis_right_reserve_default = 0.0
+    else:
+        line_axis_left_reserve_default = 0.0
+        line_axis_right_reserve_default = 0.0
+
+    def _line_axis_reserves_for_page(page_index: int) -> tuple[float, float]:
+        left_reserve = float(line_axis_left_reserve_default)
+        right_reserve = float(line_axis_right_reserve_default)
+        if horizontal_read_direction and page_index == 0:
+            right_reserve += float(header_height)
+        return left_reserve, right_reserve
 
     def _has_followed_rest(item: dict) -> bool:
         """Return True when a note has no immediate following note in its hand.
@@ -1062,11 +1093,13 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                 'Courier',
                 12.0,
             )
+            title_size = title_size * scale
             composer_family, composer_size, composer_bold, composer_italic, composer_underline, composer_x_off, composer_y_off = _info_font(
                 'font_composer',
                 'Courier',
                 10.0,
             )
+            composer_size = composer_size * scale
             title_x, title_y = _map_output_to_drawing(
                 user_page_left + title_x_off,
                 user_page_top + title_y_off,
@@ -1128,6 +1161,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                 'Courier',
                 8.0,
             )
+            footer_size = footer_size * scale
             if horizontal_read_direction:
                 # Keep drawing-space placement near top-left, but derive it from
                 # output bottom-left so final result honors user bottom margin.
@@ -3181,7 +3215,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                         x_mm=float(x),
                         y_mm=float(y_top),
                         note=g_raw,
-                        layout=layout,
+                        layout=_grace_layout_no_tilt(layout),
                         semitone_space_mm=float(semitone_mm * g_scale),
                         notation_color=notation_color,
                         paper_color=paper_color,
@@ -3526,7 +3560,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                 hairpin_spread = float(layout.get('hairpin_width_mm', 5.0) or 5.0) * scale
                 _hg = layout.get('hairpin_text_gap_mm')
                 hairpin_gap = float(_hg if _hg is not None else 5.0)
-                dynamic_symbol_font_size_pt = float(layout.get('dynamic_symbol_font_size_pt', 12.0) or 12.0)
+                dynamic_symbol_font_size_pt = float(layout.get('dynamic_symbol_font_size_pt', 12.0) or 12.0) * scale
                 dynamic_bg_pad = float(layout.get('dynamic_symbol_background_padding_mm', 0.5) or 0.5) * scale
                 dynamic_symbol_angle_deg = 90.0
 
@@ -3674,7 +3708,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                     _draw_hairpin(hp, False)
 
             if bool(layout.get('dynamic_symbol_visible', True)) and line_dynamic_symbols:
-                text_size_pt = float(layout.get('dynamic_symbol_font_size_pt', 12.0) or 12.0)
+                text_size_pt = float(layout.get('dynamic_symbol_font_size_pt', 12.0) or 12.0) * scale
                 dynamic_bg_pad = float(
                     layout.get(
                         'dynamic_symbol_background_padding_mm',

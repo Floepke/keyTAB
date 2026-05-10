@@ -13,6 +13,9 @@ from utils.CONSTANT import BLACK_KEYS
 
 NoteheadForm = Literal["circle", "triangle", "bullet", "x"]
 NoteheadDirection = Literal["up", "down"]
+# Width scale used when narrowing black noteheads next to white notes
+# in the down-direction collision case.
+BLACK_NOTE_NARROW_WIDTH_PERCENT = 0.70
 NoteheadLiteral = Literal[
     "auto",
     "circle_white_up",
@@ -148,6 +151,7 @@ class Notehead(SymbolUtil):
     filled: bool = False
     outline_width_mm_override: float | None = None
     black_note_narrow: bool = False
+    black_note_narrow_width_percent: float = BLACK_NOTE_NARROW_WIDTH_PERCENT
 
     @property
     def pitch(self) -> int:
@@ -245,6 +249,7 @@ class Notehead(SymbolUtil):
         default_black_above: bool,
         outline_width_mm_override: float | None = None,
         black_note_narrow: bool = False,
+        black_note_narrow_width_percent: float = BLACK_NOTE_NARROW_WIDTH_PERCENT,
     ) -> "Notehead":
         spec = resolve_notehead_spec(note, default_black_above=bool(default_black_above))
         return cls(
@@ -260,4 +265,5 @@ class Notehead(SymbolUtil):
             filled=spec.filled,
             outline_width_mm_override=(None if outline_width_mm_override is None else float(outline_width_mm_override)),
             black_note_narrow=bool(black_note_narrow),
+            black_note_narrow_width_percent=float(black_note_narrow_width_percent),
         )

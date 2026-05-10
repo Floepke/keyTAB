@@ -15,8 +15,6 @@ class Layout:
     page_bottom_margin_mm: float = 10.0
     page_left_margin_mm: float = 10.0
     page_right_margin_mm: float = 10.0
-    header_height_mm: float = 15.0
-    footer_height_mm: float = 7.5
 
     black_note_rule: Literal['above_stem', 'below_stem', 'above_stem_if_collision', 'above_stem_if_chord_and_white_note', 'above_stem_if_chord_and_white_note_same_hand'] = 'above_stem'
 
@@ -46,7 +44,7 @@ class Layout:
 
     # Grace note appearance
     grace_note_visible: bool = True
-    grace_note_outline_width_mm: float = 1.0
+    grace_note_outline_width_mm: float = 0.8
     grace_note_scale: float = 0.75
 
     # Pedal appearance
@@ -81,8 +79,8 @@ class Layout:
 
     # Count line
     countline_visible: bool = True
-    countline_dash_pattern: list[float] = field(default_factory=lambda: [0.0, 2.0])  # Dash pattern for count lines (e.g., [dash_length, gap_length])
-    countline_thickness_mm: float = 1.25
+    countline_dash_pattern: list[float] = field(default_factory=lambda: [0.0, 3.0])  # Dash pattern for count lines (e.g., [dash_length, gap_length])
+    countline_thickness_mm: float = 1.5
 
     # Grid lines
     stave_visible: bool = True
@@ -90,9 +88,9 @@ class Layout:
     grid_line_visible: bool = True
     grid_band_visible: bool = True
     grid_band_track: list[GridBand] = field(default_factory=list) # Grid Band track. Single track for alternating bands.
-    grid_barline_thickness_mm: float = 1.0
+    grid_barline_thickness_mm: float = 1.25
     grid_gridline_thickness_mm: float = 1.0
-    grid_gridline_dash_pattern_mm: list[float] = field(default_factory=lambda: [3.0])
+    grid_gridline_dash_pattern_mm: list[float] = field(default_factory=lambda: [3.0, 4.0])
     grid_band_color: str = '#ccc'
     grid_band_start_phase: Literal['dark', 'light'] = 'dark'
 
@@ -114,8 +112,8 @@ class Layout:
         size_pt=25.0,
         bold=True,
     ))
-    measure_numbering_guide_thickness_mm: float = 0.7
-    measure_numbering_guide_dash_pattern_mm: list[float] = field(default_factory=lambda: [1.0, 2.0])
+    measure_numbering_guide_thickness_mm: float = 0.75
+    measure_numbering_guide_dash_pattern_mm: list[float] = field(default_factory=lambda: [2.0])
     # 'system': number at top of each system; 'barline': number at every barline
     measure_numbering_placement: Literal['system', 'barline'] = 'barline'
     measure_numbering_guide_visible: bool = True
@@ -138,25 +136,25 @@ class Layout:
     # Info fonts
     font_title: Font = field(default_factory=lambda: Font(
         family="Edwin",
-        size_pt=25.0,
-        bold=True,
+        size_pt=80.0,
+        bold=False,
     ))
     font_composer: Font = field(default_factory=lambda: Font(
         family="Edwin",
-        size_pt=15.0,
+        size_pt=40.0,
         italic=True,
     ))
     font_copyright: Font = field(default_factory=lambda: Font(
         family="Edwin",
-        size_pt=12.0,
+        size_pt=30.0,
     ))
     font_arranger: Font = field(default_factory=lambda: Font(
         family="Edwin",
-        size_pt=12.0,
+        size_pt=15.0,
     ))
     font_lyricist: Font = field(default_factory=lambda: Font(
         family="Edwin",
-        size_pt=12.0,
+        size_pt=15.0,
     ))
 
     # Stave appearence
@@ -164,7 +162,7 @@ class Layout:
     stave_three_line_thickness_mm: float = 1.1
     stave_clef_line_thickness_mm: float = 0.75
     stave_ledger_line_length_mm: float = 13.0
-    stave_clef_line_dash_pattern_mm: list[float] = field(default_factory=lambda: [3.0])  # Dash pattern for clef lines (e.g., [dash_length, gap_length])
+    stave_clef_line_dash_pattern_mm: list[float] = field(default_factory=lambda: [4.0, 3.0])  # Dash pattern for clef lines (e.g., [dash_length, gap_length])
 
 LAYOUT_FLOAT_CONFIG: dict[str, dict[str, float]] = {
     'page_width_mm': {'min': 50.0, 'max': 5_000.0, 'step': 0.5},

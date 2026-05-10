@@ -135,13 +135,20 @@ class SelectionMixin:
         self._sel_max_pitch = 88
         self._selection_active = True
 
+    def _selection_window_time_bounds(self, start_units: float, end_units: float) -> tuple[float, float]:
+        """Return selection bounds with an exclusive-style end using SHORTEST_DURATION."""
+        a = float(min(start_units, end_units))
+        raw_b = float(max(start_units, end_units))
+        epsilon = max(0.0, float(SHORTEST_DURATION * 2)) # times 2 to make selection rectangle exclude the next events on the right edge
+        b = max(a, raw_b - epsilon)
+        return float(a), float(b)
+
     def _selected_notes_from_model(self, include_grace: bool = False) -> list:
         """Return selected pitch events resolved from the live SCORE model."""
         score: SCORE | None = self.current_score()
         if score is None or not self._selection_active:
             return []
-        a = float(min(self._sel_start_units, self._sel_end_units))
-        b = float(max(self._sel_start_units, self._sel_end_units)) - 0.1
+        a, b = self._selection_window_time_bounds(self._sel_start_units, self._sel_end_units)
         min_p = max(1, min(88, int(getattr(self, '_sel_min_pitch', 1))))
         max_p = max(1, min(88, int(getattr(self, '_sel_max_pitch', 88))))
         op = Operator(SHORTEST_DURATION)
@@ -151,14 +158,14 @@ class SelectionMixin:
             event_lists.append(list(getattr(score.events, 'grace_note', []) or []))
 
         for lst in event_lists:
-            for note in lst:
+            for evt in lst:
                 try:
-                    t0 = float(getattr(note, 'time', 0.0) or 0.0)
-                    p0 = int(getattr(note, 'pitch', 0) or 0)
+                    t0 = float(getattr(evt, 'time', 0.0) or 0.0)
+                    p0 = int(getattr(evt, 'pitch', 0) or 0)
                 except Exception:
                     continue
                 if op.ge(t0, a) and op.le(t0, b) and min_p <= p0 <= max_p:
-                    out.append(note)
+                    out.append(evt)
         return out
 
     def _transpose_step_units_for_anchor_key(self, anchor_key: int, direction: int) -> int:
@@ -203,7 +210,7 @@ class SelectionMixin:
             return False
         sel = self.detect_events_from_time_window(
             float(self._sel_start_units),
-            float(self._sel_end_units) - 0.1,
+            float(self._sel_end_units),
         )
         notes = self._selected_notes_from_model(include_grace=True)
         updated = False
@@ -254,7 +261,7 @@ class SelectionMixin:
 
         sel = self.detect_events_from_time_window(
             float(self._sel_start_units),
-            float(self._sel_end_units) - 0.1,
+            float(self._sel_end_units),
         )
         notes = self._selected_notes_from_model(include_grace=True)
         texts = list(sel.get('text', []) or [])
@@ -410,8 +417,7 @@ class SelectionMixin:
         if score is None:
             return set()
 
-        a = float(min(self._sel_start_units, self._sel_end_units))
-        b = float(max(self._sel_start_units, self._sel_end_units)) - 0.1
+        a, b = self._selection_window_time_bounds(self._sel_start_units, self._sel_end_units)
         min_p = max(1, min(88, int(getattr(self, '_sel_min_pitch', 1))))
         max_p = max(1, min(88, int(getattr(self, '_sel_max_pitch', 88))))
         op = Operator(SHORTEST_DURATION)
@@ -453,8 +459,7 @@ class SelectionMixin:
         score: SCORE | None = self.current_score()
         if score is None:
             return {}
-        a = float(min(start_units, end_units))
-        b = float(max(start_units, end_units))
+        a, b = self._selection_window_time_bounds(start_units, end_units)
         op = Operator(SHORTEST_DURATION)
         min_p = max(1, min(88, int(getattr(self, '_sel_min_pitch', 1))))
         max_p = max(1, min(88, int(getattr(self, '_sel_max_pitch', 88))))
@@ -522,7 +527,7 @@ class SelectionMixin:
         """Copy current selection window events into the editor clipboard and return it."""
         if not self._selection_active:
             return None
-        sel = self.detect_events_from_time_window(self._sel_start_units, self._sel_end_units - 0.1)
+        sel = self.detect_events_from_time_window(self._sel_start_units, self._sel_end_units)
         safe_copy = copy.deepcopy(sel)
         self.clipboard = safe_copy
         self._clipboard_start_units = float(min(self._sel_start_units, self._sel_end_units))
@@ -552,7 +557,7 @@ class SelectionMixin:
         score: SCORE | None = self.current_score()
         if score is None or not self._selection_active:
             return False
-        sel = self.detect_events_from_time_window(self._sel_start_units, self._sel_end_units - 0.1)
+        sel = self.detect_events_from_time_window(self._sel_start_units, self._sel_end_units)
         deleted_any = False
         for key in sel:
             event_list = getattr(score.events, key, None)
