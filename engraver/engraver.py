@@ -713,6 +713,38 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
         y_off = float(raw_font.get('y_offset', 0.0) or 0.0)
         return family, size_pt, bold, italic, underline, x_off, y_off
 
+    def _note_has_continuation_dot_in_beam_window(note: dict, notes_sorted: list[dict], barlines: list[float], t0: float, t1: float) -> bool:
+        """Return True when note would render a continuation dot within [t0, t1)."""
+        n_start = float(note.get('time', 0.0) or 0.0)
+        n_end = float(note.get('end', n_start + float(note.get('duration', 0.0) or 0.0)) or 0.0)
+        if not (op_time.lt(n_start, float(t0)) and op_time.gt(n_end, float(t0))):
+            return False
+
+        note_idx = int(note.get('idx', note.get('id', 0)) or 0)
+        note_hand = str(note.get('hand', 'l') or 'l')
+
+        # Dot at other note starts/ends inside this note duration.
+        for other in notes_sorted:
+            other_idx = int(other.get('idx', other.get('id', 0)) or 0)
+            if other_idx == note_idx:
+                continue
+            if str(other.get('hand', 'l') or 'l') != note_hand:
+                continue
+            s = float(other.get('time', 0.0) or 0.0)
+            e = float(other.get('end', s + float(other.get('duration', 0.0) or 0.0)) or 0.0)
+            if op_time.gt(s, n_start) and op_time.lt(s, n_end) and op_time.ge(s, float(t0)) and op_time.lt(s, float(t1)):
+                return True
+            if op_time.gt(e, n_start) and op_time.lt(e, n_end) and op_time.ge(e, float(t0)) and op_time.lt(e, float(t1)):
+                return True
+
+        # Dot at crossed barlines inside this note duration.
+        for bt in barlines:
+            bt = float(bt)
+            if op_time.gt(bt, n_start) and op_time.lt(bt, n_end) and op_time.ge(bt, float(t0)) and op_time.lt(bt, float(t1)):
+                return True
+
+        return False
+
     def _assign_groups(notes_sorted: list[dict], windows: list[tuple[float, float]]) -> list[list[dict]]:
         """Assign notes to time windows by overlap and preserve start-time order.
 
@@ -725,6 +757,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
         ends = [float(n.get('end', 0.0) or 0.0) for n in notes_sorted]
         result: list[list[dict]] = []
         j = 0
+        barlines = [float(v) for v in (all_barlines or [])]
         for (t0, t1) in windows:
             j = bisect.bisect_left(starts, float(t0) - float(op_time.threshold), j)
             group: list[dict] = []
@@ -742,7 +775,9 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                 s = starts[b]
                 e = ends[b]
                 if op_time.gt(e, float(t0)) and op_time.lt(s, float(t1)):
-                    group.append(notes_sorted[b])
+                    n = notes_sorted[b]
+                    if _note_has_continuation_dot_in_beam_window(n, notes_sorted, barlines, float(t0), float(t1)):
+                        group.append(n)
                 b -= 1
             if group:
                 keyed: dict[int, dict] = {}

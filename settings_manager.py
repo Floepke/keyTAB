@@ -334,7 +334,7 @@ def get_preferences_manager() -> PreferencesManager:
         pm.register(
             key="save_on_exit",
             default=True,
-            description="Save the current file if a file is currently open when exiting the app. You will not get the yesnocancel prompt on exit.",
+            description="Save the current file if a file is currently open when exiting the app. You will not get the yesnocancel prompt on exit because with this option on you choose 'yes' by default.",
         )
         pm.register(
             key="play_note_on_edit",

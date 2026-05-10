@@ -164,6 +164,37 @@ class BeamDrawerMixin:
         windows_all: dict[str, list[tuple[float, float]]] = {}
 
         # Helper: group notes by grid intervals [t_i, t_{i+1})
+        def _note_has_continuation_dot_in_beam_window(note, notes_sorted: list, barlines: list[float], t0: float, t1: float) -> bool:
+            """Return True when note would draw a continuation dot within [t0, t1)."""
+            n_start = float(getattr(note, 'time', 0.0) or 0.0)
+            n_end = float(getattr(note, 'time', 0.0) or 0.0) + float(getattr(note, 'duration', 0.0) or 0.0)
+            if not (op.lt(n_start, float(t0)) and op.gt(n_end, float(t0))):
+                return False
+
+            note_id = int(getattr(note, '_id', -1) or -1)
+            note_hand = str(getattr(note, 'hand', 'l') or 'l')
+
+            # Dot at other note starts/ends inside this note duration.
+            for other in notes_sorted:
+                if int(getattr(other, '_id', -1) or -1) == note_id:
+                    continue
+                if str(getattr(other, 'hand', 'l') or 'l') != note_hand:
+                    continue
+                s = float(getattr(other, 'time', 0.0) or 0.0)
+                e = s + float(getattr(other, 'duration', 0.0) or 0.0)
+                if op.gt(s, n_start) and op.lt(s, n_end) and op.ge(s, float(t0)) and op.lt(s, float(t1)):
+                    return True
+                if op.gt(e, n_start) and op.lt(e, n_end) and op.ge(e, float(t0)) and op.lt(e, float(t1)):
+                    return True
+
+            # Dot at crossed barlines inside this note duration.
+            for bt in barlines:
+                bt = float(bt)
+                if op.gt(bt, n_start) and op.lt(bt, n_end) and op.ge(bt, float(t0)) and op.lt(bt, float(t1)):
+                    return True
+
+            return False
+
         def assign_groups(notes_sorted: list, starts: list[float], windows: list[tuple[float, float]]) -> list[list]:
             """Assign notes to windows by overlap, not just start-in-window.
 
@@ -176,6 +207,7 @@ class BeamDrawerMixin:
             ends = [float(n.time + n.duration) for n in notes_sorted]
             result: list[list] = []
             j = 0
+            barlines = list(cache.get('barline_times') or []) if isinstance(cache, dict) else []
             for (t0, t1) in windows:
                 # advance j near t0 to reduce scanning; use starts
                 j = bisect.bisect_left(starts, float(t0) - float(op.threshold), j)
@@ -198,7 +230,11 @@ class BeamDrawerMixin:
                     s = starts[b]
                     e = ends[b]
                     if op.gt(e, float(t0)) and op.lt(s, float(t1)):
-                        group.append(notes_sorted[b])
+                        # Only carry a spanning note into the next beam group when
+                        # it has a continuation dot inside this window.
+                        n = notes_sorted[b]
+                        if _note_has_continuation_dot_in_beam_window(n, notes_sorted, barlines, float(t0), float(t1)):
+                            group.append(n)
                     # Optional early break: if e <= t0 and s well before t0, further earlier
                     # notes are unlikely to overlap unless extremely long; keep simple for correctness.
                     b -= 1
