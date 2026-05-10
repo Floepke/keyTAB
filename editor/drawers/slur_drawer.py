@@ -4,6 +4,7 @@ import math
 from typing import TYPE_CHECKING, cast
 from ui.widgets.draw_util import DrawUtil
 from utils.CONSTANT import SLUR_SEGMENT_COUNT
+from editor.editor_defaults import SLUR_WIDTH_SIDES_MM, SLUR_WIDTH_MIDDLE_MM
 
 if TYPE_CHECKING:
     from editor.editor import Editor
@@ -23,9 +24,9 @@ class SlurDrawerMixin:
         if not slurs:
             return
 
-        lay = getattr(score, 'layout', None)
-        side_w = float(getattr(lay, 'slur_width_sides_mm', 0.1) or 0.1)
-        mid_w = float(getattr(lay, 'slur_width_middle_mm', 1.5) or 1.5)
+        # Use hardcoded editor defaults for slur widths (not from file layout)
+        side_w = float(SLUR_WIDTH_SIDES_MM or 0.75)
+        mid_w = float(SLUR_WIDTH_MIDDLE_MM or 2.0)
         n_seg = max(2, int(SLUR_SEGMENT_COUNT))
 
         is_slur_tool = False

@@ -2,6 +2,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, cast
 from ui.widgets.draw_util import DrawUtil
 from symbol_design.pedal import draw_pedal_symbol
+from editor.editor_defaults import SCALE, PEDAL_SYMBOL_THICKNESS_MM, PEDAL_BACKGROUND_PADDING_MM
 
 if TYPE_CHECKING:
     from editor.editor import Editor
@@ -48,18 +49,8 @@ class PedalDrawerMixin:
         notation_color = getattr(self, 'notation_color', (0.0, 0.0, 0.0, 1.0))
         paper_color = getattr(self, 'paper_color', (1.0, 1.0, 1.0, 1.0))
 
-        # Pedal thickness uses layout value scaled by SCORE.layout.scale in editor.
-        try:
-            if isinstance(layout, dict):
-                pedal_base = float(layout.get('pedal_symbol_thickness_mm', 0.3) or 0.3)
-                style_scale = float(layout.get('scale', 1.0) or 1.0)
-            else:
-                pedal_base = float(getattr(layout, 'pedal_symbol_thickness_mm', 0.3) or 0.3)
-                style_scale = float(getattr(layout, 'scale', 1.0) or 1.0)
-        except (TypeError, ValueError, AttributeError):
-            pedal_base = 0.3
-            style_scale = 1.0
-        pedal_thickness_mm = max(0.05, pedal_base * style_scale)
+        # Use hardcoded editor defaults for pedal styling (not from file layout)
+        pedal_thickness_mm = max(0.05, float(PEDAL_SYMBOL_THICKNESS_MM or 1.0) * float(SCALE or 1.0))
 
         for ev in events:
             t = float(getattr(ev, 'time', 0.0) or 0.0)
@@ -104,14 +95,8 @@ class PedalDrawerMixin:
 
             # Register a hit rectangle so tools can add/delete pedal symbols by click.
             span = max(0.8, float(semitone_space_mm))
-            background_pad = 0.0
-            try:
-                if isinstance(layout, dict):
-                    background_pad = float(layout.get('pedal_background_padding_mm', 0.0) or 0.0)
-                else:
-                    background_pad = float(getattr(layout, 'pedal_background_padding_mm', 0.0) or 0.0)
-            except (TypeError, ValueError, AttributeError):
-                background_pad = 0.0
+            # Use hardcoded editor default for background padding (not from file layout)
+            background_pad = float(PEDAL_BACKGROUND_PADDING_MM or 1.0)
             background_pad = max(0.0, float(background_pad))
             if symbol in ('down_keytab', 'down_klavarskribo'):
                 x1 = float(x_mm - (span * 2.0) - background_pad)

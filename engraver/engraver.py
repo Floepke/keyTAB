@@ -2063,8 +2063,12 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
 
             # Problem solved: render count lines as lightweight guides.
             if bool(layout.get('countline_visible', True)) and count_lines:
-                dash_pattern_raw = list(layout.get('countline_dash_pattern', []) or [])
-                dash_pattern = [float(v) * scale for v in dash_pattern_raw] if dash_pattern_raw else None
+                default_countline_dash_mm = list(getattr(Layout(), 'countline_dash_pattern', [0.0, 2.0]) or [0.0, 2.0])
+                dash_pattern = _scaled_dash_pattern_with_default(
+                    layout.get('countline_dash_pattern', default_countline_dash_mm),
+                    default_countline_dash_mm,
+                    scale,
+                )
                 countline_w = float(layout.get('countline_thickness_mm', 0.5) or 0.5) * scale
                 base_x_c4 = _key_to_x(40)
                 for ev in count_lines:

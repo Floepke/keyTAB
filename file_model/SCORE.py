@@ -1,5 +1,3 @@
-
-
 # my json structure design for *.piano files.
 from __future__ import annotations
 from dataclasses import dataclass, field, fields, MISSING, is_dataclass
@@ -32,6 +30,7 @@ from file_model.analysis import Analysis
 from utils.CONSTANT import GRACENOTE_THRESHOLD, QUARTER_NOTE_UNIT
 from file_model.base_grid import BaseGrid
 from file_model.appstate import AppState
+from file_model.old_file_conversion import convert_legacy_piano_data
 from utils.operator import Operator
 
 
@@ -94,27 +93,23 @@ def _defaults_for(dc_type):
 
 
 def _apply_legacy_conversion(data: dict) -> dict:
-	"""Apply legacy file conversions (fail-open)."""
-	try:
-		from file_model.old_file_conversion import convert_legacy_piano_data
-		data = convert_legacy_piano_data(data)
-	except Exception:
-		pass
+    """Apply legacy file conversions (fail-open)."""
+    data = convert_legacy_piano_data(data)
 
-	# Layout key migration: dynamic symbol background padding rename.
-	if isinstance(data, dict):
-		layout = data.get('layout', None)
-		if isinstance(layout, dict):
-			if layout.get('time_signature_indicator_type') == 'both':
-				layout['time_signature_indicator_type'] = 'classical & klavarskribo'
-			if 'hairpin_font_size_pt' not in layout and 'hairpin_text_size_pt' in layout:
-				layout['hairpin_font_size_pt'] = layout.get('hairpin_text_size_pt')
-			if 'dynamic_symbol_background_padding_mm' not in layout:
-				if 'dynamic_symbol_background_padding' in layout:
-					layout['dynamic_symbol_background_padding_mm'] = layout.get('dynamic_symbol_background_padding')
-				elif 'dynamic_background_padding' in layout:
-					layout['dynamic_symbol_background_padding_mm'] = layout.get('dynamic_background_padding')
-	return data
+    # Layout key migration: dynamic symbol background padding rename.
+    if isinstance(data, dict):
+        layout = data.get('layout', None)
+        if isinstance(layout, dict):
+            if layout.get('time_signature_indicator_type') == 'both':
+                layout['time_signature_indicator_type'] = 'classical & klavarskribo'
+            if 'hairpin_font_size_pt' not in layout and 'hairpin_text_size_pt' in layout:
+                layout['hairpin_font_size_pt'] = layout.get('hairpin_text_size_pt')
+            if 'dynamic_symbol_background_padding_mm' not in layout:
+                if 'dynamic_symbol_background_padding' in layout:
+                    layout['dynamic_symbol_background_padding_mm'] = layout.get('dynamic_symbol_background_padding')
+                elif 'dynamic_background_padding' in layout:
+                    layout['dynamic_symbol_background_padding_mm'] = layout.get('dynamic_background_padding')
+    return data
 
 
 def _merge_with_defaults(dc_type, incoming: dict, context: str, skip_keys: set = {'id', '_id'}) -> dict:

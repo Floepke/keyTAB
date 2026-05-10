@@ -55,11 +55,19 @@ def convert_legacy_piano_data(data: dict) -> dict:
     - events.note[].notehead: empty/default -> 'auto'
     - events.note[].hand: legacy '<'/'>' -> 'l'/'r'
     - events.beam[].hand: legacy '<'/'>' -> 'l'/'r'
+    - layout.notehead_tilt: negative values -> positive values
 
     This function is intentionally idempotent.
     """
     if not isinstance(data, dict):
         return data
+
+    # Normalize notehead_tilt values
+    layout = data.get('layout', {})
+    if isinstance(layout, dict):
+        notehead_tilt = layout.get('notehead_tilt', 0)
+        if isinstance(notehead_tilt, (int, float)) and notehead_tilt < 0:
+            layout['notehead_tilt'] = abs(notehead_tilt)
 
     # Legacy schema migration: move editor zoom into app_state.
     try:

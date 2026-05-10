@@ -9,6 +9,7 @@ from utils.operator import Operator
 from typing import Tuple
 from ui.style import Style
 from symbol_design.noteheads import Notehead, normalize_notehead_literal, resolve_notehead_spec
+from editor.editor_defaults import NOTE_WIDTH_SCALING, NOTE_STEM_LENGTH_SEMITONE
 
 if TYPE_CHECKING:
     from editor.editor import Editor
@@ -150,9 +151,8 @@ class NoteDrawerMixin:
         self = cast("Editor", self)
         fill = self._midinote_color(n, draw_mode)
         w = float(self.semitone_dist or 0.5)
-        layout = self.current_score().layout
-        head_scale = float(getattr(layout, 'note_width_scaling', 0.75) or 0.75)
-        head_half_w = w * max(0.05, head_scale)
+        # Use hardcoded editor default for note width scaling (not from file layout)
+        head_half_w = w * max(0.05, NOTE_WIDTH_SCALING)
         du.add_polygon(
             [
                 (x, y1),
@@ -172,6 +172,8 @@ class NoteDrawerMixin:
         x_left = x - max(w, head_half_w)
         x_right = x + max(w, head_half_w)
         y_top = y1           # top of notehead
+        score = self.current_score()
+        layout = score.layout if score else None
         spec = resolve_notehead_spec(n, default_black_above=self._black_note_above_stem(n, layout))
         if bool(getattr(spec, 'is_up', False)):
             y_top = float(y1) - (w * 2.0)
@@ -192,9 +194,9 @@ class NoteDrawerMixin:
                 break
         if not on_barline:
             return
-        layout = self.current_score().layout
+        # Use hardcoded editor default for stem length (not from file layout)
         w = float(self.semitone_dist or 0.5)
-        stem_len = float(layout.note_stem_length_semitone or 3) * w
+        stem_len = float(NOTE_STEM_LENGTH_SEMITONE or 7) * w
         thickness = self._editor_line_width_mm()
         hand = getattr(n, 'hand', 'l')
         if hand == 'l':
@@ -281,8 +283,8 @@ class NoteDrawerMixin:
 
     def _draw_stem(self, du: DrawUtil, n, x: float, y1: float, draw_mode: str) -> None:
         self = cast("Editor", self)
-        layout = self.current_score().layout
-        stem_len = float(layout.note_stem_length_semitone or 3) * float(self.semitone_dist or 0.5)
+        # Use hardcoded editor default for stem length (not from file layout)
+        stem_len = float(NOTE_STEM_LENGTH_SEMITONE or 7) * float(self.semitone_dist or 0.5)
         stem_w = self._editor_line_width_mm()
         # Stem direction based on hand
         if getattr(n, 'hand', 'l') == 'l':

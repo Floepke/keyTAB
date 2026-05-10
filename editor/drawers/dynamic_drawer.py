@@ -1,6 +1,7 @@
 from __future__ import annotations
 from typing import TYPE_CHECKING, cast
 from ui.widgets.draw_util import DrawUtil
+from editor.editor_defaults import SCALE, DYNAMIC_SYMBOL_FONT_SIZE_PT, DYNAMIC_SYMBOL_BACKGROUND_PADDING_MM
 
 if TYPE_CHECKING:
     from editor.editor import Editor
@@ -19,20 +20,9 @@ class DynamicDrawerMixin:
         if not events:
             return
 
-        layout = getattr(score, 'layout', None)
-        style_scale = float(getattr(layout, 'scale', 1.0) or 1.0) if layout is not None else 1.0
-        text_size_pt = float(getattr(layout, 'hairpin_font_size_pt', 12.0) or 12.0)
-        dynamic_bg_pad = float(
-            getattr(
-                layout,
-                'dynamic_symbol_background_padding_mm',
-                getattr(
-                    layout,
-                    'dynamic_symbol_background_padding',
-                    getattr(layout, 'dynamic_background_padding', getattr(layout, 'text_background_padding_mm', 0.5)),
-                ),
-            ) or 0.0
-        ) * style_scale
+        # Use hardcoded editor defaults for dynamic symbol styling (not from file layout)
+        text_size_pt = float(DYNAMIC_SYMBOL_FONT_SIZE_PT or 12.0)
+        dynamic_bg_pad = float(DYNAMIC_SYMBOL_BACKGROUND_PADDING_MM or 1.5)
 
         paper_color = getattr(self, 'paper_color', (1.0, 1.0, 1.0, 1.0))
         text_color = self.notation_color

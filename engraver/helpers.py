@@ -16,27 +16,40 @@ def is_light_paper(rgb_tuple: tuple[int, int, int]) -> bool:
 
 
 def scaled_dash_pattern_with_default(raw_value, fallback_mm: list[float], local_scale: float) -> list[float] | None:
-    parsed: list[float] = []
-    try:
-        if isinstance(raw_value, str):
-            tokens = [p.strip() for p in str(raw_value).split(',') if p.strip() != '']
-            parsed = [float(v) for v in tokens]
-        elif isinstance(raw_value, (list, tuple)):
-            parsed = [float(v) for v in raw_value]
-        elif raw_value is not None:
-            parsed = [float(raw_value)]
-    except Exception:
-        parsed = []
-
-    valid_mm = [float(v) for v in parsed if float(v) > 0.0]
-    if not valid_mm:
+    def _parse_pattern(value) -> list[float]:
+        parsed_local: list[float] = []
         try:
-            valid_mm = [float(v) for v in (fallback_mm or []) if float(v) > 0.0]
+            if isinstance(value, str):
+                chunks = str(value).replace(',', ' ').split()
+                parsed_local = [float(v) for v in chunks]
+            elif isinstance(value, (list, tuple)):
+                parsed_local = [float(v) for v in value]
+            elif value is not None:
+                parsed_local = [float(value)]
         except Exception:
-            valid_mm = []
-    if not valid_mm:
-        valid_mm = [3.0]
-    return [float(v) * float(local_scale) for v in valid_mm]
+            parsed_local = []
+
+        cleaned: list[float] = []
+        for v in parsed_local:
+            fv = float(v)
+            if fv < 0.0:
+                continue
+            cleaned.append(fv)
+        return cleaned
+
+    raw_pattern = _parse_pattern(raw_value)
+    fallback_pattern = _parse_pattern(fallback_mm)
+
+    # Explicit user input wins over fallback, even when it means solid.
+    selected = raw_pattern if raw_pattern else fallback_pattern
+    if not selected:
+        selected = [3.0]
+
+    # A single 0 means "solid" in style fields.
+    if not any(float(v) > 0.0 for v in selected):
+        return None
+
+    return [float(v) * float(local_scale) for v in selected]
 
 
 def build_grid_band_dark_intervals(markers: list, bars: list[float], total_len: float, starts_dark: bool = True) -> list[tuple[float, float]]:

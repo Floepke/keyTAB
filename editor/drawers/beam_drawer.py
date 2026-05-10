@@ -6,6 +6,7 @@ from utils.CONSTANT import QUARTER_NOTE_UNIT
 from file_model.base_grid import resolve_grid_layer_offsets
 import bisect
 import math
+from editor.editor_defaults import SCALE, BEAM_CORNER_RADIUS_MM
 
 if TYPE_CHECKING:
     from editor.editor import Editor
@@ -122,10 +123,8 @@ class BeamDrawerMixin:
             (float(x1 + half*2), y_start),
         ]
 
-        score = self.current_score()
-        layout = getattr(score, 'layout', None) if score is not None else None
-        style_scale = float(getattr(layout, 'scale', 1.0) or 1.0)
-        corner_r = float(getattr(layout, 'beam_corner_radius_mm', 0.2) or 0.2) * style_scale
+        # Use hardcoded editor defaults for beam styling (not from file layout)
+        corner_r = float(BEAM_CORNER_RADIUS_MM or 0.75) * float(SCALE or 1.0)
         if corner_r > 1e-6:
             beam_poly = self._rounded_polygon(beam_poly, radius=corner_r, steps=16)
 

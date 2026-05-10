@@ -1,6 +1,7 @@
 from __future__ import annotations
 from typing import TYPE_CHECKING, cast
 from ui.widgets.draw_util import DrawUtil
+from editor.editor_defaults import SCALE, HAIRPIN_LINE_WIDTH_MM, HAIRPIN_WIDTH_MM, DYNAMIC_SYMBOL_FONT_SIZE_PT, DYNAMIC_SYMBOL_BACKGROUND_PADDING_MM, HAIRPIN_TEXT_GAP_MM
 
 if TYPE_CHECKING:
     from editor.editor import Editor
@@ -81,11 +82,9 @@ class DecrescendoDrawerMixin:
         """
         self = cast("Editor", self)
         score = self.current_score()
-        layout = getattr(score, 'layout', None) if score else None
         
-        # Use hairpin_text_gap_mm from layout for spacing
-        _hg = getattr(layout, 'hairpin_text_gap_mm', None) if layout else None
-        gap_mm = float(_hg if _hg is not None else 5.0)
+        # Use hardcoded editor default for hairpin text gap (not from file layout)
+        gap_mm = float(HAIRPIN_TEXT_GAP_MM or 0.5)
         
         # Check if there's a symbol at the start position
         symbol_at_start = self._get_dynamic_symbol_at_position(t_start, x_rpitch)
@@ -111,15 +110,13 @@ class DecrescendoDrawerMixin:
         if score is None:
             return
 
-        layout = getattr(score, 'layout', None)
-
         events = list(getattr(score.events, 'decrescendo', []) or [])
         if not events:
             return
 
-        style_scale = float(getattr(layout, 'scale', 1.0) or 1.0) if layout is not None else 1.0
-        lw = float(getattr(layout, 'hairpin_line_width_mm', 0.5) or 0.5) * style_scale
-        spread = float(getattr(layout, 'hairpin_width_mm', 5.0) or 5.0) * style_scale
+        # Use hardcoded editor defaults for hairpin styling (not from file layout)
+        lw = float(HAIRPIN_LINE_WIDTH_MM or 1.0) * float(SCALE or 1.0)
+        spread = float(HAIRPIN_WIDTH_MM or 10.0) * float(SCALE or 1.0)
 
         top_mm = float(getattr(self, '_view_y_mm_offset', 0.0) or 0.0)
         vp_h_mm = float(getattr(self, '_viewport_h_mm', 0.0) or 0.0)
