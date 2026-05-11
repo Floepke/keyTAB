@@ -55,6 +55,11 @@ class NoteTool(BaseTool):
         except Exception:
             return True
 
+    def _adjust_session_note_counter(self, delta: int) -> None:
+        """Track net notes created during this app session on the editor instance."""
+        current = int(getattr(self._editor, '_session_note_delta', 0) or 0)
+        setattr(self._editor, '_session_note_delta', int(current + int(delta)))
+
     def _audition_pitch(self, pitch: int) -> None:
         if not self._play_note_on_edit_enabled():
             return
@@ -533,6 +538,7 @@ class NoteTool(BaseTool):
             units = float(max(1e-6, getattr(self._editor, 'snap_size_units', 8.0)))
             acc_preview = int(self.preview_accidental_for_pitch(int(pitch_press)))
             self.edit_note = score.new_note(pitch=pitch_press, time=t_press_snap, duration=units, hand=self._hand, acc=acc_preview)
+            self._adjust_session_note_counter(1)
             self._editing_existing = False
             self._orig_duration = float(units)
             self._press_start_time = float(t_press_snap)
@@ -1070,9 +1076,8 @@ class NoteTool(BaseTool):
         return int(self._acc_toggle)
 
     def preview_accidental_for_pitch(self, pitch: int) -> int:
-        try:
-            p = int(pitch)
-        except Exception:
+        p = int(pitch)
+        if p is None:
             return 0
         if int(self._acc_toggle) == 0:
             return 0

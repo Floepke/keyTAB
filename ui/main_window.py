@@ -430,14 +430,21 @@ class MainWindow(QtWidgets.QMainWindow):
         return paths
 
     def keyPressEvent(self, ev: QtGui.QKeyEvent) -> None:
+        # Escape asks for an explicit OS-exit confirmation first.
+        if (
+            ev.key() == QtCore.Qt.Key_Escape
+            and ev.modifiers() == QtCore.Qt.KeyboardModifier.NoModifier
+            and not ev.isAutoRepeat()
+        ):
+            self._confirm_exit_to_os_then_close()
+            ev.accept()
+            return
+
         # Number keys 1..8 control snap selector/listbox + divider.
         # Applies to both top-row digits and numpad digits.
-        try:
-            if self._handle_snap_number_shortcut(ev):
-                ev.accept()
-                return
-        except Exception:
-            pass
+        if self._handle_snap_number_shortcut(ev):
+            ev.accept()
+            return
 
         # Space toggles play/stop from the editor's time cursor (with note chasing)
         try:
@@ -599,11 +606,11 @@ class MainWindow(QtWidgets.QMainWindow):
         exit_act = QtGui.QAction(tr("Exit"), self)
         exit_act.setToolTip(tr("Exit the application."))
         exit_act.setShortcuts([QtGui.QKeySequence("Esc"), QtGui.QKeySequence.StandardKey.Quit])
-        exit_act.triggered.connect(self.close)
+        exit_act.triggered.connect(self._confirm_exit_to_os_then_close)
 
         new_act.setShortcuts([QtGui.QKeySequence("N"), QtGui.QKeySequence.StandardKey.New])
         open_act.setShortcuts([QtGui.QKeySequence("O"), QtGui.QKeySequence.StandardKey.Open])
-        save_act.setShortcuts([QtGui.QKeySequence("S"), QtGui.QKeySequence.StandardKey.Save])
+        save_act.setShortcuts([QtGui.QKeySequence.StandardKey.Save])
         save_as_act.setShortcut(QtGui.QKeySequence.StandardKey.SaveAs)
 
         file_menu.addAction(new_act)
@@ -1893,6 +1900,42 @@ class MainWindow(QtWidgets.QMainWindow):
             dlg.show()
         except Exception:
             pass
+
+    def _confirm_exit_to_os_then_close(self) -> None:
+        """Ask for explicit OS exit confirmation, then run normal close flow."""
+        try:
+            num_of_created_notes = 0
+            try:
+                num_of_created_notes = int(getattr(getattr(self, 'editor_controller', None), '_session_note_delta', 0) or 0)
+            except Exception:
+                pass
+
+            if num_of_created_notes <= 0:
+                add_message = 'no'
+            else:
+                add_message = str(num_of_created_notes)
+
+            message = self.tr("Do you want to exit keyTAB?\nYou added {add_message} musical notes during this session.").format(
+                add_message=add_message
+            )
+            if num_of_created_notes > 5000:
+                message = message + "\n" + self.tr("Keep going! You're doing great!")  # Fun encouragement for power users
+
+            msg = QtWidgets.QMessageBox(self)
+            msg.setIcon(QtWidgets.QMessageBox.Icon.Question)
+            msg.setWindowTitle(self.tr("keyTAB"))
+            msg.setText(message)
+            msg.setStandardButtons(
+                QtWidgets.QMessageBox.StandardButton.Yes | QtWidgets.QMessageBox.StandardButton.No
+            )
+            msg.setDefaultButton(QtWidgets.QMessageBox.StandardButton.Yes)
+            msg.setEscapeButton(QtWidgets.QMessageBox.StandardButton.No)
+            result = msg.exec()
+            if result == int(QtWidgets.QMessageBox.StandardButton.Yes):
+                self.close()
+        except Exception:
+            # Fall back to existing close behavior if confirmation cannot be shown.
+            self.close()
 
     def _file_new(self) -> None:
         # If there are unsaved changes, confirm save before starting a new project

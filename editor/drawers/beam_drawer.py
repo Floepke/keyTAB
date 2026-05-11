@@ -2,7 +2,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, cast
 from ui.widgets.draw_util import DrawUtil
 from utils.operator import Operator
-from utils.CONSTANT import QUARTER_NOTE_UNIT
+from utils.CONSTANT import QUARTER_NOTE_UNIT, SHORTEST_DURATION
 from file_model.base_grid import resolve_grid_layer_offsets
 import bisect
 import math
@@ -152,7 +152,7 @@ class BeamDrawerMixin:
         notes_by_hand = cache.get('notes_by_hand') or {}
         grid_times = cache.get('grid_den_times') or []
         beam_markers = cache.get('beam_by_hand') or {}
-        op: Operator = cache.get('op') or Operator(7)
+        op: Operator = cache.get('op') or Operator(float(SHORTEST_DURATION))
         score = self.current_score()
         layout = score.layout if score else None
 

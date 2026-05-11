@@ -130,6 +130,8 @@ class Editor(QtCore.QObject,
         self._pending_right_double_release: bool = False
         self._pending_left_double_pos: tuple[float, float] | None = None
         self._pending_right_double_pos: tuple[float, float] | None = None
+        # Net notes created this app session (increment on create, decrement on delete).
+        self._session_note_delta: int = 0
 
         # layout metrics (mm)
         self.margin: float = None
