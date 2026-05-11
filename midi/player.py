@@ -82,7 +82,6 @@ def _ensure_fluidsynth_lib() -> None:
     if env_lib:
         try:
             _try_load_cdll(env_lib)
-            sys.stderr.write(f"[midi] Loaded libfluidsynth from PYFLUIDSYNTH_LIB={env_lib!r}\n")
             return
         except OSError as exc:
             load_errors.append(str(exc))
@@ -110,7 +109,6 @@ def _ensure_fluidsynth_lib() -> None:
             continue
         try:
             _try_load_cdll(str(path))
-            sys.stderr.write(f"[midi] Loaded libfluidsynth from candidate: {path}\n")
             os.environ.setdefault("PYFLUIDSYNTH_LIB", str(path))
             return
         except OSError as exc:
@@ -133,7 +131,6 @@ def _ensure_fluidsynth_lib() -> None:
                 if full_path.exists():
                     try:
                         _try_load_cdll(str(full_path))
-                        sys.stderr.write(f"[midi] Loaded libfluidsynth from full path: {full_path}\n")
                         os.environ.setdefault("PYFLUIDSYNTH_LIB", str(full_path))
                         return
                     except OSError as exc2:

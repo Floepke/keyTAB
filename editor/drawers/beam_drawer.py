@@ -459,7 +459,7 @@ class BeamDrawerMixin:
         # from the first note time (y1) to the last note time (y2).
         # X positions: start at the highest pitch's stem tip (pitch_x + stem_len),
         # and end at x1 + semitone_dist to give a gentle diagonal.
-        stem_len = float(layout.note_stem_length_semitone or 3) * float(self.semitone_dist or 0.5)
+        stem_len = 7.0 * float(self.semitone_dist or 0.5)
         stem_w = self._editor_line_width_mm()
 
         # Iterate windows in lockstep with groups for right hand

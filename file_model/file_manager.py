@@ -17,6 +17,7 @@ from file_model.base_grid import BaseGrid
 from file_model.appstate import AppState
 from file_model.layout import Layout
 from midi.midi_exporter import export_score_to_midi
+from utils.piano2musicxml import export_score_to_musicxml
 from utils.CONSTANT import UTILS_SAVE_DIR
 from appdata_manager import get_appdata_manager
 
@@ -37,8 +38,8 @@ class FileManager:
         "MIDI File (*.mid *.midi);;"
         "MusicXML File (*.musicxml *.mxl *.xml);;"
     )
-    # Save dialog: allow .piano and MIDI export
-    SAVE_FILE_FILTER = "keyTAB Score (*.piano);;MIDI File (*.mid *.midi)"
+    # Save dialog: allow .piano, MIDI, and MusicXML export
+    SAVE_FILE_FILTER = "keyTAB Score (*.piano);;MIDI File (*.mid *.midi);;MusicXML File (*.musicxml *.xml)"
 
     def __init__(self, parent: Optional[QWidget] = None) -> None:
         self._parent: Optional[QWidget] = parent
@@ -367,8 +368,17 @@ class FileManager:
             return False
         target = self._ensure_save_suffix(Path(fname), str(selected_filter or ''), allow_export=allow_export)
         self._refresh_analysis()
-        if str(target.suffix or '').lower() in ('.mid', '.midi'):
+        suffix = str(target.suffix or '').lower()
+        if suffix in ('.mid', '.midi'):
             export_score_to_midi(self._current, target)
+            self._last_dir = target.parent
+            adm = get_appdata_manager()
+            adm.set("last_file_dialog_dir", str(self._last_dir))
+            adm.save()
+            return True
+        elif suffix in ('.musicxml', '.xml'):
+            self._apply_before_save_hook()
+            export_score_to_musicxml(self._current, target)
             self._last_dir = target.parent
             adm = get_appdata_manager()
             adm.set("last_file_dialog_dir", str(self._last_dir))
@@ -432,6 +442,10 @@ class FileManager:
         if allow_export and 'midi' in selected:
             if suffix not in ('.mid', '.midi'):
                 return p.with_suffix('.mid')
+            return p
+        if allow_export and 'musicxml' in selected:
+            if suffix not in ('.musicxml', '.xml'):
+                return p.with_suffix('.musicxml')
             return p
         if suffix == '.piano':
             return p
