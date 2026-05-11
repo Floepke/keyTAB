@@ -1222,7 +1222,10 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                 y1 = page_top + header_offset
                 y2 = float(page_h - page_bottom - footer_height)
 
-            mini_piano_enabled = bool(layout.get('mini_piano_visible', True)) and page_index == 0 and line_index == 0
+            # In horizontal read direction page_lines is reversed, so the visual first
+            # system (leftmost column) is the last element; in vertical it is the first.
+            visual_first_line = (line_index == len(page_lines) - 1) if horizontal_read_direction else (line_index == 0)
+            mini_piano_enabled = bool(layout.get('mini_piano_visible', True)) and page_index == 0 and visual_first_line
             mini_piano_height_mm = (7.0 * float(semitone_mm)) if mini_piano_enabled else 0.0
             y2_draw = max(y1 + 1.0, y2 - mini_piano_height_mm) if mini_piano_enabled else y2
             if y2 <= y1:
@@ -2992,23 +2995,39 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                     mini_piano_color = str(layout.get('mini_piano_color', '#ccc') or '#ccc')
                     mr, mg, mb, _ = hex_to_rgba(_normalize_hex_color(mini_piano_color) or '#ccc', 1.0)
                     grey_fill = (float(mr) / 255.0, float(mg) / 255.0, float(mb) / 255.0, 1.0)
+                    # Grey bands should fill to the same x-bounds as the keyboard outline.
+                    kb_fill_x1 = float(kb_x1 - semitone_mm)
+                    kb_fill_x2 = float(kb_x2 + semitone_mm)
+                    visible_spans: list[tuple[float, float]] = []
                     for span_start, span_end in grey_octave_spans:
-                        gx1 = float(_key_to_x(int(span_start))) - float(semitone_mm)
-                        gx2 = float(_key_to_x(int(span_end))) + float(semitone_mm)
-                        gx1 = max(kb_x1, gx1)
-                        gx2 = min(kb_x2, gx2)
-                        if gx2 > gx1:
-                            du.add_rectangle(
-                                gx1 - semitone_mm,
-                                kb_y1,
-                                gx2,
-                                kb_y2,
-                                stroke_color=None,
-                                fill_color=grey_fill,
-                                corner_radius=1.0,
-                                id=0,
-                                tags=['piano_octave_band'],
-                            )
+                        raw_x1 = float(_key_to_x(int(span_start))) - semitone_mm
+                        raw_x2 = float(_key_to_x(int(span_end))) + semitone_mm
+                        if min(raw_x2, kb_fill_x2) > max(raw_x1, kb_fill_x1):
+                            visible_spans.append((raw_x1, raw_x2))
+
+                    if visible_spans:
+                        for idx, (raw_x1, raw_x2) in enumerate(visible_spans):
+                            gx1 = float(raw_x1)
+                            gx2 = float(raw_x2)
+                            # Only edge bands should extend to the keyboard outline edges.
+                            if idx + 1 == 0:
+                                gx1 = kb_fill_x1
+                            if idx == len(visible_spans):
+                                gx2 = kb_fill_x2
+                            gx1 = max(kb_fill_x1, gx1)
+                            gx2 = min(kb_fill_x2, gx2)
+                            if gx2 > gx1:
+                                du.add_rectangle(
+                                    gx1,
+                                    kb_y1,
+                                    gx2,
+                                    kb_y2,
+                                    stroke_color=None,
+                                    fill_color=grey_fill,
+                                    corner_radius=1.0,
+                                    id=0,
+                                    tags=['piano_octave_band'],
+                                )
 
                     for key in range(max(1, int(natural_bound_left)), min(PIANO_KEY_AMOUNT, int(natural_bound_right)) + 1):
                         if key not in black_key_set:
@@ -3031,19 +3050,20 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                         )
 
                     if bool(layout.get('mini_piano_octave_numbering', True)):
-                        octave_label_keys = [key for key in range(8, PIANO_KEY_AMOUNT + 1, 12)]
+                        octave_label_keys = [key for key in range(4, PIANO_KEY_AMOUNT + 1, 12)]
                         for key in octave_label_keys:
-                            x_pos = float(_key_to_x(key)) + semitone_mm
+                            x_pos = float(_key_to_x(key))
                             if not (kb_x1 <= x_pos <= kb_x2):
                                 continue
                             du.add_text(
-                                x_pos,
-                                kb_y1 + semitone_mm * 6.5,
+                                x_pos if read_direction == 'vertical' else x_pos + semitone_mm,
+                                kb_y1 + semitone_mm * 5.5 if read_direction == 'vertical' else kb_y1 + key_len_mm + semitone_mm * 1.75,
                                 str(_octave_number(key)),
                                 family='Edwin',
                                 color=notation_color,
-                                anchor='s',
-                                size_pt=20.0 * scale,
+                                anchor='center',
+                                size_pt=16.0 * scale,
+                                angle_deg=90.0 if read_direction == 'horizontal' else 0.0,
                                 id=0,
                                 tags=['piano_octave_number'],
                             )
