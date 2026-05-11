@@ -163,6 +163,11 @@ class Layout:
     stave_ledger_line_length_mm: float = 13.0
     stave_clef_line_dash_pattern_mm: list[float] = field(default_factory=lambda: [4.0, 3.0])  # Dash pattern for clef lines (e.g., [dash_length, gap_length])
 
+    # Mini piano keyboard in engraver
+    mini_piano_visible: bool = True
+    mini_piano_octave_numbering: bool = True
+    mini_piano_color: str = '#ccc'
+
 LAYOUT_FLOAT_CONFIG: dict[str, dict[str, float]] = {
     'page_width_mm': {'min': 50.0, 'max': 5_000.0, 'step': 0.5},
     'page_height_mm': {'min': 50.0, 'max': 10_000.0, 'step': 0.5},

@@ -623,6 +623,9 @@ class StyleDialog(QtWidgets.QDialog):
             'stave_clef_line_thickness_mm': self.tr('Stave clef line thickness (mm)'),
             'stave_ledger_line_length_mm': self.tr('Stave ledger line length (mm)'),
             'stave_clef_line_dash_pattern_mm': self.tr('Stave clef line dash pattern (mm)'),
+            'mini_piano_visible': self.tr('Mini piano visible'),
+            'mini_piano_octave_numbering': self.tr('Mini piano octave numbering'),
+            'mini_piano_color': self.tr('Mini piano color'),
         }
 
     def _coerce_layout_fonts(self, layout_obj: Layout) -> None:
@@ -684,6 +687,7 @@ class StyleDialog(QtWidgets.QDialog):
         self._tab_titles: list[str] = []
         self._all_fonts_combo: QtWidgets.QFontComboBox | None = None
         self._field_tabs: dict[str, str] = {}
+        self._bool_field_widgets: dict[str, list[QtWidgets.QCheckBox]] = {}
 
         lay = QtWidgets.QVBoxLayout(self)
         lay.setContentsMargins(8, 8, 8, 8)
@@ -739,6 +743,7 @@ class StyleDialog(QtWidgets.QDialog):
             self.tr("Grid band"),
             self.tr("Time signature"),
             self.tr("Measure Numbering"),
+            self.tr("Repeat"),
             self.tr("Fonts"),
             self.tr("Note"),
             self.tr("Grace note"),
@@ -802,9 +807,18 @@ class StyleDialog(QtWidgets.QDialog):
             'note_continuation_dot_size_mm': 'Note',
             'note_midinote_left_color': 'Note',
             'note_midinote_right_color': 'Note',
+            'accidental_visible': 'Note',
+            'chord_connect_visible': 'Note',
+            'note_head_visible': 'Note',
+            'note_stem_visible': 'Note',
+            'note_stop_visible': 'Note',
+            'note_continuation_dot_visible': 'Note',
+            'note_leftdot_visible': 'Note',
+            'note_midinote_visible': 'Note',
             # Beam
             'beam_thickness_mm': 'Beam',
             'beam_corner_radius_mm': 'Beam',
+            'beam_visible': 'Beam',
             # Dynamic
             'hairpin_line_width_mm': 'Dynamic',
             'hairpin_width_mm': 'Dynamic',
@@ -812,38 +826,52 @@ class StyleDialog(QtWidgets.QDialog):
             'hairpin_text_gap_mm': 'Dynamic',
             'dynamic_symbol_font_size_pt': 'Dynamic',
             'dynamic_symbol_background_padding_mm': 'Dynamic',
+            'hairpin_visible': 'Dynamic',
+            'dynamic_symbol_visible': 'Dynamic',
             # Pedal
             'pedal_symbol_thickness_mm': 'Pedal',
             'pedal_background_padding_mm': 'Pedal',
             # Grace note
             'grace_note_outline_width_mm': 'Grace note',
             'grace_note_scale': 'Grace note',
+            'grace_note_visible': 'Grace note',
             # Text
             'text_background_padding_mm': 'Text',
+            'text_visible': 'Text',
             # Slur
             'slur_width_sides_mm': 'Slur',
             'slur_width_middle_mm': 'Slur',
+            'slur_visible': 'Slur',
             # Countline
             'countline_dash_pattern': 'Countline',
             'countline_thickness_mm': 'Countline',
+            'countline_visible': 'Countline',
             # Time signature
             'time_signature_indicator_type': 'Time signature',
             'time_signature_indicator_lane_width_mm': 'Time signature',
             'time_signature_indicator_guide_thickness_mm': 'Time signature',
             'time_signature_indicator_divide_guide_thickness_mm': 'Time signature',
+            'time_signature_visible': 'Time signature',
             # Grid
             'grid_barline_thickness_mm': 'Grid',
             'grid_gridline_thickness_mm': 'Grid',
             'grid_gridline_dash_pattern_mm': 'Grid',
+            'grid_line_visible': 'Grid',
             # Grid band
             'grid_band_color': 'Grid band',
             'grid_band_start_phase': 'Grid band',
+            'grid_band_visible': 'Grid band',
             # Stave
             'stave_two_line_thickness_mm': 'Stave',
             'stave_three_line_thickness_mm': 'Stave',
             'stave_clef_line_thickness_mm': 'Stave',
             'stave_ledger_line_length_mm': 'Stave',
             'stave_clef_line_dash_pattern_mm': 'Stave',
+            'stave_visible': 'Stave',
+            'barline_visible': 'Stave',
+            'mini_piano_visible': 'Stave',
+            'mini_piano_octave_numbering': 'Stave',
+            'mini_piano_color': 'Stave',
             # Fonts
             'font_text': 'Text',
             'font_title': 'Fonts',
@@ -858,33 +886,13 @@ class StyleDialog(QtWidgets.QDialog):
             'measure_numbering_guide_dash_pattern_mm': 'Measure Numbering',
             'measure_numbering_placement': 'Measure Numbering',
             'measure_numbering_font': 'Measure Numbering',
-            # Visibility
-            'note_head_visible': 'Visibility',
-            'note_stem_visible': 'Visibility',
-            'note_stop_visible': 'Visibility',
-            'note_continuation_dot_visible': 'Visibility',
-            'note_leftdot_visible': 'Visibility',
-            'note_midinote_visible': 'Visibility',
-            'stave_visible': 'Visibility',
-            'barline_visible': 'Visibility',
-            'grid_line_visible': 'Visibility',
-            'grid_band_visible': 'Visibility',
-            'beam_visible': 'Visibility',
-            'grace_note_visible': 'Visibility',
-            'text_visible': 'Visibility',
-            'hairpin_visible': 'Visibility',
-            'slur_visible': 'Visibility',
-            'countline_visible': 'Visibility',
-            'repeat_start_visible': 'Visibility',
-            'repeat_end_visible': 'Visibility',
-            'double_barline_visible': 'Visibility',
-            'measure_numbering_guide_visible': 'Visibility',
-            'measure_numbers_visible': 'Visibility',
+            'measure_numbering_guide_visible': 'Measure Numbering',
+            'measure_numbers_visible': 'Measure Numbering',
             'tempo_indicator_visible': 'Visibility',
-            'time_signature_visible': 'Visibility',
-            'dynamic_symbol_visible': 'Visibility',
-            'accidental_visible': 'Visibility',
-            'chord_connect_visible': 'Visibility',
+            # Repeat
+            'repeat_start_visible': 'Repeat',
+            'repeat_end_visible': 'Repeat',
+            'double_barline_visible': 'Repeat',
         }
 
         type_hints = {}
@@ -900,18 +908,25 @@ class StyleDialog(QtWidgets.QDialog):
         self._field_tabs = field_tabs
         field_labels = self._style_field_labels()
 
+        # First pass: process all bool fields (visibility toggles) first
         for f in fields(Layout):
             name = f.name
             if name in _hide_fields:
                 continue
+            field_type = type_hints.get(name, f.type)
+            # Skip non-bool fields in first pass
+            if field_type is not bool:
+                continue
+            
             fallback_label = name.replace('_', ' ').capitalize()
             label = field_labels.get(name, self.tr(fallback_label))
             value = getattr(self._layout, name)
-            field_type = type_hints.get(name, f.type)
             editor = self._make_editor(field_type, value, name)
             if editor is None:
                 continue
             self._editors[name] = editor
+            if field_type is bool and isinstance(editor, QtWidgets.QCheckBox):
+                self._register_bool_widget(name, editor)
             tab_name = self.tr(field_tabs.get(name, 'Page'))
             vbox = tab_forms.get(tab_name, tab_forms[self.tr('Page')])
             box = QtWidgets.QGroupBox(label, self)
@@ -922,6 +937,36 @@ class StyleDialog(QtWidgets.QDialog):
             vbox.addWidget(box)
             self._wire_editor_change(editor)
 
+        # Second pass: process all non-bool fields
+        for f in fields(Layout):
+            name = f.name
+            if name in _hide_fields:
+                continue
+            field_type = type_hints.get(name, f.type)
+            # Skip bool fields in second pass (already processed)
+            if field_type is bool:
+                continue
+            
+            fallback_label = name.replace('_', ' ').capitalize()
+            label = field_labels.get(name, self.tr(fallback_label))
+            value = getattr(self._layout, name)
+            editor = self._make_editor(field_type, value, name)
+            if editor is None:
+                continue
+            self._editors[name] = editor
+            if field_type is bool and isinstance(editor, QtWidgets.QCheckBox):
+                self._register_bool_widget(name, editor)
+            tab_name = self.tr(field_tabs.get(name, 'Page'))
+            vbox = tab_forms.get(tab_name, tab_forms[self.tr('Page')])
+            box = QtWidgets.QGroupBox(label, self)
+            box_layout = QtWidgets.QVBoxLayout(box)
+            box_layout.setContentsMargins(6, 2, 6, 6)
+            box_layout.setSpacing(0)
+            box_layout.addWidget(editor)
+            vbox.addWidget(box)
+            self._wire_editor_change(editor)
+
+        self._add_visibility_mirror_controls(tab_forms, field_labels)
         self._add_all_fonts_control(tab_forms.get(self.tr('Fonts')))  # type: ignore[arg-type]
 
         # Add stretch to each tab's layout to push groupboxes to the top
@@ -988,6 +1033,46 @@ class StyleDialog(QtWidgets.QDialog):
         if category_list is None:
             return 0
         return int(max(0, category_list.currentRow()))
+
+    def _register_bool_widget(self, field_name: str, widget: QtWidgets.QCheckBox) -> None:
+        self._bool_field_widgets.setdefault(field_name, []).append(widget)
+
+    def _sync_bool_widgets(self, field_name: str, value: bool) -> None:
+        for widget in self._bool_field_widgets.get(field_name, []):
+            blocked = widget.blockSignals(True)
+            try:
+                widget.setChecked(bool(value))
+            finally:
+                widget.blockSignals(blocked)
+
+    def _on_bool_widget_changed(self, field_name: str, value: bool) -> None:
+        try:
+            setattr(self._layout, field_name, bool(value))
+        except Exception:
+            pass
+        self._sync_bool_widgets(field_name, bool(value))
+        self.values_changed.emit()
+
+    def _add_visibility_mirror_controls(self, tab_forms: dict[str, QtWidgets.QVBoxLayout], field_labels: dict[str, str]) -> None:
+        visibility_tab = tab_forms.get(self.tr('Visibility'))
+        if visibility_tab is None:
+            return
+        for f in fields(Layout):
+            name = f.name
+            field_type = self._type_hints.get(name, f.type)
+            if field_type is not bool:
+                continue
+            label = field_labels.get(name, self.tr(name.replace('_', ' ').capitalize()))
+            mirror = QtWidgets.QCheckBox(self)
+            mirror.setChecked(bool(getattr(self._layout, name, False)))
+            mirror.stateChanged.connect(lambda _state, field_name=name, cb=mirror: self._on_bool_widget_changed(field_name, bool(cb.isChecked())))
+            self._register_bool_widget(name, mirror)
+            box = QtWidgets.QGroupBox(label, self)
+            box_layout = QtWidgets.QVBoxLayout(box)
+            box_layout.setContentsMargins(6, 2, 6, 6)
+            box_layout.setSpacing(0)
+            box_layout.addWidget(mirror)
+            visibility_tab.addWidget(box)
 
     def _pstyle_dir(self) -> Path:
         root = Path.home() / ".keyTAB" / "pstyle"
@@ -1088,6 +1173,8 @@ class StyleDialog(QtWidgets.QDialog):
                 setattr(self._layout, name, value)
             except Exception:
                 pass
+            if field_type is bool:
+                self._sync_bool_widgets(name, bool(value))
         try:
             self.values_changed.emit()
         except Exception:
@@ -1353,6 +1440,8 @@ class StyleDialog(QtWidgets.QDialog):
             field_type = self._type_hints.get(name, f.type)
             value = getattr(layout_obj, name, None)
             self._set_editor_value(editor, field_type, value)
+            if field_type is bool:
+                self._sync_bool_widgets(name, bool(value))
         if self._all_fonts_combo is not None:
             try:
                 self._all_fonts_combo.blockSignals(True)

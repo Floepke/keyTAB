@@ -1206,7 +1206,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
         leftover = max(0.0, available_width - used_width)
         gap = leftover / float(len(page_lines) + 1)
         x_cursor = page_left + line_axis_left_reserve + gap
-        for line in page_lines:
+        for line_index, line in enumerate(page_lines):
             # Shift line_x_start right by the left ledger overhang so left-side
             # ledger stubs land inside the allocated column width.
             _ledger_left_overhang = float(line.get('ledger_left_overhang', 0.0) or 0.0)
@@ -1221,10 +1221,20 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                     header_offset = float(header_height)
                 y1 = page_top + header_offset
                 y2 = float(page_h - page_bottom - footer_height)
+
+            mini_piano_enabled = bool(layout.get('mini_piano_visible', True)) and page_index == 0 and line_index == 0
+            mini_piano_height_mm = (7.0 * float(semitone_mm)) if mini_piano_enabled else 0.0
+            y2_draw = max(y1 + 1.0, y2 - mini_piano_height_mm) if mini_piano_enabled else y2
             if y2 <= y1:
                 y2 = y1 + 1.0
+            if y2_draw <= y1:
+                y2_draw = y1 + 1.0
             line['y_top'] = y1
-            line['y_bottom'] = y2
+            line['y_bottom'] = y2_draw
+            line['mini_piano_visible'] = bool(mini_piano_enabled)
+            line['mini_piano_height_mm'] = float(mini_piano_height_mm)
+            line['mini_piano_y_top'] = float(y2_draw)
+            line['mini_piano_y_bottom'] = float(y2)
 
             bound_left = int(line.get('bound_left', line['range'][0]))
             bound_right = int(line.get('bound_right', line['range'][1]))
@@ -1247,7 +1257,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                 total = max(1e-6, float(line['time_end'] - line['time_start']))
                 rel = (float(ticks) - float(line['time_start'])) / total
                 rel = max(0.0, min(1.0, rel))
-                return y1 + (y2 - y1) * rel
+                return y1 + (y2_draw - y1) * rel
 
             def _hand_band_x_span(_hand_key: str, _t0: float, _t1: float) -> tuple[float, float] | None:
                 # Single band span from key 10 to key 77.
@@ -1368,7 +1378,9 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                 offset_down = max(0.0, -min_y)
                 return w_mm, h_mm, offset_down, rot_corners, rot_poly
 
-            tick_per_mm = (float(line['time_end'] - line['time_start'])) / max(1e-6, (y2 - y1))
+            # Use drawable stave height (excluding first-system mini piano reserve)
+            # so time-signature indicator guide spacing and numbering align correctly.
+            tick_per_mm = (float(line['time_end'] - line['time_start'])) / max(1e-6, (y2_draw - y1))
             mm_per_quarter = float(QUARTER_NOTE_UNIT) / max(1e-6, tick_per_mm)
 
             indicator_type = str(layout.get('time_signature_indicator_type', 'classical') or 'classical')
@@ -2015,7 +2027,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                     color=grid_color, 
                     width_mm=end_thick_w * 1.5, 
                     id=0, 
-                    tags=['grid_line', 'final_barline'], 
+                    tags=['end_barline'],
                     dash_pattern=None
                 )
 
@@ -2775,7 +2787,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
             symbol_width = max(3.0, semitone_mm * 4.0)
             symbol_gap = max(0.6, semitone_mm * 0.35)
             symbol_thick_w = max(0.1, bar_width_mm)
-            symbol_dot_d = max(1.0, semitone_mm * 0.6)
+            symbol_dot_d = max(1.0, semitone_mm * scale)
             # Minimum clear gap between the outer edge of the horizontal line
             # and the nearest edge of a dot. Increase to space dots further out.
             dot_line_gap = semitone_mm
@@ -2922,7 +2934,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                         x_pos,
                         y1,
                         x_pos,
-                        y2,
+                        y2_draw,
                         color=notation_color,
                         width_mm=width_mm,
                         dash_pattern=None,
@@ -2948,12 +2960,105 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                         x_pos,
                         y1,
                         x_pos,
-                        y2,
+                        y2_draw,
                         color=notation_color,
                         width_mm=width_mm,
                         dash_pattern=dash,
                         id=0,
                         tags=['stave']
+                    )
+
+            if mini_piano_enabled:
+                kb_y1 = float(y2_draw)
+                kb_y2 = float(y2)
+                kb_x1 = float(_key_to_x(int(natural_bound_left))) - float(semitone_mm)
+                kb_x2 = float(_key_to_x(int(natural_bound_right))) + float(semitone_mm)
+                if kb_x2 > kb_x1:
+                    bar_width_mm = max(0.01, float(1.125 * scale))
+                    key_len_mm = float(semitone_mm) * 4.0
+                    black_key_width_mm = semitone_mm
+                    black_key_set = set(BLACK_KEYS)
+
+                    def _octave_number(key: int) -> int:
+                        midi_note = 20 + int(key)
+                        return (midi_note // 12) - 1
+
+                    grey_octave_spans = [
+                        (4, 15),
+                        (28, 39),
+                        (52, 63),
+                        (76, 87),
+                    ]
+                    mini_piano_color = str(layout.get('mini_piano_color', '#ccc') or '#ccc')
+                    mr, mg, mb, _ = hex_to_rgba(_normalize_hex_color(mini_piano_color) or '#ccc', 1.0)
+                    grey_fill = (float(mr) / 255.0, float(mg) / 255.0, float(mb) / 255.0, 1.0)
+                    for span_start, span_end in grey_octave_spans:
+                        gx1 = float(_key_to_x(int(span_start))) - float(semitone_mm)
+                        gx2 = float(_key_to_x(int(span_end))) + float(semitone_mm)
+                        gx1 = max(kb_x1, gx1)
+                        gx2 = min(kb_x2, gx2)
+                        if gx2 > gx1:
+                            du.add_rectangle(
+                                gx1 - semitone_mm,
+                                kb_y1,
+                                gx2,
+                                kb_y2,
+                                stroke_color=None,
+                                fill_color=grey_fill,
+                                corner_radius=1.0,
+                                id=0,
+                                tags=['piano_octave_band'],
+                            )
+
+                    for key in range(max(1, int(natural_bound_left)), min(PIANO_KEY_AMOUNT, int(natural_bound_right)) + 1):
+                        if key not in black_key_set:
+                            continue
+                        x_pos = float(_key_to_x(key))
+                        if not (kb_x1 <= x_pos <= kb_x2):
+                            continue
+                        dash = [0.5, 1.0] if key in (41, 43) else None
+                        du.add_line(
+                            x_pos,
+                            kb_y1,
+                            x_pos,
+                            kb_y1 + key_len_mm,
+                            color=notation_color,
+                            dash_pattern=dash,
+                            dash_offset_mm=0.4,
+                            width_mm=black_key_width_mm,
+                            id=0,
+                            tags=['piano_black_key'],
+                        )
+
+                    if bool(layout.get('mini_piano_octave_numbering', True)):
+                        octave_label_keys = [key for key in range(8, PIANO_KEY_AMOUNT + 1, 12)]
+                        for key in octave_label_keys:
+                            x_pos = float(_key_to_x(key)) + semitone_mm
+                            if not (kb_x1 <= x_pos <= kb_x2):
+                                continue
+                            du.add_text(
+                                x_pos,
+                                kb_y1 + semitone_mm * 6.5,
+                                str(_octave_number(key)),
+                                family='Edwin',
+                                color=notation_color,
+                                anchor='s',
+                                size_pt=20.0 * scale,
+                                id=0,
+                                tags=['piano_octave_number'],
+                            )
+
+                    du.add_rectangle(
+                        kb_x1 - semitone_mm,
+                        kb_y1,
+                        kb_x2 + semitone_mm,
+                        kb_y2,
+                        stroke_color=notation_color,
+                        stroke_width_mm=bar_width_mm,
+                        corner_radius=0.75 * scale,
+                        fill_color=None,
+                        id=0,
+                        tags=['piano_outline'],
                     )
 
             # ---- Beam drawing per line ----
@@ -4190,8 +4295,8 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
             _lines_map.append({
                 'time_start': float(_line.get('time_start', 0.0)),
                 'time_end': float(_line.get('time_end', 0.0)),
-                'y_top': float(_y_top),
-                'y_bottom': float(_y_bot),
+                'y_top': float(_line.get('y_top', _y_top)),
+                'y_bottom': float(_line.get('y_bottom', _y_bot)),
                 'x_start': float(_lx_s),
                 'x_end': float(_lx_e),
             })
