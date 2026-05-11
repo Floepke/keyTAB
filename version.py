@@ -82,6 +82,6 @@ change_log = '''
 - editor: note continuation dot logic improved for beam drawing
 - editor: time comparison logic refactored across tools and drawers for consistency
 - editor: note editing performance optimizations
-- fix: line break dialog labels updated for horizontal read direction
+- fix: line break dialog labels updated for horizontal read direction 
 - fix: enhance clipboard functionality by tracking start units for better alignment during cut/copy operations
 '''
