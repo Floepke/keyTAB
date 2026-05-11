@@ -219,7 +219,7 @@ class CrescendoDrawerMixin:
                     start_handle_x + handle_r, start_bottom,
                     stroke_color=None,
                     stroke_width_mm=0.0,
-                    fill_color=(0.5, 0.0, 0.0, .75),
+                    fill_color=(0.5, 0.0, 0.0, 0.75),
                     id=ev_id,
                     tags=['hairpin_handle'],
                 )
@@ -235,7 +235,7 @@ class CrescendoDrawerMixin:
                     end_handle_x + handle_r, end_bottom,
                     stroke_color=None,
                     stroke_width_mm=0.0,
-                    fill_color=(0.5, 0.0, 0.0, .75),
+                    fill_color=(0.5, 0.0, 0.0, 0.75),
                     id=ev_id,
                     tags=['hairpin_handle'],
                 )
