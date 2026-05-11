@@ -161,6 +161,10 @@ class TextDrawerMixin:
         vp_h_mm = float(getattr(self, '_viewport_h_mm', 0.0) or 0.0)
         bottom_mm = top_mm + vp_h_mm
         bleed_mm = max(2.0, float(getattr(score.app_state, 'zoom_mm_per_quarter', 25.0) or 25.0) * 0.25)
+        viewport_time_a = float(self.mm_to_time(top_mm - bleed_mm))
+        viewport_time_b = float(self.mm_to_time(bottom_mm + bleed_mm))
+        viewport_time_min = min(viewport_time_a, viewport_time_b)
+        viewport_time_max = max(viewport_time_a, viewport_time_b)
 
         active_tool = str(getattr(getattr(self, '_tool', None), 'TOOL_NAME', ''))
         show_handles = (active_tool == 'text')
@@ -186,8 +190,6 @@ class TextDrawerMixin:
             alignment = str(getattr(ev, 'alignment', 'left') or 'left').lower()
 
             y_mm = float(self.time_to_mm(t) + y_off)
-            if y_mm < (top_mm - bleed_mm) or y_mm > (bottom_mm + bleed_mm):
-                continue
 
             x_mm = float(self.relative_c4pitch_to_x(rp)) + x_off
 
@@ -214,6 +216,15 @@ class TextDrawerMixin:
             max_x = max(p[0] for p in poly)
             min_y = min(p[1] for p in poly)
             max_y = max(p[1] for p in poly)
+            text_hit_rect_mm = (min_x, min_y, max(0.0, max_x - min_x), max(0.0, max_y - min_y))
+
+            # Cull by time overlap derived from real drawn text bounds.
+            text_time_a = float(self.mm_to_time(min_y))
+            text_time_b = float(self.mm_to_time(max_y))
+            text_time_min = min(text_time_a, text_time_b)
+            text_time_max = max(text_time_a, text_time_b)
+            if text_time_max < viewport_time_min or text_time_min > viewport_time_max:
+                continue
 
             # White background mask to cover stave behind text
             du.add_polygon(
@@ -230,6 +241,16 @@ class TextDrawerMixin:
             total_h = line_block_h_mm * max(1, len(lines))
 
             def _to_world(local_x: float, local_y: float) -> tuple[float, float]:
+                """Convert local text-box coordinates into editor/world mm coordinates.
+
+                The local frame is centered on the text block anchor at (0, 0), where:
+                - +x points to the right within the unrotated text block
+                - +y points downward within the unrotated text block
+
+                This helper applies the same rotation (``angle``) used for drawing text,
+                around the text block center ``(x_mm, cy)``, and returns the transformed
+                absolute coordinates in the editor's millimeter space.
+                """
                 wx = x_mm + (local_x * cos_a) - (local_y * sin_a)
                 wy = cy + (local_x * sin_a) + (local_y * cos_a)
                 return wx, wy
@@ -260,6 +281,7 @@ class TextDrawerMixin:
                         angle_deg=angle,
                         id=int(getattr(ev, '_id', 0) or 0),
                         tags=["text"],
+                        hit_rect_mm=text_hit_rect_mm,
                     )
 
                 if underline and line_text:

@@ -40,8 +40,6 @@ class LineBreakDrawerMixin:
             t0 = float(getattr(ev, 'time', 0.0) or 0.0)
             is_page = bool(getattr(ev, 'page_break', False))
             y_mm = float(self.time_to_mm(t0))
-            if y_mm < (top_mm - bleed_mm) or y_mm > (bottom_mm + bleed_mm):
-                continue
 
             label = QtCore.QCoreApplication.translate('LineBreakDialog', 'P' if is_page else 'L')
             # Rectangle sized to text, top aligned at time position
@@ -53,6 +51,9 @@ class LineBreakDrawerMixin:
             marker_x = rect_x1 + (rect_w * 0.5)
             rect_y1 = y_mm
             rect_y2 = y_mm + rect_h
+            # Cull by marker extent overlap, not just marker anchor.
+            if rect_y2 < (top_mm - bleed_mm) or rect_y1 > (bottom_mm + bleed_mm):
+                continue
             du.add_rectangle(
                 rect_x1,
                 rect_y1,
