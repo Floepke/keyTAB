@@ -169,6 +169,9 @@ class ToolSelectorWidget(QtWidgets.QListWidget):
 
 
 class ToolSelectorDock(QtWidgets.QDockWidget):
+    def minimumSizeHint(self) -> QtCore.QSize:
+        return QtCore.QSize(0, 0)
+
     def __init__(self, parent=None):
         super().__init__("Tools", parent)
         self.setWindowTitle(self.tr("Tools"))

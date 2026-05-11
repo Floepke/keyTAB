@@ -245,8 +245,10 @@ class MainWindow(QtWidgets.QMainWindow):
         # Place Snap Size dock above the Tool Selector dock on the left
         self.snap_dock = SnapSizeDock(self)
         self.addDockWidget(QtCore.Qt.DockWidgetArea.LeftDockWidgetArea, self.snap_dock)
+        self.snap_dock.setMinimumWidth(0)
         self.tool_dock = ToolSelectorDock(self)
         self.addDockWidget(QtCore.Qt.DockWidgetArea.LeftDockWidgetArea, self.tool_dock)
+        self.tool_dock.setMinimumWidth(0)
         self._tooltip_redirect_source: QtCore.QObject | None = None
         QtWidgets.QApplication.instance().installEventFilter(self)
         # Stack vertically: snap (top) above tool selector (bottom)

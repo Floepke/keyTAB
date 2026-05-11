@@ -383,6 +383,9 @@ class SnapSizeSelector(QtWidgets.QWidget):
 
 
 class SnapSizeDock(QtWidgets.QDockWidget):
+    def minimumSizeHint(self) -> QtCore.QSize:
+        return QtCore.QSize(0, 0)
+
     def __init__(self, parent=None):
         super().__init__(self.tr("Snap Size"), parent)
         self.setObjectName("SnapSizeDock")

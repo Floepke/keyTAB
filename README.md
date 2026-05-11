@@ -34,7 +34,6 @@ Welcome to **keyTAB**, a passion project for creating, editing, and engraving Kl
 - `Backspace` / `Delete`: remove selection.
 - `Ctrl/Cmd+Z`, `Ctrl/Cmd+Shift+Z`: undo/redo.
 
-## MIDI Import Behavior
 ## MIDI Import
 - Pure-Python byte-level parser — no dependency on `mido` or `pretty_midi`.
 - Handles corrupt or truncated MIDI files: bad meta-message fields are defaulted rather than crashing.
