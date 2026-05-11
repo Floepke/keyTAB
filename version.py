@@ -7,7 +7,7 @@ Bump policy (Semantic Versioning):
   PATCH - bug fixes only
 """
 
-__version__ = "1.0.8"
+__version__ = "1.0.8beta"
 APP_NAME    = "keyTAB"
 
 change_log = '''
@@ -72,7 +72,16 @@ change_log = '''
 - print view: playhead focus now correctly targets both X and Y viewport axes
 - fix: midi player no longer makes timing/duration mistakes with fine floating-point note values, midi player overall enhanced
 
-1.0.8 (2026-06-15)
-- fix: on some configurations, the selection rectangle didn't detect underlying note time correctly
+1.0.8beta (2026-05-11)
+- engraver: dynamic symbols now rendered at 45° rotation with rotated polygon background; hairpin connects to rotated symbol bounds
+- engraver: mini piano keyboard added to first system of first page in both vertical and horizontal read directions, with configurable visibility, octave numbering, color, and keyboard height
+- style dialog: new Repeat tab; visibility toggles appear at top of every tab and are mirrored in the Visibility tab
+- engraver: time signature indicator guide line and Klavarskribo numbering Y positions now correctly account for mini piano reserved height
+- engraver: improved viewport culling logic in line and text drawers for more accurate rendering
+- editor: grace note rendering and selection logic improved for better visual contrast and accuracy
+- editor: note continuation dot logic improved for beam drawing
+- editor: time comparison logic refactored across tools and drawers for consistency
+- editor: note editing performance optimizations
+- fix: line break dialog labels updated for horizontal read direction
 - fix: enhance clipboard functionality by tracking start units for better alignment during cut/copy operations
 '''

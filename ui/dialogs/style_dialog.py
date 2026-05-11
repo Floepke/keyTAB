@@ -743,7 +743,7 @@ class StyleDialog(QtWidgets.QDialog):
             self.tr("Grid band"),
             self.tr("Time signature"),
             self.tr("Measure Numbering"),
-            self.tr("Repeat"),
+            self.tr("Barline Symbols"),
             self.tr("Fonts"),
             self.tr("Note"),
             self.tr("Grace note"),
@@ -890,9 +890,9 @@ class StyleDialog(QtWidgets.QDialog):
             'measure_numbers_visible': 'Measure Numbering',
             'tempo_indicator_visible': 'Visibility',
             # Repeat
-            'repeat_start_visible': 'Repeat',
-            'repeat_end_visible': 'Repeat',
-            'double_barline_visible': 'Repeat',
+            'repeat_start_visible': 'Barline Symbols',
+            'repeat_end_visible': 'Barline Symbols',
+            'double_barline_visible': 'Barline Symbols',
         }
 
         type_hints = {}
