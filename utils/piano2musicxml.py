@@ -335,6 +335,46 @@ def _split_notes_into_measures(notes: list[NoteEvent], measures: list[MeasureInf
     return chunks
 
 
+def _tempo_beat_unit_and_quarter_bpm(duration_units: float, tempo: int) -> tuple[str, Optional[str], int, float]:
+    """Map keyTAB tempo event (duration_units, tempo) to MusicXML beat-unit.
+
+    keyTAB model: ``tempo`` units of ``duration_units`` ticks happen per minute.
+    MusicXML <sound tempo> is always in quarter-note BPM.
+
+    Returns (beat_unit, optional_dot, per_minute, quarter_bpm).
+    """
+    dur = float(duration_units) if float(duration_units) > 0 else float(QUARTER_NOTE_UNIT)
+    q = float(QUARTER_NOTE_UNIT)
+    quarter_bpm = float(max(1, int(tempo))) * (dur / q)
+
+    # Standard note durations (in QUARTER_NOTE_UNIT ticks) -> (type_name, dotted)
+    standard: list[tuple[float, str, bool]] = [
+        (q * 4,        "whole",   False),
+        (q * 3,        "half",    True),
+        (q * 2,        "half",    False),
+        (q * 1.5,      "quarter", True),
+        (q * 1,        "quarter", False),
+        (q * 0.75,     "eighth",  True),
+        (q * 0.5,      "eighth",  False),
+        (q * 0.375,    "16th",    True),
+        (q * 0.25,     "16th",    False),
+        (q * 0.1875,   "32nd",    True),
+        (q * 0.125,    "32nd",    False),
+        (q * 0.09375,  "64th",    True),
+        (q * 0.0625,   "64th",    False),
+        (q * 0.046875, "128th",   True),
+        (q * 0.03125,  "128th",   False),
+    ]
+    for std_dur, type_name, dotted in standard:
+        if abs(dur - std_dur) < 0.5:          # within half a tick
+            per_minute = int(round(float(max(1, int(tempo)))))
+            dot = "yes" if dotted else None
+            return type_name, dot, per_minute, round(quarter_bpm, 6)
+
+    # Non-standard duration: keep quarter as beat unit, convert BPM
+    return "quarter", None, max(1, int(round(quarter_bpm))), round(quarter_bpm, 6)
+
+
 def _append_note(
     measure_el: ET.Element,
     *,
@@ -511,12 +551,18 @@ def export_score_to_musicxml(score: SCORE, output_path: Path) -> dict[str, int]:
             if t_units < m.start_units - _EPS or t_units >= m.end_units - _EPS:
                 continue
             bpm = int(getattr(t, "tempo", 120) or 120)
+            dur_units = float(getattr(t, "duration", QUARTER_NOTE_UNIT) or QUARTER_NOTE_UNIT)
+            beat_unit, dot, per_minute, quarter_bpm = _tempo_beat_unit_and_quarter_bpm(dur_units, bpm)
             direction = ET.SubElement(measure_el, "direction", {"placement": "above"})
             direction_type = ET.SubElement(direction, "direction-type")
             metronome = ET.SubElement(direction_type, "metronome")
-            ET.SubElement(metronome, "beat-unit").text = "quarter"
-            ET.SubElement(metronome, "per-minute").text = str(max(1, bpm))
-            ET.SubElement(direction, "sound", {"tempo": str(max(1, bpm))})
+            ET.SubElement(metronome, "beat-unit").text = beat_unit
+            if dot:
+                ET.SubElement(metronome, "beat-unit-dot")
+            ET.SubElement(metronome, "per-minute").text = str(per_minute)
+            # <sound tempo> must always be in quarter-note BPM
+            sound_bpm = max(1, int(round(quarter_bpm)))
+            ET.SubElement(direction, "sound", {"tempo": str(sound_bpm)})
 
         measure_chunks = chunks_by_measure.get(m.index, [])
 

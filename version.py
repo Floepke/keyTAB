@@ -7,7 +7,7 @@ Bump policy (Semantic Versioning):
   PATCH - bug fixes only
 """
 
-__version__ = "1.0.8"
+__version__ = "1.0.9beta"
 APP_NAME    = "keyTAB"
 
 change_log = '''
@@ -72,7 +72,7 @@ change_log = '''
 - print view: playhead focus now correctly targets both X and Y viewport axes
 - fix: midi player no longer makes timing/duration mistakes with fine floating-point note values, midi player overall enhanced
 
-1.0.8beta (2026-05-11)
+1.0.8 (2026-05-11)
 - engraver: dynamic symbols now rendered at 45° rotation with rotated polygon background; hairpin connects to rotated symbol bounds
 - engraver: mini piano keyboard added to first system of first page in both vertical and horizontal read directions, with configurable visibility, octave numbering, color, and keyboard height
 - style dialog: new Repeat tab; visibility toggles appear at top of every tab and are mirrored in the Visibility tab
@@ -85,4 +85,14 @@ change_log = '''
 - fix: line break dialog labels updated for horizontal read direction 
 - fix: enhance clipboard functionality by tracking start units for better alignment during cut/copy operations
 - fix: on Windows tooltips now correctly display special characters and multiline text without issues
+
+1.0.9beta (2026-05-11)
+- added Keyboard Shortcut Card and updated the main window help/shortcut flow
+- added session note create/delete counter and improved Escape exit confirmation dialog behavior
+- added MusicXML export support in File -> Save As, including a new piano-to-MusicXML converter
+- MusicXML export now preserves note accidental semantics from keyTAB notes
+- MusicXML export writes classic grand staff piano output (treble + bass staves)
+- MusicXML export now detects and writes separate voices per hand for unequal rhythmic layers
+- MusicXML tempo export now correctly maps duration-based tempo units (e.g. 256=quarter, 128=eighth)
+- for non-standard tempo durations, MusicXML tempo is converted to an equivalent quarter-note tempo value
 '''
