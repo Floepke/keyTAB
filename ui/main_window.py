@@ -1083,6 +1083,10 @@ class MainWindow(QtWidgets.QMainWindow):
         if isinstance(watched, QtWidgets.QMenu):
             action = watched.actionAt(event.pos())
             if action is not None:
+                if watched is getattr(self, '_recent_menu', None):
+                    # Recent-file entries are already fully visible in the menu.
+                    # Suppress forwarding their long path text into the left panel.
+                    return ""
                 return str(action.toolTip() or action.text() or "").strip()
             return str(watched.toolTip() or "").strip()
 
@@ -1113,11 +1117,35 @@ class MainWindow(QtWidgets.QMainWindow):
 
         return ""
 
+    def _format_tooltip_text_for_panel(self, text: str) -> str:
+        value = str(text or "").strip()
+        if not value:
+            return ""
+
+        # Unbroken strings (for example Windows paths) can expand QLabel size
+        # hints aggressively; hard-wrap them for stable dock width.
+        if any(ch.isspace() for ch in value) or len(value) <= 80:
+            return value
+
+        chunks: list[str] = []
+        current: str = ""
+        for ch in value:
+            current += ch
+            if ch in ("/", "\\") and len(current) >= 64:
+                chunks.append(current)
+                current = ""
+            elif len(current) >= 80:
+                chunks.append(current)
+                current = ""
+        if current:
+            chunks.append(current)
+        return "\n".join(chunks)
+
     def _show_tooltip_in_tool_area(self, text: str, hide_popup: bool = True) -> bool:
         area = self._tooltip_anchor_widget()
         if area is None:
             return False
-        self.tool_dock.set_tooltip_text(str(text or ""))
+        self.tool_dock.set_tooltip_text(self._format_tooltip_text_for_panel(text))
         if hide_popup:
             QtWidgets.QToolTip.hideText()
         return True

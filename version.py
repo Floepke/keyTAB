@@ -84,4 +84,5 @@ change_log = '''
 - editor: note editing performance optimizations
 - fix: line break dialog labels updated for horizontal read direction 
 - fix: enhance clipboard functionality by tracking start units for better alignment during cut/copy operations
+- fix: on Windows tooltips now correctly display special characters and multiline text without issues
 '''
