@@ -1,10 +1,12 @@
 from __future__ import annotations
+import math
 from typing import TYPE_CHECKING, cast
 from ui.widgets.draw_util import DrawUtil
-from editor.editor_defaults import SCALE, DYNAMIC_SYMBOL_FONT_SIZE_PT, DYNAMIC_SYMBOL_BACKGROUND_PADDING_MM
+from editor.editor_defaults import DYNAMIC_SYMBOL_FONT_SIZE_PT, DYNAMIC_SYMBOL_BACKGROUND_PADDING_MM
 
 if TYPE_CHECKING:
     from editor.editor import Editor
+    from file_model.SCORE import SCORE
 
 
 class DynamicDrawerMixin:
@@ -12,7 +14,7 @@ class DynamicDrawerMixin:
         self = cast("Editor", self)
         if getattr(self, 'is_tiny_mode_ultra', None) and self.is_tiny_mode_ultra():
             return
-        score = getattr(self, 'current_score', lambda: None)()
+        score: SCORE = getattr(self, 'current_score', lambda: None)()
         if score is None:
             return
 
@@ -20,14 +22,15 @@ class DynamicDrawerMixin:
         if not events:
             return
 
-        # Use hardcoded editor defaults for dynamic symbol styling (not from file layout)
+
+        # Use hardcoded editor defaults for consistent sizing
         text_size_pt = float(DYNAMIC_SYMBOL_FONT_SIZE_PT or 12.0)
         dynamic_bg_pad = float(DYNAMIC_SYMBOL_BACKGROUND_PADDING_MM or 1.5)
-
         paper_color = getattr(self, 'paper_color', (1.0, 1.0, 1.0, 1.0))
         text_color = self.notation_color
         text_family = 'LelandText'
-        text_angle_deg = 90.0
+        # Universal rotation for both read directions.
+        text_angle_deg = 45.0
 
         top_mm = float(getattr(self, '_view_y_mm_offset', 0.0) or 0.0)
         vp_h_mm = float(getattr(self, '_viewport_h_mm', 0.0) or 0.0)
@@ -66,27 +69,45 @@ class DynamicDrawerMixin:
             by = float(y_mm) - (float(yb) + (float(h) * 0.5))
             rx = bx + float(xb)
             ry = by + float(yb)
-            # Text is rotated 90 degrees around its center in DrawUtil. Use a
-            # swapped axis-aligned bbox so background and hit-rect stay aligned.
+            # Text is rotated around its center in DrawUtil. Build an axis-aligned
+            # bbox from the rotated glyph extents so background/hit-rect match.
             cx = rx + (float(w) * 0.5)
             cy = ry + (float(h) * 0.5)
-            rot_w = float(h)
-            rot_h = float(w)
-            sym_x1 = cx - (rot_w * 0.5) - dynamic_bg_pad
-            sym_y1 = cy - (rot_h * 0.5) - dynamic_bg_pad
-            sym_x2 = cx + (rot_w * 0.5) + dynamic_bg_pad
-            sym_y2 = cy + (rot_h * 0.5) + dynamic_bg_pad
+            hw = float(w) * 0.5
+            hh = float(h) * 0.5
+            ang = math.radians(text_angle_deg)
+            sin_a = math.sin(ang)
+            cos_a = math.cos(ang)
 
-            du.add_rectangle(
-                sym_x1,
-                sym_y1,
-                sym_x2,
-                sym_y2,
-                corner_radius=max(0.0, dynamic_bg_pad),
+            # Build the padded glyph rectangle in local space, then rotate it.
+            bg_half_w = hw + dynamic_bg_pad
+            bg_half_h = hh + dynamic_bg_pad
+            local_corners = [
+                (-bg_half_w, -bg_half_h),
+                (bg_half_w, -bg_half_h),
+                (bg_half_w, bg_half_h),
+                (-bg_half_w, bg_half_h),
+            ]
+            bg_poly = [
+                (
+                    cx + (lx * cos_a) - (ly * sin_a),
+                    cy + (lx * sin_a) + (ly * cos_a),
+                )
+                for (lx, ly) in local_corners
+            ]
+            sym_x1 = min(p[0] for p in bg_poly)
+            sym_y1 = min(p[1] for p in bg_poly)
+            sym_x2 = max(p[0] for p in bg_poly)
+            sym_y2 = max(p[1] for p in bg_poly)
+            sym_hit_rect_mm = (sym_x1, sym_y1, max(0.0, sym_x2 - sym_x1), max(0.0, sym_y2 - sym_y1))
+
+            du.add_polygon(
+                bg_poly,
                 stroke_color=None,
                 fill_color=paper_color,
                 id=ev_id,
-                tags=['dynamic_symbol_bg_top'],
+                tags=['dynamic_symbol_bg'],
+                hit_rect_mm=sym_hit_rect_mm,
             )
             du.add_text(
                 bx,
@@ -100,7 +121,8 @@ class DynamicDrawerMixin:
                 anchor=None,
                 angle_deg=text_angle_deg,
                 id=ev_id,
-                tags=['dynamic_symbol_text_top'],
+                tags=['dynamic_symbol_text'],
+                hit_rect_mm=sym_hit_rect_mm,
             )
 
             if is_dynamic_tool:

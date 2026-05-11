@@ -64,8 +64,7 @@ class Layout:
     hairpin_visible: bool = True
     hairpin_line_width_mm: float = 1.0
     hairpin_width_mm: float = 10.0  # width of the open end of the hairpin in mm
-    hairpin_text_gap_mm: float = 0.5  # gap between hairpin and text in mm
-    dynamic_symbol_font_size_pt: float = 12.0  # Font size for standalone dynamic symbols
+    dynamic_symbol_font_size_pt: float = 35.0  # Font size for standalone dynamic symbols
     dynamic_symbol_background_padding_mm: float = 1.5
     dynamic_symbol_visible: bool = True
 
@@ -190,8 +189,7 @@ LAYOUT_FLOAT_CONFIG: dict[str, dict[str, float]] = {
     'text_background_padding_mm': {'min': 0.0, 'max': 20.0, 'step': 0.05},
     'hairpin_line_width_mm': {'min': 0.05, 'max': 5.0, 'step': 0.05},
     'hairpin_width_mm': {'min': 0.05, 'max': 20.0, 'step': 0.05},
-    'dynamic_symbol_font_size_pt': {'min': 4.0, 'max': 48.0, 'step': 0.5},
-    'hairpin_text_gap_mm': {'min': 0.0, 'max': 20.0, 'step': 0.05},
+    'dynamic_symbol_font_size_pt': {'min': 4.0, 'max': 100.0, 'step': 0.5},
     'dynamic_symbol_background_padding_mm': {'min': 0.0, 'max': 20.0, 'step': 0.05},
     'slur_width_sides_mm': {'min': 0.05, 'max': 5.0, 'step': 0.05},
     'slur_width_middle_mm': {'min': 0.05, 'max': 5.0, 'step': 0.05},

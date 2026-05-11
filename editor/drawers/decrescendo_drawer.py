@@ -1,7 +1,15 @@
 from __future__ import annotations
+import math
 from typing import TYPE_CHECKING, cast
 from ui.widgets.draw_util import DrawUtil
-from editor.editor_defaults import SCALE, HAIRPIN_LINE_WIDTH_MM, HAIRPIN_WIDTH_MM, DYNAMIC_SYMBOL_FONT_SIZE_PT, DYNAMIC_SYMBOL_BACKGROUND_PADDING_MM, HAIRPIN_TEXT_GAP_MM
+from editor.editor_defaults import (
+    SCALE,
+    HAIRPIN_LINE_WIDTH_MM,
+    HAIRPIN_WIDTH_MM,
+    DYNAMIC_SYMBOL_FONT_SIZE_PT,
+    DYNAMIC_SYMBOL_BACKGROUND_PADDING_MM,
+    START_END_DYNAMIC_DISTANCE_OFFSET_MM,
+)
 from utils.CONSTANT import SHORTEST_DURATION
 from utils.operator import Operator
 
@@ -10,19 +18,23 @@ if TYPE_CHECKING:
 
 
 class DecrescendoDrawerMixin:
-    def _get_dynamic_symbol_at_position(self, t: float, x_rpitch: int) -> dict | None:
+    def _get_dynamic_symbol_at_position(self, du: DrawUtil, t: float, x_rpitch: int) -> dict | None:
         """
-        Check if there's a dynamic symbol at the given time and x_rpitch.
-        Returns dict with 'glyph', 'width_mm', 'height_mm' if found, None otherwise.
+        Check if there's a dynamic symbol at the given time and x_rpitch with 45° rotation.
+        Returns dict with rotated Y bounds if found, None otherwise.
         """
         self = cast("Editor", self)
         score = self.current_score()
         if score is None:
             return None
-        
-        layout = getattr(score, 'layout', None)
+
         dynamic_symbols = list(getattr(score.events, 'dynamic_symbol', []) or [])
         op = Operator(float(SHORTEST_DURATION))
+        text_family = 'LelandText'
+        # Use hardcoded editor defaults
+        text_size_pt = float(DYNAMIC_SYMBOL_FONT_SIZE_PT or 12.0)
+        bg_pad = float(DYNAMIC_SYMBOL_BACKGROUND_PADDING_MM or 1.5)
+        text_angle_deg = 45.0
         
         for sym in dynamic_symbols:
             sym_time = float(getattr(sym, 'time', 0.0) or 0.0)
@@ -33,75 +45,67 @@ class DecrescendoDrawerMixin:
                 glyph = str(getattr(sym, 'symbol', '') or '')
                 if not glyph:
                     return None
-                
-                # Calculate glyph dimensions using font metrics
+
+                y_mm = float(self.time_to_mm(t))
                 try:
-                    from fonts import register_font_from_bytes
-                    import PySide6.QtGui as QtGui
-                    
-                    leland_family = register_font_from_bytes('LelandText') or 'LelandText'
-                    symbol_font = QtGui.QFont(leland_family)
-                    font_size_pt = float(getattr(layout, 'dynamic_symbol_font_size_pt', 12.0) or 12.0)
-                    symbol_font.setPointSizeF(font_size_pt)
-                    
-                    metrics = QtGui.QFontMetrics(symbol_font)
-                    glyph_w_px = metrics.horizontalAdvance(glyph)
-                    glyph_h_px = metrics.boundingRect(glyph).height()
-                    
-                    # Convert to mm (approximate: 1pt ≈ 0.35mm at screen DPI levels)
-                    scale = float(getattr(layout, 'scale', 1.0) or 1.0)
-                    px_per_mm = float(getattr(self, '_widget_px_per_mm', 1.0) or 1.0)
-                    glyph_w_mm = (glyph_w_px / px_per_mm) * scale if px_per_mm else 3.5
-                    glyph_h_mm = (glyph_h_px / px_per_mm) * scale if px_per_mm else 2.5
-                    
-                    padding = float(getattr(layout, 'dynamic_symbol_background_padding_mm', 2.5) or 2.5)
-                    
+                    xb, yb, w, h = du._get_text_extents_mm(glyph, text_family, text_size_pt, False, False)
+                    hw = float(w) * 0.5
+                    hh = float(h) * 0.5
+                    ang = math.radians(text_angle_deg)
+                    rot_half_w = abs(hw * math.cos(ang)) + abs(hh * math.sin(ang))
+                    rot_half_h = abs(hw * math.sin(ang)) + abs(hh * math.cos(ang))
+                    x_mm = float(self.relative_c4pitch_to_x(x_rpitch))
                     return {
                         'glyph': glyph,
-                        'width_mm': glyph_w_mm + (2 * padding),
-                        'height_mm': glyph_h_mm + (2 * padding),
+                        'x_mm': x_mm,
+                        'y_mm': y_mm,
+                        'y_min_mm': y_mm - rot_half_h - bg_pad,
+                        'y_max_mm': y_mm + rot_half_h + bg_pad,
                     }
                 except Exception:
                     # Fallback if font calculation fails
                     return {
                         'glyph': glyph,
-                        'width_mm': 4.0,
-                        'height_mm': 3.0,
+                        'x_mm': float(self.relative_c4pitch_to_x(x_rpitch)),
+                        'y_mm': y_mm,
+                        'y_min_mm': y_mm - 1.5,
+                        'y_max_mm': y_mm + 1.5,
                     }
         
         return None
     
     def _adjust_hairpin_for_symbols(
-        self, 
-        t_start: float, 
-        t_end: float, 
+        self,
+        du: DrawUtil,
+        t_start: float,
+        t_end: float,
         x_rpitch: int,
         y_start_draw: float,
         y_end_draw: float,
     ) -> tuple[float, float]:
         """
-        Adjust hairpin start/end draw positions to avoid overlapping with dynamic symbols.
+        Adjust hairpin start/end draw positions to connect directly to dynamic symbol bounds.
+        No gap or padding adjustment - straight connection.
         Returns (adjusted_y_start_draw, adjusted_y_end_draw).
         """
         self = cast("Editor", self)
-        score = self.current_score()
-        
-        # Use hardcoded editor default for hairpin text gap (not from file layout)
-        gap_mm = float(HAIRPIN_TEXT_GAP_MM or 0.5)
+        endpoint_offset = max(0.0, float(START_END_DYNAMIC_DISTANCE_OFFSET_MM or 0.0))
         
         # Check if there's a symbol at the start position
-        symbol_at_start = self._get_dynamic_symbol_at_position(t_start, x_rpitch)
+        symbol_at_start = self._get_dynamic_symbol_at_position(du, t_start, x_rpitch)
         if symbol_at_start is not None:
-            # Move the visible start inward so the open end does not sit under the symbol.
-            symbol_half_height = symbol_at_start['height_mm'] * 0.5
-            y_start_draw += symbol_half_height + gap_mm
+            # Connect directly to symbol's rotated bottom edge
+            y_start_draw = max(float(y_start_draw), float(symbol_at_start['y_max_mm']))
+            # Positive offset moves the start farther outward toward the connected symbol.
+            y_start_draw -= endpoint_offset
         
         # Check if there's a symbol at the end position
-        symbol_at_end = self._get_dynamic_symbol_at_position(t_end, x_rpitch)
+        symbol_at_end = self._get_dynamic_symbol_at_position(du, t_end, x_rpitch)
         if symbol_at_end is not None:
-            # Move the tip inward so the decrescendo gets shorter instead of extending through the symbol.
-            symbol_half_height = symbol_at_end['height_mm'] * 0.5
-            y_end_draw -= symbol_half_height + gap_mm
+            # Connect directly to symbol's rotated top edge
+            y_end_draw = min(float(y_end_draw), float(symbol_at_end['y_min_mm']))
+            # Positive offset moves the end farther outward toward the connected symbol.
+            y_end_draw += endpoint_offset
         
         return y_start_draw, y_end_draw
     
@@ -161,9 +165,14 @@ class DecrescendoDrawerMixin:
                 y_start_draw = mid - (min_span * 0.5)
                 y_end_draw = mid + (min_span * 0.5)
 
+            # Keep tool handles on the original hairpin endpoints (before
+            # dynamic-symbol connection offsets are applied).
+            y_start_handle = y_start_draw
+            y_end_handle = y_end_draw
+
             # Adjust hairpin position to avoid overlapping with dynamic symbols
             y_start_draw, y_end_draw = self._adjust_hairpin_for_symbols(
-                t_start, t_end, x_rpitch, y_start_draw, y_end_draw
+                du, t_start, t_end, x_rpitch, y_start_draw, y_end_draw
             )
 
             # Decrescendo: open at top (start), closes toward bottom (end/tip)
@@ -174,7 +183,7 @@ class DecrescendoDrawerMixin:
                 width_mm=lw,
                 line_cap='round',
                 id=ev_id,
-                tags=['decrescendo'],
+                tags=['hairpin'],
             )
             # Right arm: top-right → bottom-point
             du.add_line(
@@ -183,16 +192,16 @@ class DecrescendoDrawerMixin:
                 width_mm=lw,
                 line_cap='round',
                 id=ev_id,
-                tags=['decrescendo'],
+                tags=['hairpin'],
             )
 
             if is_dynamic_tool:
                 start_handle_x = x_mm
                 end_handle_x = x_mm
-                # Handles are edge-anchored to the actual drawn hairpin endpoints.
-                # This keeps handle position aligned even when text offsets move y_start_draw/y_end_draw.
-                start_anchor_y = y_start_draw
-                end_anchor_y = y_end_draw
+                # Handles stay at original endpoints and do not follow dynamic-symbol
+                # connection offsets.
+                start_anchor_y = y_start_handle
+                end_anchor_y = y_end_handle
                 start_top = start_anchor_y
                 start_bottom = start_anchor_y + (2.0 * handle_r)
                 end_top = end_anchor_y - (2.0 * handle_r)

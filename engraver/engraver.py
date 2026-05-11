@@ -3558,14 +3558,13 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
             if bool(layout.get('hairpin_visible', True)) and (line_crescendos or line_decrescendos):
                 hairpin_w = float(layout.get('hairpin_line_width_mm', 0.5) or 0.5) * scale
                 hairpin_spread = float(layout.get('hairpin_width_mm', 5.0) or 5.0) * scale
-                _hg = layout.get('hairpin_text_gap_mm')
-                hairpin_gap = float(_hg if _hg is not None else 5.0)
+                hairpin_gap = float(0.0) * scale
                 dynamic_symbol_font_size_pt = float(layout.get('dynamic_symbol_font_size_pt', 12.0) or 12.0) * scale
                 dynamic_bg_pad = float(layout.get('dynamic_symbol_background_padding_mm', 0.5) or 0.5) * scale
                 dynamic_symbol_angle_deg = 90.0
 
                 def _get_dynamic_symbol_at_position(t: float, x_rpitch: int) -> dict | None:
-                    """Get dynamic symbol dimensions at given time and x_rpitch."""
+                    """Get dynamic symbol dimensions at given time and x_rpitch with 45° rotation."""
                     dyn_op = Operator(float(SHORTEST_DURATION))
                     for ds in line_dynamic_symbols:
                         ds_time = float(ds.get('time', 0.0) or 0.0)
@@ -3580,18 +3579,29 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                             # Calculate glyph dimensions
                             try:
                                 xb, yb, w, h = du._get_text_extents_mm(glyph, 'LelandText', dynamic_symbol_font_size_pt, False, False)
+                                hw = float(w) * 0.5
+                                hh = float(h) * 0.5
+                                ang = math.radians(45.0)  # 45° CCW rotation
+                                rot_half_w = abs(hw * math.cos(ang)) + abs(hh * math.sin(ang))
+                                rot_half_h = abs(hw * math.sin(ang)) + abs(hh * math.cos(ang))
                             except Exception:
                                 # Fallback dimensions
                                 w = max(1.0, (dynamic_symbol_font_size_pt / 72.0) * 25.4)
                                 h = max(1.0, (dynamic_symbol_font_size_pt / 72.0) * 25.4 * 0.8)
+                                hw = float(w) * 0.5
+                                hh = float(h) * 0.5
+                                ang = math.radians(45.0)
+                                rot_half_w = abs(hw * math.cos(ang)) + abs(hh * math.sin(ang))
+                                rot_half_h = abs(hw * math.sin(ang)) + abs(hh * math.cos(ang))
                             
                             return {
                                 'glyph': glyph,
-                                # Dynamic symbols are rendered rotated by 90°.
-                                # Swap extents so spacing/collision follows the
-                                # final rendered orientation.
-                                'width_mm': h + (2 * dynamic_bg_pad),
-                                'height_mm': w + (2 * dynamic_bg_pad),
+                                'x_mm': rpitch_to_x(float(x_rpitch)),
+                                'y_mm': _time_to_y(t),
+                                'y_min_mm': _time_to_y(t) - rot_half_h - dynamic_bg_pad,
+                                'y_max_mm': _time_to_y(t) + rot_half_h + dynamic_bg_pad,
+                                'width_mm': (rot_half_w * 2.0) + (dynamic_bg_pad * 2.0),
+                                'height_mm': (rot_half_h * 2.0) + (dynamic_bg_pad * 2.0),
                             }
                     
                     return None
@@ -3607,31 +3617,18 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                     adjust_start: bool,
                     adjust_end: bool,
                 ) -> tuple[float, float]:
-                    """Adjust hairpin y positions to avoid overlapping with dynamic symbols."""
-                    start_offset = 0.0
-                    end_offset = 0.0
-
+                    """Adjust hairpin y positions based on rotated dynamic symbol Y bounds."""
                     if adjust_start:
                         symbol_at_start = _get_dynamic_symbol_at_position(t_start, x_rpitch)
                         if symbol_at_start is not None:
-                            start_offset = (symbol_at_start['height_mm'] * 0.5) + hairpin_gap
+                            # Base start on the symbol's outer rotated bottom edge plus gap
+                            y0 = max(float(y0), float(symbol_at_start['y_max_mm']) + hairpin_gap)
 
                     if adjust_end:
                         symbol_at_end = _get_dynamic_symbol_at_position(t_end, x_rpitch)
                         if symbol_at_end is not None:
-                            end_offset = (symbol_at_end['height_mm'] * 0.5) + hairpin_gap
-
-                    # Both wedge types need the visible span shortened inward along time.
-                    visible_span = max(0.0, y1 - y0)
-                    min_visible_span = max(hairpin_w * 2.0, 0.5 * scale)
-                    max_inset = max(0.0, visible_span - min_visible_span)
-                    requested_inset = start_offset + end_offset
-                    if requested_inset > max_inset and requested_inset > 0.0:
-                        inset_scale = max_inset / requested_inset
-                        start_offset *= inset_scale
-                        end_offset *= inset_scale
-                    y0 += start_offset
-                    y1 -= end_offset
+                            # Base end on the symbol's outer rotated top edge minus gap
+                            y1 = min(float(y1), float(symbol_at_end['y_min_mm']) - hairpin_gap)
 
                     return y0, y1
 
@@ -3671,11 +3668,10 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                     if is_crescendo:
                         half0 = half_spread * prog0
                         half1 = half_spread * prog1
-                        tags = ['crescendo']
                     else:
                         half0 = half_spread * (1.0 - prog0)
                         half1 = half_spread * (1.0 - prog1)
-                        tags = ['decrescendo']
+                    tags = ['hairpin']
 
                     hp_id = int(hp.get('id', 0) or 0)
                     du.add_line(
@@ -3717,7 +3713,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                 ) * scale
                 text_family = 'LelandText'
                 text_color = notation_color
-                dynamic_symbol_angle_deg = 90.0
+                dynamic_symbol_angle_deg = 45.0  # 45° CCW rotation
 
                 for ds in line_dynamic_symbols:
                     symbol = str(ds.get('symbol', '') or '')
@@ -3736,22 +3732,39 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                     by = float(y_mm) - (float(yb) + (float(h) * 0.5))
                     rx = bx + float(xb)
                     ry = by + float(yb)
-                    # Text rotates around its bbox center in DrawUtil. Use a
-                    # swapped axis-aligned bbox for the background.
+                    # Text is rotated 45° around its center in DrawUtil. Build a rotated
+                    # polygon background that matches the 45° rotation.
                     cx = rx + (float(w) * 0.5)
                     cy = ry + (float(h) * 0.5)
-                    rot_w = float(h)
-                    rot_h = float(w)
+                    hw = float(w) * 0.5
+                    hh = float(h) * 0.5
+                    ang = math.radians(dynamic_symbol_angle_deg)
+                    sin_a = math.sin(ang)
+                    cos_a = math.cos(ang)
 
-                    du.add_rectangle(
-                        cx - (rot_w * 0.5) - dynamic_bg_pad,
-                        cy - (rot_h * 0.5) - dynamic_bg_pad,
-                        cx + (rot_w * 0.5) + dynamic_bg_pad,
-                        cy + (rot_h * 0.5) + dynamic_bg_pad,
+                    # Build the padded glyph rectangle in local space, then rotate it.
+                    bg_half_w = hw + dynamic_bg_pad
+                    bg_half_h = hh + dynamic_bg_pad
+                    local_corners = [
+                        (-bg_half_w, -bg_half_h),
+                        (bg_half_w, -bg_half_h),
+                        (bg_half_w, bg_half_h),
+                        (-bg_half_w, bg_half_h),
+                    ]
+                    bg_poly = [
+                        (
+                            cx + (lx * cos_a) - (ly * sin_a),
+                            cy + (lx * sin_a) + (ly * cos_a),
+                        )
+                        for (lx, ly) in local_corners
+                    ]
+
+                    du.add_polygon(
+                        bg_poly,
                         stroke_color=None,
                         fill_color=paper_color,
                         id=int(ds.get('id', 0) or 0),
-                        tags=['dynamic_symbol_bg_top'],
+                        tags=['dynamic_symbol_bg'],
                     )
                     du.add_text(
                         bx,
@@ -3765,7 +3778,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                         anchor=None,
                         angle_deg=dynamic_symbol_angle_deg,
                         id=int(ds.get('id', 0) or 0),
-                        tags=['dynamic_symbol_text_top'],
+                        tags=['dynamic_symbol_text'],
                     )
 
             '''Text drawing.'''

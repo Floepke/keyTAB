@@ -513,7 +513,7 @@ class DrawUtil:
         self._pages[self._current_index].items.append(Polyline(list(points_mm), False, stroke, None, id, tags, hit_rect_mm))
 
     def add_text(self, x_mm: float, y_mm: float, text: str,
-                 family: str = "Sans",
+                 family: str = "Edwin",
                  size_pt: float = 10.0,
                  italic: bool = False,
                  bold: bool = False,
