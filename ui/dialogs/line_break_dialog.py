@@ -139,10 +139,7 @@ class LineBreakDialog(QtWidgets.QDialog):
         self.setWindowTitle(self.tr("Line/Page Break"))
         self.setModal(False)
         self.setWindowModality(QtCore.Qt.NonModal)
-        try:
-            self.resize(900, 600)
-        except Exception:
-            pass
+        self.resize(900, 200)
 
         lay = QtWidgets.QVBoxLayout(self)
         lay.setContentsMargins(8, 8, 8, 8)
@@ -296,10 +293,7 @@ class LineBreakDialog(QtWidgets.QDialog):
         return title, label
 
     def _focus_first(self) -> None:
-        try:
-            self.break_table.setFocus(QtCore.Qt.FocusReason.OtherFocusReason)
-        except Exception:
-            pass
+        self.break_table.setFocus(QtCore.Qt.FocusReason.OtherFocusReason)
 
     def _create_type_badge(self, is_page: bool) -> QtWidgets.QToolButton:
         btn = QtWidgets.QToolButton(self)

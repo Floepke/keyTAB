@@ -17,6 +17,7 @@ from ui.widgets.snap_size_selector import SnapSizeDock
 from ui.widgets.draw_util import DrawUtil
 from ui.widgets.draw_view import DrawUtilView
 from ui.about_dialog import AboutDialog
+from ui.keyboard_shortcuts_dialog import KeyboardShortcutsDialog
 from ui.error_dialog import show_error_dialog
 from ui.style import Style
 from ui.dialogs.fluidsynth_reverb_config_dialog import FluidSynthReverbConfigDialog
@@ -582,7 +583,7 @@ class MainWindow(QtWidgets.QMainWindow):
         document_menu = menubar.addMenu(tr("&Document"))
         tools_menu = menubar.addMenu(tr("&Tools"))
         playback_menu = menubar.addMenu(tr("&Playback"))
-        help_menu = menubar.addMenu(tr("&About"))
+        help_menu = menubar.addMenu(tr("&Help"))
         for menu in (file_menu, edit_menu, selection_menu, view_menu, document_menu, tools_menu, playback_menu, help_menu):
             menu.setToolTipsVisible(True)
 
@@ -597,15 +598,12 @@ class MainWindow(QtWidgets.QMainWindow):
         save_as_act.setToolTip(tr("Save the current project under a new file name."))
         exit_act = QtGui.QAction(tr("Exit"), self)
         exit_act.setToolTip(tr("Exit the application."))
-        try:
-            exit_act.setShortcut(QtGui.QKeySequence("Escape"))
-        except Exception:
-            pass
+        exit_act.setShortcuts([QtGui.QKeySequence("Esc"), QtGui.QKeySequence.StandardKey.Quit])
         exit_act.triggered.connect(self.close)
 
-        new_act.setShortcut(QtGui.QKeySequence.StandardKey.New)
-        open_act.setShortcut(QtGui.QKeySequence.StandardKey.Open)
-        save_act.setShortcut(QtGui.QKeySequence.StandardKey.Save)
+        new_act.setShortcuts([QtGui.QKeySequence("N"), QtGui.QKeySequence.StandardKey.New])
+        open_act.setShortcuts([QtGui.QKeySequence("O"), QtGui.QKeySequence.StandardKey.Open])
+        save_act.setShortcuts([QtGui.QKeySequence("S"), QtGui.QKeySequence.StandardKey.Save])
         save_as_act.setShortcut(QtGui.QKeySequence.StandardKey.SaveAs)
 
         file_menu.addAction(new_act)
@@ -656,13 +654,12 @@ class MainWindow(QtWidgets.QMainWindow):
 
         export_pdf_act = QtGui.QAction(tr("Export PDF..."), self)
         export_pdf_act.setToolTip(tr("Export the current score as a PDF document."))
-        export_pdf_act.setShortcut(QtGui.QKeySequence("Ctrl+E"))
+        export_pdf_act.setShortcuts([QtGui.QKeySequence("E"), QtGui.QKeySequence("Ctrl+E")])
         export_pdf_act.triggered.connect(self._export_pdf)
         file_menu.addAction(export_pdf_act)
 
         export_image_pdf_act = QtGui.QAction(tr("Export Image PDF..."), self)
         export_image_pdf_act.setToolTip(tr("Export the current score as a rasterized PDF document (600 DPI)."))
-        export_image_pdf_act.setShortcut(QtGui.QKeySequence("Ctrl+Shift+E"))
         export_image_pdf_act.triggered.connect(self._export_image_pdf)
         file_menu.addAction(export_image_pdf_act)
 
@@ -716,12 +713,18 @@ class MainWindow(QtWidgets.QMainWindow):
 
         self._set_playback_mode(str(self._get_playback_mode_from_appdata() or 'system'), show_status=False)
 
+        shortcuts_act = QtGui.QAction(tr("Keyboard Shortcut Card"), self)
+        shortcuts_act.setToolTip(tr("Display a reference card with all keyboard shortcuts."))
+        shortcuts_act.triggered.connect(self._open_keyboard_shortcuts_dialog)
+        
         about_act = QtGui.QAction(tr("About keyTAB"), self)
         about_act.setToolTip(tr("Show information about keyTAB."))
         about_act.triggered.connect(self._open_about_dialog)
         about_qt_act = QtGui.QAction(tr("About Qt"), self)
         about_qt_act.setToolTip(tr("Show information about the Qt framework."))
         about_qt_act.triggered.connect(lambda: QtWidgets.QMessageBox.aboutQt(self))
+        help_menu.addAction(shortcuts_act)
+        help_menu.addSeparator()
         help_menu.addAction(about_act)
         help_menu.addSeparator()
         help_menu.addAction(about_qt_act)
@@ -781,7 +784,7 @@ class MainWindow(QtWidgets.QMainWindow):
         # Selection menu (discoverability for selection shortcuts/actions)
         select_all_act = QtGui.QAction(tr("Select All"), self)
         select_all_act.setToolTip(tr("Select all editable events."))
-        select_all_act.setShortcut(QtGui.QKeySequence.StandardKey.SelectAll)
+        select_all_act.setShortcuts([QtGui.QKeySequence("A"), QtGui.QKeySequence.StandardKey.SelectAll])
 
         _is_horizontal = str(get_preferences_manager().get('editor_orientation', 'vertical') or 'vertical').strip().lower() == 'horizontal'
         _transpose_key_neg = QtCore.Qt.Key_Down if _is_horizontal else QtCore.Qt.Key_Left
@@ -1879,6 +1882,14 @@ class MainWindow(QtWidgets.QMainWindow):
         """Show licensing and attribution info."""
         try:
             dlg = AboutDialog(self)
+            dlg.show()
+        except Exception:
+            pass
+
+    def _open_keyboard_shortcuts_dialog(self) -> None:
+        """Show keyboard shortcuts reference card."""
+        try:
+            dlg = KeyboardShortcutsDialog(self)
             dlg.show()
         except Exception:
             pass
