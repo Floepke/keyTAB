@@ -368,6 +368,47 @@ class SelectionMixin:
         self._snapshot_if_changed(coalesce=True, label='quantize_selected_notes')
         return True
 
+    def quantize_all_notes(self, qtype: str = 'start/end') -> bool:
+        """Quantize all notes in the score to current snap size."""
+        score: SCORE | None = self.current_score()
+        if score is None:
+            return False
+        mode = str(qtype or 'start/end').strip().lower()
+        if mode not in ('start/end', 'start', 'end'):
+            mode = 'start/end'
+        units = float(max(1e-6, getattr(self, 'snap_size_units', 0.0) or 0.0))
+        notes = list(getattr(score.events, 'note', []) or [])
+        if not notes:
+            return False
+
+        def _q(value: float) -> float:
+            return float(round(float(value) / units) * units)
+
+        updated = False
+        op = Operator(SHORTEST_DURATION)
+        for note in notes:
+            t0 = float(getattr(note, 'time', 0.0) or 0.0)
+            dur = float(getattr(note, 'duration', 0.0) or 0.0)
+            t1 = t0 + max(0.0, dur)
+
+            qt0 = max(0.0, _q(t0)) if mode in ('start/end', 'start') else t0
+            qt1 = max(0.0, _q(t1)) if mode in ('start/end', 'end') else t1
+            if qt1 <= qt0:
+                qt1 = qt0 + units
+            qdur = max(units, qt1 - qt0)
+
+            if (not op.eq(qt0, t0)) or (not op.eq(qdur, dur)):
+                setattr(note, 'time', float(qt0))
+                setattr(note, 'duration', float(qdur))
+                updated = True
+
+        if not updated:
+            return False
+
+        self.update_score_length()
+        self._snapshot_if_changed(coalesce=True, label='quantize_all_notes')
+        return True
+
     def set_selected_notes_hand(self, hand: str) -> bool:
         """Assign selected notes to a hand and snapshot the change."""
         score: SCORE | None = self.current_score()

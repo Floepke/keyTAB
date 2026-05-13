@@ -504,6 +504,18 @@ class MainWindow(QtWidgets.QMainWindow):
                     return
         except Exception:
             pass
+        # 'Q' quantizes starts and ends when focus is not on a text input
+        try:
+            if ev.key() == QtCore.Qt.Key_Q and ev.modifiers() == QtCore.Qt.KeyboardModifier.NoModifier:
+                fw = QtWidgets.QApplication.focusWidget()
+                if isinstance(fw, (QtWidgets.QLineEdit, QtWidgets.QTextEdit, QtWidgets.QPlainTextEdit)):
+                    pass
+                else:
+                    self._selection_quantize('start/end')
+                    ev.accept()
+                    return
+        except Exception:
+            pass
         super().keyPressEvent(ev)
 
     def changeEvent(self, ev: QtCore.QEvent) -> None:
@@ -831,7 +843,7 @@ class MainWindow(QtWidgets.QMainWindow):
         quantize_act = QtGui.QAction(tr("Quantize Starts and Ends on Snap Band"), self)
         quantize_act.setToolTip(tr("Quantize Selection Starts and Ends to the Current Snap Band."))
         quantize_act.setShortcut(QtGui.QKeySequence("Q"))
-        quantize_act.setShortcutContext(QtCore.Qt.ShortcutContext.WidgetShortcut)
+        quantize_act.setShortcutContext(QtCore.Qt.ShortcutContext.WindowShortcut)
         quantize_start_act = QtGui.QAction(tr("Quantize Starts on Snap Band"), self)
         quantize_start_act.setToolTip(tr("Quantize Selection Starts to the Current Snap Band."))
         quantize_end_act = QtGui.QAction(tr("Quantize Ends on Snap Band"), self)
@@ -1965,38 +1977,18 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def _confirm_exit_to_os_then_close(self) -> None:
         """Ask for explicit OS exit confirmation, then run normal close flow."""
-        try:
-            num_of_created_notes = 0
-            try:
-                num_of_created_notes = int(getattr(getattr(self, 'editor_controller', None), '_session_note_delta', 0) or 0)
-            except Exception:
-                pass
-
-            if num_of_created_notes <= 0:
-                add_message = 'no'
-            else:
-                add_message = str(num_of_created_notes)
-
-            message = self.tr("Do you want to exit keyTAB?\nYou added {add_message} musical notes during this session.").format(
-                add_message=add_message
-            )
-            if num_of_created_notes > 5000:
-                message = message + "\n" + self.tr("Keep going! You're doing great!")  # Fun encouragement for power users
-
-            msg = QtWidgets.QMessageBox(self)
-            msg.setIcon(QtWidgets.QMessageBox.Icon.Question)
-            msg.setWindowTitle(self.tr("keyTAB"))
-            msg.setText(message)
-            msg.setStandardButtons(
-                QtWidgets.QMessageBox.StandardButton.Yes | QtWidgets.QMessageBox.StandardButton.No
-            )
-            msg.setDefaultButton(QtWidgets.QMessageBox.StandardButton.Yes)
-            msg.setEscapeButton(QtWidgets.QMessageBox.StandardButton.No)
-            result = msg.exec()
-            if result == int(QtWidgets.QMessageBox.StandardButton.Yes):
-                self.close()
-        except Exception:
-            # Fall back to existing close behavior if confirmation cannot be shown.
+        message = self.tr("Do you want to exit keyTAB?")
+        msg = QtWidgets.QMessageBox(self)
+        msg.setIcon(QtWidgets.QMessageBox.Icon.Question)
+        msg.setWindowTitle(self.tr("keyTAB"))
+        msg.setText(message)
+        msg.setStandardButtons(
+            QtWidgets.QMessageBox.StandardButton.Yes | QtWidgets.QMessageBox.StandardButton.No
+        )
+        msg.setDefaultButton(QtWidgets.QMessageBox.StandardButton.Yes)
+        msg.setEscapeButton(QtWidgets.QMessageBox.StandardButton.No)
+        result = msg.exec()
+        if result == int(QtWidgets.QMessageBox.StandardButton.Yes):
             self.close()
 
     def _file_new(self) -> None:
@@ -2005,38 +1997,20 @@ class MainWindow(QtWidgets.QMainWindow):
             return
         self.file_manager.new()
         self._session_restore_mode = False
-        try:
-            self.print_view.reset_view_state()
-        except Exception:
-            pass
+        self.print_view.reset_view_state()
         self._refresh_views_from_score()
-        try:
-            QtCore.QTimer.singleShot(1000, lambda: self.engraver.engrave(self._current_score_dict()))
-        except Exception:
-            pass
+        QtCore.QTimer.singleShot(1000, lambda: self.engraver.engrave(self._current_score_dict()))
         # Provide current score to editor for drawers needing direct access
-        try:
-            self.editor_controller.set_score(self.file_manager.current())
-            # Reset undo stack for new project
-            self.editor_controller.reset_undo_stack()
-        except Exception:
-            pass
-        try:
-            if hasattr(self.editor_controller, 'force_redraw_from_model'):
-                self.editor_controller.force_redraw_from_model()
-        except Exception:
-            pass
+        self.editor_controller.set_score(self.file_manager.current())
+        # Reset undo stack for new project
+        self.editor_controller.reset_undo_stack()
+        if hasattr(self.editor_controller, 'force_redraw_from_model'):
+            self.editor_controller.force_redraw_from_model()
         # Reset editor scroll to top for a fresh project
-        try:
-            self._pending_scroll_restore = 0
-            self.editor_vscroll.setValue(0)
-            self.editor_canvas.set_scroll_logical_px(0)
-        except Exception:
-            pass
-        try:
-            self._restore_app_state_from_score()
-        except Exception:
-            pass
+        self._pending_scroll_restore = 0
+        self.editor_vscroll.setValue(0)
+        self.editor_canvas.set_scroll_logical_px(0)
+        self._restore_app_state_from_score()
         self._update_title()
         self._show_status_default(force=True)
         self._show_file_action_status("New project")
@@ -2803,24 +2777,66 @@ class MainWindow(QtWidgets.QMainWindow):
             pass
 
     def _selection_quantize(self, qtype: str = 'start/end') -> None:
+        score = None
+        selected_note_ids = set()
         try:
-            changed = bool(getattr(self.editor_controller, 'quantize_selected_notes', lambda *_args, **_kwargs: False)(qtype))
+            score = self.file_manager.current()
+            selected_note_ids = set(self.editor_controller.get_selected_note_ids_cached(score) or set())
+        except Exception:
+            selected_note_ids = set()
+
+        mode = str(qtype or 'start/end').strip().lower()
+
+        if not selected_note_ids:
+            msg = QtWidgets.QMessageBox(self)
+            msg.setWindowTitle(self.tr("Quantize Whole Composition"))
+            msg.setIcon(QtWidgets.QMessageBox.Icon.Question)
+            msg.setText(self.tr("No selection found. Quantize the whole composition?"))
+            msg.setInformativeText(
+                self.tr(
+                    "Tip: you can first make a selection to quantize selected notes only."
+                )
+            )
+            msg.setStandardButtons(
+                QtWidgets.QMessageBox.StandardButton.Yes | QtWidgets.QMessageBox.StandardButton.No
+            )
+            msg.setDefaultButton(QtWidgets.QMessageBox.StandardButton.No)
+            if msg.exec() != int(QtWidgets.QMessageBox.StandardButton.Yes):
+                self._status(self.tr("Quantize cancelled"), 1200)
+                return
+
+            changed = bool(
+                getattr(self.editor_controller, 'quantize_all_notes', lambda *_args, **_kwargs: False)(qtype)
+            )
             if changed:
                 try:
                     self.editor_canvas.update()
                 except Exception:
                     pass
-                mode = str(qtype or 'start/end').strip().lower()
                 if mode == 'start':
-                    self._status(self.tr("Quantized selection starts to snap"), 1200)
+                    self._status(self.tr("Quantized whole composition starts to snap"), 1200)
                 elif mode == 'end':
-                    self._status(self.tr("Quantized selection ends to snap"), 1200)
+                    self._status(self.tr("Quantized whole composition ends to snap"), 1200)
                 else:
-                    self._status(self.tr("Quantized selection starts and ends to snap"), 1200)
+                    self._status(self.tr("Quantized whole composition starts and ends to snap"), 1200)
             else:
-                self._status(self.tr("No selection to quantize"), 1200)
-        except Exception:
-            pass
+                self._status(self.tr("Nothing to quantize in whole composition"), 1200)
+            return
+
+        changed = bool(getattr(self.editor_controller, 'quantize_selected_notes', lambda *_args, **_kwargs: False)(qtype))
+        if changed:
+            try:
+                self.editor_canvas.update()
+            except Exception:
+                pass
+            if mode == 'start':
+                self._status(self.tr("Quantized selection starts to snap"), 1200)
+            elif mode == 'end':
+                self._status(self.tr("Quantized selection ends to snap"), 1200)
+            else:
+                self._status(self.tr("Quantized selection starts and ends to snap"), 1200)
+        else:
+            self._status(self.tr("No selection to quantize"), 1200)
 
     def _update_title(self) -> None:
         self.setWindowTitle("keyTAB")

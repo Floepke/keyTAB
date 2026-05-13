@@ -76,6 +76,38 @@ def _install_ui_translator(app: QtWidgets.QApplication, preferences: dict) -> No
             return
 
 
+def _install_qt_translator(app: QtWidgets.QApplication, preferences: dict) -> None:
+    """Install Qt's built-in translations (standard buttons, dialogs, etc.)."""
+    lang = _resolve_ui_language(preferences)
+    if lang == "en":
+        return
+
+    qt_translator = QtCore.QTranslator(app)
+    qt_translation_dirs: list[Path] = []
+    try:
+        qt_dir = Path(QtCore.QLibraryInfo.path(QtCore.QLibraryInfo.LibraryPath.TranslationsPath))
+        qt_translation_dirs.append(qt_dir)
+    except Exception:
+        pass
+
+    appdir = os.environ.get("APPDIR")
+    if appdir:
+        qt_translation_dirs.append(Path(appdir) / "usr" / "translations")
+        qt_translation_dirs.append(Path(appdir) / "usr" / "share" / "qt6" / "translations")
+
+    # Try common Qt translation catalogs in order.
+    for base_name in ("qtbase", "qt"):
+        file_name = f"{base_name}_{lang}.qm"
+        for directory in qt_translation_dirs:
+            candidate = directory / file_name
+            if not candidate.exists():
+                continue
+            if qt_translator.load(str(candidate)):
+                app.installTranslator(qt_translator)
+                setattr(app, "_qt_translator", qt_translator)
+                return
+
+
 class KeyTabApplication(QtWidgets.QApplication):
     fileRequested = QtCore.Signal(str)
 
@@ -315,6 +347,7 @@ def main(argv: list[str] | None = None):
     # Create QApplication with argv to ensure proper initialization paths on macOS
     app = KeyTabApplication([sys.argv[0], *qt_args])
     _install_ui_translator(app, preferences)
+    _install_qt_translator(app, preferences)
 
     # Always register embedded engraving fonts for in-process use.
     # On Windows, Cairo can require the user font store to see the font.
