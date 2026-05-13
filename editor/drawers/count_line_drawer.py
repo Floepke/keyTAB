@@ -35,23 +35,40 @@ class CountLineDrawerMixin:
             try:
                 t0 = float(getattr(ev, 'time', 0.0) or 0.0)
                 rp1 = int(getattr(ev, 'rpitch1', 0) or 0)
-                rp2 = int(getattr(ev, 'rpitch2', 4) or 4)
+                rp2_raw = getattr(ev, 'rpitch2', 4)
+                rp2 = int(4 if rp2_raw is None else rp2_raw)
             except Exception:
                 continue
             y_mm = float(self.time_to_mm(t0))
             if y_mm < (top_mm - bleed_mm) or y_mm > (bottom_mm + bleed_mm):
                 continue
 
-            x1 = float(self.relative_c4pitch_to_x(rp1))
-            x2 = float(self.relative_c4pitch_to_x(rp2))
-            if x2 < x1:
-                x1, x2 = x2, x1
+            # Keep semantic handle identity stable:
+            # - start handle is always rpitch1
+            # - end handle is always rpitch2
+            x_start = float(self.relative_c4pitch_to_x(rp1))
+            x_end = float(self.relative_c4pitch_to_x(rp2))
+            x_left = min(x_start, x_end)
+            x_right = max(x_start, x_end)
+
+            line_hit_half_h = max(0.2, float(getattr(self, 'editor_line_width_global', 0.5) or 0.5))
+            line_hit_x1 = min(x_left + handle_w * .5, x_right - handle_w * .5)
+            line_hit_x2 = max(x_left + handle_w * .5, x_right - handle_w * .5)
+            self.register_hit_rect(
+                'count_line',
+                int(getattr(ev, '_id', 0) or 0),
+                line_hit_x1,
+                y_mm - line_hit_half_h,
+                line_hit_x2,
+                y_mm + line_hit_half_h,
+                part='line',
+            )
 
             # the count line itself
             du.add_line(
-                x1,
+                x_left,
                 y_mm,
-                x2,
+                x_right,
                 y_mm,
                 color=self.accent_color,
                 width_mm=0.4,
@@ -62,10 +79,19 @@ class CountLineDrawerMixin:
 
             # Handle rectangles at both ends (only in count line tool)
             if show_handles:
-                du.add_rectangle(
-                    x1 - handle_w * .7,
+                self.register_hit_rect(
+                    'count_line',
+                    int(getattr(ev, '_id', 0) or 0),
+                    x_start - handle_w * .7,
                     y_mm - handle_h * .7,
-                    x1 + handle_w * .7,
+                    x_start + handle_w * .7,
+                    y_mm + handle_h * .7,
+                    part='start',
+                )
+                du.add_rectangle(
+                    x_start - handle_w * .7,
+                    y_mm - handle_h * .7,
+                    x_start + handle_w * .7,
                     y_mm + handle_h * .7,
                     stroke_color=None,
                     stroke_width_mm=0.0,
@@ -73,10 +99,19 @@ class CountLineDrawerMixin:
                     id=int(getattr(ev, '_id', 0) or 0),
                     tags=["count_line", "count_line_handle", "count_line_handle_start"],
                 )
-                du.add_rectangle(
-                    x2 - handle_w * .7,
+                self.register_hit_rect(
+                    'count_line',
+                    int(getattr(ev, '_id', 0) or 0),
+                    x_end - handle_w * .7,
                     y_mm - handle_h * .7,
-                    x2 + handle_w * .7,
+                    x_end + handle_w * .7,
+                    y_mm + handle_h * .7,
+                    part='end',
+                )
+                du.add_rectangle(
+                    x_end - handle_w * .7,
+                    y_mm - handle_h * .7,
+                    x_end + handle_w * .7,
                     y_mm + handle_h * .7,
                     stroke_color=None,
                     stroke_width_mm=0.0,

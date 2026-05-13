@@ -47,15 +47,7 @@ class SlurTool(BaseTool):
 
     def x_mm_to_relative_x(self, x_mm: float) -> int:
         """Inverse of relative_x_to_x_mm: X mm to semitone offset from key 40."""
-        base_x = float(self._editor.pitch_to_x(40))
-        dist = float(self._editor.semitone_dist or 0.0)
-        if dist <= 1e-6:
-            return 0
-        # Clamp to visible view
-        vw = self._view_width_mm()
-        x_clamped = max(0.0, min(float(x_mm), vw if vw > 0 else float(x_mm)))
-        offset = round((x_clamped - base_x) / dist)
-        return int(offset)
+        return self.x_mm_to_rpitch_clamped(float(x_mm))
 
     def _cursor_mm(self, x_px: float, y_px: float) -> Tuple[float, float]:
         return self._editor.widget_px_to_page_mm(float(x_px), float(y_px))
@@ -88,20 +80,20 @@ class SlurTool(BaseTool):
     def _apply_drag(self, sl, handle: int, rpitch: int, time_val: float) -> None:
         offset = 6 if str(self._hand) == 'r' else -6
         if handle == 1:
-            sl.x1_rpitch = rpitch
+            sl.x1_rpitch = self.clamp_rpitch(rpitch)
             sl.y1_time = time_val
-            sl.x2_rpitch = rpitch + offset
+            sl.x2_rpitch = self.clamp_rpitch(rpitch + offset)
             sl.y2_time = time_val
         elif handle == 2:
-            sl.x2_rpitch = rpitch
+            sl.x2_rpitch = self.clamp_rpitch(rpitch)
             sl.y2_time = time_val
         elif handle == 3:
-            sl.x3_rpitch = rpitch
+            sl.x3_rpitch = self.clamp_rpitch(rpitch)
             sl.y3_time = time_val
         elif handle == 4:
-            sl.x4_rpitch = rpitch
+            sl.x4_rpitch = self.clamp_rpitch(rpitch)
             sl.y4_time = time_val
-            sl.x3_rpitch = rpitch + offset
+            sl.x3_rpitch = self.clamp_rpitch(rpitch + offset)
             sl.y3_time = time_val
 
     def _redraw(self) -> None:

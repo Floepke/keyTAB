@@ -349,6 +349,39 @@ class CairoEditorWidget(QtWidgets.QWidget):
         # Repaint; metrics will be recomputed and emitted in paintEvent
         self.update()
 
+    def apply_x_zoom_steps(self, steps: int) -> None:
+        """Adjust horizontal layout zoom in 0.1 steps via app_state.x_zoom_factor.
+
+        x_zoom_factor range:
+        - 1.0 => margin divisor 6 (default)
+        - 0.0 => margin divisor 3 (wider stave area)
+        """
+        if steps == 0 or self._editor is None:
+            return
+        sc = self._editor.current_score()
+        if sc is None:
+            return
+        app_state = getattr(sc, 'app_state', None)
+        if app_state is None:
+            return
+
+        current_raw = getattr(app_state, 'x_zoom_factor', 1.0)
+        try:
+            current = float(current_raw)
+        except Exception:
+            current = 1.0
+        # Positive wheel step zooms in on X: move toward 1.0 (divisor 6).
+        new_factor = current + (0.1 * float(steps))
+        new_factor = max(0.0, min(1.0, new_factor))
+        new_factor = round(new_factor * 10.0) / 10.0
+        if abs(new_factor - current) < 1e-9:
+            return
+
+        app_state.x_zoom_factor = float(new_factor)
+        self.scrollWheelUsed.emit()
+        # Full redraw required: layout metrics and hit regions depend on x spacing.
+        self.force_full_redraw()
+
     def wheelEvent(self, ev: QtGui.QWheelEvent) -> None:
         # Determine effective scroll delta, preferring the axis that matches the
         # editor orientation.  On macOS trackpads pixelDelta gives smooth values;
@@ -366,13 +399,37 @@ class CairoEditorWidget(QtWidgets.QWidget):
             raw_pixel = pixel_delta.y()
             raw_angle = angle_delta.y() if angle_delta.y() != 0 else angle_delta.x()
 
-        # Ctrl+Wheel/pinch: zoom — use any non-zero angle axis
+        # Use a dedicated zoom axis for wheel gestures so zoom direction is
+        # consistent regardless of editor orientation.
         zoom_angle = angle_delta.y() if angle_delta.y() != 0 else angle_delta.x()
+        zoom_pixel = pixel_delta.y() if pixel_delta.y() != 0 else pixel_delta.x()
         mods = ev.modifiers()
         try:
             ctrl_down = bool(mods & QtCore.Qt.KeyboardModifier.ControlModifier)
         except Exception:
             ctrl_down = False
+        try:
+            shift_down = bool(mods & QtCore.Qt.KeyboardModifier.ShiftModifier)
+        except Exception:
+            shift_down = False
+
+        # Shift+Wheel: X-axis zoom (layout margin interpolation).
+        if shift_down and self._editor is not None:
+            if zoom_angle != 0:
+                steps = int(round(zoom_angle / 120.0))
+            elif zoom_pixel != 0:
+                steps = 1 if zoom_pixel > 0 else -1
+            else:
+                steps = 0
+            # Direction contract:
+            # - scroll up   => zoom in
+            # - scroll down => zoom out
+            # apply_x_zoom_steps interprets positive steps as zoom in.
+            if steps != 0:
+                self.apply_x_zoom_steps(steps)
+            ev.accept()
+            return
+
         if ctrl_down and self._editor is not None and zoom_angle != 0:
             steps = int(round(zoom_angle / 120.0))
             if steps != 0:

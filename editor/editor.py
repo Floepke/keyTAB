@@ -49,7 +49,7 @@ from editor.drawers.time_signature_drawer import TimeSignatureDrawerMixin
 from editor.drawers.arpeggio_drawer import ArpeggioDrawerMixin
 from utils.CONSTANT import PIANO_KEY_AMOUNT, BLACK_KEYS
 from utils.operator import Operator
-from editor.collision import CollisionMixin
+from editor.hit_testing import HitTestingMixin
 from ui.widgets.draw_util import DrawUtil
 from midi.player import Player
 
@@ -59,7 +59,7 @@ if TYPE_CHECKING:
 
 
 class Editor(QtCore.QObject,
-             CollisionMixin,
+             HitTestingMixin,
              SelectionMixin,
              StaveDrawerMixin,
              SnapDrawerMixin,
@@ -331,11 +331,20 @@ class Editor(QtCore.QObject,
         The drawing is programmed in vertical orientation and rotated afterwards
         if the editor orientation == 'horizontal'.
 
-        - margin: 1/6 of the width
+        - margin divisor interpolates from 6 (x_zoom_factor=1.0) to 3 (x_zoom_factor=0.0)
         - stave width: width - 2 * margin
         - semitone spacing: stave width / physical semitone range (101 semitones from A0 to C8 including BE gaps)
         """
-        self.margin = view_width_mm / 6
+        x_zoom_factor = 1.0
+        try:
+            sc = self.current_score()
+            app_state = getattr(sc, 'app_state', None) if sc is not None else None
+            x_zoom_factor = float(getattr(app_state, 'x_zoom_factor', 1.0) if app_state is not None else 1.0)
+        except Exception:
+            x_zoom_factor = 1.0
+        x_zoom_factor = max(0.0, min(1.0, x_zoom_factor))
+        margin_divisor = 3.0 + (3.0 * x_zoom_factor)
+        self.margin = view_width_mm / max(1e-6, float(margin_divisor))
         physical_semitone_spaces = 101
         self.stave_width = view_width_mm - (2 * self.margin)
         self.semitone_dist = self.stave_width / physical_semitone_spaces

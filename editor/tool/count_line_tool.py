@@ -12,6 +12,11 @@ class CountLineTool(BaseTool):
         super().__init__()
         self._active_line = None
         self._active_handle: str | None = None  # 'start', 'end', or 'line'
+        self._line_drag_anchor_cursor_time: float | None = None
+        self._line_drag_anchor_cursor_x_mm: float | None = None
+        self._line_drag_anchor_time: float | None = None
+        self._line_drag_anchor_rp1: int | None = None
+        self._line_drag_anchor_rp2: int | None = None
 
     # ---- Helpers ----
     def _request_light_repaint(self) -> None:
@@ -19,41 +24,35 @@ class CountLineTool(BaseTool):
             return
         w = getattr(self._editor, 'widget', None)
         if w is not None and hasattr(w, 'update'):
-            try:
-                w.update()
-                return
-            except Exception:
-                pass
-        try:
-            self._editor.draw_frame()
-        except Exception:
-            pass
-
-    def _handle_half_extent_mm(self) -> float:
-        if self._editor is None:
-            return 1.4
-        vis_size = max(2.0, float(getattr(self._editor, 'semitone_dist', 2.5) or 2.5))
-        return float(vis_size) * 0.7
-
-    def _rpitch_to_x_mm(self, rpitch: int) -> float:
-        return float(self._editor.relative_c4pitch_to_x(int(rpitch))) if self._editor else 0.0
+            w.update()
+            return
+        self._editor.draw_frame()
 
     def _x_mm_to_rpitch(self, x_mm: float) -> int:
-        if self._editor is None:
-            return 0
-        base_x = float(self._editor.pitch_to_x(40))
-        dist = float(self._editor.semitone_dist or 0.0)
-        if dist <= 1e-6:
-            return 0
-        rp = (float(x_mm) - base_x) / dist
-        # Keep handles within a sensible horizontal band of the stave.
-        rp = max(-68.0, min(rp, 73.0))
-        return int(round(rp))
+        return self.x_mm_to_rpitch_clamped(float(x_mm))
 
     def _cursor_mm(self, x_px: float, y_px: float) -> Tuple[float, float]:
         if self._editor is None:
             return (0.0, 0.0)
         return self._editor.widget_px_to_page_mm(float(x_px), float(y_px))
+
+    def _clear_line_drag_anchor(self) -> None:
+        self._line_drag_anchor_cursor_time = None
+        self._line_drag_anchor_cursor_x_mm = None
+        self._line_drag_anchor_time = None
+        self._line_drag_anchor_rp1 = None
+        self._line_drag_anchor_rp2 = None
+
+    def _capture_line_drag_anchor(self, x: float, y: float) -> None:
+        if self._editor is None or self._active_line is None:
+            return
+        self._line_drag_anchor_cursor_time = float(self._editor.widget_px_to_time(x, y))
+        x_mm, _y_mm = self._cursor_mm(x, y)
+        self._line_drag_anchor_cursor_x_mm = float(x_mm)
+        self._line_drag_anchor_time = float(getattr(self._active_line, 'time', 0.0) or 0.0)
+        self._line_drag_anchor_rp1 = int(getattr(self._active_line, 'rpitch1', 0) or 0)
+        rp2_raw = getattr(self._active_line, 'rpitch2', 4)
+        self._line_drag_anchor_rp2 = int(4 if rp2_raw is None else rp2_raw)
 
     def toolbar_spec(self) -> list[dict]:
         return []
@@ -66,38 +65,18 @@ class CountLineTool(BaseTool):
         if score is None:
             return
 
+        self._editor.draw_frame()
+
         # Convert mouse to page-space mm for hit testing.
         x_mm, y_mm = self._cursor_mm(x, y)
 
-        # Hit test handles: exact match to CountLineDrawer visual rects
-        # x/y are drawn from center ± (semitone_dist * 0.7).
-        handle_half = self._handle_half_extent_mm()
-        hit = None
-        hit_handle = None
-        for ev in list(getattr(score.events, 'count_line', []) or []):
-            try:
-                t0 = float(getattr(ev, 'time', 0.0) or 0.0)
-                rp1 = int(getattr(ev, 'rpitch1', 0) or 0)
-                rp2 = int(getattr(ev, 'rpitch2', 4) or 4)
-            except Exception:
-                continue
-            y_ev = float(self._editor.time_to_mm(t0))
-            x1 = float(self._rpitch_to_x_mm(rp1))
-            x2 = float(self._rpitch_to_x_mm(rp2))
-            # Start handle rect
-            if (x1 - handle_half) <= x_mm <= (x1 + handle_half) and (y_ev - handle_half) <= y_mm <= (y_ev + handle_half):
-                hit = ev
-                hit_handle = 'start'
-                break
-            # End handle rect
-            if (x2 - handle_half) <= x_mm <= (x2 + handle_half) and (y_ev - handle_half) <= y_mm <= (y_ev + handle_half):
-                hit = ev
-                hit_handle = 'end'
-                break
+        hit, hit_handle = self._editor.hit_test_count_line_mm(float(x_mm), float(y_mm))
 
         if hit is not None:
             self._active_line = hit
-            self._active_handle = hit_handle
+            self._active_handle = str(hit_handle or 'line')
+            if hit_handle == 'line':
+                self._capture_line_drag_anchor(x, y)
             return
 
         # Create a new count line at the snapped time
@@ -105,9 +84,10 @@ class CountLineTool(BaseTool):
         t_press_raw = float(self._editor.widget_px_to_time(x, y))
         t_press_snap = float(self._editor.snap_time(t_press_raw))
         rp_press = self._x_mm_to_rpitch(x_mm)
-        rp2 = rp_press + 4
+        rp2 = self.clamp_rpitch(rp_press + 4)
         self._active_line = score.new_count_line(time=t_press_snap, rpitch1=rp_press, rpitch2=rp2)
         self._active_handle = 'end'
+        self._clear_line_drag_anchor()
         if hasattr(self._editor, 'force_redraw_from_model'):
             self._editor.force_redraw_from_model()
         else:
@@ -116,6 +96,7 @@ class CountLineTool(BaseTool):
         super().on_left_unpress(x, y)
         self._active_line = None
         self._active_handle = None
+        self._clear_line_drag_anchor()
     def on_left_click(self, x: float, y: float) -> None:
         super().on_left_click(x, y)
         return
@@ -133,28 +114,53 @@ class CountLineTool(BaseTool):
         x_mm, _y_mm = self._cursor_mm(x, y)
         t_raw = float(self._editor.widget_px_to_time(x, y))
         t_snap = float(self._editor.snap_time(t_raw))
-        try:
-            self._active_line.time = float(t_snap)
-        except Exception:
-            pass
+        self._active_line.time = float(t_snap)
 
         # Update pitch for active handle
         rpitch = self._x_mm_to_rpitch(x_mm)
         if self._active_handle == 'start':
-            try:
-                self._active_line.rpitch1 = int(rpitch)
-            except Exception:
-                pass
+            self._active_line.rpitch1 = int(self.clamp_rpitch(rpitch))
         elif self._active_handle == 'end':
-            try:
-                self._active_line.rpitch2 = int(rpitch)
-            except Exception:
-                pass
+            self._active_line.rpitch2 = int(self.clamp_rpitch(rpitch))
+        elif self._active_handle == 'line':
+            if (
+                self._line_drag_anchor_cursor_time is None
+                or self._line_drag_anchor_cursor_x_mm is None
+                or self._line_drag_anchor_time is None
+                or self._line_drag_anchor_rp1 is None
+                or self._line_drag_anchor_rp2 is None
+            ):
+                self._capture_line_drag_anchor(x, y)
+
+            anchor_cursor_time = float(self._line_drag_anchor_cursor_time)
+            base_time = float(self._line_drag_anchor_time)
+            target_time = base_time + (float(t_raw) - anchor_cursor_time)
+            self._active_line.time = float(self._editor.snap_time(target_time))
+
+            semitone_mm = float(getattr(self._editor, 'semitone_dist', 0.0) or 0.0)
+            if semitone_mm > 1e-6:
+                rp_delta = int(round((x_mm - float(self._line_drag_anchor_cursor_x_mm)) / semitone_mm))
+            else:
+                rp_delta = 0
+
+            base_rp1 = int(self._line_drag_anchor_rp1)
+            base_rp2 = int(self._line_drag_anchor_rp2)
+            min_rp, max_rp = self.rpitch_bounds()
+            lower_allowed_delta = int(min_rp - min(base_rp1, base_rp2))
+            upper_allowed_delta = int(max_rp - max(base_rp1, base_rp2))
+            if rp_delta < lower_allowed_delta:
+                rp_delta = lower_allowed_delta
+            if rp_delta > upper_allowed_delta:
+                rp_delta = upper_allowed_delta
+
+            self._active_line.rpitch1 = int(base_rp1 + rp_delta)
+            self._active_line.rpitch2 = int(base_rp2 + rp_delta)
         self._request_light_repaint()
     def on_left_drag_end(self, x: float, y: float) -> None:
         super().on_left_drag_end(x, y)
         self._active_line = None
         self._active_handle = None
+        self._clear_line_drag_anchor()
     def on_right_press(self, x: float, y: float) -> None:
         super().on_right_press(x, y)
         print('CountLineTool: on_right_press()')
@@ -169,37 +175,26 @@ class CountLineTool(BaseTool):
         if score is None:
             return
 
-        # Delete nearest handle if clicked on it
-        x_mm, y_mm = self._cursor_mm(x, y)
-        handle_half = self._handle_half_extent_mm()
+        try:
+            self._editor.draw_frame()
+        except Exception:
+            pass
 
-        lst = list(getattr(score.events, 'count_line', []) or [])
-        for ev in lst:
-            try:
-                t0 = float(getattr(ev, 'time', 0.0) or 0.0)
-                rp1 = int(getattr(ev, 'rpitch1', 0) or 0)
-                rp2 = int(getattr(ev, 'rpitch2', 4) or 4)
-            except Exception:
-                continue
-            y_ev = float(self._editor.time_to_mm(t0))
-            x1 = float(self._rpitch_to_x_mm(rp1))
-            x2 = float(self._rpitch_to_x_mm(rp2))
-            if (x1 - handle_half) <= x_mm <= (x1 + handle_half) and (y_ev - handle_half) <= y_mm <= (y_ev + handle_half):
-                lst.remove(ev)
-                score.events.count_line = lst
-                if hasattr(self._editor, 'force_redraw_from_model'):
-                    self._editor.force_redraw_from_model()
-                else:
-                    self._editor.draw_frame()
-                return
-            if (x2 - handle_half) <= x_mm <= (x2 + handle_half) and (y_ev - handle_half) <= y_mm <= (y_ev + handle_half):
-                lst.remove(ev)
-                score.events.count_line = lst
-                if hasattr(self._editor, 'force_redraw_from_model'):
-                    self._editor.force_redraw_from_model()
-                else:
-                    self._editor.draw_frame()
-                return
+        # Delete when clicking either handle or the line body.
+        x_mm, y_mm = self._cursor_mm(x, y)
+        hit, _hit_handle = self._editor.hit_test_count_line_mm(float(x_mm), float(y_mm))
+        if hit is None:
+            return
+
+        hit_id = int(getattr(hit, '_id', -1) or -1)
+        score.events.count_line = [
+            ev for ev in list(getattr(score.events, 'count_line', []) or [])
+            if int(getattr(ev, '_id', -2) or -2) != hit_id
+        ]
+        if hasattr(self._editor, 'force_redraw_from_model'):
+            self._editor.force_redraw_from_model()
+        else:
+            self._editor.draw_frame()
     def on_right_double_click(self, x: float, y: float) -> None:
         super().on_right_double_click(x, y)
         print('CountLineTool: on_right_double_click()')

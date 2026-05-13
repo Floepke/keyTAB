@@ -8,6 +8,7 @@ from typing import List
 class AppState:
     """Per-project UI/app state persisted in .piano files."""
     zoom_mm_per_quarter: float = 25.0
+    x_zoom_factor: float = 1.0
     print_view_page_index: int = 0
     editor_scroll_pos: int = 0
     snap_base: int = 8

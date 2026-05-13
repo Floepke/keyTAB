@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 
-class CollisionMixin:
+class HitTestingMixin:
     # ---- Hit rectangles ----
     def register_hit_rect(self, type: str, _id: int, x1: float, y1: float, x2: float, y2: float, **extra) -> None:
         """Register a clickable rectangle for hit detection."""
@@ -122,3 +122,17 @@ class CollisionMixin:
             if int(getattr(ev, "_id", -1) or -1) == symbol_id:
                 return (ev, "dynamic_symbol", "")
         return (None, None, None)
+
+    def hit_test_count_line_mm(self, x_mm: float, y_mm: float):
+        r = self.hit_test_hit_rect(float(x_mm), float(y_mm), "count_line")
+        if r is None:
+            return (None, None)
+        count_line_id = int(r["_id"])
+        part = str(r.get("part", "line") or "line")
+        score = self.current_score()
+        if score is None:
+            return (None, None)
+        for ev in (getattr(score.events, "count_line", []) or []):
+            if int(getattr(ev, "_id", -1) or -1) == count_line_id:
+                return (ev, part)
+        return (None, None)

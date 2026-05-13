@@ -61,6 +61,51 @@ class BaseTool:
             raise RuntimeError("Editor not set")
         return self._editor.draw_util()
 
+    # Shared rpitch helpers
+    def rpitch_bounds(self) -> tuple[int, int]:
+        """Return dynamic rpitch bounds for the current visible page width."""
+        if self._editor is None:
+            return (-68, 73)
+        try:
+            score = self._editor.current_score()
+            layout = getattr(score, 'layout', None) if score is not None else None
+            view_width_mm = float(getattr(layout, 'page_width_mm', 210.0) or 210.0)
+            self._editor._calculate_layout(view_width_mm)
+            base_x = float(self._editor.pitch_to_x(40))
+            dist = float(getattr(self._editor, 'semitone_dist', 0.0) or 0.0)
+            if dist <= 1e-6:
+                return (-68, 73)
+            min_rp = int(round((0.0 - base_x) / dist))
+            max_rp = int(round((view_width_mm - base_x) / dist))
+            if min_rp > max_rp:
+                min_rp, max_rp = max_rp, min_rp
+            return (min_rp + 5, max_rp - 5)
+        except Exception:
+            return (-68, 73)
+
+    def clamp_rpitch(self, rpitch: float | int) -> int:
+        """Clamp rpitch to current viewport bounds."""
+        min_rp, max_rp = self.rpitch_bounds()
+        try:
+            rp = float(rpitch)
+        except Exception:
+            rp = 0.0
+        return int(max(min_rp, min(max_rp, int(round(rp)))))
+
+    def x_mm_to_rpitch_clamped(self, x_mm: float) -> int:
+        """Convert page-space x(mm) to rpitch and clamp to viewport bounds."""
+        if self._editor is None:
+            return 0
+        try:
+            base_x = float(self._editor.pitch_to_x(40))
+            dist = float(getattr(self._editor, 'semitone_dist', 0.0) or 0.0)
+            if dist <= 1e-6:
+                return 0
+            rp = (float(x_mm) - base_x) / dist
+            return self.clamp_rpitch(rp)
+        except Exception:
+            return 0
+
     # Mouse events
     def on_left_press(self, x: float, y: float) -> None: pass
     def on_left_unpress(self, x: float, y: float) -> None: pass

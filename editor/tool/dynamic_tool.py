@@ -95,12 +95,7 @@ class DynamicTool(BaseTool):
             return 0.0
 
     def _x_mm_to_rpitch(self, x_mm: float) -> int:
-        base_x = float(self._editor.pitch_to_x(40))
-        dist = float(self._editor.semitone_dist or 0.0)
-        vw = self._view_width_mm()
-        x_clamped = max(0.0, min(float(x_mm), vw if vw > 0 else float(x_mm)))
-        offset = round((x_clamped - base_x) / dist)
-        return int(max(-68, min(73, offset)))
+        return self.x_mm_to_rpitch_clamped(float(x_mm))
 
     def _snap_time(self, x_px: float, y_px: float) -> float:
         t_raw = float(self._editor.widget_px_to_time(x_px, y_px))
@@ -226,11 +221,11 @@ class DynamicTool(BaseTool):
 
     def _translate_symbol(self, symbol, delta_time: float, delta_rpitch: int) -> None:
         symbol.time = float(max(0.0, float(getattr(symbol, 'time', 0.0) or 0.0) + float(delta_time)))
-        symbol.x_rpitch = int(getattr(symbol, 'x_rpitch', 0) or 0) + int(delta_rpitch)
+        symbol.x_rpitch = self.clamp_rpitch(int(getattr(symbol, 'x_rpitch', 0) or 0) + int(delta_rpitch))
 
     def _translate_hairpin(self, hp, delta_time: float, delta_rpitch: int) -> None:
         hp.time = float(max(0.0, float(getattr(hp, 'time', 0.0) or 0.0) + float(delta_time)))
-        hp.x_rpitch = int(getattr(hp, 'x_rpitch', 0) or 0) + int(delta_rpitch)
+        hp.x_rpitch = self.clamp_rpitch(int(getattr(hp, 'x_rpitch', 0) or 0) + int(delta_rpitch))
 
     def _set_hairpin_handle(self, hp, handle: str, t_snap: float, rpitch: int) -> None:
         self._apply_handle_drag(hp, handle, float(t_snap), int(rpitch))
@@ -312,7 +307,7 @@ class DynamicTool(BaseTool):
             start = float(getattr(hp, 'time', 0.0) or 0.0)
             new_end = max(start + snap_units, t_snap)
             hp.duration = float(new_end - start)
-        hp.x_rpitch = int(rpitch)
+        hp.x_rpitch = self.clamp_rpitch(rpitch)
 
     # ---- Events ----
 

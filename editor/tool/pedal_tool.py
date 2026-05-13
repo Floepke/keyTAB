@@ -112,15 +112,7 @@ class PedalTool(BaseTool):
         ]
 
     def _x_mm_to_rpitch(self, x_mm: float) -> int:
-        if self._editor is None:
-            return 0
-        base_x = float(self._editor.pitch_to_x(40))
-        dist = float(self._editor.semitone_dist or 0.0)
-        if dist <= 1e-6:
-            return 0
-        rp = (float(x_mm) - base_x) / dist
-        rp = max(-68.0, min(rp, 73.0))
-        return int(round(rp))
+        return self.x_mm_to_rpitch_clamped(float(x_mm))
 
     def _cursor_mm(self, x_px: float, y_px: float) -> tuple[float, float]:
         if self._editor is None:
@@ -222,7 +214,7 @@ class PedalTool(BaseTool):
         t_snap = float(self._editor.snap_time(t_raw))
 
         try:
-            self._active_pedal.rpitch = int(rpitch)
+            self._active_pedal.rpitch = int(self.clamp_rpitch(rpitch))
             self._active_pedal.time = float(t_snap)
         except Exception:
             return
@@ -238,7 +230,7 @@ class PedalTool(BaseTool):
 
             if partner is not None:
                 try:
-                    partner.rpitch = int(rpitch)
+                    partner.rpitch = int(self.clamp_rpitch(rpitch))
                     partner.time = float(t_snap)
                 except Exception:
                     self._active_bound_partner = None

@@ -78,16 +78,7 @@ class TextTool(BaseTool):
         return float(self._editor.relative_c4pitch_to_x(int(rpitch)))
 
     def x_mm_to_relative_x(self, x_mm: float) -> int:
-        base_x = float(self._editor.pitch_to_x(40))
-        dist = float(self._editor.semitone_dist or 0.0)
-        if dist <= 1e-6:
-            return 0
-        rp = (float(x_mm) - base_x) / dist
-        # Clamp horizontal drag in rpitch space so it stays inside the stave.
-        min_rp = -68.0
-        max_rp = 73.0
-        rp = max(min_rp, min(rp, max_rp))
-        return int(round(rp))
+        return self.x_mm_to_rpitch_clamped(float(x_mm))
 
     def _cursor_mm(self, x_px: float, y_px: float) -> Tuple[float, float]:
         return self._editor.widget_px_to_page_mm(float(x_px), float(y_px))
@@ -451,7 +442,7 @@ class TextTool(BaseTool):
             else:
                 rp_delta = 0
             base_rp = int(self._move_anchor_text_rpitch or 0)
-            rp = max(-68, min(73, base_rp + rp_delta))
+            rp = self.clamp_rpitch(base_rp + rp_delta)
             self._active_text.time = float(t_snap)
             self._active_text.x_rpitch = int(rp)
         if hasattr(self._editor, 'force_redraw_from_model'):

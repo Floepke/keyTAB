@@ -134,11 +134,11 @@ class StaveDrawerMixin:
             if kb_x1 <= x_pos <= kb_x2 and editor_orientation == 'vertical':
                 du.add_text(
                     x_pos,
-                    y_kb + 7.5,
+                    kb_y2 + 1.0,
                     str(octave_number(key)),
                     family="Edwin",
                     color=self.notation_color,
-                    anchor='center',
+                    anchor='n',
                     size_pt=10.0,
                     id=0,
                     tags=["piano_keyboard", "piano_octave_number"],
@@ -156,7 +156,7 @@ class StaveDrawerMixin:
                     x_pos -= .1
                 du.add_text(
                     x_pos,
-                    y_kb + 8.0,
+                    kb_y2 + 2.0,
                     str(octave_number(key)),
                     family="Edwin",
                     color=self.notation_color,
