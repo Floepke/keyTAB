@@ -1,0 +1,144 @@
+keyTAB Windows Installatiehandleiding (voor eerste bijdragers)
+
+Doel
+Een gekloonde keyTAB-repo op Windows instellen zodat je snel kunt syncen en elke commit kunt testen.
+
+Wat je gaat installeren
+1. Git (versiebeheer)
+2. Python 3.12 (of 3.11), 64-bit
+3. Visual Studio Code
+4. Optioneel: een Git GUI-app (GitHub Desktop / Fork / Sourcetree)
+
+Vereisten
+- Windows 10 of Windows 11
+- Beheerdersrechten voor software-installatie
+- Internetverbinding
+
+Stap 1: Installeer Git voor Windows
+1. Ga naar https://git-scm.com/download/win
+2. Installeer met de standaardopties.
+
+Stap 2: Installeer Python (64-bit)
+1. Ga naar https://www.python.org/downloads/windows/
+2. Installeer Python 3.12 (of 3.11), 64-bit.
+3. Belangrijk: vink "Add Python to PATH" aan tijdens de installatie.
+
+Stap 3: Installeer Visual Studio Code
+1. Ga naar https://code.visualstudio.com/
+2. Installeer VS Code.
+3. Aanbevolen VS Code-extensies:
+   - Python (ms-python.python)
+   - Pylance (ms-python.vscode-pylance)
+   - GitLens (eamodio.gitlens) (optioneel)
+
+Stap 4: Clone keyTAB lokaal
+Optie A (command line)
+1. Open PowerShell.
+2. Kies een werkmap en voer uit:
+   cd $HOME
+   git clone https://github.com/Floepke/keyTAB.git
+   cd keyTAB
+()
+
+Optie B (GUI)
+1. Gebruik GitHub Desktop (of Fork / Sourcetree).
+2. Clone de repository naar een map zoals:
+   C:\Users\<jouw-gebruiker>\keyTAB
+
+Stap 5: Open het project in VS Code
+1. In VS Code: File -> Open Folder...
+2. Selecteer je keyTAB-map.
+3. Open de terminal in VS Code (Terminal -> New Terminal).
+
+Stap 6: Maak en activeer een virtuele omgeving
+In de projectroot:
+1. Maak de venv:
+   python -m venv .venv
+2. Activeer in PowerShell:
+   .\.venv\Scripts\Activate.ps1
+3. Werk pip-tools bij:
+   python -m pip install --upgrade pip setuptools wheel
+
+Als PowerShell activatie blokkeert, voer eenmalig uit:
+Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
+Open daarna de terminal opnieuw en activeer nogmaals.
+
+Stap 7: Installeer project-afhankelijkheden
+Met actieve venv:
+python -m pip install -r requirements.txt
+
+Stap 8: Start keyTAB
+Vanuit de projectroot (venv actief):
+python keyTAB.py
+
+Stap 9: Dagelijkse sync-workflow (snel nieuwste commits testen)
+Vanuit de projectroot:
+1. Zorg dat je op je basisbranch zit:
+   git checkout main
+2. Sync met remote:
+   git pull --ff-only
+3. Start de app:
+   python keyTAB.py
+
+Stap 10: Test snel een specifieke commit
+1. Haal alle updates op:
+   git fetch --all --tags
+2. Checkout direct op een commit:
+   git checkout <commit_sha>
+3. Start de app:
+   python keyTAB.py
+4. Later terug naar de nieuwste main:
+   git checkout main
+   git pull --ff-only
+
+Tip: Als je lokale wijzigingen wilt behouden terwijl je oude commits test, maak dan een tijdelijke branch:
+git switch -c test/<naam> <commit_sha>
+
+Bestaan er GUI-tools voor makkelijker syncen/testen?
+Ja. Goede opties op Windows:
+- GitHub Desktop: het eenvoudigst voor beginners.
+- Fork: erg snel en krachtig als Git UI.
+- Sourcetree: populair en gratis.
+
+Deze tools kunnen pull/fetch/checkout/branch-acties uitvoeren zonder dat je alle commando's hoeft te onthouden.
+
+Kan setup geautomatiseerd worden?
+Ja. Een setupscript is een goed idee voor Windows.
+
+Typische taken van een geautomatiseerd setupscript:
+1. Controleren of Python en Git zijn geinstalleerd.
+2. .venv aanmaken.
+3. requirements installeren.
+4. Optioneel een VS Code-workspace en aanbevolen extensiebestand maken.
+5. Optioneel keyTAB een keer starten.
+
+Voorbeeldcommando als zo'n script bestaat:
+powershell -ExecutionPolicy Bypass -File .\scripts\setup_windows.ps1
+
+Let op: Deze repo bevat momenteel niet standaard een specifiek Windows-bootstrapscript. Als je wilt, kun je er een toevoegen onder scripts/ voor one-command onboarding.
+
+Veelvoorkomende problemen oplossen
+1. "python is not recognized"
+- Installeer Python opnieuw en vink "Add Python to PATH" aan.
+
+2. Activeren van virtuele omgeving mislukt
+- Gebruik het execution policy-commando hierboven.
+
+3. Installatie van afhankelijkheden faalt op een package
+- Werk eerst pip/setuptools/wheel bij.
+- Controleer dat je 64-bit Python 3.11/3.12 gebruikt.
+
+4. App start niet na installatie
+- Controleer of venv actief is (.venv in prompt).
+- Voer opnieuw uit: python -m pip install -r requirements.txt
+- Start daarna: python keyTAB.py
+
+Minimale quick-start (kopieer/plak)
+cd $HOME
+git clone <REPO_URL_HERE> keyTAB
+cd keyTAB
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install --upgrade pip setuptools wheel
+python -m pip install -r requirements.txt
+python keyTAB.py

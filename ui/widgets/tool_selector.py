@@ -37,13 +37,14 @@ class ToolSelectorWidget(QtWidgets.QListWidget):
 
     def __init__(self, parent=None):
         super().__init__(parent)
+        self.setMinimumWidth(0)
         # Icon size reduced by a quarter from 48 -> 36
         self.setIconSize(QtCore.QSize(36, 36))
         # Allow per-item size hints; do not enforce uniform sizes
         self.setUniformItemSizes(False)
         self.setSpacing(4)
         # Fill available dock width
-        self.setSizePolicy(QtWidgets.QSizePolicy.Policy.Expanding,
+        self.setSizePolicy(QtWidgets.QSizePolicy.Policy.Ignored,
                            QtWidgets.QSizePolicy.Policy.Preferred)
         self.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         # Allow vertical scrolling when more tools are added
@@ -176,6 +177,7 @@ class ToolSelectorDock(QtWidgets.QDockWidget):
         super().__init__("Tools", parent)
         self.setWindowTitle(self.tr("Tools"))
         self.setObjectName("ToolSelectorDock")
+        self.setMinimumWidth(0)
         # Lock dock: no moving, no floating, no closing
         self.setAllowedAreas(QtCore.Qt.DockWidgetArea.LeftDockWidgetArea | QtCore.Qt.DockWidgetArea.RightDockWidgetArea)
         self.setFeatures(QtWidgets.QDockWidget.DockWidgetFeature.NoDockWidgetFeatures)
@@ -191,6 +193,7 @@ class ToolSelectorDock(QtWidgets.QDockWidget):
         ))
         # Wrap the list in a container with small margins to match Snap Size indent
         container = QtWidgets.QWidget(self)
+        container.setMinimumWidth(0)
         lay = QtWidgets.QVBoxLayout(container)
         lay.setContentsMargins(LEFT_PANEL_PADDING_PX, LEFT_PANEL_PADDING_PX, LEFT_PANEL_PADDING_PX, LEFT_PANEL_PADDING_PX)
         lay.setSpacing(6)
@@ -199,6 +202,7 @@ class ToolSelectorDock(QtWidgets.QDockWidget):
 
         self.tooltip_area = QtWidgets.QFrame(container)
         self.tooltip_area.setObjectName("toolSelectorTooltipArea")
+        self.tooltip_area.setMinimumWidth(0)
         self.tooltip_area.setFrameShape(QtWidgets.QFrame.Shape.NoFrame)
         self.tooltip_area.setAutoFillBackground(True)
         self.tooltip_area.setBackgroundRole(QtGui.QPalette.ColorRole.Window)
@@ -209,7 +213,8 @@ class ToolSelectorDock(QtWidgets.QDockWidget):
         self.tooltip_label = QtWidgets.QLabel(self.tooltip_area)
         self.tooltip_label.setWordWrap(True)
         self.tooltip_label.setAlignment(QtCore.Qt.AlignmentFlag.AlignLeft | QtCore.Qt.AlignmentFlag.AlignTop)
-        self.tooltip_label.setSizePolicy(QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Expanding)
+        self.tooltip_label.setMinimumWidth(0)
+        self.tooltip_label.setSizePolicy(QtWidgets.QSizePolicy.Policy.Ignored, QtWidgets.QSizePolicy.Policy.Expanding)
         self.tooltip_label.setText("")
         tooltip_layout.addWidget(self.tooltip_label, stretch=1)
         lay.addWidget(self.tooltip_area, stretch=0)
@@ -255,3 +260,7 @@ class ToolSelectorDock(QtWidgets.QDockWidget):
 
     def set_tooltip_text(self, text: str) -> None:
         self.tooltip_label.setText(str(text or ""))
+
+    def minimumSizeHint(self) -> QtCore.QSize:
+        base = super().minimumSizeHint()
+        return QtCore.QSize(0, base.height())

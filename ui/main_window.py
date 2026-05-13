@@ -3431,9 +3431,9 @@ class MainWindow(QtWidgets.QMainWindow):
 
         pref_width = int(getattr(self, '_left_panel_width_pref_px', 220) or 220)
         if pref_width > 0:
-            target_width = max(80, pref_width)
+            target_width = max(1, pref_width)
         else:
-            target_width = max(80, snap_width, tool_width)
+            target_width = max(1, snap_width, tool_width)
         # Apply an initial width while still allowing user resizing afterward
         self.resizeDocks([self.snap_dock, self.tool_dock], [target_width, target_width], QtCore.Qt.Orientation.Horizontal)
         self._schedule_left_panel_width_save()
