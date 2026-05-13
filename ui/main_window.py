@@ -71,6 +71,11 @@ class MainWindow(QtWidgets.QMainWindow):
         except Exception:
             self._center_playhead_enabled = True
         self._playhead_anchor_measure: int | None = None
+        try:
+            pm_tt = get_preferences_manager()
+            self._show_tooltips_in_panel = bool(pm_tt.get("show_tooltips", True))
+        except Exception:
+            self._show_tooltips_in_panel = True
         self._playhead_last_visible_measure: int | None = None
         self._last_engraver_error_signature: str | None = None
         
@@ -83,6 +88,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self._apply_autosave_preferences()
 
         self._create_menus()
+        self._apply_global_tooltip_visibility(self._show_tooltips_in_panel)
 
         self.splitter = ToolbarSplitter(QtCore.Qt.Orientation.Horizontal)
         
@@ -253,6 +259,7 @@ class MainWindow(QtWidgets.QMainWindow):
         QtWidgets.QApplication.instance().installEventFilter(self)
         # Stack vertically: snap (top) above tool selector (bottom)
         self.splitDockWidget(self.snap_dock, self.tool_dock, QtCore.Qt.Orientation.Vertical)
+        self.tool_dock.set_tooltip_area_visible(self._show_tooltips_in_panel)
         # Avoid docks stealing focus from the editor
         try:
             self.snap_dock.setFocusPolicy(QtCore.Qt.FocusPolicy.NoFocus)
@@ -879,6 +886,15 @@ class MainWindow(QtWidgets.QMainWindow):
         view_menu.addAction(full_screen_act)
         view_menu.addSeparator()
 
+        # Tooltip panel toggle
+        self._show_tooltips_act = QtGui.QAction(tr("Show Tooltips"), self)
+        self._show_tooltips_act.setCheckable(True)
+        self._show_tooltips_act.setChecked(self._show_tooltips_in_panel)
+        self._show_tooltips_act.setToolTip(tr("Show or hide tooltips throughout the application."))
+        self._show_tooltips_act.triggered.connect(self._toggle_tooltip_panel)
+        view_menu.addAction(self._show_tooltips_act)
+        view_menu.addSeparator()
+
         # Language actions
         language_menu = view_menu.addMenu(tr("Language"))
         language_menu.setToolTipsVisible(True)
@@ -1155,7 +1171,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def _show_tooltip_in_tool_area(self, text: str, hide_popup: bool = True) -> bool:
         area = self._tooltip_anchor_widget()
-        if area is None:
+        if area is None or not self._show_tooltips_in_panel:
             return False
         self.tool_dock.set_tooltip_text(self._format_tooltip_text_for_panel(text))
         if hide_popup:
@@ -1164,6 +1180,10 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def eventFilter(self, watched: QtCore.QObject, event: QtCore.QEvent) -> bool:
         et = event.type()
+
+        if not self._show_tooltips_in_panel and et == QtCore.QEvent.Type.ToolTip:
+            QtWidgets.QToolTip.hideText()
+            return True
 
         # Persist left dock width when user drags the dock separator.
         try:
@@ -1204,10 +1224,50 @@ class MainWindow(QtWidgets.QMainWindow):
         if et in (QtCore.QEvent.Type.Leave, QtCore.QEvent.Type.FocusOut, QtCore.QEvent.Type.Hide):
             if watched is self._tooltip_redirect_source or self._is_editor_scrollbar_source(watched):
                 self._tooltip_redirect_source = None
-                self.tool_dock.set_tooltip_text("")
+                if hasattr(self, 'tool_dock'):
+                    self.tool_dock.set_tooltip_text("")
                 QtWidgets.QToolTip.hideText()
 
         return super().eventFilter(watched, event)
+
+    def _toggle_tooltip_panel(self, checked: bool) -> None:
+        self._apply_global_tooltip_visibility(bool(checked))
+        try:
+            pm = get_preferences_manager()
+            pm.set("show_tooltips", self._show_tooltips_in_panel)
+            pm.save()
+        except Exception:
+            pass
+        # Keep legacy appdata key in sync for backward compatibility.
+        try:
+            adm = get_appdata_manager()
+            adm.set("show_tooltips_in_panel", self._show_tooltips_in_panel)
+        except Exception:
+            pass
+
+    def _apply_global_tooltip_visibility(self, enabled: bool) -> None:
+        self._show_tooltips_in_panel = bool(enabled)
+
+        # Sync menu/toolbar tooltip behavior globally.
+        menubar = self.menuBar()
+        for menu in menubar.findChildren(QtWidgets.QMenu):
+            menu.setToolTipsVisible(self._show_tooltips_in_panel)
+
+        # Sync the dedicated tooltip panel in the left tool dock.
+        if hasattr(self, 'tool_dock') and self.tool_dock is not None:
+            self.tool_dock.set_tooltip_area_visible(self._show_tooltips_in_panel)
+            if not self._show_tooltips_in_panel:
+                self.tool_dock.set_tooltip_text("")
+
+        # Clear any currently visible tooltip.
+        if not self._show_tooltips_in_panel:
+            self._tooltip_redirect_source = None
+            QtWidgets.QToolTip.hideText()
+
+        if hasattr(self, '_show_tooltips_act') and self._show_tooltips_act is not None:
+            blocker = QtCore.QSignalBlocker(self._show_tooltips_act)
+            self._show_tooltips_act.setChecked(self._show_tooltips_in_panel)
+            del blocker
 
     def _editor_scrollbar_tooltip_text(self, predicted_top_value: int) -> str:
         measure_idx = self._editor_scrollbar_measure_index_for_predicted_top(int(predicted_top_value))

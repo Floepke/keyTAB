@@ -361,6 +361,11 @@ def get_preferences_manager() -> PreferencesManager:
                 "Examples: \n\t'%d-%m-%Y' becomes \n\t'%Y-%m-%d %H:%M:%S'\nUse '%%' for a literal percent sign."
             ),
         )
+        pm.register(
+            key="show_tooltips",
+            default=True,
+            description="Show tooltips throughout the application.",
+        )
         pm.load()
         try:
             raw = pm._parse_toml_dict(pm.path) if pm.path.exists() else {}

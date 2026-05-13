@@ -387,6 +387,7 @@ class FlexibleDoubleSpinBox(QtWidgets.QDoubleSpinBox):
 class FontPicker(QtWidgets.QWidget):
     valueChanged = QtCore.Signal()
 
+
     def __init__(self, value: Font | dict[str, Any], parent=None, show_offsets: bool = False) -> None:
         super().__init__(parent)
         coerced = self._coerce_font_value(value)
@@ -395,11 +396,7 @@ class FontPicker(QtWidgets.QWidget):
         self._combo = QtWidgets.QFontComboBox(self)
         self._size = QtWidgets.QSpinBox(self)
         self._size.setRange(1, 200)
-        try:
-            # Emit changes while typing in the spinbox
-            self._size.setKeyboardTracking(True)
-        except Exception:
-            pass
+        self._size.setKeyboardTracking(True)
         self._bold = QtWidgets.QCheckBox(self.tr("Bold"), self)
         self._italic = QtWidgets.QCheckBox(self.tr("Italic"), self)
         self._underline = QtWidgets.QCheckBox(self.tr("Underline"), self)
@@ -414,27 +411,50 @@ class FontPicker(QtWidgets.QWidget):
                 spin.setSingleStep(0.25)
                 spin.setMinimumWidth(70)
                 spin.setKeyboardTracking(True)
-                spin.setToolTip(self.tr("{axis}-offset (mm).").format(axis=axis))
+                spin.setToolTip(self.tr(f"{axis}-offset (mm)."))
 
-        layout = QtWidgets.QHBoxLayout(self)
+        # Use a vertical layout with labels for each widget
+        layout = QtWidgets.QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(6)
-        layout.addWidget(self._combo, 1)
-        layout.addWidget(self._size, 0)
-        layout.addWidget(self._bold, 0)
-        layout.addWidget(self._italic, 0)
-        layout.addWidget(self._underline, 0)
+        layout.setSpacing(4)
+
+        # Font family
+        row_font = QtWidgets.QHBoxLayout()
+        row_font.setSpacing(4)
+        row_font.addWidget(QtWidgets.QLabel(self.tr("Font family:")), 0)
+        row_font.addWidget(self._combo, 1)
+        layout.addLayout(row_font)
+
+        # Font size
+        row_size = QtWidgets.QHBoxLayout()
+        row_size.setSpacing(4)
+        row_size.addWidget(QtWidgets.QLabel(self.tr("Size (pt):")), 0)
+        row_size.addWidget(self._size, 1)
+        layout.addLayout(row_size)
+
+        # Font style (bold, italic, underline)
+        row_style = QtWidgets.QHBoxLayout()
+        row_style.setSpacing(4)
+        row_style.addWidget(self._bold, 0)
+        row_style.addWidget(self._italic, 0)
+        row_style.addWidget(self._underline, 0)
+        row_style.addStretch(1)
+        layout.addLayout(row_style)
+
+        # Offsets (if enabled)
         if self._show_offsets and self._x_offset and self._y_offset:
-            layout.addWidget(self._x_offset, 0)
-            layout.addWidget(self._y_offset, 0)
+            row_offset = QtWidgets.QHBoxLayout()
+            row_offset.setSpacing(4)
+            row_offset.addWidget(QtWidgets.QLabel(self.tr("X offset (mm):")), 0)
+            row_offset.addWidget(self._x_offset, 1)
+            row_offset.addWidget(QtWidgets.QLabel(self.tr("Y offset (mm):")), 0)
+            row_offset.addWidget(self._y_offset, 1)
+            layout.addLayout(row_offset)
 
         self.set_value(coerced)
         self._combo.currentFontChanged.connect(lambda _f: self.valueChanged.emit())
         self._size.valueChanged.connect(lambda _v: self.valueChanged.emit())
-        try:
-            self._size.editingFinished.connect(lambda: self.valueChanged.emit())
-        except Exception:
-            pass
+        self._size.editingFinished.connect(lambda: self.valueChanged.emit())
         self._bold.stateChanged.connect(lambda _v: self.valueChanged.emit())
         self._italic.stateChanged.connect(lambda _v: self.valueChanged.emit())
         self._underline.stateChanged.connect(lambda _v: self.valueChanged.emit())
@@ -630,31 +650,28 @@ class StyleDialog(QtWidgets.QDialog):
 
     def _coerce_layout_fonts(self, layout_obj: Layout) -> None:
         """Ensure all LayoutFont-typed fields are dataclass instances, not dict payloads."""
-        try:
-            hints = getattr(self, '_type_hints', None)
-            if not isinstance(hints, dict):
+        hints = getattr(self, '_type_hints', None)
+        if not isinstance(hints, dict):
+            try:
+                hints = get_type_hints(Layout)
+            except Exception:
+                hints = {}
+        defaults = Layout()
+        for f in fields(Layout):
+            name = f.name
+            hint = hints.get(name, f.type)
+            if hint is not Font:
+                continue
+            val = getattr(layout_obj, name, getattr(defaults, name))
+            if isinstance(val, dict):
                 try:
-                    hints = get_type_hints(Layout)
+                    val = Font(**val)
                 except Exception:
-                    hints = {}
-            defaults = Layout()
-            for f in fields(Layout):
-                name = f.name
-                hint = hints.get(name, f.type)
-                if hint is not Font:
-                    continue
-                val = getattr(layout_obj, name, getattr(defaults, name))
-                if isinstance(val, dict):
-                    try:
-                        val = Font(**val)
-                    except Exception:
-                        val = getattr(defaults, name)
-                    try:
-                        setattr(layout_obj, name, val)
-                    except Exception:
-                        pass
-        except Exception:
-            pass
+                    val = getattr(defaults, name)
+                try:
+                    setattr(layout_obj, name, val)
+                except Exception:
+                    pass
 
     def _font_family_from_value(self, value: Any, fallback: str = "Edwin") -> str:
         try:
@@ -675,7 +692,7 @@ class StyleDialog(QtWidgets.QDialog):
         self.setModal(False)
         self.setWindowModality(QtCore.Qt.NonModal)
         self.setMinimumSize(280, 300)
-        self.resize(768, 512)
+        self.resize(512, 256)
 
         self._layout = layout or Layout()
         self._editors: dict[str, QtWidgets.QWidget] = {}

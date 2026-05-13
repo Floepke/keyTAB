@@ -261,6 +261,9 @@ class ToolSelectorDock(QtWidgets.QDockWidget):
     def set_tooltip_text(self, text: str) -> None:
         self.tooltip_label.setText(str(text or ""))
 
+    def set_tooltip_area_visible(self, visible: bool) -> None:
+        self.tooltip_area.setVisible(bool(visible))
+
     def minimumSizeHint(self) -> QtCore.QSize:
         base = super().minimumSizeHint()
         return QtCore.QSize(0, base.height())
