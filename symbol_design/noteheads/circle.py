@@ -1,32 +1,15 @@
 from __future__ import annotations
 
-import math
 from typing import TYPE_CHECKING
 
 from ui.widgets.draw_util import DrawUtil
+from symbol_design.noteheads.geometry import sheared_notehead_outline_points
 from symbol_design.symbol_util import SymbolUtil
 from utils.CONSTANT import BLACK_KEYS
 
 if TYPE_CHECKING:
     from symbol_design.noteheads.notehead import Notehead
     from file_model.events.note import Note
-
-
-def _sheared_oval_points(
-    cx: float, cy: float, rx: float, ry: float, shear: float, n: int = 64
-) -> list[tuple[float, float]]:
-    """Return polygon points for a vertically sheared oval.
-
-    A vertical shear shifts y proportional to x: y' = y + shear * x.
-    Applied to an ellipse this produces the traditional tilted notehead shape.
-    """
-    pts = []
-    for i in range(n):
-        t = 2.0 * math.pi * i / n
-        x = cx + rx * math.cos(t)
-        y = cy + ry * math.sin(t) + shear * rx * math.cos(t)
-        pts.append((x, y))
-    return pts
 
 
 def draw_circle_notehead(
@@ -50,6 +33,7 @@ def draw_circle_notehead(
     fill_color = fill_color_override if fill_color_override is not None else symbol.notation_color
     tilt = float(symbol.notehead_tilt)
     note_obj: Note = getattr(symbol, "note", None)
+    hand = "l"
     if note_obj is not None:
         # set tilt
         if isinstance(note_obj, dict):
@@ -87,10 +71,17 @@ def draw_circle_notehead(
                 tags=list(tags),
             )
     else:
-        # draw tilted notehead with polygon points
-        cx = float(x_mm)
-        cy = top_y + full_h / 2.0
-        pts = _sheared_oval_points(cx, cy, half_w, full_h / 2.0, tilt)
+        # Draw tilted notehead with cached local outline points, then translate.
+        local_pts = sheared_notehead_outline_points(
+            hand=hand,
+            is_up=(str(direction) == "up"),
+            semitone_space_mm=float(symbol.semitone_space_mm),
+            width_scale=float(symbol.note_width_scaling),
+            height_scale=float(symbol.notehead_height_scaling),
+            base_tilt=float(symbol.notehead_tilt),
+            sample_count=64,
+        )
+        pts = [(float(x_mm) + float(px), float(y_mm) + float(py)) for (px, py) in local_pts]
         xs = [p[0] for p in pts]
         ys = [p[1] for p in pts]
         hit_x = min(xs)

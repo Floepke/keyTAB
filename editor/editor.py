@@ -52,6 +52,7 @@ from utils.CONSTANT import PIANO_KEY_AMOUNT, BLACK_KEYS
 from utils.operator import Operator
 from editor.hit_testing import HitTestingMixin
 from ui.widgets.draw_util import DrawUtil
+from symbol_design.noteheads import resolve_notehead_spec, sheared_notehead_support_v
 from midi.player import Player
 
 if TYPE_CHECKING:
@@ -1127,7 +1128,10 @@ class Editor(QtCore.QObject,
             zpq_arp = float(getattr(score.app_state, 'zoom_mm_per_quarter', 25.0) or 25.0)
             semi_arp = float(self.semitone_dist or 0.5)
             layout_arp = getattr(score, 'layout', None)
-            stem_len_arp = float(getattr(layout_arp, 'note_stem_length_semitone', 3.0) or 3.0) * semi_arp
+            width_scale_arp = max(0.05, float(getattr(layout_arp, 'note_width_scaling', 1.0) or 1.0)) if layout_arp is not None else 1.0
+            height_scale_arp = max(0.1, float(getattr(layout_arp, 'notehead_height_scaling', 1.0) or 1.0)) if layout_arp is not None else 1.0
+            base_tilt_arp = float(getattr(layout_arp, 'notehead_tilt', 0.0) or 0.0) if layout_arp is not None else 0.0
+            base_tilt_arp = max(-1.0, min(1.0, base_tilt_arp))
 
             def _t2mm(ticks: float) -> float:
                 return margin_mm + (float(ticks) / float(QUARTER_NOTE_UNIT)) * zpq_arp
@@ -1138,6 +1142,10 @@ class Editor(QtCore.QObject,
                     rtime1 = float(getattr(arp, 'rtime1', 0.0) or 0.0)
                     rtime2 = float(getattr(arp, 'rtime2', 0.0) or 0.0)
                 except Exception:
+                    continue
+                # Zero/zero means "normal chord" visual state while editing.
+                # Skip arpeggio suppression/overrides so note stems redraw immediately.
+                if abs(rtime1) <= 1e-9 and abs(rtime2) <= 1e-9:
                     continue
                 base_time_key = int(round(base_time))
                 pitches = [int(p) for p in (getattr(arp, 'note_pitches', []) or []) if int(p) > 0]
@@ -1150,15 +1158,17 @@ class Editor(QtCore.QObject,
                 span = max(1, len(chord_sorted) - 1)
                 y_start = _t2mm(base_time + rtime1)
                 y_end = _t2mm(base_time + rtime2)
-                # Compute each note's x_stem to find span for ratio calculation
                 stem_xs: list[float] = []
                 for note_obj in chord_sorted:
                     pitch = int(getattr(note_obj, 'pitch', 0) or 0)
-                    hand = str(getattr(note_obj, 'hand', 'l') or 'l')
                     x_note = float(self.pitch_to_x(pitch))
-                    stem_xs.append(float(x_note + stem_len_arp if hand == 'l' else x_note - stem_len_arp))
+                    stem_xs.append(float(x_note))
                 x_line_start = float(stem_xs[0])
                 x_line_end = float(stem_xs[-1])
+                dx_line = float(x_line_end - x_line_start)
+                dy_line = float(y_end - y_start)
+                m_line = float(dy_line / dx_line) if abs(dx_line) > 1e-9 else 0.0
+                support_cache: dict[tuple[str, bool], float] = {}
                 for i, (note_obj, x_stem) in enumerate(zip(chord_sorted, stem_xs)):
                     nid = int(getattr(note_obj, '_id', 0) or 0)
                     if abs(x_line_end - x_line_start) <= 1e-6:
@@ -1166,7 +1176,32 @@ class Editor(QtCore.QObject,
                     else:
                         ratio = (float(x_stem) - x_line_start) / float(x_line_end - x_line_start)
                     ratio = max(0.0, min(1.0, ratio))
-                    arpeggio_y_overrides[nid] = float(y_start + (y_end - y_start) * ratio)
+
+                    # Keep X stable at note center and offset Y only by exact notehead outline support.
+                    # y1 = y_line - support_v where support is taken on the correct side
+                    # (up noteheads use max support, down noteheads use min support).
+                    y_line = float(y_start + (y_end - y_start) * ratio)
+                    hand_local = str(getattr(note_obj, 'hand', 'l') or 'l')
+                    try:
+                        default_black_above_local = bool(self._black_note_above_stem(note_obj, layout_arp))
+                    except Exception:
+                        default_black_above_local = True
+                    spec_local = resolve_notehead_spec(note_obj, default_black_above=default_black_above_local)
+                    is_up_local = bool(getattr(spec_local, 'is_up', False))
+                    cache_key = (hand_local, is_up_local)
+                    if cache_key not in support_cache:
+                        support_cache[cache_key] = sheared_notehead_support_v(
+                            hand=hand_local,
+                            is_up=is_up_local,
+                            semitone_space_mm=semi_arp,
+                            width_scale=width_scale_arp,
+                            height_scale=height_scale_arp,
+                            base_tilt=base_tilt_arp,
+                            m_line=m_line,
+                            sample_count=64,
+                        )
+                    v_support = float(support_cache[cache_key])
+                    arpeggio_y_overrides[nid] = float(y_line - v_support)
                     arpeggio_chord_note_ids.add(nid)
         self._arpeggio_y_overrides = arpeggio_y_overrides
         self._arpeggio_chord_note_ids = arpeggio_chord_note_ids
