@@ -66,6 +66,7 @@ class Layout:
     hairpin_width_mm: float = 10.0  # width of the open end of the hairpin in mm
     dynamic_symbol_font_size_pt: float = 35.0  # Font size for standalone dynamic symbols
     dynamic_symbol_background_padding_mm: float = 1.5
+    dynamic_rotation: float = 0.0
     dynamic_symbol_visible: bool = True
 
     # Repeat markers
@@ -196,6 +197,7 @@ LAYOUT_FLOAT_CONFIG: dict[str, dict[str, float]] = {
     'hairpin_width_mm': {'min': 0.05, 'max': 20.0, 'step': 0.05},
     'dynamic_symbol_font_size_pt': {'min': 4.0, 'max': 100.0, 'step': 0.5},
     'dynamic_symbol_background_padding_mm': {'min': 0.0, 'max': 20.0, 'step': 0.05},
+    'dynamic_rotation': {'min': 0.0, 'max': 360.0, 'step': 1.0},
     'slur_width_sides_mm': {'min': 0.05, 'max': 5.0, 'step': 0.05},
     'slur_width_middle_mm': {'min': 0.05, 'max': 5.0, 'step': 0.05},
     'countline_thickness_mm': {'min': 0.05, 'max': 5.0, 'step': 0.05},

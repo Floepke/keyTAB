@@ -29,8 +29,7 @@ class DynamicDrawerMixin:
         paper_color = getattr(self, 'paper_color', (1.0, 1.0, 1.0, 1.0))
         text_color = self.notation_color
         text_family = 'LelandText'
-        # Universal rotation for both read directions.
-        text_angle_deg = 45.0
+        layout_rotation = float(getattr(getattr(score, 'layout', None), 'dynamic_rotation', 0.0) or 0.0)
 
         top_mm = float(getattr(self, '_view_y_mm_offset', 0.0) or 0.0)
         vp_h_mm = float(getattr(self, '_viewport_h_mm', 0.0) or 0.0)
@@ -50,6 +49,8 @@ class DynamicDrawerMixin:
             symbol = str(getattr(ev, 'symbol', '') or '')
             if not symbol:
                 continue
+            raw_rotation = getattr(ev, 'rotation', None)
+            text_angle_deg = float(layout_rotation if raw_rotation is None else raw_rotation)
 
             t = float(getattr(ev, 'time', 0.0) or 0.0)
             y_mm = float(self.time_to_mm(t))

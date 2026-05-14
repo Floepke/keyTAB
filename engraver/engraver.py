@@ -235,10 +235,13 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
     for idx, ev in enumerate(dynamic_symbols):
         if not isinstance(ev, dict):
             continue
+        raw_rotation = ev.get('rotation', None)
+        rotation = None if raw_rotation is None else float(raw_rotation)
         norm_dynamic_symbols.append({
             'time': float(ev.get('time', 0.0) or 0.0),
             'x_rpitch': float(ev.get('x_rpitch', 0) or 0),
             'symbol': str(ev.get('symbol', '') or ''),
+            'rotation': rotation,
             'id': int(ev.get('_id', 0) or 0),
             'idx': int(idx),
         })
@@ -3686,10 +3689,10 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                 hairpin_gap = float(0.0) * scale
                 dynamic_symbol_font_size_pt = float(layout.get('dynamic_symbol_font_size_pt', 12.0) or 12.0) * scale
                 dynamic_bg_pad = float(layout.get('dynamic_symbol_background_padding_mm', 0.5) or 0.5) * scale
-                dynamic_symbol_angle_deg = 90.0
+                layout_dynamic_rotation = float(layout.get('dynamic_rotation', 0.0) or 0.0)
 
                 def _get_dynamic_symbol_at_position(t: float, x_rpitch: int) -> dict | None:
-                    """Get dynamic symbol dimensions at given time and x_rpitch with 45° rotation."""
+                    """Get dynamic symbol dimensions at given time/x_rpitch using symbol rotation."""
                     dyn_op = Operator(float(SHORTEST_DURATION))
                     for ds in line_dynamic_symbols:
                         ds_time = float(ds.get('time', 0.0) or 0.0)
@@ -3700,33 +3703,39 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                             glyph = str(ds.get('symbol', '') or '')
                             if not glyph:
                                 return None
+                            raw_rotation = ds.get('rotation', None)
+                            angle_deg = float(layout_dynamic_rotation if raw_rotation is None else raw_rotation)
                             
                             # Calculate glyph dimensions
                             try:
                                 xb, yb, w, h = du._get_text_extents_mm(glyph, 'LelandText', dynamic_symbol_font_size_pt, False, False)
                                 hw = float(w) * 0.5
                                 hh = float(h) * 0.5
-                                ang = math.radians(45.0)  # 45° CCW rotation
-                                rot_half_w = abs(hw * math.cos(ang)) + abs(hh * math.sin(ang))
-                                rot_half_h = abs(hw * math.sin(ang)) + abs(hh * math.cos(ang))
+                                bg_half_w = hw + dynamic_bg_pad
+                                bg_half_h = hh + dynamic_bg_pad
+                                ang = math.radians(angle_deg)
+                                rot_half_w = abs(bg_half_w * math.cos(ang)) + abs(bg_half_h * math.sin(ang))
+                                rot_half_h = abs(bg_half_w * math.sin(ang)) + abs(bg_half_h * math.cos(ang))
                             except Exception:
                                 # Fallback dimensions
                                 w = max(1.0, (dynamic_symbol_font_size_pt / 72.0) * 25.4)
                                 h = max(1.0, (dynamic_symbol_font_size_pt / 72.0) * 25.4 * 0.8)
                                 hw = float(w) * 0.5
                                 hh = float(h) * 0.5
-                                ang = math.radians(45.0)
-                                rot_half_w = abs(hw * math.cos(ang)) + abs(hh * math.sin(ang))
-                                rot_half_h = abs(hw * math.sin(ang)) + abs(hh * math.cos(ang))
+                                bg_half_w = hw + dynamic_bg_pad
+                                bg_half_h = hh + dynamic_bg_pad
+                                ang = math.radians(angle_deg)
+                                rot_half_w = abs(bg_half_w * math.cos(ang)) + abs(bg_half_h * math.sin(ang))
+                                rot_half_h = abs(bg_half_w * math.sin(ang)) + abs(bg_half_h * math.cos(ang))
                             
                             return {
                                 'glyph': glyph,
                                 'x_mm': rpitch_to_x(float(x_rpitch)),
                                 'y_mm': _time_to_y(t),
-                                'y_min_mm': _time_to_y(t) - rot_half_h - dynamic_bg_pad,
-                                'y_max_mm': _time_to_y(t) + rot_half_h + dynamic_bg_pad,
-                                'width_mm': (rot_half_w * 2.0) + (dynamic_bg_pad * 2.0),
-                                'height_mm': (rot_half_h * 2.0) + (dynamic_bg_pad * 2.0),
+                                'y_min_mm': _time_to_y(t) - rot_half_h,
+                                'y_max_mm': _time_to_y(t) + rot_half_h,
+                                'width_mm': rot_half_w * 2.0,
+                                'height_mm': rot_half_h * 2.0,
                             }
                     
                     return None
@@ -3838,7 +3847,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                 ) * scale
                 text_family = 'LelandText'
                 text_color = notation_color
-                dynamic_symbol_angle_deg = 45.0  # 45° CCW rotation
+                layout_dynamic_rotation = float(layout.get('dynamic_rotation', 0.0) or 0.0)
 
                 for ds in line_dynamic_symbols:
                     symbol = str(ds.get('symbol', '') or '')
@@ -3847,6 +3856,8 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                     t_time = float(ds.get('time', 0.0) or 0.0)
                     x_mm = rpitch_to_x(float(ds.get('x_rpitch', 0.0) or 0.0))
                     y_mm = _time_to_y(t_time)
+                    raw_rotation = ds.get('rotation', None)
+                    dynamic_symbol_angle_deg = float(layout_dynamic_rotation if raw_rotation is None else raw_rotation)
 
                     try:
                         xb, yb, w, h = du._get_text_extents_mm(symbol, text_family, text_size_pt, False, False)
@@ -3857,8 +3868,8 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                     by = float(y_mm) - (float(yb) + (float(h) * 0.5))
                     rx = bx + float(xb)
                     ry = by + float(yb)
-                    # Text is rotated 45° around its center in DrawUtil. Build a rotated
-                    # polygon background that matches the 45° rotation.
+                    # Text is rotated around its center in DrawUtil. Build a rotated
+                    # polygon background matching the symbol's own rotation.
                     cx = rx + (float(w) * 0.5)
                     cy = ry + (float(h) * 0.5)
                     hw = float(w) * 0.5

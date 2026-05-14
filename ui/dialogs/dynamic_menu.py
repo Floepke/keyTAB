@@ -44,7 +44,8 @@ DYNAMIC_GLYPH_CHOICES: list[tuple[str, str]] = [
 class DynamicSymbolGrid(QtWidgets.QListWidget):
     """Grid widget for selecting dynamic symbols."""
     
-    symbol_selected = QtCore.Signal(str)  # Emitted when a symbol is selected
+    symbol_selected = QtCore.Signal(str)       # Emitted when a symbol is single-clicked
+    symbol_double_clicked = QtCore.Signal(str)  # Emitted when a symbol is double-clicked
     
     def __init__(self, parent: Optional[QtWidgets.QWidget] = None, current_value: str = '') -> None:
         super().__init__(parent)
@@ -111,13 +112,17 @@ class DynamicSymbolGrid(QtWidgets.QListWidget):
         if self.currentRow() < 0 and self.count() > 0:
             self.setCurrentRow(0)
         
-        # Connect single-click to close menu with selection
+        # Connect single- and double-click
         self.itemClicked.connect(self._on_item_clicked)
+        self.itemDoubleClicked.connect(self._on_item_double_clicked)
     
     def _on_item_clicked(self, item: QtWidgets.QListWidgetItem) -> None:
-        """Emit selected symbol and close menu on click."""
         glyph = str(item.data(QtCore.Qt.ItemDataRole.UserRole) or '')
         self.symbol_selected.emit(glyph)
+
+    def _on_item_double_clicked(self, item: QtWidgets.QListWidgetItem) -> None:
+        glyph = str(item.data(QtCore.Qt.ItemDataRole.UserRole) or '')
+        self.symbol_double_clicked.emit(glyph)
     
     def selected_glyph(self) -> str:
         """Get currently selected glyph."""

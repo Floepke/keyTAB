@@ -602,6 +602,7 @@ class StyleDialog(QtWidgets.QDialog):
             'hairpin_text_gap_mm': self.tr('Hairpin text gap (mm)'),
             'dynamic_symbol_font_size_pt': self.tr('Dynamic symbol font size (pt)'),
             'dynamic_symbol_background_padding_mm': self.tr('Dynamic symbol background padding (mm)'),
+            'dynamic_rotation': self.tr('Dynamic symbol rotation (degrees)'),
             'dynamic_symbol_visible': self.tr('Dynamic symbol visible'),
             'repeat_start_visible': self.tr('Start repeat visible'),
             'repeat_end_visible': self.tr('End repeat visible'),
@@ -843,6 +844,7 @@ class StyleDialog(QtWidgets.QDialog):
             'hairpin_text_gap_mm': 'Dynamic',
             'dynamic_symbol_font_size_pt': 'Dynamic',
             'dynamic_symbol_background_padding_mm': 'Dynamic',
+            'dynamic_rotation': 'Dynamic',
             'hairpin_visible': 'Dynamic',
             'dynamic_symbol_visible': 'Dynamic',
             # Pedal
