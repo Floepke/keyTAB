@@ -101,6 +101,14 @@ class DynamicTool(BaseTool):
         t_raw = float(self._editor.widget_px_to_time(x_px, y_px))
         return float(self._editor.snap_time(t_raw))
 
+    def _clamp_time(self, ticks: float) -> float:
+        if self._editor is None:
+            return float(ticks)
+        try:
+            return float(self._editor.clamp_time_to_visible_range(float(ticks)))
+        except Exception:
+            return float(ticks)
+
     def _snap_units(self) -> float:
         return float(getattr(self._editor, 'snap_size_units', QUARTER_NOTE_UNIT) or QUARTER_NOTE_UNIT)
 
@@ -246,11 +254,11 @@ class DynamicTool(BaseTool):
         )
 
     def _translate_symbol(self, symbol, delta_time: float, delta_rpitch: int) -> None:
-        symbol.time = float(max(0.0, float(getattr(symbol, 'time', 0.0) or 0.0) + float(delta_time)))
+        symbol.time = self._clamp_time(float(getattr(symbol, 'time', 0.0) or 0.0) + float(delta_time))
         symbol.x_rpitch = self.clamp_rpitch(int(getattr(symbol, 'x_rpitch', 0) or 0) + int(delta_rpitch))
 
     def _translate_hairpin(self, hp, delta_time: float, delta_rpitch: int) -> None:
-        hp.time = float(max(0.0, float(getattr(hp, 'time', 0.0) or 0.0) + float(delta_time)))
+        hp.time = self._clamp_time(float(getattr(hp, 'time', 0.0) or 0.0) + float(delta_time))
         hp.x_rpitch = self.clamp_rpitch(int(getattr(hp, 'x_rpitch', 0) or 0) + int(delta_rpitch))
 
     def _set_hairpin_handle(self, hp, handle: str, t_snap: float, rpitch: int) -> None:
@@ -301,7 +309,7 @@ class DynamicTool(BaseTool):
             if clean == '':
                 return
             score.new_dynamic_symbol(
-                time=float(max(0.0, self._hairpin_endpoint_time(hp, handle))),
+                time=self._clamp_time(float(self._hairpin_endpoint_time(hp, handle))),
                 x_rpitch=int(getattr(hp, 'x_rpitch', 0) or 0),
                 symbol=clean,
                 rotation=rotation,
@@ -311,14 +319,14 @@ class DynamicTool(BaseTool):
             self._delete_dynamic_symbol(connected)
             return
         connected.symbol = clean
-        connected.time = float(max(0.0, self._hairpin_endpoint_time(hp, handle)))
+        connected.time = self._clamp_time(float(self._hairpin_endpoint_time(hp, handle)))
         connected.x_rpitch = int(getattr(hp, 'x_rpitch', 0) or 0)
         connected.rotation = rotation
 
     def _move_connected_symbol_with_handle(self, hp, handle: str, symbol) -> None:
         if symbol is None:
             return
-        symbol.time = float(max(0.0, self._hairpin_endpoint_time(hp, handle)))
+        symbol.time = self._clamp_time(float(self._hairpin_endpoint_time(hp, handle)))
         symbol.x_rpitch = int(getattr(hp, 'x_rpitch', 0) or 0)
 
     def _apply_handle_drag(self, hp, handle: str, t_snap: float, rpitch: int) -> None:
@@ -326,7 +334,7 @@ class DynamicTool(BaseTool):
         if handle == 'start':
             # Move start: keep end time fixed, shrink/grow duration
             old_end = float(getattr(hp, 'time', 0.0) or 0.0) + float(getattr(hp, 'duration', snap_units) or snap_units)
-            new_time = max(0.0, min(t_snap, old_end - snap_units))
+            new_time = self._clamp_time(min(t_snap, old_end - snap_units))
             new_dur = old_end - new_time
             hp.time = float(new_time)
             hp.duration = float(max(snap_units, new_dur))
@@ -463,7 +471,7 @@ class DynamicTool(BaseTool):
                 rpitch = self._x_mm_to_rpitch(x_mm)
             except Exception:
                 rpitch = int(getattr(self._active_symbol, 'x_rpitch', 0) or 0)
-            self._active_symbol.time = float(max(0.0, t_snap))
+            self._active_symbol.time = self._clamp_time(float(t_snap))
             self._active_symbol.x_rpitch = int(rpitch)
             self._dragged_symbol = True
             self._redraw()

@@ -14,31 +14,21 @@ if TYPE_CHECKING:
 class ArpeggioDrawerMixin:
     _arp_time_op: Operator = Operator(float(SHORTEST_DURATION))
 
-    def _resolve_arpeggio_notes(self, arp: "Arpeggio", notes_all: list, op: Operator, notes_by_time: dict[float, list] | None = None) -> list:
-        # Match notes at the arpeggio time whose pitches are listed in arp.notes
-        base_time = float(getattr(arp, "time", 0.0) or 0.0)
-        target_pitches = list(getattr(arp, "notes", []) or [])
-        if len(target_pitches) < 2:
+    def _resolve_arpeggio_notes(self, arp: "Arpeggio", notes_by_time_pitch: dict[tuple[int, int], object]) -> list[object]:
+        """Resolve arpeggio member notes by stable (time, pitch) keys."""
+        base_time_key = int(round(float(getattr(arp, "time", 0.0) or 0.0)))
+        pitches = [int(p) for p in (getattr(arp, "note_pitches", []) or []) if int(p) > 0]
+        if len(pitches) < 2:
             return []
-        if notes_by_time is not None:
-            matches = list(notes_by_time.get(round(float(base_time), 6), []))
-        else:
-            matches = [n for n in notes_all if op.eq(float(getattr(n, "time", 0.0) or 0.0), base_time)]
-        remaining = list(int(p) for p in target_pitches)
         resolved = []
-        for n in sorted(matches, key=lambda m: int(getattr(m, "pitch", 0) or 0)):
-            p = int(getattr(n, "pitch", 0) or 0)
-            if p in remaining:
-                resolved.append(n)
-                remaining.remove(p)
+        for pitch in pitches:
+            note_obj = notes_by_time_pitch.get((base_time_key, pitch))
+            if note_obj is not None:
+                resolved.append(note_obj)
         return resolved
 
-    def _arpeggio_times(self, base_time: float, duration: float, kind: str) -> tuple[float, float]:
-        end_type = str(kind or "").endswith("ending")
-        if end_type:
-            start_t = max(0.0, float(base_time) - max(0.0, duration))
-            return (start_t, float(base_time))
-        return (float(base_time), float(base_time) + max(0.0, duration))
+    def _arpeggio_time_window(self, base_time: float, rtime1: float, rtime2: float) -> tuple[float, float]:
+        return (float(base_time) + float(rtime1), float(base_time) + float(rtime2))
 
     def draw_arpeggio(self, du: DrawUtil) -> None:
         self = cast("Editor", self)
@@ -47,120 +37,201 @@ class ArpeggioDrawerMixin:
             return
 
         arps = list(getattr(score.events, "arpeggio", []) or [])
-        if not arps:
-            return
 
-        cache = getattr(self, "_draw_cache", {}) or {}
-        notes_sorted = cache.get("notes_sorted") or list(getattr(score.events, "note", []) or [])
-        notes_by_time: dict[float, list] = {}
-        for n in notes_sorted:
-            nt = round(float(getattr(n, "time", 0.0) or 0.0), 6)
-            notes_by_time.setdefault(nt, []).append(n)
-
+        notes_all = list(getattr(score.events, "note", []) or [])
+        notes_by_time_pitch: dict[tuple[int, int], object] = {
+            (int(round(float(getattr(n, "time", 0.0) or 0.0))), int(getattr(n, "pitch", 0) or 0)): n
+            for n in notes_all
+        }
         semi = float(self.semitone_dist or 0.5)
-        op = self._arp_time_op
+        layout = getattr(score, "layout", None)
+        scale = float(getattr(layout, "scale", 1.0) or 1.0) if layout is not None else 1.0
+        stem_w = float(getattr(layout, "note_stem_thickness_mm", 0.8) or 0.8) * scale if layout is not None else 0.8
+        stem_len = float(getattr(layout, "note_stem_length_semitone", 3.0) or 3.0) * semi
+        active_tool_name = str(getattr(getattr(self, "_tool", None), "TOOL_NAME", "") or "")
+        show_handles = active_tool_name == "arpeggio"
+        arp_keys: set[tuple[int, tuple[int, ...]]] = set()
 
         for arp in arps:
             try:
                 base_time = float(getattr(arp, "time", 0.0) or 0.0)
-                dur = max(0.0, float(getattr(arp, "duration", 32.0) or 32.0))
-                kind = str(getattr(arp, "type", "up/starting") or "up/starting")
+                rtime1 = float(getattr(arp, "rtime1", 0.0) or 0.0)
+                rtime2 = float(getattr(arp, "rtime2", 0.0) or 0.0)
                 arp_id = int(getattr(arp, "_id", 0) or 0)
             except Exception:
                 continue
 
-            chord_notes = self._resolve_arpeggio_notes(arp, notes_sorted, op, notes_by_time)
+            arp_pitches = tuple(sorted(int(p) for p in (getattr(arp, "note_pitches", []) or []) if int(p) > 0))
+            if len(arp_pitches) >= 2:
+                arp_keys.add((int(round(base_time)), arp_pitches))
+
+            chord_notes = self._resolve_arpeggio_notes(arp, notes_by_time_pitch)
             if len(chord_notes) < 2:
                 continue
 
-            start_t, end_t = self._arpeggio_times(base_time, dur, kind)
-            up = kind.startswith("up")
-
-            # Sort by pitch to define ordering along the diagonal stem
-            chord_sorted = sorted(chord_notes, key=lambda n: int(getattr(n, "pitch", 0) or 0), reverse=not up)
-            steps = max(1, len(chord_sorted) - 1)
-            span = float(max(0.0, end_t - start_t))
-            if op.eq(span, 0.0):
-                span = float(max(1.0, dur))
-                end_t = start_t + span
-
-            chord_xs = [float(self.pitch_to_x(int(getattr(n, "pitch", 0) or 0))) for n in chord_sorted]
-            if not chord_xs:
+            start_t, end_t = self._arpeggio_time_window(base_time, rtime1, rtime2)
+            chord_sorted = sorted(chord_notes, key=lambda n: int(getattr(n, "pitch", 0) or 0))
+            if len(chord_sorted) < 2:
                 continue
-            x0 = min(chord_xs) - semi * 0.35
-            x1 = max(chord_xs) + semi * 0.35
+
+            # The arpeggio diagonal line endpoints and projected notehead positions
+            # are already pre-computed by _build_render_cache into _arpeggio_y_overrides.
+            # Read them back here so the arpeggio drawer uses exactly the same geometry.
+            arp_y_overrides: dict[int, float] = getattr(self, "_arpeggio_y_overrides", {}) or {}
+            span = max(1, len(chord_sorted) - 1)
             y0 = float(self.time_to_mm(start_t))
             y1 = float(self.time_to_mm(end_t))
 
-            def _lerp(a: float, b: float, r: float) -> float:
-                return float(a + (b - a) * r)
+            stem_x_positions: list[float] = []
+            for note_obj in chord_sorted:
+                pitch = int(getattr(note_obj, "pitch", 0) or 0)
+                hand = str(getattr(note_obj, "hand", "l") or "l")
+                x_note = float(self.pitch_to_x(pitch))
+                stem_x_positions.append(float(x_note if hand == "l" else x_note))
 
-            # Points along the diagonal stem and corresponding notehead anchors
-            note_positions: list[tuple[float, float, object]] = []
-            for idx, note_obj in enumerate(chord_sorted):
-                x_note = float(self.pitch_to_x(int(getattr(note_obj, "pitch", 0) or 0)))
-                if op.eq(float(x1 - x0), 0.0):
-                    ratio = 0.0
-                else:
-                    ratio = max(0.0, min(1.0, (x_note - x0) / float(x1 - x0)))
-                y_note = _lerp(y0, y1, ratio)
-                note_positions.append((x_note, y_note, note_obj))
+            if len(stem_x_positions) < 2:
+                continue
 
-            start_pt = (x0, y0)
-            end_pt = (x1, y1)
-            du.add_polyline(
-                [start_pt, end_pt],
-                stroke_color=self.accent_color,
-                stroke_width_mm=0.55,
-                id=arp_id,
-                tags=["arpeggio"],
-                dash_pattern=None,
-            )
+            x_line_start = float(stem_x_positions[0])
+            x_line_end = float(stem_x_positions[-1])
 
-            # Render full note visuals along the diagonal stem using the same helpers as note drawer
-            for x_note, y_note, note_obj in note_positions:
-                # Align head center on the diagonal, then let notehead helper adjust for black-note rules
-                w = float(self.semitone_dist or 0.5)
-                y_head_top = float(y_note - w)
-                # Midi body spans the arpeggio duration
-                self._draw_midinote(du, note_obj, x_note, y0, y1, draw_mode="note")
-                self._draw_notehead(du, note_obj, x_note, y_head_top, draw_mode="note")
+            # Projected endpoint positions used for hit-rect and handles.
+            # These mirror the logic in _build_render_cache exactly.
+            projected: list[tuple[float, float]] = []
+            for i, (note_obj, x_stem) in enumerate(zip(chord_sorted, stem_x_positions)):
+                nid = int(getattr(note_obj, "_id", 0) or 0)
+                y_proj = arp_y_overrides.get(nid)
+                if y_proj is None:
+                    # Fallback: recompute inline if cache miss (e.g. first frame)
+                    if abs(x_line_end - x_line_start) <= 1e-6:
+                        ratio = float(i) / float(span)
+                    else:
+                        ratio = (float(x_stem) - x_line_start) / float(x_line_end - x_line_start)
+                    y_proj = float(y0 + (y1 - y0) * max(0.0, min(1.0, ratio)))
+                projected.append((float(x_stem), float(y_proj)))
 
-            # Accent handle at the terminal end of the diagonal (used for resizing)
-            handle_x, handle_y = end_pt
-            r = semi * 0.8
-            du.add_oval(
-                handle_x - r,
-                handle_y - r,
-                handle_x + r,
-                handle_y + r,
-                stroke_color=None,
-                fill_color=self.accent_color,
-                id=arp_id,
-                tags=["arpeggio_handle"],
-            )
+            if len(projected) < 2:
+                continue
+
+            # Skip drawing the diagonal line if both handles are at 0 (phantom arpeggio)
+            is_phantom = (rtime1 == 0.0 and rtime2 == 0.0)
+            
+            # Draw the arpeggio annotation line (the diagonal) only for non-phantom arpeggios.
+            if not is_phantom:
+                du.add_polyline(
+                    [
+                        (x_line_start, y0),
+                        (x_line_end, y1),
+                    ],
+                    stroke_color=self.notation_color,
+                    stroke_width_mm=stem_w,
+                    id=arp_id,
+                    tags=["chord_connect"],
+                )
+
+            x_values = [p[0] for p in projected]
+            y_values = [p[1] for p in projected]
             try:
                 self.register_hit_rect(
-                    'arpeggio', arp_id,
-                    handle_x - r * 1.2, handle_y - r * 1.2,
-                    handle_x + r * 1.2, handle_y + r * 1.2,
+                    "arpeggio",
+                    arp_id,
+                    min(x_values) - (semi * 0.5),
+                    min(y_values) - (semi * 0.5),
+                    max(x_values) + (semi * 0.5),
+                    max(y_values) + (semi * 0.5),
+                    handle="body",
                 )
             except Exception:
                 pass
 
-            # Direction marker arrow at the start of the stroke
-            arrow_w = semi * 0.8
-            arrow_h = semi * 1.0
-            if up:
-                tri = [
-                    (start_pt[0] - arrow_w * 0.5, start_pt[1] + arrow_h * 0.4),
-                    (start_pt[0] + arrow_w * 0.5, start_pt[1] + arrow_h * 0.4),
-                    (start_pt[0], start_pt[1] - arrow_h * 0.6),
-                ]
-            else:
-                tri = [
-                    (start_pt[0] - arrow_w * 0.5, start_pt[1] - arrow_h * 0.4),
-                    (start_pt[0] + arrow_w * 0.5, start_pt[1] - arrow_h * 0.4),
-                    (start_pt[0], start_pt[1] + arrow_h * 0.6),
-                ]
-            du.add_polygon(tri, stroke_color=None, fill_color=self.accent_color, id=arp_id, tags=["arpeggio_arrow"])
+            if show_handles:
+                handle_r = semi * 0.75
+                for handle_name, (hx, hy) in (("low", projected[0]), ("high", projected[-1])):
+                    du.add_oval(
+                        hx - handle_r,
+                        hy - handle_r,
+                        hx + handle_r,
+                        hy + handle_r,
+                        stroke_color=None,
+                        fill_color=self.accent_color,
+                        id=arp_id,
+                        tags=["beam_marker"],
+                    )
+                    try:
+                        self.register_hit_rect(
+                            "arpeggio",
+                            arp_id,
+                            hx - handle_r * 1.2,
+                            hy - handle_r * 1.2,
+                            hx + handle_r * 1.2,
+                            hy + handle_r * 1.2,
+                            handle=handle_name,
+                        )
+                    except Exception:
+                        pass
+
+        if not show_handles:
+            return
+
+        # Synthetic handles for plain chords with no arpeggio object yet.
+        # These are draggable; tool code creates model arpeggio lazily on first drag.
+        chord_groups: dict[tuple[int, str], list[object]] = {}
+        for note_obj in notes_all:
+            try:
+                t_key = int(round(float(getattr(note_obj, "time", 0.0) or 0.0)))
+            except Exception:
+                t_key = 0
+            hand = str(getattr(note_obj, "hand", "l") or "l")
+            chord_groups.setdefault((t_key, hand), []).append(note_obj)
+
+        for (_t_key, _hand), chord_notes in chord_groups.items():
+            if len(chord_notes) < 2:
+                continue
+
+            pitches = tuple(sorted(set(int(getattr(n, "pitch", 0) or 0) for n in chord_notes if int(getattr(n, "pitch", 0) or 0) > 0)))
+            if len(pitches) < 2:
+                continue
+
+            base_time = float(getattr(chord_notes[0], "time", 0.0) or 0.0)
+            key = (int(round(base_time)), pitches)
+            if key in arp_keys:
+                continue
+
+            chord_sorted = sorted(chord_notes, key=lambda n: int(getattr(n, "pitch", 0) or 0))
+            stem_x_positions: list[float] = []
+            for note_obj in chord_sorted:
+                pitch = int(getattr(note_obj, "pitch", 0) or 0)
+                hand = str(getattr(note_obj, "hand", "l") or "l")
+                x_note = float(self.pitch_to_x(pitch))
+                stem_x_positions.append(float(x_note if hand == "l" else x_note))
+
+            if len(stem_x_positions) < 2:
+                continue
+
+            y_flat = float(self.time_to_mm(base_time))
+            handle_r = semi * 0.75
+            for handle_name, hx in (("low", stem_x_positions[0]), ("high", stem_x_positions[-1])):
+                du.add_oval(
+                    hx - handle_r,
+                    y_flat - handle_r,
+                    hx + handle_r,
+                    y_flat + handle_r,
+                    stroke_color=None,
+                    fill_color=self.accent_color,
+                    id=0,
+                    tags=["beam_marker"],
+                )
+                try:
+                    self.register_hit_rect(
+                        "arpeggio",
+                        0,
+                        hx - handle_r * 1.2,
+                        y_flat - handle_r * 1.2,
+                        hx + handle_r * 1.2,
+                        y_flat + handle_r * 1.2,
+                        handle=handle_name,
+                        base_time=base_time,
+                        note_pitches=list(pitches),
+                    )
+                except Exception:
+                    pass

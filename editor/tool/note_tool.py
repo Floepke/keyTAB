@@ -6,7 +6,6 @@ from utils.operator import Operator
 from ui.widgets.draw_util import DrawUtil
 from utils.CONSTANT import BLACK_KEYS, QUARTER_NOTE_UNIT, SHORTEST_DURATION
 from file_model.events.note import Note
-from file_model.events.arpeggio import Arpeggio
 from symbol_design.noteheads import resolve_notehead_spec
 from ui.dialogs.notehead_dialog import NoteheadDialog
 from PySide6 import QtCore, QtGui, QtWidgets
@@ -14,8 +13,7 @@ from PySide6 import QtCore, QtGui, QtWidgets
 
 class NoteTool(BaseTool):
     TOOL_NAME = 'note'
-    _ARP_TYPES = ["up/ending", "down/ending", "up/starting", "down/starting"]
-    _arp_op: Operator = Operator(float(SHORTEST_DURATION))
+
     def __init__(self):
         super().__init__()
         self._acc_cycle: tuple[int, ...] = (0, 1, -1, 2, -2)
@@ -42,10 +40,6 @@ class NoteTool(BaseTool):
         self._suppress_note_edit_until_release: bool = False
         self._notehead_dialog_active: bool = False
         self._pending_notehead_dialog_note_id: int | None = None
-        # Arpeggio edit session
-        self._arpeggio_dragging: bool = False
-        self._arpeggio_target: Arpeggio | None = None
-        self._arpeggio_drag_anchor_time: float = 0.0
 
     def _play_note_on_edit_enabled(self) -> bool:
         try:
@@ -67,204 +61,8 @@ class NoteTool(BaseTool):
             self._editor.player.audition_note(pitch=int(pitch))
             self._last_audition_pitch = int(pitch)
 
-    def _arpeggio_button_text(self) -> tuple[str, str]:
-        current = self._current_arpeggio_type()
-        if current:
-            return ("Arp", QtCore.QCoreApplication.translate('NoteTool', 'Cycle arpeggio (current: {0})').format(current))
-        return ("Arp", QtCore.QCoreApplication.translate('NoteTool', 'Cycle arpeggio on selected chord (currently off)'))
-
-    def _current_arpeggio_type(self) -> str | None:
-        chord_notes, base_time = self._find_chord_notes()
-        if not chord_notes:
-            return None
-        score = self._editor.current_score()
-        if score is None:
-            return None
-        arp = self._find_arpeggio_for_notes(score, chord_notes, base_time)
-        if arp is None:
-            return None
-        kind = str(getattr(arp, 'type', '') or '')
-        return kind if kind in self._ARP_TYPES else None
-
-    def _find_chord_notes(self) -> tuple[list[Note], float | None]:
-        if self._editor is None:
-            return ([], None)
-        score: SCORE | None = self._editor.current_score()
-        if score is None:
-            return ([], None)
-
-        op = self._arp_op
-
-        def _cluster(notes: list[Note]) -> tuple[list[Note], float | None]:
-            clusters: list[tuple[float, list[Note]]] = []
-            for n in notes:
-                t = float(getattr(n, 'time', 0.0) or 0.0)
-                placed = False
-                for idx, (ct, lst) in enumerate(clusters):
-                    if op.eq(ct, t):
-                        lst.append(n)
-                        placed = True
-                        break
-                if not placed:
-                    clusters.append((t, [n]))
-            if not clusters:
-                return ([], None)
-            clusters.sort(key=lambda c: len(c[1]), reverse=True)
-            t0, members = clusters[0]
-            if len(members) < 2:
-                return ([], None)
-            hands = {str(getattr(m, 'hand', 'l') or 'l') for m in members}
-            if len(hands) > 1:
-                return ([], None)
-            return (members, float(t0))
-
-        # Prefer an active selection window if present
-        try:
-            sel_active = bool(getattr(self._editor, '_selection_active', False))
-        except Exception:
-            sel_active = False
-        if sel_active:
-            start = float(getattr(self._editor, '_sel_start_units', 0.0) or 0.0)
-            end = float(getattr(self._editor, '_sel_end_units', 0.0) or 0.0)
-            sel = self._editor.detect_events_from_time_window(start, end - 0.1)
-            notes = sel.get('note', []) if isinstance(sel, dict) else []
-            found, t0 = _cluster(list(notes))
-            if found:
-                return (found, t0)
-
-        # Fallback: use time cursor if available
-        cursor_t = getattr(self._editor, 'time_cursor', None)
-        if cursor_t is None:
-            return ([], None)
-        grouped: dict[float, list[Note]] = {}
-        for n in getattr(score.events, 'note', []) or []:
-            t = float(getattr(n, 'time', 0.0) or 0.0)
-            if op.eq(t, float(cursor_t)):
-                grouped.setdefault(t, []).append(n)
-        if not grouped:
-            return ([], None)
-        grouped_items = sorted(grouped.items(), key=lambda kv: len(kv[1]), reverse=True)
-        t_sel, lst = grouped_items[0]
-        if len(lst) < 2:
-            return ([], None)
-        hands = {str(getattr(m, 'hand', 'l') or 'l') for m in lst}
-        if len(hands) > 1:
-            return ([], None)
-        return (lst, float(t_sel))
-
-    def _find_arpeggio_for_notes(self, score: SCORE, notes: list[Note], base_time: float | None) -> Arpeggio | None:
-        if base_time is None:
-            return None
-        op = self._arp_op
-        target_pitches = sorted(int(getattr(n, 'pitch', 0) or 0) for n in notes)
-        if len(target_pitches) < 2:
-            return None
-        for arp in getattr(score.events, 'arpeggio', []) or []:
-            t = float(getattr(arp, 'time', 0.0) or 0.0)
-            if not op.eq(t, float(base_time)):
-                continue
-            arp_pitches = sorted(int(i) for i in (getattr(arp, 'notes', []) or []) if int(i) != 0 or i == 0)
-            if arp_pitches == target_pitches:
-                return arp
-        return None
-
-    def _find_arpeggio_by_id(self, score: SCORE, arp_id: int) -> Arpeggio | None:
-        for arp in getattr(score.events, 'arpeggio', []) or []:
-            if int(getattr(arp, '_id', -1) or -1) == int(arp_id):
-                return arp
-        return None
-
-    def _cleanup_arpeggios(self, score: SCORE) -> None:
-        notes_all = list(getattr(score.events, 'note', []) or [])
-        cleaned: list[Arpeggio] = []
-        op = self._arp_op
-        for arp in getattr(score.events, 'arpeggio', []) or []:
-            base_time = float(getattr(arp, 'time', 0.0) or 0.0)
-            target_pitches = list(getattr(arp, 'notes', []) or [])
-            if len(target_pitches) < 2:
-                continue
-            chord_notes = [n for n in notes_all if op.eq(float(getattr(n, 'time', 0.0) or 0.0), base_time)]
-            # Match pitches with multiplicity
-            remaining = list(int(p) for p in target_pitches)
-            matched: list[int] = []
-            for n in sorted(chord_notes, key=lambda m: int(getattr(m, 'pitch', 0) or 0)):
-                p = int(getattr(n, 'pitch', 0) or 0)
-                if p in remaining:
-                    matched.append(p)
-                    remaining.remove(p)
-            if len(matched) < 2:
-                continue
-            arp.notes = sorted(matched)
-            cleaned.append(arp)
-        score.events.arpeggio = cleaned
-
-    def _toggle_arpeggio(self) -> bool:
-        score: SCORE | None = self._editor.current_score()
-        if score is None:
-            return False
-        chord_notes, base_time = self._find_chord_notes()
-        if not chord_notes or base_time is None:
-            return False
-        existing = self._find_arpeggio_for_notes(score, chord_notes, base_time)
-        order = self._ARP_TYPES
-        next_type: str | None
-        if existing is None:
-            next_type = order[0]
-        else:
-            try:
-                idx = order.index(str(getattr(existing, 'type', order[0]) or order[0]))
-            except ValueError:
-                idx = -1
-            next_type = order[idx + 1] if 0 <= idx < len(order) - 1 else None
-
-        note_pitches = sorted(int(getattr(n, 'pitch', 0) or 0) for n in chord_notes)
-        if len(note_pitches) < 2:
-            return False
-        if next_type is None and existing is not None:
-            try:
-                score.events.arpeggio.remove(existing)
-            except ValueError:
-                score.events.arpeggio = [a for a in getattr(score.events, 'arpeggio', []) or [] if a is not existing]
-        else:
-            if existing is None:
-                default_duration = 32.0
-                existing = score.new_arpeggio(time=float(base_time), duration=default_duration, notes=note_pitches, type=next_type or order[0])
-            else:
-                existing.type = next_type or order[0]
-            existing.time = float(base_time)
-            existing.notes = note_pitches
-            if float(getattr(existing, 'duration', 0.0) or 0.0) <= 0.0:
-                existing.duration = 32.0
-        self._cleanup_arpeggios(score)
-        if hasattr(self._editor, 'force_redraw_from_model'):
-            self._editor.force_redraw_from_model()
-        else:
-            self._editor.draw_frame()
-        if hasattr(self._editor, '_snapshot_if_changed'):
-            self._editor._snapshot_if_changed(coalesce=True, label='arpeggio_toggle')
-        return True
-
-    def _update_arpeggio_duration_from_cursor(self, x: float, y: float) -> None:
-        if self._editor is None or self._arpeggio_target is None:
-            return
-        base_time = float(getattr(self._arpeggio_target, 'time', self._arpeggio_drag_anchor_time) or self._arpeggio_drag_anchor_time)
-        kind = str(getattr(self._arpeggio_target, 'type', 'up/starting') or 'up/starting')
-        t_raw = float(self._editor.widget_px_to_time(x, y))
-        t_snap = float(self._editor.snap_time(t_raw))
-        step = float(max(1e-6, getattr(self._editor, 'snap_size_units', SHORTEST_DURATION)))
-        if kind.endswith('ending'):
-            new_duration = max(step, float(base_time) - t_snap)
-        else:
-            new_duration = max(step, t_snap - float(base_time))
-        self._arpeggio_target.duration = float(new_duration)
-        if hasattr(self._editor, 'force_redraw_from_model'):
-            self._editor.force_redraw_from_model()
-        else:
-            self._editor.draw_frame()
-
     def toolbar_spec(self) -> list[dict]:
         # Two explicit hand selectors for quick switching
-        _text, _tip = self._arpeggio_button_text()
         hand = str(getattr(self._editor, 'hand_cursor', self._hand) or self._hand)
         
         # read editor orientation
@@ -308,12 +106,6 @@ class NoteTool(BaseTool):
                 'active': bool(self._velocity_mode),
                 'tooltip': (QtCore.QCoreApplication.translate('NoteTool', 'Velocity editing is on. Toggle on/off to edit the note velocities using the sliders on the sides of the editor.') if self._velocity_mode else QtCore.QCoreApplication.translate('NoteTool', 'Velocity editing is off. Toggle on/off to edit the note velocities using the sliders on the sides of the editor.')),
             },
-            {
-                'name': 'arpeggio_toggle',
-                'icon': 'arpeggio',
-                'text': _text,
-                'tooltip': _tip,
-            },
         ]
 
     @property
@@ -329,9 +121,9 @@ class NoteTool(BaseTool):
         if hit_rect is None:
             return None, None, y_mm
         hit_id = int(hit_rect.get('_id', -1) or -1)
-        for n in getattr(score.events, 'note', []) or []:
-            if int(getattr(n, '_id', -1) or -1) == hit_id:
-                return n, hit_rect, y_mm
+        n = self._editor.get_note_by_id(hit_id)
+        if n is not None:
+            return n, hit_rect, y_mm
         return None, hit_rect, y_mm
 
     def _hit_velocity_handle(self, score: SCORE, x_px: float, y_px: float):
@@ -422,7 +214,7 @@ class NoteTool(BaseTool):
         end_t = float(start_t + max(0.0, float(candidate_duration)))
         pitch = int(getattr(note, 'pitch', 0) or 0)
         note_id = int(getattr(note, '_id', -1) or -1)
-        op = self._arp_op
+        op = Operator(float(SHORTEST_DURATION))
 
         for other in getattr(score.events, 'note', []) or []:
             other_id = int(getattr(other, '_id', -2) or -2)
@@ -441,10 +233,10 @@ class NoteTool(BaseTool):
         if score is None:
             return True
         note_id = int(getattr(note, '_id', -1) or -1)
-        start_t = float(max(0.0, candidate_time))
+        start_t = float(candidate_time)
         duration = float(max(0.0, self._orig_duration))
         end_t = float(start_t + duration)
-        op = self._arp_op
+        op = Operator(float(SHORTEST_DURATION))
 
         for other in getattr(score.events, 'note', []) or []:
             other_id = int(getattr(other, '_id', -2) or -2)
@@ -487,17 +279,6 @@ class NoteTool(BaseTool):
                 self._move_pitch_time_mode = False
                 self._apply_velocity_from_cursor(x, y)
                 return
-
-        # Arpeggio handle hit test (resize)
-        if score is not None and hasattr(self._editor, 'hit_test_arpeggio_handle'):
-            arp_id = self._editor.hit_test_arpeggio_handle(x, y)
-            if arp_id is not None:
-                target = self._find_arpeggio_by_id(score, arp_id)
-                if target is not None:
-                    self._arpeggio_dragging = True
-                    self._arpeggio_target = target
-                    self._arpeggio_drag_anchor_time = float(getattr(target, 'time', 0.0) or 0.0)
-                    return
 
         # Compute raw (non-snapped) time for detection and snapped for creation
         t_press_raw = float(self._editor.widget_px_to_time(x, y))
@@ -571,11 +352,6 @@ class NoteTool(BaseTool):
             self._ignore_next_left_release = False
             return
         # Keep last edit and clear the session handle
-        if self._arpeggio_dragging and hasattr(self._editor, '_snapshot_if_changed'):
-            self._editor._snapshot_if_changed(coalesce=True, label='arpeggio_resize')
-        self._arpeggio_dragging = False
-        self._arpeggio_target = None
-        self._arpeggio_drag_anchor_time = 0.0
         self._velocity_dragging = False
         self._velocity_target = None
         self._velocity_targets = []
@@ -824,9 +600,6 @@ class NoteTool(BaseTool):
             return
         if self._notehead_dialog_active or self._suppress_note_edit_until_release:
             return
-        if self._arpeggio_dragging:
-            self._update_arpeggio_duration_from_cursor(x, y)
-            return
         if self._velocity_dragging:
             self._apply_velocity_from_cursor(x, y)
             return
@@ -865,7 +638,7 @@ class NoteTool(BaseTool):
         else:
             # Editing existing note:
             if self._move_pitch_time_mode:
-                candidate_time = float(max(0.0, cur_t_snap))
+                candidate_time = float(cur_t_snap)
                 candidate_pitch = int(cur_pitch)
                 if not self._can_apply_time_pitch_move(note, candidate_time, candidate_pitch):
                     return
@@ -915,11 +688,6 @@ class NoteTool(BaseTool):
         if self._notehead_dialog_active or self._suppress_note_edit_until_release:
             return
         # Finalize edit session
-        if self._arpeggio_dragging and hasattr(self._editor, '_snapshot_if_changed'):
-            self._editor._snapshot_if_changed(coalesce=True, label='arpeggio_resize')
-        self._arpeggio_dragging = False
-        self._arpeggio_target = None
-        self._arpeggio_drag_anchor_time = 0.0
         self._velocity_dragging = False
         self._velocity_target = None
         self._velocity_targets = []
@@ -941,7 +709,7 @@ class NoteTool(BaseTool):
         # Ensure the music/base_grid covers latest note end
         self._editor.update_score_length()
 
-    def on_right_click(self, x: float, y: float) -> None:
+    def on_right_click(self, x: float, y: float) -> bool:
         super().on_right_click(x, y)
         # Detect a note at click position; if found, delete and redraw
         score: SCORE = self._editor.current_score()
@@ -953,19 +721,29 @@ class NoteTool(BaseTool):
         if target is not None:
             notes_list = getattr(score.events, 'note', None)
             if isinstance(notes_list, list):
-                if target in notes_list:
-                    notes_list.remove(target)
+                # Fast path: remove the exact detected note object by identity.
+                target_index = -1
+                for i, note_item in enumerate(notes_list):
+                    if note_item is target:
+                        target_index = i
+                        break
+                if target_index >= 0:
+                    notes_list.pop(target_index)
                     deleted_any = True
                 else:
+                    # Fallback for stale references: remove first note with matching id.
                     tid = int(getattr(target, '_id', -1) or -1)
-                    new_list = [m for m in notes_list if int(getattr(m, '_id', -2) or -2) != tid]
-                    if len(new_list) != len(notes_list):
-                        score.events.note = new_list
-                        deleted_any = True
+                    if tid >= 0:
+                        for i, note_item in enumerate(notes_list):
+                            if int(getattr(note_item, '_id', -2) or -2) == tid:
+                                notes_list.pop(i)
+                                deleted_any = True
+                                break
         if deleted_any:
-            self._cleanup_arpeggios(score)
             # Keep base_grid in sync and trigger engrave via snapshot.
             self._editor.update_score_length()
+            return True
+        return False
 
     def _latest_measure_has_notes(self, score: SCORE) -> bool:
         """Return True if there is at least one note in the score's latest measure window.
@@ -1064,8 +842,6 @@ class NoteTool(BaseTool):
                 w = getattr(self._editor, 'widget')
                 if hasattr(w, 'request_overlay_refresh'):
                     w.request_overlay_refresh()
-        elif name == 'arpeggio_toggle':
-            self._toggle_arpeggio()
         # Refresh overlay guides to reflect the change immediately
         if hasattr(self._editor, 'widget') and getattr(self._editor, 'widget', None) is not None:
             w = getattr(self._editor, 'widget')

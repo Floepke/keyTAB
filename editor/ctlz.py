@@ -1,12 +1,10 @@
 from __future__ import annotations
-import copy
-from typing import Optional
 
 class CtlZ:
     """
     Dict-based undo/redo manager modeled after provided design.
 
-    - Stores deep-copied SCORE dict snapshots
+    - Stores SCORE dict snapshots
     - On add_ctlz(), truncates forward history if not at tail
     - undo()/redo() return a SCORE instance reconstructed from dict
     """
@@ -24,7 +22,7 @@ class CtlZ:
             return {}
 
     def reset_ctlz(self) -> None:
-        d = copy.deepcopy(self._current_dict())
+        d = self._current_dict()
         self.buffer = [d]
         self.index = 0
 
@@ -38,7 +36,7 @@ class CtlZ:
         if self.index != (len(self.buffer) - 1):
             self.buffer = self.buffer[: self.index + 1]
         # append new snapshot
-        self.buffer.append(copy.deepcopy(cur))
+        self.buffer.append(cur)
         # enforce limit
         if len(self.buffer) > self.max_ctlz_num:
             self.buffer.pop(0)

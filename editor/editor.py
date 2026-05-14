@@ -21,6 +21,7 @@ from editor.tool.time_signature_tool import TimeSignatureTool
 from editor.tool.dynamic_tool import DynamicTool
 from editor.tool.tempo_tool import TempoTool
 from editor.tool.grid_band_tool import GridBandTool
+from editor.tool.arpeggio_tool import ArpeggioTool
 from editor.ctlz import CtlZ
 from file_model.base_grid import BaseGrid, resolve_grid_layer_offsets
 from settings_manager import get_preferences_manager
@@ -115,6 +116,7 @@ class Editor(QtCore.QObject,
             'dynamic': DynamicTool,
             'tempo': TempoTool,
             'grid_band': GridBandTool,
+            'arpeggio': ArpeggioTool,
         }
         self._tm.set_tool(self._tool)
 
@@ -210,6 +212,11 @@ class Editor(QtCore.QObject,
         # to avoid full re-sorts every frame when notes are unchanged.
         self._note_time_cache_key: tuple | None = None
         self._note_time_cache_values: tuple[list, list[float], list[float], list[tuple[float, int]], list[float]] | None = None
+        # Per-frame arpeggio Y-override data (populated by _build_render_cache).
+        # arpeggio_y_overrides: note_id → projected y_mm for notes in an arpeggio chord.
+        # arpeggio_chord_note_ids: set of all note IDs belonging to any arpeggio chord.
+        self._arpeggio_y_overrides: dict[int, float] = {}
+        self._arpeggio_chord_note_ids: set[int] = set()
         # Tiny mode: toggled by viewport width (stage 1: simplified drawing,
         # stage 2: skip drawing). tiny_mode_alpha is a continuous fade factor
         # (1.0 = fully opaque, 0.0 = fully transparent) used by the view to
@@ -745,8 +752,9 @@ class Editor(QtCore.QObject,
             else:
                 px, py = self._press_pos
                 if (not is_right_double_release) and (abs(x - px) <= self.DRAG_THRESHOLD and abs(y - py) <= self.DRAG_THRESHOLD):
-                    self._tool.on_right_click(x, y)
-                self._snapshot_if_changed(coalesce=False, label="right_click")
+                    changed = self._tool.on_right_click(x, y)
+                    if changed is not False:
+                        self._snapshot_if_changed(coalesce=False, label="right_click")
             # Stop drawing selection on any click
             if not self._dragging_right:
                 self._selection_active = False
@@ -1011,17 +1019,6 @@ class Editor(QtCore.QObject,
                 self._note_time_cache_key = note_cache_key
                 self._note_time_cache_values = (notes_sorted, starts, ends, end_pairs, end_values)
 
-        # Collect arpeggio member note IDs for quick skip in note drawer
-        arpeggio_note_ids: set[int] = set()
-        try:
-            arp_op = getattr(self, '_arp_time_op', Operator(float(SHORTEST_DURATION)))
-            for arp in getattr(score.events, 'arpeggio', []) or []:
-                for n in self._resolve_arpeggio_notes(arp, notes_sorted, arp_op):
-                    nid = int(getattr(n, '_id', 0) or 0)
-                    arpeggio_note_ids.add(nid)
-        except Exception:
-            arpeggio_note_ids = set()
-
         # Candidate indices: include
         # 1) notes with start in [time_begin, time_end]
         # 2) notes with end in   [time_begin, time_end] (requires ends sorted by value)
@@ -1115,6 +1112,65 @@ class Editor(QtCore.QObject,
             self._grid_time_cache_key = grid_cache_key
             self._grid_time_cache_values = (grid_den_times, barline_times)
 
+        # Build per-frame arpeggio Y-override lookup so note_drawer can position
+        # arpeggiated noteheads along the arpeggio diagonal without any coupling.
+        arpeggio_y_overrides: dict[int, float] = {}
+        arpeggio_chord_note_ids: set[int] = set()
+        arps_all = list(getattr(score.events, 'arpeggio', []) or [])
+        if arps_all:
+            # Build (round(time), pitch) → note lookup for stable arpeggio resolution
+            notes_by_time_pitch: dict[tuple[int, int], object] = {
+                (int(round(float(getattr(n, 'time', 0.0) or 0.0))), int(getattr(n, 'pitch', 0) or 0)): n
+                for n in notes_sorted
+            }
+            margin_mm = float(self.margin or 0.0)
+            zpq_arp = float(getattr(score.app_state, 'zoom_mm_per_quarter', 25.0) or 25.0)
+            semi_arp = float(self.semitone_dist or 0.5)
+            layout_arp = getattr(score, 'layout', None)
+            stem_len_arp = float(getattr(layout_arp, 'note_stem_length_semitone', 3.0) or 3.0) * semi_arp
+
+            def _t2mm(ticks: float) -> float:
+                return margin_mm + (float(ticks) / float(QUARTER_NOTE_UNIT)) * zpq_arp
+
+            for arp in arps_all:
+                try:
+                    base_time = float(getattr(arp, 'time', 0.0) or 0.0)
+                    rtime1 = float(getattr(arp, 'rtime1', 0.0) or 0.0)
+                    rtime2 = float(getattr(arp, 'rtime2', 0.0) or 0.0)
+                except Exception:
+                    continue
+                base_time_key = int(round(base_time))
+                pitches = [int(p) for p in (getattr(arp, 'note_pitches', []) or []) if int(p) > 0]
+                if len(pitches) < 2:
+                    continue
+                chord_notes = [notes_by_time_pitch[(base_time_key, p)] for p in pitches if (base_time_key, p) in notes_by_time_pitch]
+                if len(chord_notes) < 2:
+                    continue
+                chord_sorted = sorted(chord_notes, key=lambda n: int(getattr(n, 'pitch', 0) or 0))
+                span = max(1, len(chord_sorted) - 1)
+                y_start = _t2mm(base_time + rtime1)
+                y_end = _t2mm(base_time + rtime2)
+                # Compute each note's x_stem to find span for ratio calculation
+                stem_xs: list[float] = []
+                for note_obj in chord_sorted:
+                    pitch = int(getattr(note_obj, 'pitch', 0) or 0)
+                    hand = str(getattr(note_obj, 'hand', 'l') or 'l')
+                    x_note = float(self.pitch_to_x(pitch))
+                    stem_xs.append(float(x_note + stem_len_arp if hand == 'l' else x_note - stem_len_arp))
+                x_line_start = float(stem_xs[0])
+                x_line_end = float(stem_xs[-1])
+                for i, (note_obj, x_stem) in enumerate(zip(chord_sorted, stem_xs)):
+                    nid = int(getattr(note_obj, '_id', 0) or 0)
+                    if abs(x_line_end - x_line_start) <= 1e-6:
+                        ratio = float(i) / float(span)
+                    else:
+                        ratio = (float(x_stem) - x_line_start) / float(x_line_end - x_line_start)
+                    ratio = max(0.0, min(1.0, ratio))
+                    arpeggio_y_overrides[nid] = float(y_start + (y_end - y_start) * ratio)
+                    arpeggio_chord_note_ids.add(nid)
+        self._arpeggio_y_overrides = arpeggio_y_overrides
+        self._arpeggio_chord_note_ids = arpeggio_chord_note_ids
+
         self._draw_cache = {
             'time_begin': time_begin,
             'time_end': time_end,
@@ -1128,7 +1184,6 @@ class Editor(QtCore.QObject,
             'beam_by_hand': beam_by_hand,
             'grid_den_times': grid_den_times,
             'barline_times': barline_times,
-            'arpeggio_note_ids': arpeggio_note_ids,
         }
 
     # ---- Tiny mode (viewport-based) ----
@@ -1318,7 +1373,32 @@ class Editor(QtCore.QObject,
             self._calculate_layout(float(w_mm))
         zpq = float(getattr(score.app_state, 'zoom_mm_per_quarter', 25.0) or 25.0)
         ticks = (float(y_mm) - float(self.margin or 0.0)) / max(1e-6, zpq) * float(QUARTER_NOTE_UNIT)
-        return max(0.0, ticks)
+        return self.clamp_time_to_visible_range(float(ticks))
+
+    def _visible_time_bounds(self) -> tuple[float, float]:
+        """Return the minimum/maximum time ticks visible in page-space Y [0..page_h_mm]."""
+        score: SCORE | None = self.current_score()
+        if score is None:
+            t = float(0.0)
+            return (t, t)
+        if self.margin is None:
+            lay = getattr(score, 'layout', None)
+            w_mm = float(getattr(lay, 'page_width_mm', 210.0) or 210.0) if lay is not None else 210.0
+            self._calculate_layout(float(w_mm))
+        lay = getattr(score, 'layout', None)
+        page_h_mm = float(getattr(lay, 'page_height_mm', 297.0) or 297.0) if lay is not None else 297.0
+        zpq = float(getattr(score.app_state, 'zoom_mm_per_quarter', 25.0) or 25.0)
+        margin = float(self.margin or 0.0)
+        t_min = ((0.0 - margin) / max(1e-6, zpq)) * float(QUARTER_NOTE_UNIT)
+        t_max = ((page_h_mm - margin) / max(1e-6, zpq)) * float(QUARTER_NOTE_UNIT)
+        if t_min > t_max:
+            t_min, t_max = t_max, t_min
+        return (float(t_min), float(t_max))
+
+    def clamp_time_to_visible_range(self, ticks: float) -> float:
+        """Clamp time ticks to values that are visible within page-space vertical bounds."""
+        t_min, t_max = self._visible_time_bounds()
+        return max(float(t_min), min(float(t_max), float(ticks)))
 
     def px_to_time(self, y_px: float) -> float:
         """Convert Y in logical (Qt) pixels to time ticks efficiently using cached px/mm."""
@@ -1352,10 +1432,10 @@ class Editor(QtCore.QObject,
         beyond the midpoint between k*S and (k+1)*S snap to (k+1)*S.
         """
         units = max(1e-6, float(self.snap_size_units))
-        ratio = float(ticks) / units
+        ratio = float(self.clamp_time_to_visible_range(float(ticks))) / units
         # Nearest-band snapping (round half up) with a tiny epsilon for float stability.
         k = math.floor(ratio + 0.5 + 1e-9)
-        return k * units
+        return float(self.clamp_time_to_visible_range(float(k * units)))
 
     # ---- Editor guides (tool-agnostic overlays) ----
     def draw_guides(self, du: DrawUtil) -> None:

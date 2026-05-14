@@ -161,7 +161,6 @@ class NoteDrawerMixin:
             self._cached_notes_sorted = cache.get('notes_sorted') or []
             self._cached_notes_starts = cache.get('starts') or []
             self._cached_barline_positions = cache.get('barline_positions') or []
-            skip_ids = set(cache.get('arpeggio_note_ids') or [])
         else:
             # Fallback: minimal local candidate selection (start-only)
             notes_sorted = sorted(score.events.note or [], key=lambda n: (n.time, n.pitch))
@@ -171,17 +170,17 @@ class NoteDrawerMixin:
             candidate_indices = list(range(max(0, lo - 1), hi))
             self._cached_notes_view = [notes_sorted[i] for i in candidate_indices]
             self._cached_barline_positions = self._get_barline_positions()
-            skip_ids = set()
 
         self._rebuild_note_lookup(self._cached_notes_view)
+
+        # Per-frame arpeggio Y overrides (set by _build_render_cache)
+        arp_y_overrides: dict[int, float] = getattr(self, '_arpeggio_y_overrides', {}) or {}
 
         # Iterate candidate set only
         for idx in candidate_indices:
             if idx < 0 or idx >= len(notes_sorted):
                 continue
             n = notes_sorted[idx]
-            if skip_ids and int(getattr(n, '_id', -1) or -1) in skip_ids:
-                continue
             # Final interval intersection test in time domain
             n_start = float(n.time)
             n_end = float(n.time + n.duration)
@@ -189,7 +188,8 @@ class NoteDrawerMixin:
                 continue
             # Compute positions once and draw parts
             x = self.pitch_to_x(n.pitch)
-            y1 = time_to_mm(n_start)
+            nid = int(getattr(n, '_id', 0) or 0)
+            y1 = arp_y_overrides[nid] if nid in arp_y_overrides else time_to_mm(n_start)
             y2 = time_to_mm(n_end)
             self._draw_single_note(du, n, x, y1, y2, draw_mode=draw_mode)
 
@@ -369,6 +369,11 @@ class NoteDrawerMixin:
 
     def _draw_stem(self, du: DrawUtil, n, x: float, y1: float, draw_mode: str) -> None:
         self = cast("Editor", self)
+        # Arpeggio notes: the arpeggio diagonal line serves as the shared chord stem.
+        # Suppress individual horizontal stems so they don't cross the diagonal.
+        arp_chord_ids: set[int] = getattr(self, '_arpeggio_chord_note_ids', set()) or set()
+        if arp_chord_ids and int(getattr(n, '_id', 0) or 0) in arp_chord_ids:
+            return
         stem_len = self._layout_stem_length_mm()
         scale = self.current_score().layout.scale if self.current_score() and self.current_score().layout else 1.0
         stem_w = self.current_score().layout.note_stem_thickness_mm * scale if self.current_score() and self.current_score().layout else 0.8
@@ -468,6 +473,12 @@ class NoteDrawerMixin:
 
     def _draw_connect_stem(self, du: DrawUtil, n, x: float, y1: float, draw_mode: str) -> None:
         self = cast("Editor", self)
+        # Arpeggio chords: notes are already drawn at their projected Y positions along
+        # the arpeggio diagonal — a flat horizontal connector makes no sense there.
+        # The arpeggio_drawer owns the diagonal line that visually connects them.
+        arp_chord_ids: set[int] = getattr(self, '_arpeggio_chord_note_ids', set()) or set()
+        if arp_chord_ids and int(getattr(n, '_id', 0) or 0) in arp_chord_ids:
+            return
         # Connect notes in a chord (same start time, same hand)
         layout = self.current_score().layout
         stem_w = layout.note_stem_thickness_mm * layout.scale

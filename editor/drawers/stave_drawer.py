@@ -144,16 +144,6 @@ class StaveDrawerMixin:
                     tags=["piano_keyboard", "piano_octave_number"],
                 )
             else: # horizontal orientation
-                if key == 1:
-                    x_pos += .15
-                if key == 88:
-                    x_pos -= 1.0
-                if key == 4:
-                    x_pos -= .15
-                if key == 88:
-                    x_pos += .2
-                if key == 28:
-                    x_pos -= .1
                 du.add_text(
                     x_pos,
                     kb_y2 + 2.0,

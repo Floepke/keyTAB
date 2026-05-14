@@ -93,23 +93,23 @@ def _defaults_for(dc_type):
 
 
 def _apply_legacy_conversion(data: dict) -> dict:
-    """Apply legacy file conversions (fail-open)."""
-    data = convert_legacy_piano_data(data)
+	"""Apply legacy file conversions (fail-open)."""
+	data = convert_legacy_piano_data(data)
 
-    # Layout key migration: dynamic symbol background padding rename.
-    if isinstance(data, dict):
-        layout = data.get('layout', None)
-        if isinstance(layout, dict):
-            if layout.get('time_signature_indicator_type') == 'both':
-                layout['time_signature_indicator_type'] = 'classical & klavarskribo'
-            if 'hairpin_font_size_pt' not in layout and 'hairpin_text_size_pt' in layout:
-                layout['hairpin_font_size_pt'] = layout.get('hairpin_text_size_pt')
-            if 'dynamic_symbol_background_padding_mm' not in layout:
-                if 'dynamic_symbol_background_padding' in layout:
-                    layout['dynamic_symbol_background_padding_mm'] = layout.get('dynamic_symbol_background_padding')
-                elif 'dynamic_background_padding' in layout:
-                    layout['dynamic_symbol_background_padding_mm'] = layout.get('dynamic_background_padding')
-    return data
+	# Layout key migration: dynamic symbol background padding rename.
+	if isinstance(data, dict):
+		layout = data.get('layout', None)
+		if isinstance(layout, dict):
+			if layout.get('time_signature_indicator_type') == 'both':
+				layout['time_signature_indicator_type'] = 'classical & klavarskribo'
+			if 'hairpin_font_size_pt' not in layout and 'hairpin_text_size_pt' in layout:
+				layout['hairpin_font_size_pt'] = layout.get('hairpin_text_size_pt')
+			if 'dynamic_symbol_background_padding_mm' not in layout:
+				if 'dynamic_symbol_background_padding' in layout:
+					layout['dynamic_symbol_background_padding_mm'] = layout.get('dynamic_symbol_background_padding')
+				elif 'dynamic_background_padding' in layout:
+					layout['dynamic_symbol_background_padding_mm'] = layout.get('dynamic_background_padding')
+	return data
 
 
 def _merge_with_defaults(dc_type, incoming: dict, context: str, skip_keys: set = {'id', '_id'}) -> dict:
@@ -316,7 +316,7 @@ class SCORE:
 		return obj
 
 	def new_arpeggio(self, **kwargs) -> Arpeggio:
-		base = {'time': 0.0, 'duration': 32.0, 'notes': [], 'type': 'up/starting'}
+		base = {'time': 0.0, 'rtime1': 0.0, 'rtime2': 32.0, 'note_pitches': []}
 		base.update(kwargs)
 		obj = Arpeggio(**base, _id=self._gen_id())
 		self.events.arpeggio.append(obj)

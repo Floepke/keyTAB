@@ -28,6 +28,7 @@ TOOL_ITEMS: list[dict] = [
     { 'name': 'dynamic',        'displayed_name': 'Dynamics',       'icon': 'dynamics',       'tooltip': 'Left Click/Drag: edit existing dynamic item (hairpin handle or dynamic symbol). Left Click/Drag in empty space: create new item from current mode (hairpin or symbol), then drag to position/length. Right Click: delete symbol or hairpin.' },
     { 'name': 'text',           'displayed_name': 'Text',           'icon': 'text',           'tooltip': 'Left Click/Drag: move existing text, or drag the red handle to rotate. Left Click/Drag in empty space: create new text + edit afterwards in the dialog. Right Click: delete text item.' },
     { 'name': 'beam',           'displayed_name': 'Note Grouping',  'icon': 'beam',           'tooltip': 'Left Click/Drag: edit an existing beam marker duration. Left Click/Drag in empty space: create a beam marker, then drag to set duration. Right Click: delete marker under cursor (or create one if none exists there).' },
+    { 'name': 'arpeggio',       'displayed_name': 'Arpeggio',       'icon': 'arpeggio',       'tooltip': 'Left Click chord note: attach arpeggio to that chord using the selected type. Drag arpeggio end handles to adjust spread duration. Right Click: remove arpeggio under cursor.' },
     # layout elements
     { 'name': 'line_break',     'displayed_name': 'Line/Page-Break Marker','icon': 'line_break',     'tooltip': 'Left Click/Drag: edit existing line/page-break marker (toggle L/P on click, move on drag). Left Click/Drag in empty space: create a new line-break marker at cursor time. Right Click: delete marker.' },
     { 'name': 'time_signature', 'displayed_name': 'Time Signature', 'icon': 'time_signature', 'tooltip': 'Left Click/Drag: edit existing meter/grid context (on barline: open time-signature dialog; off barline: add grid line). Left Click/Drag in empty space: create a new subdivision in current measure. Right Click: remove subdivision, or remove a time-signature change at a barline.' },
@@ -97,6 +98,7 @@ class ToolSelectorWidget(QtWidgets.QListWidget):
             'count_line':     self.tr("Count Line"),
             'dynamic':        self.tr("Dynamics"),
             'beam':           self.tr("Note Grouping"),
+            'arpeggio':       self.tr("Arpeggio"),
             'line_break':     self.tr("Line/Page Break"),
             'time_signature': self.tr("Time Signature"),
             'grid_band':      self.tr("Grid Band"),
@@ -112,6 +114,7 @@ class ToolSelectorWidget(QtWidgets.QListWidget):
             'count_line':     self.tr("Left Click/Drag: edit an existing count line handle (start/end and time). Left Click/Drag in empty space: create a count line, then drag its end handle. Right Click: delete count line by handle."),
             'dynamic':        self.tr("Left Click/Drag: edit existing dynamic item (hairpin handle or dynamic symbol). Left Click/Drag in empty space: create new item from current mode (hairpin or symbol), then drag to position/length. Right Click: delete symbol or hairpin."),
             'beam':           self.tr("Left Click/Drag: edit an existing beam marker duration. Left Click/Drag in empty space: create a beam marker, then drag to set duration. Right Click: delete marker under cursor (or create one if none exists there)."),
+            'arpeggio':       self.tr("Left Click chord note: attach arpeggio to that chord using the selected type. Drag arpeggio end handles to adjust spread duration. Right Click: remove arpeggio under cursor."),
             'line_break':     self.tr("Left Click/Drag: edit existing line/page-break marker (toggle L/P on click, move on drag). Left Click/Drag in empty space: create a new line-break marker at cursor time. Right Click: delete marker."),
             'time_signature': self.tr("Left Click/Drag: edit existing meter/grid context (on barline: open time-signature dialog; off barline: add grid line). Left Click/Drag in empty space: create a new subdivision in current measure. Right Click: remove subdivision, or remove a time-signature change at a barline."),
             'grid_band':      self.tr("Left Click/Drag: edit an existing grid-band marker duration. Left Click/Drag in empty space: create a grid-band marker, then drag to set duration. Right Click: insert/remove a stop marker (zero duration) at the clicked band start."),

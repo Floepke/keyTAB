@@ -434,7 +434,7 @@ class TextTool(BaseTool):
             t_raw = float(self._editor.widget_px_to_time(x, y))
             anchor_time = float(self._move_anchor_cursor_time or t_raw)
             base_text_time = float(self._move_anchor_text_time or 0.0)
-            t_snap = max(0.0, float(self._editor.snap_time(base_text_time + (t_raw - anchor_time))))
+            t_snap = float(self._editor.snap_time(base_text_time + (t_raw - anchor_time)))
 
             semitone_mm = float(getattr(self._editor, 'semitone_dist', 0.0) or 0.0)
             if semitone_mm > 1e-6:

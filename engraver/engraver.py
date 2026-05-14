@@ -1235,6 +1235,15 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                 y2 = y1 + 1.0
             if y2_draw <= y1:
                 y2_draw = y1 + 1.0
+            line_time_start = float(line.get('time_start', 0.0) or 0.0)
+            line_time_end = float(line.get('time_end', 0.0) or 0.0)
+            line_span_ticks = max(1e-6, float(line_time_end - line_time_start))
+            line_span_mm = max(1e-6, float(y2_draw - y1))
+            is_first_system_line = op_time.eq(line_time_start, first_system_start)
+            pre_roll_ticks = 0.0
+            if is_first_system_line:
+                pre_roll_ticks = max(0.0, line_span_ticks * max(0.0, float(y1)) / line_span_mm)
+            line_time_start_render = float(line_time_start - pre_roll_ticks)
             line['y_top'] = y1
             line['y_bottom'] = y2_draw
             line['mini_piano_visible'] = bool(mini_piano_enabled)
@@ -1260,9 +1269,12 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
 
             def _time_to_y(ticks: float) -> float:
                 # Problem solved: normalize time to line height for vertical layout.
-                total = max(1e-6, float(line['time_end'] - line['time_start']))
-                rel = (float(ticks) - float(line['time_start'])) / total
-                rel = max(0.0, min(1.0, rel))
+                rel = (float(ticks) - line_time_start) / line_span_ticks
+                if is_first_system_line:
+                    min_rel = -pre_roll_ticks / line_span_ticks if line_span_ticks > 1e-6 else 0.0
+                    rel = max(float(min_rel), min(1.0, rel))
+                else:
+                    rel = max(0.0, min(1.0, rel))
                 return y1 + (y2_draw - y1) * rel
 
             def _hand_band_x_span(_hand_key: str, _t0: float, _t1: float) -> tuple[float, float] | None:
@@ -2153,7 +2165,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                 n_t = float(item.get('time', 0.0) or 0.0)
                 n_end = float(item.get('end', 0.0) or 0.0)
                 p = int(item.get('pitch', 0) or 0)
-                if op_time.ge(n_t, float(line['time_end'])) or op_time.le(n_end, float(line['time_start'])):
+                if op_time.ge(n_t, line_time_end) or op_time.le(n_end, line_time_start_render):
                     continue
                 if p < 1 or p > PIANO_KEY_AMOUNT:
                     continue
@@ -2164,7 +2176,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
             for item in norm_grace:
                 g_t = float(item.get('time', 0.0) or 0.0)
                 p = int(item.get('pitch', 0) or 0)
-                if op_time.lt(g_t, float(line['time_start'])) or op_time.ge(g_t, float(line['time_end'])):
+                if op_time.lt(g_t, line_time_start_render) or op_time.ge(g_t, line_time_end):
                     continue
                 if p < 1 or p > PIANO_KEY_AMOUNT:
                     continue
@@ -2175,7 +2187,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
             line_slur_end_indicators: list[dict] = []  # connected slurs starting at line_end
             line_slur_start_indicators: list[dict] = [] # connected slurs ending at line_start
             if norm_slurs:
-                line_start = float(line.get('time_start', 0.0) or 0.0)
+                line_start = float(line_time_start_render)
                 line_end = float(line.get('time_end', 0.0) or 0.0)
                 for sl in norm_slurs:
                     p1_t = float(sl.get('y1_time', 0.0) or 0.0)
@@ -2203,7 +2215,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
 
             line_texts: list[dict] = []
             if norm_texts:
-                line_start = float(line.get('time_start', 0.0) or 0.0)
+                line_start = float(line_time_start_render)
                 line_end = float(line.get('time_end', 0.0) or 0.0)
                 for tx in norm_texts:
                     t_time = float(tx.get('time', 0.0) or 0.0)
@@ -2213,7 +2225,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
 
             line_dynamic_symbols: list[dict] = []
             if norm_dynamic_symbols:
-                line_start = float(line.get('time_start', 0.0) or 0.0)
+                line_start = float(line_time_start_render)
                 line_end = float(line.get('time_end', 0.0) or 0.0)
                 for ds in norm_dynamic_symbols:
                     t_time = float(ds.get('time', 0.0) or 0.0)
@@ -2223,7 +2235,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
 
             line_crescendos: list[dict] = []
             if norm_crescendos:
-                line_start = float(line.get('time_start', 0.0) or 0.0)
+                line_start = float(line_time_start_render)
                 line_end = float(line.get('time_end', 0.0) or 0.0)
                 for hp in norm_crescendos:
                     hp_start = float(hp.get('time', 0.0) or 0.0)
@@ -2234,7 +2246,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
 
             line_decrescendos: list[dict] = []
             if norm_decrescendos:
-                line_start = float(line.get('time_start', 0.0) or 0.0)
+                line_start = float(line_time_start_render)
                 line_end = float(line.get('time_end', 0.0) or 0.0)
                 for hp in norm_decrescendos:
                     hp_start = float(hp.get('time', 0.0) or 0.0)
@@ -2245,7 +2257,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
 
             line_tempos: list[dict] = []
             if norm_tempos:
-                line_start = float(line.get('time_start', 0.0) or 0.0)
+                line_start = float(line_time_start_render)
                 line_end = float(line.get('time_end', 0.0) or 0.0)
                 for tp in norm_tempos:
                     t_start = float(tp.get('time', 0.0) or 0.0)
@@ -2261,7 +2273,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                 notes_by_hand_line[hand_norm].append(item)
 
             beam_groups_by_hand: dict[str, tuple[list[list[dict]], list[tuple[float, float]]]] = {}
-            line_start = float(line.get('time_start', 0.0) or 0.0)
+            line_start = float(line_time_start_render)
             line_end = float(line.get('time_end', 0.0) or 0.0)
 
             def _is_line_continuation(note_dict: dict) -> bool:
@@ -3096,7 +3108,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                 layout_stem_len = stem_len_units * semitone_mm
                 beam_w = float(layout.get('beam_thickness_mm', 1.0) or 1.0) * scale
                 stem_w = float(layout.get('note_stem_thickness_mm', 0.5) or 0.5) * scale
-                line_start = float(line.get('time_start', 0.0) or 0.0)
+                line_start = float(line_time_start_render)
                 line_end = float(line.get('time_end', 0.0) or 0.0)
 
                 beam_half = max(0.1, float(beam_w) * 0.5)
@@ -3272,7 +3284,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                                 tags=['beam_stem'],
                             )
 
-            line_start = float(line.get('time_start', 0.0) or 0.0)
+            line_start = float(line_time_start_render)
             line_end = float(line.get('time_end', 0.0) or 0.0)
 
             def _clip_poly_y(poly: list[tuple[float, float]], y_min: float, y_max: float) -> list[tuple[float, float]]:
