@@ -13,7 +13,12 @@ from file_model.base_grid import resolve_grid_layer_offsets
 from file_model.info import Info
 from file_model.analysis import Analysis
 from ui.style import Style
-from symbol_design.noteheads import Notehead, normalize_notehead_literal, resolve_notehead_spec
+from symbol_design.noteheads import (
+    Notehead,
+    normalize_notehead_literal,
+    resolve_notehead_spec,
+    sheared_notehead_support_v,
+)
 from symbol_design.pedal import draw_pedal_symbol
 from file_model.events.note import Note
 from engraver.helpers import (
@@ -65,6 +70,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
     double_bars = list(events.get('double_bar', []) or [])
     tempos = list(events.get('tempo', []) or [])
     pedals = list(events.get('pedal', []) or [])
+    arpeggios = list(events.get('arpeggio', []) or [])
 
     # Theme colors
     notation_rgb = Style.get_notation_color()
@@ -318,6 +324,25 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
         })
     if norm_pedals:
         norm_pedals = sorted(norm_pedals, key=lambda m: float(m.get('time', 0.0) or 0.0))
+
+    norm_arpeggios: list[dict] = []
+    for idx, ev in enumerate(arpeggios):
+        if not isinstance(ev, dict):
+            continue
+        pitches_raw = ev.get('note_pitches', []) or []
+        pitches: tuple[int, ...] = tuple(
+            sorted({int(p) for p in pitches_raw if int(p) > 0})
+        )
+        norm_arpeggios.append({
+            'time': float(ev.get('time', 0.0) or 0.0),
+            'rtime1': float(ev.get('rtime1', 0.0) or 0.0),
+            'rtime2': float(ev.get('rtime2', 0.0) or 0.0),
+            'note_pitches': pitches,
+            'id': int(ev.get('_id', 0) or 0),
+            'idx': int(idx),
+        })
+    if norm_arpeggios:
+        norm_arpeggios = sorted(norm_arpeggios, key=lambda m: float(m.get('time', 0.0) or 0.0))
 
     pedal_segments: list[dict] = []
     if norm_pedals:
@@ -1705,6 +1730,77 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
 
             stem_len_units_for_barlines = float(layout.get('note_stem_length_semitone', 3) or 3)
             stem_len_mm_for_barlines = stem_len_units_for_barlines * semitone_mm
+
+            line_notes_by_time_pitch_for_barlines: dict[tuple[int, int], dict] = {
+                (int(round(float(it.get('time', 0.0) or 0.0))), int(it.get('pitch', 0) or 0)): it
+                for it in line_notes_for_barlines
+            }
+
+            active_arpeggio_chord_keys_for_barlines: set[tuple[int, str, tuple[int, ...]]] = set()
+            arpeggio_segments_for_barlines: list[dict[str, object]] = []
+            if norm_arpeggios:
+                for arp in norm_arpeggios:
+                    base_time = float(arp.get('time', 0.0) or 0.0)
+                    rtime1 = float(arp.get('rtime1', 0.0) or 0.0)
+                    rtime2 = float(arp.get('rtime2', 0.0) or 0.0)
+                    base_time_key = int(round(base_time))
+                    pitches = tuple(int(p) for p in (arp.get('note_pitches', ()) or ()) if int(p) > 0)
+                    if len(pitches) < 2:
+                        continue
+                    chord_notes = [
+                        line_notes_by_time_pitch_for_barlines[(base_time_key, p)]
+                        for p in pitches
+                        if (base_time_key, p) in line_notes_by_time_pitch_for_barlines
+                    ]
+                    if len(chord_notes) < 2:
+                        continue
+                    chord_sorted = sorted(chord_notes, key=lambda n: int(n.get('pitch', 0) or 0))
+                    chord_hand = str(chord_sorted[0].get('hand', 'l') or 'l')
+                    chord_pitch_key = tuple(int(n.get('pitch', 0) or 0) for n in chord_sorted)
+                    chord_key = (base_time_key, chord_hand, chord_pitch_key)
+
+                    if abs(rtime1) <= 1e-9 and abs(rtime2) <= 1e-9:
+                        continue
+
+                    active_arpeggio_chord_keys_for_barlines.add(chord_key)
+
+                    y_start = float(_time_to_y(base_time + rtime1))
+                    y_end = float(_time_to_y(base_time + rtime2))
+                    x_start = float(_key_to_x(int(chord_sorted[0].get('pitch', 0) or 0)))
+                    x_end = float(_key_to_x(int(chord_sorted[-1].get('pitch', 0) or 0)))
+                    dx_seg = float(x_end - x_start)
+                    dy_seg = float(y_end - y_start)
+                    seg_len = float(math.hypot(dx_seg, dy_seg))
+                    if seg_len <= 1e-9:
+                        ux_seg, uy_seg = (1.0, 0.0)
+                    else:
+                        ux_seg, uy_seg = (dx_seg / seg_len, dy_seg / seg_len)
+
+                    if chord_hand == 'l':
+                        tip_x = float(x_start - (ux_seg * stem_len_mm_for_barlines))
+                        tip_y = float(y_start - (uy_seg * stem_len_mm_for_barlines))
+                        points = [
+                            (tip_x, tip_y),
+                            (x_start, y_start),
+                            (x_end, y_end),
+                        ]
+                    else:
+                        tip_x = float(x_end + (ux_seg * stem_len_mm_for_barlines))
+                        tip_y = float(y_end + (uy_seg * stem_len_mm_for_barlines))
+                        points = [
+                            (x_start, y_start),
+                            (x_end, y_end),
+                            (tip_x, tip_y),
+                        ]
+
+                    arpeggio_segments_for_barlines.append(
+                        {
+                            'points': points,
+                            'y_min': float(min(pt[1] for pt in points)),
+                            'y_max': float(max(pt[1] for pt in points)),
+                        }
+                    )
+
             note_head_half_w = semitone_mm * float(layout.get('note_width_scaling', 0.75) or 0.75)
             stem_collision_pad = max(0.15, float(layout.get('note_stem_thickness_mm', 0.5) or 0.5) * scale)
             head_collision_pad = max(0.15, semitone_mm * 0.15)
@@ -1838,12 +1934,43 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                         ]
                         if len(chord_notes_at_tick) >= 2:
                             pitches_at_tick = [int(n.get('pitch', 0) or 0) for n in chord_notes_at_tick]
+                            chord_key = (
+                                int(round(float(ticks))),
+                                chord_hand_key,
+                                tuple(sorted(pitches_at_tick)),
+                            )
+                            if chord_key in active_arpeggio_chord_keys_for_barlines:
+                                continue
                             x_lo = _key_to_x(min(pitches_at_tick))
                             x_hi = _key_to_x(max(pitches_at_tick))
                             intervals.append((
                                 x_lo - stem_collision_pad - barline_symbol_gap_mm,
                                 x_hi + stem_collision_pad + barline_symbol_gap_mm,
                             ))
+
+                y_tick = float(_time_to_y(float(ticks)))
+                for arp_seg in arpeggio_segments_for_barlines:
+                    y_min_seg = float(arp_seg.get('y_min', 0.0) or 0.0)
+                    y_max_seg = float(arp_seg.get('y_max', 0.0) or 0.0)
+                    if y_tick < y_min_seg - 1e-9 or y_tick > y_max_seg + 1e-9:
+                        continue
+                    pts = list(arp_seg.get('points', []) or [])
+                    for i in range(len(pts) - 1):
+                        x0, y0 = pts[i]
+                        x1, y1_local = pts[i + 1]
+                        y_lo = min(float(y0), float(y1_local))
+                        y_hi = max(float(y0), float(y1_local))
+                        if y_tick < y_lo - 1e-9 or y_tick > y_hi + 1e-9:
+                            continue
+                        if abs(float(y1_local) - float(y0)) <= 1e-9:
+                            x_hit = float(x0)
+                        else:
+                            ratio = (y_tick - float(y0)) / (float(y1_local) - float(y0))
+                            x_hit = float(x0) + (float(x1) - float(x0)) * float(ratio)
+                        intervals.append((
+                            x_hit - stem_collision_pad - barline_symbol_gap_mm,
+                            x_hit + stem_collision_pad + barline_symbol_gap_mm,
+                        ))
 
                 for seg in beam_segments_for_barlines:
                     t0 = float(seg.get('t_start', 0.0) or 0.0)
@@ -2298,6 +2425,132 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
 
             stem_len_units = float(layout.get('note_stem_length_semitone', 3) or 3)
             stem_len_mm = stem_len_units * semitone_mm
+            black_rule = str(layout.get('black_note_rule', 'below_stem') or 'below_stem')
+
+            arpeggio_y_overrides_line: dict[int, float] = {}
+            arpeggio_chord_note_ids_line: set[int] = set()
+            active_arpeggio_chord_keys_line: set[tuple[int, str, tuple[int, ...]]] = set()
+            line_arpeggio_stems: list[dict[str, object]] = []
+            if norm_arpeggios and line_notes:
+                line_notes_by_time_pitch: dict[tuple[int, int], dict] = {
+                    (int(round(float(it.get('time', 0.0) or 0.0))), int(it.get('pitch', 0) or 0)): it
+                    for it in line_notes
+                }
+                width_scale_arp = max(0.05, float(layout.get('note_width_scaling', 1.0) or 1.0))
+                height_scale_arp = max(0.1, float(layout.get('notehead_height_scaling', 1.0) or 1.0))
+                base_tilt_arp = max(-1.0, min(1.0, float(layout.get('notehead_tilt', 0.0) or 0.0)))
+
+                for arp in norm_arpeggios:
+                    base_time = float(arp.get('time', 0.0) or 0.0)
+                    rtime1 = float(arp.get('rtime1', 0.0) or 0.0)
+                    rtime2 = float(arp.get('rtime2', 0.0) or 0.0)
+                    arp_id = int(arp.get('id', 0) or 0)
+                    base_time_key = int(round(base_time))
+                    pitches = tuple(int(p) for p in (arp.get('note_pitches', ()) or ()) if int(p) > 0)
+                    if len(pitches) < 2:
+                        continue
+                    chord_notes = [
+                        line_notes_by_time_pitch[(base_time_key, p)]
+                        for p in pitches
+                        if (base_time_key, p) in line_notes_by_time_pitch
+                    ]
+                    if len(chord_notes) < 2:
+                        continue
+
+                    chord_sorted = sorted(chord_notes, key=lambda n: int(n.get('pitch', 0) or 0))
+                    chord_hand = str(chord_sorted[0].get('hand', 'l') or 'l')
+                    chord_pitch_key = tuple(int(n.get('pitch', 0) or 0) for n in chord_sorted)
+                    chord_key = (base_time_key, chord_hand, chord_pitch_key)
+
+                    if abs(rtime1) <= 1e-9 and abs(rtime2) <= 1e-9:
+                        continue
+
+                    active_arpeggio_chord_keys_line.add(chord_key)
+
+                    span = max(1, len(chord_sorted) - 1)
+                    y0_arp = float(_time_to_y(base_time + rtime1))
+                    y1_arp = float(_time_to_y(base_time + rtime2))
+                    stem_xs: list[float] = [
+                        float(_key_to_x(int(note_item.get('pitch', 0) or 0)))
+                        for note_item in chord_sorted
+                    ]
+                    if len(stem_xs) < 2:
+                        continue
+                    x_line_start = float(stem_xs[0])
+                    x_line_end = float(stem_xs[-1])
+                    dx_line = float(x_line_end - x_line_start)
+                    dy_line = float(y1_arp - y0_arp)
+                    m_line = float(dy_line / dx_line) if abs(dx_line) > 1e-9 else 0.0
+
+                    support_cache: dict[tuple[str, bool], float] = {}
+                    for i, (note_item, x_stem) in enumerate(zip(chord_sorted, stem_xs)):
+                        note_idx = int(note_item.get('idx', -1) or -1)
+                        if abs(x_line_end - x_line_start) <= 1e-6:
+                            ratio = float(i) / float(span)
+                        else:
+                            ratio = (float(x_stem) - x_line_start) / float(x_line_end - x_line_start)
+                        ratio = max(0.0, min(1.0, ratio))
+                        y_line = float(y0_arp + (y1_arp - y0_arp) * ratio)
+
+                        p_local = int(note_item.get('pitch', 0) or 0)
+                        default_black_above_local = (
+                            p_local in BLACK_KEYS
+                            and _black_note_above_stem(note_item, black_rule, line_notes)
+                        )
+                        spec_local = resolve_notehead_spec(
+                            note_item.get('raw', {}) or {},
+                            default_black_above=default_black_above_local,
+                        )
+                        hand_local = str(note_item.get('hand', 'l') or 'l')
+                        is_up_local = bool(getattr(spec_local, 'is_up', False))
+                        cache_key = (hand_local, is_up_local)
+                        if cache_key not in support_cache:
+                            support_cache[cache_key] = sheared_notehead_support_v(
+                                hand=hand_local,
+                                is_up=is_up_local,
+                                semitone_space_mm=semitone_mm,
+                                width_scale=width_scale_arp,
+                                height_scale=height_scale_arp,
+                                base_tilt=base_tilt_arp,
+                                m_line=m_line,
+                                sample_count=64,
+                            )
+                        v_support = float(support_cache[cache_key])
+                        arpeggio_y_overrides_line[note_idx] = float(y_line - v_support)
+                        arpeggio_chord_note_ids_line.add(note_idx)
+
+                    seg_len = float(math.hypot(dx_line, dy_line))
+                    if seg_len <= 1e-9:
+                        ux_line, uy_line = (1.0, 0.0)
+                    else:
+                        ux_line, uy_line = (dx_line / seg_len, dy_line / seg_len)
+
+                    if chord_hand == 'l':
+                        tip_x = float(x_line_start - (ux_line * stem_len_mm))
+                        tip_y = float(y0_arp - (uy_line * stem_len_mm))
+                        stem_points = [
+                            (tip_x, tip_y),
+                            (x_line_start, y0_arp),
+                            (x_line_end, y1_arp),
+                        ]
+                    else:
+                        tip_x = float(x_line_end + (ux_line * stem_len_mm))
+                        tip_y = float(y1_arp + (uy_line * stem_len_mm))
+                        stem_points = [
+                            (x_line_start, y0_arp),
+                            (x_line_end, y1_arp),
+                            (tip_x, tip_y),
+                        ]
+
+                    line_arpeggio_stems.append(
+                        {
+                            'id': int(arp_id),
+                            'points': stem_points,
+                            'time_min': float(min(base_time + rtime1, base_time + rtime2)),
+                            'time_max': float(max(base_time + rtime1, base_time + rtime2)),
+                            'x_max': float(max(pt[0] for pt in stem_points)),
+                        }
+                    )
 
             # Pre-compute beam line bounds so measure numbers can test real beam spans.
             beam_thickness_mm = float(layout.get('beam_thickness_mm', 1.0) or 1.0) * scale
@@ -2385,8 +2638,6 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
             mn_numbers_visible = layout.get('measure_numbers_visible', True) is not False
             tempo_indicator_visible = layout.get('tempo_indicator_visible', True) is not False
             line_time_start = float(line.get('time_start', 0.0) or 0.0)
-            black_rule = str(layout.get('black_note_rule', 'below_stem') or 'below_stem')
-
             def _measure_text_metrics_mm(txt: str) -> tuple[float, float, float, float]:
                 # Returns (raw_w, raw_h, effective_w_for_x_collision, effective_h_for_y_time_span)
                 _xb, _yb, raw_w, raw_h = du._get_text_extents_mm(txt, mn_family, size_pt, mn_italic, mn_bold)
@@ -2422,6 +2673,14 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                     _x0, x1 = _note_x_range(it, include_stem=near_start)
                     if x1 > max_x:
                         max_x = x1
+                for arp_stem in line_arpeggio_stems:
+                    a_t0 = float(arp_stem.get('time_min', 0.0) or 0.0)
+                    a_t1 = float(arp_stem.get('time_max', 0.0) or 0.0)
+                    if op_time.ge(a_t0, float(t1)) or op_time.le(a_t1, float(t0)):
+                        continue
+                    a_x_max = float(arp_stem.get('x_max', grid_right) or grid_right)
+                    if a_x_max > max_x:
+                        max_x = a_x_max
                 return max_x
 
             def _y_to_time_unclamped(y_mm: float) -> float:
@@ -2487,8 +2746,9 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                     n_t = float(item.get('time', 0.0) or 0.0)
                     n_end = float(item.get('end', 0.0) or 0.0)
                     hand_key = str(item.get('hand', 'l') or 'l')
+                    note_idx = int(item.get('idx', -1) or -1)
 
-                    y_start = _time_to_y(n_t)
+                    y_start = float(arpeggio_y_overrides_line.get(note_idx, _time_to_y(n_t)))
                     default_black_above = p in BLACK_KEYS and _black_note_above_stem(item, black_rule, line_notes)
                     spec = resolve_notehead_spec(item.get('raw', {}) or {}, default_black_above=default_black_above)
                     note_y = y_start
@@ -3372,11 +3632,14 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                 p = int(item.get('pitch', 0) or 0)
                 hand_key = str(item.get('hand', 'l') or 'l')
                 n = item.get('raw', {}) or {}
+                note_idx = int(item.get('idx', -1) or -1)
                 x = _key_to_x(p)
-                y_start = _time_to_y(n_t)
+                y_start = float(arpeggio_y_overrides_line.get(note_idx, _time_to_y(n_t)))
                 y_end = _time_to_y(n_end)
-                if y_end < y_start:
-                    y_start, y_end = y_end, y_start
+                # Keep notehead/stem anchored at the (possibly arpeggio-adjusted) start.
+                # Only the MIDI body needs ordered vertical bounds.
+                y_midi_top = min(float(y_start), float(y_end))
+                y_midi_bottom = max(float(y_start), float(y_end))
                 w = semitone_mm
                 default_black_above = p in BLACK_KEYS and _black_note_above_stem(item, black_rule, line_notes)
                 spec = resolve_notehead_spec(n, default_black_above=default_black_above)
@@ -3402,11 +3665,11 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                 fill = _midi_fill_from_rgb((int(r_i), int(g_i), int(b_i)))
                 if bool(layout.get('note_midinote_visible', True)):
                     midi_poly = [
-                        (x, y_start),
-                        (x - w, y_start + semitone_mm),
-                        (x - w, y_end),
-                        (x + w, y_end),
-                        (x + w, y_start + semitone_mm),
+                        (x, y_midi_top),
+                        (x - w, y_midi_top + semitone_mm),
+                        (x - w, y_midi_bottom),
+                        (x + w, y_midi_bottom),
+                        (x + w, y_midi_top + semitone_mm),
                     ]
                     du.add_polygon(
                         midi_poly,
@@ -3438,20 +3701,21 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
 
                 # Problem solved: attach stems only to non-continuation heads.
                 if not continues_from_prev_line and bool(layout.get('note_stem_visible', True)):
-                    stem_len_units = float(layout.get('note_stem_length_semitone', 3) or 3)
-                    stem_len = stem_len_units * semitone_mm
-                    stem_w = float(layout.get('note_stem_thickness_mm', 0.5) or 0.5) * scale
-                    x2 = x - stem_len if hand_key == 'l' else x + stem_len
-                    du.add_line(
-                        x,
-                        y_start,
-                        x2,
-                        y_start,
-                        color=notation_color,
-                        width_mm=stem_w,
-                        id=0,
-                        tags=['stem'],
-                    )
+                    if note_idx not in arpeggio_chord_note_ids_line:
+                        stem_len_units = float(layout.get('note_stem_length_semitone', 3) or 3)
+                        stem_len = stem_len_units * semitone_mm
+                        stem_w = float(layout.get('note_stem_thickness_mm', 0.5) or 0.5) * scale
+                        x2 = x - stem_len if hand_key == 'l' else x + stem_len
+                        du.add_line(
+                            x,
+                            y_start,
+                            x2,
+                            y_start,
+                            color=notation_color,
+                            width_mm=stem_w,
+                            id=0,
+                            tags=['stem'],
+                        )
 
                 # Problem solved: accidental guide line points to derived pitch position.
                 acc = int(n.get('acc', 0) or 0)
@@ -3648,7 +3912,14 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                 if len(same_time) >= 2 and bool(layout.get('chord_connect_visible', True)):
                     lowest = min(same_time, key=lambda m: int(m.get('pitch', 0) or 0))
                     highest = max(same_time, key=lambda m: int(m.get('pitch', 0) or 0))
+                    chord_key = (
+                        int(round(float(n_t))),
+                        hand_key,
+                        tuple(sorted(int(m.get('pitch', 0) or 0) for m in same_time)),
+                    )
                     if int(lowest.get('id', 0) or 0) == int(item.get('id', 0) or 0):
+                        if chord_key in active_arpeggio_chord_keys_line:
+                            continue
                         x1 = _key_to_x(int(lowest.get('pitch', 0) or 0))
                         x2 = _key_to_x(int(highest.get('pitch', 0) or 0))
                         du.add_line(
@@ -3683,6 +3954,20 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                         stroke_width_mm=float(layout.get('note_stopsign_thickness_mm', 0.4) or 0.4) * scale,
                         id=0,
                         tags=['stop_sign'],
+                    )
+
+            if bool(layout.get('chord_connect_visible', True)) and line_arpeggio_stems:
+                stem_w = float(layout.get('note_stem_thickness_mm', 0.5) or 0.5) * scale
+                for arp_stem in line_arpeggio_stems:
+                    stem_points = list(arp_stem.get('points', []) or [])
+                    if len(stem_points) < 2:
+                        continue
+                    du.add_polyline(
+                        stem_points,
+                        stroke_color=notation_color,
+                        stroke_width_mm=stem_w,
+                        id=int(arp_stem.get('id', 0) or 0),
+                        tags=['chord_connect'],
                     )
 
             def clamp_x(val: float) -> float:
