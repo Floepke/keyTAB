@@ -289,6 +289,22 @@ class PreferencesManager:
 # ---- Registration hub (add new app preferences here) ----
 _prefs_manager: Optional[PreferencesManager] = None
 
+# Active UI scale used by widgets at construction time.
+# Set by keyTAB.py before any widget is created.
+_active_ui_scale: float = 1.0
+
+
+def get_ui_scale() -> float:
+    """Return the active UI scale factor (1.0 = default). Widgets use this
+    at construction time on macOS/Linux where QT_SCALE_FACTOR is not used."""
+    return _active_ui_scale
+
+
+def set_ui_scale(scale: float) -> None:
+    """Store the active UI scale factor. Call before creating any widgets."""
+    global _active_ui_scale
+    _active_ui_scale = max(0.5, min(3.0, float(scale)))
+
 
 def get_preferences_manager() -> PreferencesManager:
     global _prefs_manager

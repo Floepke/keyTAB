@@ -2,6 +2,7 @@ from PySide6 import QtCore, QtGui, QtWidgets
 
 from icons.icons import get_qicon
 from ui.style import Style
+from settings_manager import get_ui_scale
 
 
 class ContextualToolbar(QtWidgets.QWidget):
@@ -17,8 +18,9 @@ class ContextualToolbar(QtWidgets.QWidget):
         self.setObjectName("ContextualToolbar")
         self.setSizePolicy(QtWidgets.QSizePolicy.Policy.Fixed, QtWidgets.QSizePolicy.Policy.Expanding)
 
-        self._button_size = 35
-        self._icon_size = self._button_size - 6
+        _s = get_ui_scale()
+        self._button_size = max(1, int(round(35 * _s)))
+        self._icon_size = max(1, self._button_size - 6)
 
         layout = QtWidgets.QVBoxLayout(self)
         layout.setContentsMargins(8, 8, 8, 8)

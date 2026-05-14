@@ -3,11 +3,18 @@ import sys
 from PySide6 import QtCore, QtGui, QtWidgets
 from icons.icons import get_qicon
 from ui.style import Style
+from settings_manager import get_ui_scale
 
-# Fixed row height to fit 36px icons comfortably
-ITEM_ROW_HEIGHT_PX: int = 42
+# Fixed row height and padding base values; scaled at widget construction via _scaled()
+_BASE_ITEM_ROW_HEIGHT_PX: int = 42
+ITEM_ROW_HEIGHT_PX: int = 42  # kept for backwards compat; prefer _scaled(_BASE_ITEM_ROW_HEIGHT_PX) at runtime
 TOOLTIP_PANEL_HEIGHT_PX: int = 200
 LEFT_PANEL_PADDING_PX: int = 6
+
+
+def _scaled(base: int) -> int:
+    """Return base value scaled by current ui_scale."""
+    return max(1, int(round(base * get_ui_scale())))
 # Configurable tool items.
 # - 'name': internal tool identifier used in code/events
 # - 'displayed_name': human-readable label shown in the listbox
@@ -38,8 +45,9 @@ class ToolSelectorWidget(QtWidgets.QListWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setMinimumWidth(0)
-        # Icon size reduced by a quarter from 48 -> 36
-        self.setIconSize(QtCore.QSize(36, 36))
+        # Icon size scaled for macOS/Linux where QT_SCALE_FACTOR is not used
+        _icon_px = _scaled(36)
+        self.setIconSize(QtCore.QSize(_icon_px, _icon_px))
         # Allow per-item size hints; do not enforce uniform sizes
         self.setUniformItemSizes(False)
         self.setSpacing(4)
@@ -126,7 +134,7 @@ class ToolSelectorWidget(QtWidgets.QListWidget):
             it.setData(QtCore.Qt.ItemDataRole.ToolTipRole, tooltip)
             it.setToolTip(tooltip)
             # Make row height comfortably fit the 36px icon + padding
-            it.setSizeHint(QtCore.QSize(it.sizeHint().width(), ITEM_ROW_HEIGHT_PX))
+            it.setSizeHint(QtCore.QSize(it.sizeHint().width(), _scaled(_BASE_ITEM_ROW_HEIGHT_PX)))
             self.addItem(it)
         # Select 'note' tool initially (visually and functionally)
         for i in range(self.count()):
@@ -177,7 +185,10 @@ class ToolSelectorDock(QtWidgets.QDockWidget):
         super().__init__("Tools", parent)
         self.setWindowTitle(self.tr("Tools"))
         self.setObjectName("ToolSelectorDock")
+        self.setMinimumSize(0, 0)
         self.setMinimumWidth(0)
+        self.setSizePolicy(QtWidgets.QSizePolicy.Policy.Ignored,
+                           QtWidgets.QSizePolicy.Policy.Preferred)
         # Lock dock: no moving, no floating, no closing
         self.setAllowedAreas(QtCore.Qt.DockWidgetArea.LeftDockWidgetArea | QtCore.Qt.DockWidgetArea.RightDockWidgetArea)
         self.setFeatures(QtWidgets.QDockWidget.DockWidgetFeature.NoDockWidgetFeatures)
@@ -193,7 +204,10 @@ class ToolSelectorDock(QtWidgets.QDockWidget):
         ))
         # Wrap the list in a container with small margins to match Snap Size indent
         container = QtWidgets.QWidget(self)
+        container.setMinimumSize(0, 0)
         container.setMinimumWidth(0)
+        container.setSizePolicy(QtWidgets.QSizePolicy.Policy.Ignored,
+                    QtWidgets.QSizePolicy.Policy.Preferred)
         lay = QtWidgets.QVBoxLayout(container)
         lay.setContentsMargins(LEFT_PANEL_PADDING_PX, LEFT_PANEL_PADDING_PX, LEFT_PANEL_PADDING_PX, LEFT_PANEL_PADDING_PX)
         lay.setSpacing(6)

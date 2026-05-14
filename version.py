@@ -86,13 +86,15 @@ change_log = '''
 - fix: enhance clipboard functionality by tracking start units for better alignment during cut/copy operations
 - fix: on Windows tooltips now correctly display special characters and multiline text without issues
 
-1.0.9beta (2026-05-11)
+1.1.0 (2026-05-11)
+- update to 1.1.0 because the interface changes and new features are significant enough to warrant a minor version bump, even though there are no breaking file format changes
+- the contextual toolbar is on the left of the main window now as a second vertical toolbar, this allows for more space for the editor and print preview and also gives a better visual connection between tool selector and contextual toolbar.
 - added Keyboard Shortcut Card and updated the main window help/shortcut flow
-- added session note create/delete counter and improved Escape exit confirmation dialog behavior
-- added MusicXML export support in File -> Save As, including a new piano-to-MusicXML converter
+- improved Escape exit confirmation dialog behavior
+- added MusicXML export support in File -> Save As, including a new piano-to-MusicXML converter (first version, some data may not be fully supported yet, but the basics are there)
 - MusicXML export now preserves note accidental semantics from keyTAB notes
 - MusicXML export writes classic grand staff piano output (treble + bass staves)
 - MusicXML export now detects and writes separate voices per hand for unequal rhythmic layers
-- MusicXML tempo export now correctly maps duration-based tempo units (e.g. 256=quarter, 128=eighth)
+- MusicXML tempo export now correctly maps duration-based tempo units (the unit is the duration of the tempo marker, tempo = the amount of units in a minute)
 - for non-standard tempo durations, MusicXML tempo is converted to an equivalent quarter-note tempo value
 '''

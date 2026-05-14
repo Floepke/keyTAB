@@ -3,6 +3,7 @@ from PySide6 import QtCore, QtGui, QtWidgets
 from fractions import Fraction
 from utils.CONSTANT import QUARTER_NOTE_UNIT, SHORTEST_DURATION
 from ui.widgets.tool_selector import LEFT_PANEL_PADDING_PX
+from settings_manager import get_ui_scale
 
 BASE_ITEMS: list[tuple[int, str]] = [
     (1, "Whole"),
@@ -71,16 +72,16 @@ class SnapSizeSelector(QtWidgets.QWidget):
             ic_minus = None
         if ic_minus:
             self.minus_btn.setIcon(ic_minus)
-            # 25% smaller than previous 45x45 -> ~34x34
-            self.minus_btn.setIconSize(QtCore.QSize(34, 34))
+            self.minus_btn.setIconSize(QtCore.QSize(max(1, int(round(17 * get_ui_scale()))), max(1, int(round(17 * get_ui_scale())))))
             self.minus_btn.setText("")
         else:
             self.minus_btn.setText("-")
+        _btn_px = max(1, int(round(27 * get_ui_scale())))
         self.minus_btn.setToolTip(self.tr("Decrease the snap divider by one step."))
         self.minus_btn.clicked.connect(self._dec_divide)
         # Keep normal visual size but permit shrinking when dock is collapsed.
-        self.minus_btn.setMinimumSize(0, 54)
-        self.minus_btn.setMaximumSize(54, 54)
+        self.minus_btn.setMinimumSize(0, _btn_px)
+        self.minus_btn.setMaximumSize(_btn_px, _btn_px)
         fbtn = self.minus_btn.font()
         try:
             base_sz = fbtn.pointSize()
@@ -89,11 +90,11 @@ class SnapSizeSelector(QtWidgets.QWidget):
         except Exception:
             fbtn.setPointSize(15)
         self.minus_btn.setFont(fbtn)
-        # Wrapper to preserve original center position (54x54 area)
+        # Wrapper to preserve original center position
         self._minus_wrap = QtWidgets.QWidget(self)
         # Wrapper keeps default visual size but can compress to 0 width.
-        self._minus_wrap.setMinimumSize(0, 54)
-        self._minus_wrap.setMaximumSize(54, 54)
+        self._minus_wrap.setMinimumSize(0, _btn_px)
+        self._minus_wrap.setMaximumSize(_btn_px, _btn_px)
         wrap_l = QtWidgets.QVBoxLayout(self._minus_wrap)
         wrap_l.setContentsMargins(0, 0, 0, 0)
         wrap_l.setSpacing(0)
@@ -113,7 +114,7 @@ class SnapSizeSelector(QtWidgets.QWidget):
         except Exception:
             fl.setPointSize(20)
         self.label.setFont(fl)
-        self.label.setMinimumHeight(54)
+        self.label.setMinimumHeight(_btn_px)
         self.label.setToolTip(self.tr(
             "Snap divider. The divider splits the selected base note into equal sub-steps. "
             "For example, base Quarter \u00F7 3 gives quarter-note triplet steps. "
@@ -132,16 +133,15 @@ class SnapSizeSelector(QtWidgets.QWidget):
             ic_plus = None
         if ic_plus:
             self.plus_btn.setIcon(ic_plus)
-            # 25% smaller than previous 45x45 -> ~34x34
-            self.plus_btn.setIconSize(QtCore.QSize(34, 34))
+            self.plus_btn.setIconSize(QtCore.QSize(max(1, int(round(17 * get_ui_scale()))), max(1, int(round(17 * get_ui_scale())))))
             self.plus_btn.setText("")
         else:
             self.plus_btn.setText("+")
         self.plus_btn.setToolTip(self.tr("Increase the snap divider by one step."))
         self.plus_btn.clicked.connect(self._inc_divide)
         # Keep normal visual size but permit shrinking when dock is collapsed.
-        self.plus_btn.setMinimumSize(0, 54)
-        self.plus_btn.setMaximumSize(54, 54)
+        self.plus_btn.setMinimumSize(0, _btn_px)
+        self.plus_btn.setMaximumSize(_btn_px, _btn_px)
         fbtn2 = self.plus_btn.font()
         try:
             base_sz2 = fbtn2.pointSize()
@@ -150,11 +150,11 @@ class SnapSizeSelector(QtWidgets.QWidget):
         except Exception:
             fbtn2.setPointSize(15)
         self.plus_btn.setFont(fbtn2)
-        # Wrapper to preserve original center position (54x54 area)
+        # Wrapper to preserve original center position
         self._plus_wrap = QtWidgets.QWidget(self)
         # Wrapper keeps default visual size but can compress to 0 width.
-        self._plus_wrap.setMinimumSize(0, 54)
-        self._plus_wrap.setMaximumSize(54, 54)
+        self._plus_wrap.setMinimumSize(0, _btn_px)
+        self._plus_wrap.setMaximumSize(_btn_px, _btn_px)
         wrap_r = QtWidgets.QVBoxLayout(self._plus_wrap)
         wrap_r.setContentsMargins(0, 0, 0, 0)
         wrap_r.setSpacing(0)
@@ -401,7 +401,10 @@ class SnapSizeDock(QtWidgets.QDockWidget):
     def __init__(self, parent=None):
         super().__init__(self.tr("Snap Size"), parent)
         self.setObjectName("SnapSizeDock")
+        self.setMinimumSize(0, 0)
         self.setMinimumWidth(0)
+        self.setSizePolicy(QtWidgets.QSizePolicy.Policy.Ignored,
+                           QtWidgets.QSizePolicy.Policy.Preferred)
         self.setToolTip(
             self.tr("Configure the snap size for the editor mouse input. The snap size determines the spacing of the visual snap bands. "
             "The edit cursor will snap to these divisions when moving or placing elements. "

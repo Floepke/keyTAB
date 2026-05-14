@@ -1,6 +1,7 @@
 from PySide6 import QtCore, QtGui, QtWidgets
 from icons.icons import get_qicon
 from ui.style import Style
+from settings_manager import get_ui_scale
 
 
 class DraggableToolButton(QtWidgets.QToolButton):
@@ -84,22 +85,24 @@ class ToolbarHandle(QtWidgets.QSplitterHandle):
             "Drag this splitter to zoom the editor and print-preview. "
             "Double-click to fit the current page entirely in the screen to get an overview of the document."
         ))
-        parent.setHandleWidth(50)
+        _s = get_ui_scale()
+        self._button_size = max(1, int(round(35 * _s)))
+        # Keep handle width proportional to button width (base: 35 -> 50).
+        parent.setHandleWidth(self._button_size + 15)
         # Prevent resize cursor when hovering the splitter handle
         self.setCursor(QtCore.Qt.CursorShape.ArrowCursor)
 
         layout = QtWidgets.QVBoxLayout(self)
         layout.setContentsMargins(8, 8, 8, 8)
         layout.setSpacing(8)
-        # Square button size to match ToolSelector list row height
-        self._button_size = 35
+        # Square button size to match ToolSelector list row height; scaled for macOS/Linux
         
         '''this button fits the print view to fit the window.'''
         # Default toolbar (top to bottom): fit, next, previous, engrave, play, stop
         self.fit_btn = DraggableToolButton(self, parent=self)
         self.fit_btn.setFocusPolicy(QtCore.Qt.FocusPolicy.NoFocus)
         self.fit_btn.setIcon(QtGui.QIcon())
-        self.fit_btn.setText('...')
+        self.fit_btn.setText('<-->')
         self.fit_btn.setToolButtonStyle(QtCore.Qt.ToolButtonStyle.ToolButtonTextOnly)
         # Keep width; reduce height to half
         self.fit_btn.setFixedWidth(self._button_size)

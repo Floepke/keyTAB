@@ -8,7 +8,7 @@ from pathlib import Path
 from PySide6 import QtCore, QtWidgets, QtGui
 from ui.main_window import MainWindow
 from ui.style import Style
-from settings_manager import get_preferences
+from settings_manager import get_preferences, set_ui_scale
 from appdata_manager import get_appdata_manager
 from icons.icons import get_qicon
 from fonts import (
@@ -320,16 +320,24 @@ def main(argv: list[str] | None = None):
     user_root.mkdir(parents=True, exist_ok=True)
     (user_root / "pstyle").mkdir(parents=True, exist_ok=True)
 
-    # Apply user-selected Qt widget scaling globally.
-    # Must be set before QApplication is constructed.
+    # Store ui_scale for widget construction (macOS/Linux bypass QT_SCALE_FACTOR).
+    set_ui_scale(ui_scale)
+
+    # On Windows use QT_SCALE_FACTOR for full Qt widget scaling.
+    # On macOS and Linux QT_SCALE_FACTOR causes unwanted rendering artefacts at
+    # non-1.0 scales (known Qt issue), so we fake the scale via font size and
+    # icon/button sizes instead (handled per-widget via get_ui_scale()).
     os.environ.setdefault("QT_ENABLE_HIGHDPI_SCALING", "1")
-    os.environ["QT_SCALE_FACTOR"] = str(ui_scale)
-    try:
-        QtGui.QGuiApplication.setHighDpiScaleFactorRoundingPolicy(
+    if sys.platform.startswith("win"):
+        os.environ["QT_SCALE_FACTOR"] = str(ui_scale)
+    else:
+        # Leave QT_SCALE_FACTOR at default (1) to avoid artefacts.
+        os.environ.pop("QT_SCALE_FACTOR", None)
+    
+    # Ensure high DPI scaling rounding is disabled to allow for smooth scaling at fractional ui_scale values.
+    QtGui.QGuiApplication.setHighDpiScaleFactorRoundingPolicy(
             QtCore.Qt.HighDpiScaleFactorRoundingPolicy.PassThrough
-        )
-    except Exception:
-        pass
+    )
 
     # Platform-specific startup handling.
     # On macOS, keep the in-window (non-native) menu bar in all window states.
@@ -401,8 +409,10 @@ def main(argv: list[str] | None = None):
     else:
         sty.set_light_theme()
 
-    # Install and apply embedded UI font (FiraCode-SemiBold) globally AFTER palette/style reset
-    install_default_ui_font(app, name='FiraCode-SemiBold', point_size=int(10))
+    # Install and apply embedded UI font (FiraCode-SemiBold) globally AFTER palette/style reset.
+    # On macOS/Linux scale the font point size to fake the ui_scale (no QT_SCALE_FACTOR used).
+    _font_pt = int(round(10 * ui_scale)) if not sys.platform.startswith('win') else 10
+    install_default_ui_font(app, name='FiraCode-SemiBold', point_size=_font_pt)
     # Fallback stylesheet to force family if Qt ignores app font
     app.setStyleSheet(app.styleSheet() + "\n* { font-family: 'Fira Code'; }\n")
 
@@ -430,11 +440,8 @@ def main(argv: list[str] | None = None):
     # Force a fast, clean termination after the event loop exits to skip Qt/PySide
     # atexit cleanup (state is already persisted in prepare_close above).
     exit_code = app.exec()
-    try:
-        while QtGui.QGuiApplication.overrideCursor() is not None:
-            QtGui.QGuiApplication.restoreOverrideCursor()
-    except Exception:
-        pass
+    while QtGui.QGuiApplication.overrideCursor() is not None:
+        QtGui.QGuiApplication.restoreOverrideCursor()
     os._exit(int(exit_code))
 
 
