@@ -9,7 +9,7 @@ from utils.operator import Operator
 from typing import Tuple
 from ui.style import Style
 from symbol_design.noteheads import Notehead, normalize_notehead_literal, resolve_notehead_spec
-from editor.editor_defaults import NOTE_WIDTH_SCALING, NOTE_STEM_LENGTH_SEMITONE
+from editor.editor_defaults import NOTE_WIDTH_SCALING
 
 if TYPE_CHECKING:
     from editor.editor import Editor
@@ -35,6 +35,11 @@ class NoteDrawerMixin:
     _cached_window_hi: int | None = None
     _cached_notes_view: list | None = None
     _cached_barline_positions: list[float] | None = None
+    _note_lookup_source_id: int | None = None
+    _notes_by_hand_lookup: dict[str, list] | None = None
+    _start_times_by_hand: dict[str, list[float]] | None = None
+    _end_times_by_hand: dict[str, list[float]] | None = None
+    _end_notes_by_hand: dict[str, list] | None = None
     _STEM_WIDTH_FACTOR: float = 1.0
 
     def _editor_line_width_mm(self) -> float:
@@ -42,6 +47,85 @@ class NoteDrawerMixin:
             return max(0.01, float(getattr(self, 'editor_line_width_global', 0.1) or 0.1))
         except Exception:
             return 0.1
+
+    def _layout_stem_length_mm(self) -> float:
+        self = cast("Editor", self)
+        score = self.current_score()
+        layout = score.layout if score else None
+        stem_len_units = float(getattr(layout, 'note_stem_length_semitone', 3) or 3) if layout is not None else 3.0
+        return stem_len_units * float(self.semitone_dist or 0.5)
+
+    def _rebuild_note_lookup(self, notes_source: list | None = None) -> None:
+        self = cast("Editor", self)
+        source = notes_source if notes_source is not None else (self._cached_notes_view or [])
+        source_id = id(source)
+        if self._note_lookup_source_id == source_id and self._notes_by_hand_lookup is not None:
+            return
+
+        by_hand: dict[str, list] = {'l': [], 'r': []}
+        for n in source:
+            hk = 'l' if str(getattr(n, 'hand', 'l') or 'l') == 'l' else 'r'
+            by_hand[hk].append(n)
+
+        start_times_by_hand: dict[str, list[float]] = {'l': [], 'r': []}
+        end_times_by_hand: dict[str, list[float]] = {'l': [], 'r': []}
+        end_notes_by_hand: dict[str, list] = {'l': [], 'r': []}
+
+        for hk in ('l', 'r'):
+            notes_sorted = sorted(by_hand[hk], key=lambda n: float(getattr(n, 'time', 0.0) or 0.0))
+            by_hand[hk] = notes_sorted
+            start_times_by_hand[hk] = [float(getattr(n, 'time', 0.0) or 0.0) for n in notes_sorted]
+
+            end_pairs = sorted(
+                ((float(getattr(n, 'time', 0.0) or 0.0) + float(getattr(n, 'duration', 0.0) or 0.0), n) for n in notes_sorted),
+                key=lambda p: p[0],
+            )
+            end_times_by_hand[hk] = [float(p[0]) for p in end_pairs]
+            end_notes_by_hand[hk] = [p[1] for p in end_pairs]
+
+        self._note_lookup_source_id = source_id
+        self._notes_by_hand_lookup = by_hand
+        self._start_times_by_hand = start_times_by_hand
+        self._end_times_by_hand = end_times_by_hand
+        self._end_notes_by_hand = end_notes_by_hand
+
+    def _notes_starting_at_time(self, t: float, hand: str | None = None) -> list:
+        self = cast("Editor", self)
+        self._rebuild_note_lookup()
+        if self._notes_by_hand_lookup is None or self._start_times_by_hand is None:
+            return []
+
+        thr = float(self._time_op.threshold)
+        hands = [hand] if hand in ('l', 'r') else ['l', 'r']
+        out: list = []
+        for hk in hands:
+            times = self._start_times_by_hand.get(hk, [])
+            notes = self._notes_by_hand_lookup.get(hk, [])
+            lo = bisect.bisect_left(times, float(t) - thr)
+            hi = bisect.bisect_right(times, float(t) + thr)
+            for i in range(lo, hi):
+                n = notes[i]
+                if self._time_op.eq(float(getattr(n, 'time', 0.0) or 0.0), float(t)):
+                    out.append(n)
+        return out
+
+    def _notes_in_open_time_interval(self, hand: str, t0: float, t1: float, by_end: bool = False) -> list:
+        self = cast("Editor", self)
+        self._rebuild_note_lookup()
+        if self._notes_by_hand_lookup is None or self._start_times_by_hand is None or self._end_times_by_hand is None or self._end_notes_by_hand is None:
+            return []
+
+        hk = 'l' if str(hand or 'l') == 'l' else 'r'
+        if by_end:
+            times = self._end_times_by_hand.get(hk, [])
+            notes = self._end_notes_by_hand.get(hk, [])
+        else:
+            times = self._start_times_by_hand.get(hk, [])
+            notes = self._notes_by_hand_lookup.get(hk, [])
+
+        lo = bisect.bisect_right(times, float(t0))
+        hi = bisect.bisect_left(times, float(t1))
+        return notes[lo:hi] if hi > lo else []
 
     def draw_note(self, du: DrawUtil) -> None:
         """Editor drawer entry point as used by draw_all()."""
@@ -88,6 +172,8 @@ class NoteDrawerMixin:
             self._cached_notes_view = [notes_sorted[i] for i in candidate_indices]
             self._cached_barline_positions = self._get_barline_positions()
             skip_ids = set()
+
+        self._rebuild_note_lookup(self._cached_notes_view)
 
         # Iterate candidate set only
         for idx in candidate_indices:
@@ -194,9 +280,8 @@ class NoteDrawerMixin:
                 break
         if not on_barline:
             return
-        # Use hardcoded editor default for stem length (not from file layout)
         w = float(self.semitone_dist or 0.5)
-        stem_len = float(NOTE_STEM_LENGTH_SEMITONE or 7) * w
+        stem_len = self._layout_stem_length_mm()
         thickness = self._editor_line_width_mm()
         hand = getattr(n, 'hand', 'l')
         if hand == 'l':
@@ -234,7 +319,8 @@ class NoteDrawerMixin:
         self = cast("Editor", self)
         layout = self.current_score().layout
         is_narrow = self._should_tune_under_stem_black_width(n, layout)
-        outline_w = self._editor_line_width_mm()
+        scale = layout.scale if layout else 1.0
+        outline_w = layout.note_stem_thickness_mm * scale if layout else 0.8
         paper_r, paper_g, paper_b = Style.get_named_rgb('paper', (255, 255, 255))
         bg_fill = (paper_r / 255.0, paper_g / 255.0, paper_b / 255.0, 1.0)
         notehead = Notehead.from_note(
@@ -283,9 +369,9 @@ class NoteDrawerMixin:
 
     def _draw_stem(self, du: DrawUtil, n, x: float, y1: float, draw_mode: str) -> None:
         self = cast("Editor", self)
-        # Use hardcoded editor default for stem length (not from file layout)
-        stem_len = float(NOTE_STEM_LENGTH_SEMITONE or 7) * float(self.semitone_dist or 0.5)
-        stem_w = self._editor_line_width_mm()
+        stem_len = self._layout_stem_length_mm()
+        scale = self.current_score().layout.scale if self.current_score() and self.current_score().layout else 1.0
+        stem_w = self.current_score().layout.note_stem_thickness_mm * scale if self.current_score() and self.current_score().layout else 0.8
         # Stem direction based on hand
         if getattr(n, 'hand', 'l') == 'l':
             x2 = x - stem_len
@@ -313,20 +399,14 @@ class NoteDrawerMixin:
         end = float(n.time + n.duration)
         w = float(self.semitone_dist or 0.5)
 
-        # Collect dot times
+        # Collect dot times from indexed hand-specific starts/ends in (start, end).
         dot_times: list[float] = []
-        # Prefer shared cached viewport notes
-        cache = cast("Editor", self)._draw_cache or {}
-        notes_view = cache.get('notes_view') or (self._cached_notes_view or [])
-        for m in notes_view:
-            if m._id == n._id or getattr(m, 'hand', 'l') != hand:
-                continue
-            s = float(m.time)
-            e = float(m.time + m.duration)
-            if self._time_op.gt(s, start) and self._time_op.lt(s, end):
-                dot_times.append(s)
-            if self._time_op.gt(e, start) and self._time_op.lt(e, end):
-                dot_times.append(e)
+        for m in self._notes_in_open_time_interval(hand, start, end, by_end=False):
+            if int(getattr(m, '_id', -1) or -1) != int(getattr(n, '_id', -2) or -2):
+                dot_times.append(float(getattr(m, 'time', 0.0) or 0.0))
+        for m in self._notes_in_open_time_interval(hand, start, end, by_end=True):
+            if int(getattr(m, '_id', -1) or -1) != int(getattr(n, '_id', -2) or -2):
+                dot_times.append(float(getattr(m, 'time', 0.0) or 0.0) + float(getattr(m, 'duration', 0.0) or 0.0))
 
         # Add a continuation dot at any crossed barline.
         barlines = self._cached_barline_positions or self._get_barline_positions()
@@ -358,10 +438,8 @@ class NoteDrawerMixin:
             # If another note starts at this exact time on adjacent pitch,
             # push continuation dot forward two semitone distances to avoid overlap.
             has_adjacent_start = False
-            for m in notes_view:
+            for m in self._notes_starting_at_time(float(t), hand=None):
                 if int(getattr(m, '_id', -1) or -1) == int(getattr(n, '_id', -2) or -2):
-                    continue
-                if not self._time_op.eq(float(getattr(m, 'time', 0.0) or 0.0), float(t)):
                     continue
                 mp = int(getattr(m, 'pitch', 0) or 0)
                 if abs(mp - dot_pitch) == 1:
@@ -392,12 +470,10 @@ class NoteDrawerMixin:
         self = cast("Editor", self)
         # Connect notes in a chord (same start time, same hand)
         layout = self.current_score().layout
-        stem_w = self._editor_line_width_mm()
+        stem_w = layout.note_stem_thickness_mm * layout.scale
         hand = getattr(n, 'hand', 'l')
         t = float(n.time)
-        cache = cast("Editor", self)._draw_cache or {}
-        notes_view = cache.get('notes_view') or (self._cached_notes_view or [])
-        same_time = [m for m in notes_view if getattr(m, 'hand', 'l') == hand and self._time_op.eq(float(m.time), t)]
+        same_time = self._notes_starting_at_time(float(t), hand=hand)
         if len(same_time) < 2:
             return
         lowest = min(same_time, key=lambda m: m.pitch)
@@ -430,24 +506,18 @@ class NoteDrawerMixin:
         rule = str(getattr(layout, 'black_note_rule', 'below_stem') or 'below_stem')
         if rule == 'above_stem':
             return True
-        cache = cast("Editor", self)._draw_cache or {}
-        notes_view = cache.get('notes_view') or (self._cached_notes_view or [])
         t0 = float(getattr(n, 'time', 0.0) or 0.0)
         p0 = int(getattr(n, 'pitch', 0) or 0)
         if rule in ('above_stem_if_collision', 'only_above_stem_if_collision'):
-            for note in notes_view:
+            for note in self._notes_starting_at_time(float(t0), hand=None):
                 if getattr(note, '_id', None) == getattr(n, '_id', None):
-                    continue
-                if not self._time_op.eq(float(getattr(note, 'time', 0.0) or 0.0), t0):
                     continue
                 if abs(int(getattr(note, 'pitch', 0) or 0) - p0) == 1:
                     return True
             return False
         if rule == 'above_stem_if_chord_and_white_note':
-            for note in notes_view:
+            for note in self._notes_starting_at_time(float(t0), hand=None):
                 if getattr(note, '_id', None) == getattr(n, '_id', None):
-                    continue
-                if not self._time_op.eq(float(getattr(note, 'time', 0.0) or 0.0), t0):
                     continue
                 mp = int(getattr(note, 'pitch', 0) or 0)
                 if mp not in BLACK_KEYS and mp != p0:
@@ -456,12 +526,8 @@ class NoteDrawerMixin:
         if rule != 'above_stem_if_chord_and_white_note_same_hand':
             return False
         hand0 = str(getattr(n, 'hand', 'l') or 'l')
-        for note in notes_view:
+        for note in self._notes_starting_at_time(float(t0), hand=hand0):
             if getattr(note, '_id', None) == getattr(n, '_id', None):
-                continue
-            if not self._time_op.eq(float(getattr(note, 'time', 0.0) or 0.0), t0):
-                continue
-            if str(getattr(note, 'hand', 'l') or 'l') != hand0:
                 continue
             mp = int(getattr(note, 'pitch', 0) or 0)
             if mp not in BLACK_KEYS and mp != p0:
@@ -469,20 +535,11 @@ class NoteDrawerMixin:
         return False
 
     def _adjacent_white_same_hand(self, n, layout) -> bool:
-        try:
-            cache = cast("Editor", self)._draw_cache or {}
-            notes_view = cache.get('notes_view') or (self._cached_notes_view or [])
-        except Exception:
-            notes_view = self._cached_notes_view or []
         t0 = float(getattr(n, 'time', 0.0) or 0.0)
         p0 = int(getattr(n, 'pitch', 0) or 0)
         h0 = str(getattr(n, 'hand', 'l') or 'l')
-        for m in notes_view:
+        for m in self._notes_starting_at_time(float(t0), hand=h0):
             if getattr(m, '_id', None) == getattr(n, '_id', None):
-                continue
-            if str(getattr(m, 'hand', 'l') or 'l') != h0:
-                continue
-            if not self._time_op.eq(float(getattr(m, 'time', 0.0) or 0.0), t0):
                 continue
             mp = int(getattr(m, 'pitch', 0) or 0)
             if mp not in BLACK_KEYS and abs(mp - p0) == 1:
@@ -507,15 +564,8 @@ class NoteDrawerMixin:
         if p0 not in BLACK_KEYS:
             return False
         t0 = float(getattr(n, 'time', 0.0) or 0.0)
-        try:
-            cache = cast("Editor", self)._draw_cache or {}
-            notes_view = cache.get('notes_view') or (self._cached_notes_view or [])
-        except Exception:
-            notes_view = self._cached_notes_view or []
-        for m in notes_view:
+        for m in self._notes_starting_at_time(float(t0), hand=None):
             if getattr(m, '_id', None) == getattr(n, '_id', None):
-                continue
-            if not self._time_op.eq(float(getattr(m, 'time', 0.0) or 0.0), t0):
                 continue
             if abs(int(getattr(m, 'pitch', 0) or 0) - p0) == 1:
                 return True

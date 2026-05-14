@@ -26,7 +26,18 @@ class TextDrawerMixin:
         size_pt: float,
         italic: bool,
         bold: bool,
+        extents_cache: dict[tuple[str, str, float, bool, bool], tuple[float, float, float, float]] | None = None,
     ) -> dict:
+        def _measure(s: str) -> tuple[float, float, float, float]:
+            if extents_cache is None:
+                return du._get_text_extents_mm(s, family, size_pt, italic, bold)
+            key = (s, family, float(size_pt), bool(italic), bool(bold))
+            if key in extents_cache:
+                return extents_cache[key]
+            val = du._get_text_extents_mm(s, family, size_pt, italic, bold)
+            extents_cache[key] = val
+            return val
+
         raw = str(text or "").replace("\r\n", "\n").replace("\r", "\n")
         raw = raw.replace("\\n", "\n").replace("\\t", "\t")
         fallback = "(no text set)"
@@ -36,7 +47,7 @@ class TextDrawerMixin:
         line_h_mm = 0.0
         for para in paragraph_strs:
             measure = para if para.strip() else " "
-            _, _, w, h = du._get_text_extents_mm(measure, family, size_pt, italic, bold)
+            _, _, w, h = _measure(measure)
             w_mm = float(max(0.0, w)) if para.strip() else 0.0
             h_mm = float(max(0.1, h))
             line_entries.append({"text": para, "width_mm": w_mm, "height_mm": h_mm})
@@ -45,7 +56,7 @@ class TextDrawerMixin:
             if h_mm > line_h_mm:
                 line_h_mm = h_mm
         if not line_entries:
-            _, _, w, h = du._get_text_extents_mm(fallback, family, size_pt, italic, bold)
+            _, _, w, h = _measure(fallback)
             line_entries = [{"text": fallback, "width_mm": float(max(0.0, w)), "height_mm": float(max(0.1, h))}]
             max_w = float(max(0.0, w))
             line_h_mm = float(max(0.1, h))
@@ -168,6 +179,15 @@ class TextDrawerMixin:
 
         active_tool = str(getattr(getattr(self, '_tool', None), 'TOOL_NAME', ''))
         show_handles = (active_tool == 'text')
+        extents_cache: dict[tuple[str, str, float, bool, bool], tuple[float, float, float, float]] = {}
+
+        def _measure(text_value: str, fam: str, size: float, it: bool, bo: bool) -> tuple[float, float, float, float]:
+            key = (text_value, fam, float(size), bool(it), bool(bo))
+            if key in extents_cache:
+                return extents_cache[key]
+            val = du._get_text_extents_mm(text_value, fam, size, it, bo)
+            extents_cache[key] = val
+            return val
 
         for ev in events:
             t = float(getattr(ev, 'time', 0.0) or 0.0)
@@ -193,7 +213,7 @@ class TextDrawerMixin:
 
             x_mm = float(self.relative_c4pitch_to_x(rp)) + x_off
 
-            layout_info = self._text_layout(du, txt, family, size_pt, italic, bold)
+            layout_info = self._text_layout(du, txt, family, size_pt, italic, bold, extents_cache)
             lines = list(layout_info.get("lines", []))
             content_w_mm = float(layout_info.get("content_width_mm", 0.0) or 0.0)
             line_h_mm = float(layout_info.get("line_height_mm", 0.0) or 0.0)
@@ -285,7 +305,7 @@ class TextDrawerMixin:
                     )
 
                 if underline and line_text:
-                    xb_mm, yb_mm, ink_w_mm, ink_h_mm = du._get_text_extents_mm(line_text, family, size_pt, italic, bold)
+                    xb_mm, yb_mm, ink_w_mm, ink_h_mm = _measure(line_text, family, size_pt, italic, bold)
                     ul_y_local = -ink_h_mm / 2.0 - yb_mm + max(0.2, size_pt * 0.025)
                     if alignment == 'right':
                         ul_x1, ul_y1 = _to_world(content_w_mm * 0.5 - ink_w_mm, line_y_local + ul_y_local)

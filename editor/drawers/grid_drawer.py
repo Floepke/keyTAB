@@ -278,12 +278,34 @@ class GridDrawerMixin:
                     merged.append((a, b))
             return merged
 
-        def _barline_cut_intervals(ticks: float) -> list[tuple[float, float]]:
-            intervals: list[tuple[float, float]] = []
-            for n in notes_view:
-                nt = float(getattr(n, 'time', 0.0) or 0.0)
-                if not _barline_time_eq(float(nt), float(ticks)):
+        notes_at_tick: dict[float, list] = {}
+        for n in notes_view:
+            nt = round(float(getattr(n, 'time', 0.0) or 0.0), 6)
+            notes_at_tick.setdefault(nt, []).append(n)
+
+        chord_span_at_tick_hand: dict[tuple[float, str], tuple[float, float]] = {}
+        for tick_key, tick_notes in notes_at_tick.items():
+            for chord_hand_key in ('l', 'r'):
+                chord_notes = [
+                    n for n in tick_notes
+                    if str(getattr(n, 'hand', 'l') or 'l') == chord_hand_key
+                ]
+                if len(chord_notes) < 2:
                     continue
+                pitches = [int(getattr(n, 'pitch', 0) or 0) for n in chord_notes]
+                x_lo = float(self.pitch_to_x(min(pitches)))
+                x_hi = float(self.pitch_to_x(max(pitches)))
+                chord_span_at_tick_hand[(tick_key, chord_hand_key)] = (x_lo, x_hi)
+
+        barline_cut_cache: dict[float, list[tuple[float, float]]] = {}
+
+        def _barline_cut_intervals(ticks: float) -> list[tuple[float, float]]:
+            tick_key = round(float(ticks), 6)
+            if tick_key in barline_cut_cache:
+                return barline_cut_cache[tick_key]
+
+            intervals: list[tuple[float, float]] = []
+            for n in notes_at_tick.get(tick_key, []):
                 p = int(getattr(n, 'pitch', 0) or 0)
                 x_note = float(self.pitch_to_x(p))
                 intervals.append((
@@ -297,18 +319,10 @@ class GridDrawerMixin:
                         min(x_note, x_stem_tip) - stem_collision_pad - barline_symbol_gap_mm,
                         max(x_note, x_stem_tip) + stem_collision_pad + barline_symbol_gap_mm,
                     ))
-            # Chord connector lines span from lowest to highest pitch in same-hand chords.
-            # Without this, the connector line between note heads can cross a barline gap.
             for chord_hand_key in ('l', 'r'):
-                chord_notes_at_tick = [
-                    n for n in notes_view
-                    if _barline_time_eq(float(getattr(n, 'time', 0.0) or 0.0), float(ticks))
-                    and str(getattr(n, 'hand', 'l') or 'l') == chord_hand_key
-                ]
-                if len(chord_notes_at_tick) >= 2:
-                    pitches_at_tick = [int(getattr(n, 'pitch', 0) or 0) for n in chord_notes_at_tick]
-                    x_lo = float(self.pitch_to_x(min(pitches_at_tick)))
-                    x_hi = float(self.pitch_to_x(max(pitches_at_tick)))
+                chord_span = chord_span_at_tick_hand.get((tick_key, chord_hand_key))
+                if chord_span is not None:
+                    x_lo, x_hi = chord_span
                     intervals.append((
                         x_lo - stem_collision_pad - barline_symbol_gap_mm,
                         x_hi + stem_collision_pad + barline_symbol_gap_mm,
@@ -337,7 +351,9 @@ class GridDrawerMixin:
                     c_x0 - beam_collision_pad - barline_symbol_gap_mm,
                     c_x1 + beam_collision_pad + barline_symbol_gap_mm,
                 ))
-            return _merge_intervals(intervals)
+            merged = _merge_intervals(intervals)
+            barline_cut_cache[tick_key] = merged
+            return merged
 
         def _draw_barline_segments(y_mm: float, cuts: list[tuple[float, float]], width_mm: float, tags: list[str], item_id: int = 0) -> None:
             if not cuts:

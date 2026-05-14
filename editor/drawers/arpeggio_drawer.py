@@ -14,13 +14,16 @@ if TYPE_CHECKING:
 class ArpeggioDrawerMixin:
     _arp_time_op: Operator = Operator(float(SHORTEST_DURATION))
 
-    def _resolve_arpeggio_notes(self, arp: "Arpeggio", notes_all: list, op: Operator) -> list:
+    def _resolve_arpeggio_notes(self, arp: "Arpeggio", notes_all: list, op: Operator, notes_by_time: dict[float, list] | None = None) -> list:
         # Match notes at the arpeggio time whose pitches are listed in arp.notes
         base_time = float(getattr(arp, "time", 0.0) or 0.0)
         target_pitches = list(getattr(arp, "notes", []) or [])
         if len(target_pitches) < 2:
             return []
-        matches = [n for n in notes_all if op.eq(float(getattr(n, "time", 0.0) or 0.0), base_time)]
+        if notes_by_time is not None:
+            matches = list(notes_by_time.get(round(float(base_time), 6), []))
+        else:
+            matches = [n for n in notes_all if op.eq(float(getattr(n, "time", 0.0) or 0.0), base_time)]
         remaining = list(int(p) for p in target_pitches)
         resolved = []
         for n in sorted(matches, key=lambda m: int(getattr(m, "pitch", 0) or 0)):
@@ -49,6 +52,10 @@ class ArpeggioDrawerMixin:
 
         cache = getattr(self, "_draw_cache", {}) or {}
         notes_sorted = cache.get("notes_sorted") or list(getattr(score.events, "note", []) or [])
+        notes_by_time: dict[float, list] = {}
+        for n in notes_sorted:
+            nt = round(float(getattr(n, "time", 0.0) or 0.0), 6)
+            notes_by_time.setdefault(nt, []).append(n)
 
         semi = float(self.semitone_dist or 0.5)
         op = self._arp_time_op
@@ -62,7 +69,7 @@ class ArpeggioDrawerMixin:
             except Exception:
                 continue
 
-            chord_notes = self._resolve_arpeggio_notes(arp, notes_sorted, op)
+            chord_notes = self._resolve_arpeggio_notes(arp, notes_sorted, op, notes_by_time)
             if len(chord_notes) < 2:
                 continue
 

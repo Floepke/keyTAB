@@ -17,7 +17,56 @@ if TYPE_CHECKING:
 
 
 class CrescendoDrawerMixin:
-    def _get_dynamic_symbol_at_position(self, du: DrawUtil, t: float, x_rpitch: int) -> dict | None:
+    def _dynamic_symbol_bounds_lookup(self, du: DrawUtil, score) -> dict[tuple[float, int], dict]:
+        lookup: dict[tuple[float, int], dict] = {}
+        dynamic_symbols = list(getattr(score.events, 'dynamic_symbol', []) or [])
+        text_family = 'LelandText'
+        text_size_pt = float(DYNAMIC_SYMBOL_FONT_SIZE_PT or 12.0)
+        bg_pad = float(DYNAMIC_SYMBOL_BACKGROUND_PADDING_MM or 1.5)
+        layout_rotation = float(getattr(getattr(score, 'layout', None), 'dynamic_rotation', 0.0) or 0.0)
+
+        extents_cache: dict[tuple[str, str, float], tuple[float, float, float, float]] = {}
+
+        def _extents(glyph: str) -> tuple[float, float, float, float]:
+            key = (glyph, text_family, text_size_pt)
+            if key in extents_cache:
+                return extents_cache[key]
+            try:
+                val = du._get_text_extents_mm(glyph, text_family, text_size_pt, False, False)
+            except Exception:
+                val = (0.0, 0.0, max(1.0, (text_size_pt / 72.0) * 25.4), max(1.0, (text_size_pt / 72.0) * 25.4 * 0.8))
+            extents_cache[key] = val
+            return val
+
+        for sym in dynamic_symbols:
+            sym_time = float(getattr(sym, 'time', 0.0) or 0.0)
+            sym_rpitch = int(getattr(sym, 'x_rpitch', 0) or 0)
+            glyph = str(getattr(sym, 'symbol', '') or '')
+            if not glyph:
+                continue
+
+            raw_rotation = getattr(sym, 'rotation', None)
+            text_angle_deg = float(layout_rotation if raw_rotation is None else raw_rotation)
+            y_mm = float(self.time_to_mm(sym_time))
+            xb, yb, w, h = _extents(glyph)
+            hw = float(w) * 0.5
+            hh = float(h) * 0.5
+            bg_half_w = hw + bg_pad
+            bg_half_h = hh + bg_pad
+            ang = math.radians(text_angle_deg)
+            rot_half_h = abs(bg_half_w * math.sin(ang)) + abs(bg_half_h * math.cos(ang))
+            x_mm = float(self.relative_c4pitch_to_x(sym_rpitch))
+            lookup[(round(sym_time, 6), int(sym_rpitch))] = {
+                'glyph': glyph,
+                'x_mm': x_mm,
+                'y_mm': y_mm,
+                'y_min_mm': y_mm - rot_half_h,
+                'y_max_mm': y_mm + rot_half_h,
+            }
+
+        return lookup
+
+    def _get_dynamic_symbol_at_position(self, du: DrawUtil, t: float, x_rpitch: int, lookup: dict[tuple[float, int], dict] | None = None) -> dict | None:
         """
         Check if there's a dynamic symbol at the given time and x_rpitch.
         Returns dict with rotated Y bounds if found, None otherwise.
@@ -27,53 +76,16 @@ class CrescendoDrawerMixin:
         if score is None:
             return None
 
-        dynamic_symbols = list(getattr(score.events, 'dynamic_symbol', []) or [])
-        op = Operator(float(SHORTEST_DURATION))
-        text_family = 'LelandText'
-        text_size_pt = float(DYNAMIC_SYMBOL_FONT_SIZE_PT or 12.0)
-        bg_pad = float(DYNAMIC_SYMBOL_BACKGROUND_PADDING_MM or 1.5)
-        layout_rotation = float(getattr(getattr(score, 'layout', None), 'dynamic_rotation', 0.0) or 0.0)
-        
-        for sym in dynamic_symbols:
-            sym_time = float(getattr(sym, 'time', 0.0) or 0.0)
-            sym_rpitch = int(getattr(sym, 'x_rpitch', 0) or 0)
-            
-            # Check if symbol is at same time and x position
-            if op.eq(sym_time, t) and sym_rpitch == x_rpitch:
-                glyph = str(getattr(sym, 'symbol', '') or '')
-                if not glyph:
-                    return None
-                raw_rotation = getattr(sym, 'rotation', None)
-                text_angle_deg = float(layout_rotation if raw_rotation is None else raw_rotation)
+        local_lookup = lookup if lookup is not None else self._dynamic_symbol_bounds_lookup(du, score)
+        key = (round(float(t), 6), int(x_rpitch))
+        if key in local_lookup:
+            return local_lookup[key]
 
-                y_mm = float(self.time_to_mm(t))
-                try:
-                    xb, yb, w, h = du._get_text_extents_mm(glyph, text_family, text_size_pt, False, False)
-                    hw = float(w) * 0.5
-                    hh = float(h) * 0.5
-                    bg_half_w = hw + bg_pad
-                    bg_half_h = hh + bg_pad
-                    ang = math.radians(text_angle_deg)
-                    rot_half_h = abs(bg_half_w * math.sin(ang)) + abs(bg_half_h * math.cos(ang))
-                    x_mm = float(self.relative_c4pitch_to_x(x_rpitch))
-                    return {
-                        'glyph': glyph,
-                        'x_mm': x_mm,
-                        'y_mm': y_mm,
-                        'y_min_mm': y_mm - rot_half_h,
-                        'y_max_mm': y_mm + rot_half_h,
-                    }
-                except Exception:
-                    # Fallback if font calculation fails
-                    fallback_half_h = max(1.0, ((text_size_pt / 72.0) * 25.4 * 0.4) + bg_pad)
-                    return {
-                        'glyph': glyph,
-                        'x_mm': float(self.relative_c4pitch_to_x(x_rpitch)),
-                        'y_mm': y_mm,
-                        'y_min_mm': y_mm - fallback_half_h,
-                        'y_max_mm': y_mm + fallback_half_h,
-                    }
-        
+        # Fallback: thresholded time-match for safety when float rounding differs.
+        op = Operator(float(SHORTEST_DURATION))
+        for (tk, rp), info in local_lookup.items():
+            if int(rp) == int(x_rpitch) and op.eq(float(tk), float(t)):
+                return info
         return None
     
     def _adjust_hairpin_for_symbols(
@@ -84,15 +96,16 @@ class CrescendoDrawerMixin:
         x_rpitch: int,
         y_start_draw: float,
         y_end_draw: float,
+        lookup: dict[tuple[float, int], dict] | None = None,
     ) -> tuple[float, float]:
         """Adjust hairpin start/end y positions to connect to dynamic symbol bounds (matching engraver)."""
         self = cast("Editor", self)
 
-        symbol_at_start = self._get_dynamic_symbol_at_position(du, t_start, x_rpitch)
+        symbol_at_start = self._get_dynamic_symbol_at_position(du, t_start, x_rpitch, lookup)
         if symbol_at_start is not None:
             y_start_draw = max(float(y_start_draw), float(symbol_at_start['y_max_mm']))
 
-        symbol_at_end = self._get_dynamic_symbol_at_position(du, t_end, x_rpitch)
+        symbol_at_end = self._get_dynamic_symbol_at_position(du, t_end, x_rpitch, lookup)
         if symbol_at_end is not None:
             y_end_draw = min(float(y_end_draw), float(symbol_at_end['y_min_mm']))
 
@@ -109,6 +122,8 @@ class CrescendoDrawerMixin:
         events = list(getattr(score.events, 'crescendo', []) or [])
         if not events:
             return
+
+        dynamic_lookup = self._dynamic_symbol_bounds_lookup(du, score)
 
         # Use hardcoded editor defaults for hairpin styling (not from file layout)
         lw = float(HAIRPIN_LINE_WIDTH_MM or 1.0) * float(SCALE or 1.0)
@@ -156,7 +171,7 @@ class CrescendoDrawerMixin:
 
             # Adjust hairpin position to connect to dynamic symbol bounds
             y_start_draw, y_end_draw = self._adjust_hairpin_for_symbols(
-                du, t_start, t_end, x_rpitch, y_start_draw, y_end_draw
+                du, t_start, t_end, x_rpitch, y_start_draw, y_end_draw, dynamic_lookup
             )
 
             # Handles at the drawn hairpin endpoints (after symbol adjustment)

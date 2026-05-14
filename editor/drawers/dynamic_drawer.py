@@ -30,6 +30,18 @@ class DynamicDrawerMixin:
         text_color = self.notation_color
         text_family = 'LelandText'
         layout_rotation = float(getattr(getattr(score, 'layout', None), 'dynamic_rotation', 0.0) or 0.0)
+        extents_cache: dict[tuple[str, str, float], tuple[float, float, float, float]] = {}
+
+        def _get_extents(symbol_text: str) -> tuple[float, float, float, float]:
+            key = (symbol_text, text_family, text_size_pt)
+            if key in extents_cache:
+                return extents_cache[key]
+            try:
+                val = du._get_text_extents_mm(symbol_text, text_family, text_size_pt, False, False)
+            except Exception:
+                val = (0.0, 0.0, max(1.0, (text_size_pt / 72.0) * 25.4), max(1.0, (text_size_pt / 72.0) * 25.4 * 0.8))
+            extents_cache[key] = val
+            return val
 
         top_mm = float(getattr(self, '_view_y_mm_offset', 0.0) or 0.0)
         vp_h_mm = float(getattr(self, '_viewport_h_mm', 0.0) or 0.0)
@@ -61,10 +73,7 @@ class DynamicDrawerMixin:
             x_mm = clamp_x(float(self.relative_c4pitch_to_x(x_rpitch)))
             ev_id = int(getattr(ev, '_id', 0) or 0)
 
-            try:
-                xb, yb, w, h = du._get_text_extents_mm(symbol, text_family, text_size_pt, False, False)
-            except Exception:
-                xb, yb, w, h = 0.0, 0.0, max(1.0, (text_size_pt / 72.0) * 25.4), max(1.0, (text_size_pt / 72.0) * 25.4 * 0.8)
+            xb, yb, w, h = _get_extents(symbol)
 
             bx = float(x_mm) - (float(xb) + (float(w) * 0.5))
             by = float(y_mm) - (float(yb) + (float(h) * 0.5))
