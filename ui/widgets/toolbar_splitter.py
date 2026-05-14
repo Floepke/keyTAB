@@ -124,7 +124,7 @@ class ToolbarHandle(QtWidgets.QSplitterHandle):
         self.next_btn.setToolTip(self.tr("Go to the next print page."))
         layout.addWidget(self.next_btn)
         self.next_btn.clicked.connect(parent.nextRequested.emit)
-        
+
         '''this button goes to the previous page in the print view.'''
         self.prev_btn = QtWidgets.QToolButton(self)
         self.prev_btn.setFocusPolicy(QtCore.Qt.FocusPolicy.NoFocus)
@@ -232,24 +232,6 @@ class ToolbarHandle(QtWidgets.QSplitterHandle):
         self.line_break_btn.setFixedSize(self._button_size, self._button_size)
         layout.addWidget(self.line_break_btn)
         self.line_break_btn.clicked.connect(parent.lineBreakRequested.emit)
-
-        # Visual separator between dialog shortcuts and contextual toolbar
-        sep = QtWidgets.QFrame(self)
-        sep.setFrameShape(QtWidgets.QFrame.Shape.NoFrame)
-        sep.setFixedHeight(4)
-        sep.setStyleSheet(
-            "background-color: rgb(0, 0, 0);"
-            "border-radius: 2px;"
-        )
-        layout.addWidget(sep)
-
-        # Contextual tool area managed by ToolManager
-        self._toolbar_area = QtWidgets.QWidget(self)
-        self._toolbar_layout = QtWidgets.QVBoxLayout(self._toolbar_area)
-        # Keep contextual area flush; we'll trim button width by 1px to reveal right border
-        self._toolbar_layout.setContentsMargins(0, 0, 0, 0)
-        self._toolbar_layout.setSpacing(6)
-        layout.addWidget(self._toolbar_area)
         layout.addStretch(1)
 
         self.setStyleSheet(
@@ -264,57 +246,10 @@ class ToolbarHandle(QtWidgets.QSplitterHandle):
         self.parent().fitRequested.emit(True)
         super().mouseDoubleClickEvent(ev)
 
-    def set_buttons(self, defs: list[dict]):
-        # Clear previous buttons
-        while self._toolbar_layout.count():
-            item = self._toolbar_layout.takeAt(0)
-            w = item.widget()
-            if w:
-                w.deleteLater()
-        # Add new buttons
-        for d in defs or []:
-            name = d.get('name', '')
-            icon_name = d.get('icon', '')
-            text = str(d.get('text', '') or '')
-            active = bool(d.get('active', False))
-            tooltip = str(d.get('tooltip', name) or '').replace(';', '.')
-            tooltip = tooltip.strip()
-            if tooltip and not tooltip.endswith('.'):
-                tooltip = f"{tooltip}."
-            btn = QtWidgets.QToolButton(self._toolbar_area)
-            btn.setFocusPolicy(QtCore.Qt.FocusPolicy.NoFocus)
-            btn.setAutoRaise(False)
-            ic = get_qicon(icon_name, size=(64, 64))
-            rotation_deg = float(d.get('rotation', 0.0) or 0.0)
-            if ic and abs(rotation_deg) > 0.1:
-                pm = ic.pixmap(64, 64)
-                transform = QtGui.QTransform().rotate(rotation_deg)
-                pm = pm.transformed(transform, QtCore.Qt.TransformationMode.SmoothTransformation)
-                ic = QtGui.QIcon(pm)
-            if ic:
-                btn.setIcon(ic)
-            if text:
-                btn.setText(text)
-            btn.setToolTip(tooltip)
-            if text and not ic:
-                btn.setToolButtonStyle(QtCore.Qt.ToolButtonStyle.ToolButtonTextOnly)
-            btn.setIconSize(QtCore.QSize(self._button_size - 6, self._button_size - 6))
-            # Trim width by 1px to ensure the right outline remains visible inside the handle
-            btn.setFixedSize(self._button_size - 1, self._button_size)
-            if active:
-                accent = Style.get_named_qcolor('accent', (0, 120, 215))
-                border = accent.darker(120)
-                btn.setStyleSheet(
-                    "QToolButton {"
-                    f"background-color: rgb({accent.red()},{accent.green()},{accent.blue()});"
-                    "color: rgb(255,255,255);"
-                    f"border: 1px solid rgb({border.red()},{border.green()},{border.blue()});"
-                    "border-radius: 4px;"
-                    "}"
-                )
-            # Emit contextButtonClicked(name) from parent splitter
-            btn.clicked.connect(lambda _=False, n=name: self.parent().contextButtonClicked.emit(n))
-            self._toolbar_layout.addWidget(btn)
+    def set_buttons(self, defs: list[dict]) -> None:
+        # Contextual buttons moved to a dedicated left-side widget in MainWindow.
+        # Keep compatibility so stale callers do not break.
+        _ = defs
 
 
 class ToolbarSplitter(QtWidgets.QSplitter):
@@ -357,7 +292,8 @@ class ToolbarSplitter(QtWidgets.QSplitter):
 
     def set_context_buttons(self, defs: list[dict]):
         if hasattr(self, '_handle') and self._handle is not None:
-            self._handle.set_buttons(defs)
+            if hasattr(self._handle, 'set_buttons'):
+                self._handle.set_buttons(defs)
 
     def mouseDoubleClickEvent(self, ev: QtGui.QMouseEvent) -> None:
         # Only trigger fit when double-clicking the splitter handle

@@ -10,6 +10,7 @@ from file_model.file_manager import FileManager
 from file_model.analysis import Analysis
 from file_model.layout import Layout
 from ui.widgets.toolbar_splitter import ToolbarSplitter
+from ui.widgets.contextual_toolbar import ContextualToolbar
 from ui.widgets.cairo_views import CairoEditorWidget
 from ui.widgets.editor_scrollbar import EditorScrollBar
 from ui.widgets.tool_selector import ToolSelectorDock, LEFT_PANEL_PADDING_PX
@@ -91,6 +92,9 @@ class MainWindow(QtWidgets.QMainWindow):
         self._apply_global_tooltip_visibility(self._show_tooltips_in_panel)
 
         self.splitter = ToolbarSplitter(QtCore.Qt.Orientation.Horizontal)
+        
+        # Create contextual toolbar for the left edge (will be integrated into central layout)
+        self.contextual_toolbar = ContextualToolbar(self)
         
         # Editor view with external scrollbar for static viewport scrolling
         self.editor_canvas = CairoEditorWidget()
@@ -224,7 +228,16 @@ class MainWindow(QtWidgets.QMainWindow):
         self.splitter.addWidget(self.print_view)
         self.splitter.setStretchFactor(0, 3)
         self.splitter.setStretchFactor(1, 2)
-        self.setCentralWidget(self.splitter)
+        
+        # Create top-level splitter: contextual toolbar (left) + editor/print-view (right)
+        self.main_layout_splitter = QtWidgets.QSplitter(QtCore.Qt.Orientation.Horizontal)
+        self.main_layout_splitter.setHandleWidth(0)  # No visible handle
+        self.main_layout_splitter.setChildrenCollapsible(False)  # Prevent collapsing
+        self.main_layout_splitter.addWidget(self.contextual_toolbar)
+        self.main_layout_splitter.addWidget(self.splitter)
+        self.main_layout_splitter.setStretchFactor(0, 0)  # Contextual toolbar: fixed width
+        self.main_layout_splitter.setStretchFactor(1, 1)  # Editor/print-view: expandable
+        self.setCentralWidget(self.main_layout_splitter)
         # Status bar for lightweight app messages and default path/dirty info
         self._status_default_text = ""
         self._statusbar = QtWidgets.QStatusBar(self)
@@ -270,7 +283,7 @@ class MainWindow(QtWidgets.QMainWindow):
             pass
         # Wiring
         # Editor + ToolManager
-        self.tool_manager = ToolManager(self.splitter)
+        self.tool_manager = ToolManager(self.contextual_toolbar)
         self.editor_controller = Editor(self.tool_manager)
         self.editor_canvas.set_editor(self.editor_controller)
         # Provide widget reference to editor for explicit full redraws
@@ -320,9 +333,6 @@ class MainWindow(QtWidgets.QMainWindow):
         self.splitter.fitRequested.connect(self._fit_print_view_to_page)
         self.splitter.fitRequested.connect(self.print_view.reset_view_state)
         self.splitter.fitRequested.connect(self._force_redraw)
-        # Any manual splitter movement should return print-view Ctrl/Cmd zoom to idle.
-        self.splitter.splitterMoved.connect(self._on_splitter_moved)
-        # Default toolbar actions
         self.splitter.nextRequested.connect(self._next_page)
         self.splitter.nextRequested.connect(self._force_redraw)
         self.splitter.previousRequested.connect(self._previous_page)
@@ -340,8 +350,10 @@ class MainWindow(QtWidgets.QMainWindow):
         self.splitter.styleRequested.connect(self._open_style_dialog)
         self.splitter.infoRequested.connect(self._open_info_dialog)
         self.splitter.lineBreakRequested.connect(self._open_line_break_dialog)
-        # Contextual tool buttons should also force redraw
-        self.splitter.contextButtonClicked.connect(lambda *_: self._force_redraw())
+        # Any manual splitter movement should return print-view Ctrl/Cmd zoom to idle.
+        self.splitter.splitterMoved.connect(self._on_splitter_moved)
+        
+        # Splitter toolbar defaults are active here (fit/page nav/edit/playback/dialog shortcuts).
         # Fit state tracking
         self.is_fit = False
         self.is_startup = True
@@ -2873,7 +2885,7 @@ class MainWindow(QtWidgets.QMainWindow):
         - Else: run the fit logic.
         - If not hidden and not fitted (in-between): run the fit logic.
         """
-        splitter = self.centralWidget()
+        splitter = getattr(self, 'splitter', None)
         if splitter is None:
             return
 
@@ -3708,7 +3720,7 @@ class MainWindow(QtWidgets.QMainWindow):
         geom_b64 = bytes(self.saveGeometry().toBase64()).decode("ascii")
         adm.set("window_geometry", geom_b64)
         # Save current splitter sizes for next startup
-        sp = self.centralWidget()
+        sp = getattr(self, 'splitter', None)
         if sp is not None and hasattr(sp, 'sizes'):
             sizes = list(sp.sizes())
             adm.set("splitter_sizes", [int(sizes[0]) if sizes else 0, int(sizes[1]) if len(sizes) > 1 else 0])

@@ -1,21 +1,22 @@
 from __future__ import annotations
-from typing import Optional
+from typing import Optional, TYPE_CHECKING
 from PySide6 import QtCore
-from icons.icons import get_qicon
-from ui.widgets.toolbar_splitter import ToolbarSplitter
+
+if TYPE_CHECKING:
+    from ui.widgets.contextual_toolbar import ContextualToolbar
 
 
 class ToolManager(QtCore.QObject):
-    """Manage the active tool and its contextual toolbar in the splitter."""
+    """Manage the active tool and its contextual toolbar."""
 
     toolChanged = QtCore.Signal(str)
 
-    def __init__(self, splitter: ToolbarSplitter):
+    def __init__(self, contextual_toolbar: 'ContextualToolbar'):
         super().__init__()
-        self._splitter = splitter
+        self._contextual_toolbar = contextual_toolbar
         self._tool = None
         self._editor = None
-        self._splitter.contextButtonClicked.connect(self._on_context_button_clicked)
+        self._contextual_toolbar.contextButtonClicked.connect(self._on_context_button_clicked)
 
     def set_tool(self, tool) -> None:
         # Deactivate previous tool
@@ -30,7 +31,7 @@ class ToolManager(QtCore.QObject):
             self._tool.on_activate()
         # Build contextual toolbar after activation so stateful buttons reflect restored tool state.
         defs = tool.toolbar_spec() or []
-        self._splitter.set_context_buttons(defs)
+        self._contextual_toolbar.set_buttons(defs)
         name = getattr(tool, 'TOOL_NAME', 'unknown')
         self.toolChanged.emit(str(name))
         if self._editor is not None:
@@ -44,7 +45,7 @@ class ToolManager(QtCore.QObject):
             self._tool.on_toolbar_button(name)
             # Rebuild contextual toolbar to reflect dynamic labels/state.
             defs = self._tool.toolbar_spec() or []
-            self._splitter.set_context_buttons(defs)
+            self._contextual_toolbar.set_buttons(defs)
         # Force immediate visual feedback after any contextual button
         if self._editor is not None:
             if hasattr(self._editor, 'force_redraw_from_model'):
@@ -57,7 +58,7 @@ class ToolManager(QtCore.QObject):
         if self._tool is None:
             return
         defs = self._tool.toolbar_spec() or []
-        self._splitter.set_context_buttons(defs)
+        self._contextual_toolbar.set_buttons(defs)
 
     def set_editor(self, editor) -> None:
         """Bind the active Editor so tools can access conversion wrappers."""
