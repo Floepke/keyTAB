@@ -33,8 +33,8 @@ class StaveDrawer:
     
     def _draw_stave_line(self, line_index: int, line: dict) -> None:
         """Draw stave lines (vertical key columns) and ledger lines for a single system line."""
-        # Check if staves are visible for this line
-        if not bool(line.get('stave_visible', True)):
+        # Match legacy behavior: global layout setting controls stave visibility.
+        if not bool(self.layout_data.get('layout', {}).get('stave_visible', True)):
             return
         
         y1 = float(line.get('y_top', 0.0))
@@ -76,15 +76,16 @@ class StaveDrawer:
         
         # Visible keys for this line (main stave range)
         visible_keys = list(line.get('visible_keys', []))
+        if not visible_keys:
+            line_keys = list(self.layout_data.get('line_keys', []))
+            line_range = list(line.get('range', [1, PIANO_KEY_AMOUNT]) or [1, PIANO_KEY_AMOUNT])
+            range_lo = int(line_range[0]) if len(line_range) >= 1 else 1
+            range_hi = int(line_range[1]) if len(line_range) >= 2 else PIANO_KEY_AMOUNT
+            visible_keys = [k for k in range(range_lo, range_hi + 1) if k in line_keys]
+
+        # natural bounds for ledger line drawing (notes outside these bounds get ledger lines)
         natural_bound_left = int(line.get('natural_bound_left', line.get('range', [1, 88])[0]))
         natural_bound_right = int(line.get('natural_bound_right', line.get('range', [1, 88])[1]))
-        
-        if not visible_keys:
-            visible_keys = [k for k in range(int(line.get('range', [1, 88])[0]), 
-                                             int(line.get('range', [1, 88])[1]) + 1) if k in self.layout_data.get('line_keys', [])]
-        
-        # Track which ledger lines have been drawn (to avoid duplicates)
-        ledger_drawn: set[tuple[int, int]] = set()
         
         # Draw special low register stave line (A#0, key 2)
         low_key_present = bool(line.get('low_key_left', False))

@@ -19,12 +19,14 @@ from file_model.SCORE import SCORE
 from file_model.analysis import Analysis
 from ui.style import Style
 from ui.widgets.draw_util import DrawUtil
-from utils.CONSTANT import PIANO_KEY_AMOUNT
+from utils.CONSTANT import PIANO_KEY_AMOUNT, BE_KEYS, BLACK_KEYS
+from utils.tiny_tool import key_class_filter
 
 from engraver.engraver import Engraver as _LegacyEngraver
 from engraver.engraver import do_engrave as _legacy_do_engrave
 
 # Import all drawer classes
+from engraver.drawers.paper_drawer import PaperDrawer
 from engraver.drawers.stave_drawer import StaveDrawer
 from engraver.drawers.barline_drawer import BarlineDrawer
 from engraver.drawers.notehead_drawer import NoteheadDrawer
@@ -45,6 +47,7 @@ from engraver.drawers.count_line_drawer import CountLineDrawer
 
 # Drawer pipeline order (independent, can be parallelized later)
 DRAWER_PIPELINE = [
+    PaperDrawer,             # Paper background
     GridBandDrawer,          # Background first
     BarlineDrawer,           # Grid structure
     StaveDrawer,             # Stave lines (vertical per key)
@@ -89,48 +92,301 @@ def _reset_drawutil_pages(target: DrawUtil, source: DrawUtil) -> None:
 
 
 def _build_stave_layout_data(score: SCORE, page_lines_map: list[dict], notation_color: tuple[float, float, float, float]) -> dict:
-    """Build the minimal layout payload required by StaveDrawer."""
+    """Build layout payload required by PaperDrawer and StaveDrawer."""
+    score = score or {}
     layout = dict((score or {}).get('layout', {}) or {})
+    events = dict((score or {}).get('events', {}) or {})
+    line_breaks = list(events.get('line_break', []) or [])
+    notes = list(events.get('note', []) or [])
+
+    try:
+        layout_scale = float(layout.get('scale', 1.0) or 1.0)
+    except Exception:
+        layout_scale = 1.0
+    if layout_scale <= 0.0:
+        layout_scale = 1.0
+
+    page_orientation = str(layout.get('page_orientation', 'portrait') or 'portrait').strip().lower()
+    if page_orientation == 'vertical':
+        page_orientation = 'portrait'
+    elif page_orientation == 'horizontal':
+        page_orientation = 'landscape'
+
+    read_direction = str(layout.get('read_direction', 'vertical') or 'vertical').strip().lower()
+    horizontal_read_direction = read_direction == 'horizontal'
+    landscape_page_orientation = page_orientation == 'landscape'
+    raw_page_w = float(layout.get('page_width_mm', 210.0) or 210.0)
+    raw_page_h = float(layout.get('page_height_mm', 297.0) or 297.0)
+    swap_page_axes = landscape_page_orientation != horizontal_read_direction
+    if swap_page_axes:
+        page_w = raw_page_h
+        page_h = raw_page_w
+    else:
+        page_w = raw_page_w
+        page_h = raw_page_h
+
+    semitone_mm = 2.0 * layout_scale
+
+    def _build_key_positions(start_key: int, end_key: int, semitone_mm_local: float) -> dict[int, float]:
+        positions: dict[int, float] = {}
+        x = 0.0
+        prev = None
+        for key in range(start_key, end_key + 1):
+            if prev is not None and prev in BE_KEYS:
+                x += semitone_mm_local
+            x += semitone_mm_local
+            positions[key] = x
+            prev = key
+        return positions
+
+    def _sanitize_range(rng) -> list[int]:
+        if not isinstance(rng, list) or len(rng) < 2:
+            return [1, PIANO_KEY_AMOUNT]
+        lo = int(rng[0])
+        hi = int(rng[1])
+        lo = max(1, min(PIANO_KEY_AMOUNT, lo))
+        hi = max(1, min(PIANO_KEY_AMOUNT, hi))
+        if hi < lo:
+            lo, hi = hi, lo
+        return [lo, hi]
+
+    def _pc_char(key: int) -> str:
+        pc = (int(key) - 1) % 12
+        if pc in (0, 2, 3, 5, 7, 8, 10):
+            return {0: 'a', 2: 'b', 3: 'c', 5: 'd', 7: 'e', 8: 'f', 10: 'g'}[pc]
+        return {1: 'A', 4: 'C', 6: 'D', 9: 'F', 11: 'G'}[pc]
+
+    def _build_line_groups() -> list[dict]:
+        groups: list[dict] = []
+        used: set[int] = set()
+
+        def _next_index(start: int, pc_target: str) -> int | None:
+            for j in range(start + 1, len(BLACK_KEYS)):
+                if j in used:
+                    continue
+                if _pc_char(BLACK_KEYS[j]) == pc_target:
+                    return j
+            return None
+
+        for i, key in enumerate(BLACK_KEYS):
+            if i in used:
+                continue
+            pc = _pc_char(key)
+            if pc == 'C':
+                keys = [key]
+                j = _next_index(i, 'D')
+                if j is not None:
+                    keys.append(BLACK_KEYS[j])
+                    used.add(j)
+                used.add(i)
+                groups.append({'keys': keys})
+            elif pc == 'F':
+                keys = [key]
+                j = _next_index(i, 'G')
+                if j is not None:
+                    keys.append(BLACK_KEYS[j])
+                    used.add(j)
+                    k = _next_index(j, 'A')
+                    if k is not None:
+                        keys.append(BLACK_KEYS[k])
+                        used.add(k)
+                used.add(i)
+                groups.append({'keys': keys})
+
+        groups.sort(key=lambda g: g['keys'][0])
+        for i, grp in enumerate(groups):
+            first = grp['keys'][0]
+            last = grp['keys'][-1]
+            if i == 0:
+                low = 1
+            else:
+                prev_last = groups[i - 1]['keys'][-1]
+                low = int((prev_last + first) // 2) + 1
+            if i == len(groups) - 1:
+                high = PIANO_KEY_AMOUNT
+            else:
+                next_first = groups[i + 1]['keys'][0]
+                high = int((last + next_first) // 2)
+            grp['range_low'] = int(max(1, low))
+            grp['range_high'] = int(min(PIANO_KEY_AMOUNT, high))
+            if 41 in grp['keys'] and 43 in grp['keys']:
+                grp['pattern'] = 'c'
+            elif len(grp['keys']) == 2:
+                grp['pattern'] = '2'
+            else:
+                grp['pattern'] = '3'
+        return groups
+
+    line_groups = _build_line_groups()
+    if not line_groups:
+        line_groups = [{'keys': [41, 43], 'range_low': 1, 'range_high': PIANO_KEY_AMOUNT, 'pattern': 'c'}]
+
+    clef_group_index = 0
+    for i, grp in enumerate(line_groups):
+        if 41 in grp['keys'] and 43 in grp['keys']:
+            clef_group_index = i
+            break
+
+    def _group_index_for_key(key: int) -> int:
+        for i, grp in enumerate(line_groups):
+            if int(grp['range_low']) <= int(key) <= int(grp['range_high']):
+                return i
+        return 0 if int(key) <= int(line_groups[0]['range_low']) else len(line_groups) - 1
+
+    def _visible_line_groups_for_range(lo: int, hi: int, include_clef: bool = True) -> list[dict]:
+        lo = int(max(1, min(PIANO_KEY_AMOUNT, lo)))
+        hi = int(max(1, min(PIANO_KEY_AMOUNT, hi)))
+        if hi < lo:
+            lo, hi = hi, lo
+        min_group = _group_index_for_key(lo)
+        max_group = _group_index_for_key(hi)
+        if include_clef:
+            if clef_group_index < min_group:
+                min_group = clef_group_index
+            if clef_group_index > max_group:
+                max_group = clef_group_index
+        return [line_groups[gi] for gi in range(min_group, max_group + 1)]
+
+    def _line_break_defaults() -> dict:
+        return {
+            'time': 0.0,
+            'margin_mm': [10.0, 10.0],
+            'stave_range': 'auto',
+            'page_break': False,
+        }
+
+    if not line_breaks:
+        line_breaks = [_line_break_defaults()]
+
+    line_breaks = sorted(line_breaks, key=lambda lb: float(lb.get('time', 0.0) or 0.0))
+    line_break_by_time: dict[float, dict] = {
+        round(float(lb.get('time', 0.0) or 0.0), 6): lb for lb in line_breaks
+    }
+
+    norm_notes: list[dict] = []
+    for n in notes:
+        if not isinstance(n, dict):
+            continue
+        n_t = float(n.get('time', 0.0) or 0.0)
+        n_d = float(n.get('duration', 0.0) or 0.0)
+        p = int(n.get('pitch', 0) or 0)
+        norm_notes.append({'time': n_t, 'end': n_t + n_d, 'pitch': p})
+
+    key_positions = _build_key_positions(1, PIANO_KEY_AMOUNT, semitone_mm)
     page_lines: list[dict] = []
     key_to_x_for_line: dict[int, object] = {}
-    semitone_mm_default = 1.0
 
     for line_index, line in enumerate(page_lines_map or []):
         x_start = float(line.get('x_start', 0.0) or 0.0)
-        x_end = float(line.get('x_end', x_start) or x_start)
         y_top = float(line.get('y_top', 0.0) or 0.0)
         y_bottom = float(line.get('y_bottom', y_top) or y_top)
-        width = max(0.0, x_end - x_start)
-        semitone_mm = width / float(max(1, PIANO_KEY_AMOUNT - 1))
-        semitone_mm_default = max(1e-6, semitone_mm)
+        t0 = float(line.get('time_start', 0.0) or 0.0)
+        t1 = float(line.get('time_end', t0) or t0)
+
+        lb = line_break_by_time.get(round(t0, 6), {})
+        stave_range = lb.get('stave_range', 'auto')
+        if stave_range is True:
+            stave_range = 'auto'
+        if isinstance(stave_range, list) and len(stave_range) >= 2:
+            r0 = int(stave_range[0])
+            r1 = int(stave_range[1])
+            if (r0 == 0 and r1 == 0) or (r0 == 1 and r1 == 1):
+                stave_range = 'auto'
+
+        def _note_range_for_window(w0: float, w1: float) -> tuple[int | None, int | None]:
+            lo = None
+            hi = None
+            for item in norm_notes:
+                n_t = float(item.get('time', 0.0) or 0.0)
+                n_end = float(item.get('end', 0.0) or 0.0)
+                p = int(item.get('pitch', 0) or 0)
+                if n_t < float(w1) and n_end > float(w0):
+                    if p < 1 or p > PIANO_KEY_AMOUNT:
+                        continue
+                    lo = p if lo is None else min(lo, p)
+                    hi = p if hi is None else max(hi, p)
+            return lo, hi
+
+        def _auto_line_keys_and_bounds(w0: float, w1: float) -> tuple[list[int], int, int]:
+            lo, hi = _note_range_for_window(w0, w1)
+            if lo is None or hi is None:
+                grp = line_groups[clef_group_index]
+                keys = list(grp['keys'])
+                return keys, int(keys[0]), int(keys[-1])
+            groups = _visible_line_groups_for_range(int(lo), int(hi), include_clef=True)
+            if not groups:
+                grp = line_groups[clef_group_index]
+                keys = list(grp['keys'])
+                return keys, int(keys[0]), int(keys[-1])
+            keys: list[int] = []
+            for grp in groups:
+                keys.extend(grp['keys'])
+            return keys, int(keys[0]), int(keys[-1])
+
+        requested_lo = 1
+        if stave_range == 'auto':
+            visible_keys, bound_left, bound_right = _auto_line_keys_and_bounds(t0, t1)
+        else:
+            manual = _sanitize_range(stave_range)
+            requested_lo = int(manual[0])
+            groups = _visible_line_groups_for_range(manual[0], manual[1], include_clef=False)
+            if not groups:
+                groups = [line_groups[clef_group_index]]
+            visible_keys = []
+            for grp in groups:
+                visible_keys.extend(grp['keys'])
+            bound_left = int(visible_keys[0])
+            bound_right = int(visible_keys[-1])
+
+        natural_bound_left = int(bound_left)
+        natural_bound_right = int(bound_right)
+        low_key_present = bool(bound_left <= 2 or (stave_range != 'auto' and int(requested_lo) <= 2))
+        for item in norm_notes:
+            n_t = float(item.get('time', 0.0) or 0.0)
+            n_end = float(item.get('end', 0.0) or 0.0)
+            p = int(item.get('pitch', 0) or 0)
+            if n_t >= t1 or n_end <= t0:
+                continue
+            if p in (1, 2, 3):
+                low_key_present = True
+                break
+        a0_ledger_mode = bool(low_key_present and int(natural_bound_left) > 2)
+
+        origin = float(key_positions.get(bound_left, 0.0))
 
         page_lines.append({
             'stave_visible': True,
             'y_top': y_top,
             'y_bottom': y_bottom,
             'line_x_start': x_start,
-            'range': [1, PIANO_KEY_AMOUNT],
-            'visible_keys': list(range(1, PIANO_KEY_AMOUNT + 1)),
-            'natural_bound_left': 1,
-            'natural_bound_right': PIANO_KEY_AMOUNT,
-            'low_key_left': False,
-            'a0_ledger_mode': False,
+            'range': [int(bound_left), int(bound_right)],
+            'bound_left': int(bound_left),
+            'bound_right': int(bound_right),
+            'visible_keys': list(visible_keys),
+            'natural_bound_left': int(natural_bound_left),
+            'natural_bound_right': int(natural_bound_right),
+            'low_key_left': bool(low_key_present),
+            'a0_ledger_mode': bool(a0_ledger_mode),
+            'stave_range': stave_range,
         })
 
         key_to_x_for_line[line_index] = (
-            lambda key, _x_start=x_start, _semitone_mm=semitone_mm_default:
-            _x_start + ((float(key) - 1.0) * _semitone_mm)
+            lambda key, _x_start=x_start, _origin=origin:
+            _x_start + (float(key_positions.get(int(key), 0.0)) - _origin)
         )
 
     return {
         'page_lines': page_lines,
         'key_to_x_for_line': key_to_x_for_line,
-        'key_positions': {k: float(k - 1) * semitone_mm_default for k in range(1, PIANO_KEY_AMOUNT + 1)},
-        'line_keys': list(range(1, PIANO_KEY_AMOUNT + 1)),
-        'semitone_mm': semitone_mm_default,
+        'key_positions': key_positions,
+        'line_keys': list(BLACK_KEYS),
+        'semitone_mm': semitone_mm,
+        'page_width_mm': float(page_w),
+        'page_height_mm': float(page_h),
         'layout': layout,
         'notation_color': notation_color,
-        'scale': 1.0,
+        'paper_color': (1.0, 1.0, 1.0, 1.0),
+        'scale': layout_scale,
     }
 
 
@@ -157,27 +413,38 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
     du._stave_time_spans_by_page = getattr(scratch_du, '_stave_time_spans_by_page', [])
 
     notation_rgb = Style.get_notation_color()
+    paper_rgb = Style.get_paper_color()
     notation_color = (
         notation_rgb[0] / 255.0,
         notation_rgb[1] / 255.0,
         notation_rgb[2] / 255.0,
         1.0,
     )
+    paper_color = (
+        paper_rgb[0] / 255.0,
+        paper_rgb[1] / 255.0,
+        paper_rgb[2] / 255.0,
+        1.0,
+    )
     if pdf_export:
         notation_color = (0.0, 0.0, 0.0, 1.0)
+        paper_color = (1.0, 1.0, 1.0, 1.0)
 
     print_time_map = list(getattr(scratch_du, 'print_time_map', []) or [])
     for page_index, page_lines_map in enumerate(print_time_map):
         du.set_current_page(int(page_index))
+        layout_data = _build_stave_layout_data(score or {}, list(page_lines_map or []), notation_color)
+        layout_data['paper_color'] = paper_color
         context = EngravingContext(
             score=score or {},
             normalized={},
-            layout_data=_build_stave_layout_data(score or {}, list(page_lines_map or []), notation_color),
+            layout_data=layout_data,
             pageno=int(page_index),
             pdf_export=bool(pdf_export),
             du=du,
             drawer_caches={},
         )
+        PaperDrawer(context).draw()
         StaveDrawer(context).draw()
 
     if du.page_count() > 0:

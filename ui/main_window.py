@@ -1437,7 +1437,18 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def _get_use_new_engraver_from_appdata(self) -> bool:
         adm = get_appdata_manager()
-        return bool(adm.get("use_new_engraver", False))
+        raw = adm.get("use_new_engraver", False)
+        if isinstance(raw, bool):
+            return raw
+        if isinstance(raw, (int, float)):
+            return bool(raw)
+        if isinstance(raw, str):
+            val = raw.strip().lower()
+            if val in ("1", "true", "yes", "on"):
+                return True
+            if val in ("0", "false", "no", "off", ""):
+                return False
+        return bool(raw)
 
     def _set_use_new_engraver_to_appdata(self, enabled: bool) -> None:
         adm = get_appdata_manager()
@@ -1448,8 +1459,14 @@ class MainWindow(QtWidgets.QMainWindow):
         engraver_cls = NewEngraver if bool(getattr(self, "_use_new_engraver", False)) else LegacyEngraver
         return engraver_cls(self.du, self)
 
-    def _switch_engraver_backend(self, use_new: bool) -> None:
-        use_new = bool(use_new)
+    def _switch_engraver_backend(self, use_new: bool | None = None) -> None:
+        # For checkable QAction signals, trust the action's checked state so
+        # the Help menu label and behavior always stay in sync.
+        action = getattr(self, "_use_new_engraver_act", None)
+        if action is not None:
+            use_new = bool(action.isChecked())
+        else:
+            use_new = bool(use_new)
         if bool(getattr(self, "_use_new_engraver", False)) == use_new:
             return
 
@@ -1469,6 +1486,12 @@ class MainWindow(QtWidgets.QMainWindow):
                 pass
 
         self._use_new_engraver = use_new
+        if action is not None:
+            try:
+                old_block = bool(action.blockSignals(True))
+                action.setChecked(use_new)
+            finally:
+                action.blockSignals(old_block)
         self._set_use_new_engraver_to_appdata(use_new)
         self.engraver = self._create_engraver_instance()
         self.engraver.engraved.connect(self._on_engraver_finished)
