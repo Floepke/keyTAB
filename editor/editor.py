@@ -1411,7 +1411,8 @@ class Editor(QtCore.QObject,
         return self.clamp_time_to_visible_range(float(ticks))
 
     def _visible_time_bounds(self) -> tuple[float, float]:
-        """Return the minimum/maximum time ticks visible in page-space Y [0..page_h_mm]."""
+        """Return the minimum/maximum time ticks visible in editor content Y [0..editor_h_mm]."""
+        # get current score and ensure layout metrics are initialized
         score: SCORE | None = self.current_score()
         if score is None:
             t = float(0.0)
@@ -1420,12 +1421,16 @@ class Editor(QtCore.QObject,
             lay = getattr(score, 'layout', None)
             w_mm = float(getattr(lay, 'page_width_mm', 210.0) or 210.0) if lay is not None else 210.0
             self._calculate_layout(float(w_mm))
-        lay = getattr(score, 'layout', None)
-        page_h_mm = float(getattr(lay, 'page_height_mm', 297.0) or 297.0) if lay is not None else 297.0
+        editor_h_mm = float(getattr(self, 'editor_height', 0.0) or 0.0)
+        if editor_h_mm <= 0.0:
+            editor_h_mm = float(self._calc_editor_height())
+            self.editor_height = editor_h_mm
+        
+        # Convert editor Y range to time ticks using current zoom. Clamp to ensure min <= max even if zoom is very small or negative.
         zpq = float(getattr(score.app_state, 'zoom_mm_per_quarter', 25.0) or 25.0)
         margin = float(self.margin or 0.0)
         t_min = ((0.0 - margin) / max(1e-6, zpq)) * float(QUARTER_NOTE_UNIT)
-        t_max = ((page_h_mm - margin) / max(1e-6, zpq)) * float(QUARTER_NOTE_UNIT)
+        t_max = ((editor_h_mm - margin) / max(1e-6, zpq)) * float(QUARTER_NOTE_UNIT)
         if t_min > t_max:
             t_min, t_max = t_max, t_min
         return (float(t_min), float(t_max))
