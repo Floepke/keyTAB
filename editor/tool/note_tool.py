@@ -4,7 +4,7 @@ from file_model.SCORE import SCORE
 from settings_manager import get_preferences
 from utils.operator import Operator
 from ui.widgets.draw_util import DrawUtil
-from utils.CONSTANT import BLACK_KEYS, QUARTER_NOTE_UNIT, SHORTEST_DURATION
+from utils.CONSTANT import BLACK_KEYS, PIANO_KEY_AMOUNT, QUARTER_NOTE_UNIT, SHORTEST_DURATION
 from file_model.events.note import Note
 from symbol_design.noteheads import resolve_notehead_spec
 from ui.dialogs.notehead_dialog import NoteheadDialog
@@ -511,12 +511,9 @@ class NoteTool(BaseTool):
             return
 
     def _editor_left_button_down(self) -> bool:
-        try:
-            widget = getattr(self._editor, 'widget', None)
-            if widget is not None:
-                return bool(getattr(widget, '_left_down', False))
-        except Exception:
-            pass
+        widget = getattr(self._editor, 'widget', None)
+        if widget is not None:
+            return bool(getattr(widget, '_left_down', False))
         return bool(getattr(self._editor, '_left_pressed', False))
 
     def _finalize_notehead_dialog_transition(self) -> None:
@@ -595,6 +592,7 @@ class NoteTool(BaseTool):
 
     def on_left_drag(self, x: float, y: float, dx: float, dy: float) -> None:
         super().on_left_drag(x, y, dx, dy)
+        self._editor.pitch_cursor = int(self._editor.widget_px_to_pitch(x, y))
         if not self._editor_left_button_down():
             self._cancel_active_note_edit(redraw=False)
             return
