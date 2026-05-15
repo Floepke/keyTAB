@@ -3,7 +3,7 @@ from file_model.SCORE import SCORE
 from settings_manager import get_preferences
 from ui.style import Style
 from ui.widgets.draw_util import DrawUtil
-from utils.CONSTANT import QUARTER_NOTE_UNIT
+from utils.CONSTANT import BLACK_KEYS, QUARTER_NOTE_UNIT
 from utils.tiny_tool import key_class_filter
 from typing import TYPE_CHECKING, cast
 
@@ -32,15 +32,16 @@ class StaveDrawerMixin:
         semitone_dx = float(self.semitone_dist)
         total_score_time = self._calc_base_grid_list_total_length()
         stave_length_mm = (total_score_time / QUARTER_NOTE_UNIT) * float(getattr(score.app_state, 'zoom_mm_per_quarter', 25.0) or 25.0)
+        FGA_keys = key_class_filter('FGA')
         y1 = self.margin
         y2 = self.margin + stave_length_mm
 
         '''Draw stave lines'''
         for key in range(1, PIANO_KEY_AMOUNT):
-            if key in key_class_filter('ACDFG'): # black keys
+            if key in BLACK_KEYS:
                 x_pos = self.pitch_to_x(key)
                 is_clef_line = key in (41, 43)  # C# and D# around middle C
-                is_three_line = key in key_class_filter('FGA')
+                is_three_line = key in FGA_keys
                 if is_clef_line:
                     width_mm = max(0.05, semitone_dx / 5.0)
                     dash = [2]

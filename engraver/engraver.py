@@ -660,15 +660,6 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
             total += measure_len * float(max(0, measures))
         return float(total)
 
-    def _line_break_defaults() -> dict:
-        """Return default line break settings used when none exist."""
-        return {
-            'time': 0.0,
-            'margin_mm': [10.0, 10.0],
-            'stave_range': 'auto',
-            'page_break': False,
-        }
-
     def _sanitize_range(rng) -> list[int]:
         """Clamp and normalize a stave range to valid piano keys."""
         if not isinstance(rng, list) or len(rng) < 2:
@@ -861,8 +852,6 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
     total_ticks = _total_score_ticks()
     if total_ticks <= 0.0:
         total_ticks = float(QUARTER_NOTE_UNIT) * 4.0
-    if not line_breaks:
-        line_breaks = [_line_break_defaults()]
 
     line_breaks = sorted(line_breaks, key=lambda lb: float(lb.get('time', 0.0) or 0.0))
 
@@ -4751,7 +4740,7 @@ class Engraver(QtCore.QObject):
 
     def __init__(self, draw_util: DrawUtil, parent=None):
         super().__init__(parent)
-        self._du = draw_util
+        self._du: DrawUtil = draw_util
         self._mp_ctx = _MP_CONTEXT
         self._result_recv = None
         self._result_send = None
@@ -4940,14 +4929,8 @@ class Engraver(QtCore.QObject):
             self._du._pages = list(result_du._pages)
             self._du._current_index = int(result_du._current_index)
             self.analysis = getattr(result_du, 'analysis', None)
-            try:
-                self._du.analysis = self.analysis
-            except Exception:
-                pass
-            try:
-                self._du.print_time_map = getattr(result_du, 'print_time_map', [])
-            except Exception:
-                pass
+            self._du.analysis = self.analysis
+            self._du.print_time_map = getattr(result_du, 'print_time_map', [])
             self.engraved.emit()
 
     @QtCore.Slot(int, str, str)

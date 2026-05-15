@@ -12,15 +12,18 @@ Currently delegates to legacy engraver for A/B testing. Gradual porting via Help
 from __future__ import annotations
 
 from dataclasses import dataclass
+import bisect
 import traceback
 from PySide6 import QtCore
 
 from file_model.SCORE import SCORE
 from file_model.analysis import Analysis
+from file_model.events.line_break import LineBreak
 from ui.style import Style
 from ui.widgets.draw_util import DrawUtil
-from utils.CONSTANT import PIANO_KEY_AMOUNT, BE_KEYS, BLACK_KEYS
-from utils.tiny_tool import key_class_filter
+
+from utils.CONSTANT import PIANO_KEY_AMOUNT, BE_KEYS, BLACK_KEYS, SHORTEST_DURATION
+from utils.operator import Operator
 
 from engraver.engraver import Engraver as _LegacyEngraver
 from engraver.engraver import do_engrave as _legacy_do_engrave
@@ -29,7 +32,7 @@ from engraver.engraver import do_engrave as _legacy_do_engrave
 from engraver.drawers.paper_drawer import PaperDrawer
 from engraver.drawers.stave_drawer import StaveDrawer
 from engraver.drawers.barline_drawer import BarlineDrawer
-from engraver.drawers.notehead_drawer import NoteheadDrawer
+from engraver.drawers.note_drawer import NoteheadDrawer
 from engraver.drawers.beam_drawer import BeamDrawer
 from engraver.drawers.arpeggio_drawer import ArpeggioDrawer
 from engraver.drawers.slur_drawer import SlurDrawer
@@ -54,17 +57,17 @@ DRAWER_PIPELINE = [
     TimeSignatureDrawer,     # Time signatures
     HeaderFooterDrawer,      # Header/footer
     CountLineDrawer,         # Count guides
-    
+
     NoteheadDrawer,          # Notes (with per-note ledgers)
-    BeamDrawer,              # Beams
-    ArpeggioDrawer,          # Arpeggios
-    GraceNoteDrawer,         # Grace notes
-    
-    SlurDrawer,              # Slurs
-    DynamicDrawer,           # Dynamics and hairpins
-    PedalDrawer,             # Pedal symbols
-    TextDrawer,              # Text annotations
-    
+    # BeamDrawer,           # Beams (disabled for now)
+    # ArpeggioDrawer,       # Arpeggios (disabled for now)
+    # GraceNoteDrawer,      # Grace notes (disabled for now)
+
+    # SlurDrawer,           # Slurs (disabled for now)
+    # DynamicDrawer,        # Dynamics and hairpins (disabled for now)
+    # PedalDrawer,          # Pedal symbols (disabled for now)
+    # TextDrawer,           # Text annotations (disabled for now)
+
     MiniPianoDrawer,         # Mini piano (last, on top)
 ]
 
@@ -91,7 +94,8 @@ def _reset_drawutil_pages(target: DrawUtil, source: DrawUtil) -> None:
         target.set_current_page_rotation_deg(float(getattr(page, 'rotation_deg', 0.0) or 0.0))
 
 
-def _build_stave_layout_data(score: SCORE, page_lines_map: list[dict], notation_color: tuple[float, float, float, float]) -> dict:
+def _build_stave_layout_data(score: SCORE, page_lines_map: list[dict], notation_color: tuple[float, float, float, float], page_index: int) -> dict:
+    op = Operator(SHORTEST_DURATION)
     """Build layout payload required by PaperDrawer and StaveDrawer."""
     score = score or {}
     layout = dict((score or {}).get('layout', {}) or {})
@@ -210,28 +214,28 @@ def _build_stave_layout_data(score: SCORE, page_lines_map: list[dict], notation_
             grp['range_low'] = int(max(1, low))
             grp['range_high'] = int(min(PIANO_KEY_AMOUNT, high))
             if 41 in grp['keys'] and 43 in grp['keys']:
-                grp['pattern'] = 'c'
+                grp['pattern'] = 'c' # clef group (c#4/db4 & d#4/eb4 clef lines | central lines)
             elif len(grp['keys']) == 2:
-                grp['pattern'] = '2'
+                grp['pattern'] = '2' # group of 2
             else:
-                grp['pattern'] = '3'
+                grp['pattern'] = '3' # group of 3
         return groups
 
-    line_groups = _build_line_groups()
-    if not line_groups:
-        line_groups = [{'keys': [41, 43], 'range_low': 1, 'range_high': PIANO_KEY_AMOUNT, 'pattern': 'c'}]
+    stave_line_groups = _build_line_groups()
+    if not stave_line_groups:
+        stave_line_groups = [{'keys': [41, 43], 'range_low': 1, 'range_high': PIANO_KEY_AMOUNT, 'pattern': 'c'}]
 
     clef_group_index = 0
-    for i, grp in enumerate(line_groups):
+    for i, grp in enumerate(stave_line_groups):
         if 41 in grp['keys'] and 43 in grp['keys']:
             clef_group_index = i
             break
 
     def _group_index_for_key(key: int) -> int:
-        for i, grp in enumerate(line_groups):
+        for i, grp in enumerate(stave_line_groups):
             if int(grp['range_low']) <= int(key) <= int(grp['range_high']):
                 return i
-        return 0 if int(key) <= int(line_groups[0]['range_low']) else len(line_groups) - 1
+        return 0 if int(key) <= int(stave_line_groups[0]['range_low']) else len(stave_line_groups) - 1
 
     def _visible_line_groups_for_range(lo: int, hi: int, include_clef: bool = True) -> list[dict]:
         lo = int(max(1, min(PIANO_KEY_AMOUNT, lo)))
@@ -245,36 +249,54 @@ def _build_stave_layout_data(score: SCORE, page_lines_map: list[dict], notation_
                 min_group = clef_group_index
             if clef_group_index > max_group:
                 max_group = clef_group_index
-        return [line_groups[gi] for gi in range(min_group, max_group + 1)]
-
-    def _line_break_defaults() -> dict:
-        return {
-            'time': 0.0,
-            'margin_mm': [10.0, 10.0],
-            'stave_range': 'auto',
-            'page_break': False,
-        }
-
-    if not line_breaks:
-        line_breaks = [_line_break_defaults()]
+        return [stave_line_groups[gi] for gi in range(min_group, max_group + 1)]
 
     line_breaks = sorted(line_breaks, key=lambda lb: float(lb.get('time', 0.0) or 0.0))
-    line_break_by_time: dict[float, dict] = {
-        round(float(lb.get('time', 0.0) or 0.0), 6): lb for lb in line_breaks
-    }
+    line_break_times: list[float] = [float(lb.get('time', 0.0) or 0.0) for lb in line_breaks]
+
+    def _line_break_for_time(ticks: float) -> dict:
+        """Return active line-break settings at time using thresholded comparison (Operator)."""
+        idx = 0
+        for i, t in enumerate(line_break_times):
+            if op.greater(ticks, t):
+                idx = i
+            elif op.equal(ticks, t):
+                idx = i
+            else:
+                break
+        if idx < 0:
+            idx = 0
+        if idx >= len(line_breaks):
+            idx = len(line_breaks) - 1
+        lb = line_breaks[idx]
+        return lb
 
     norm_notes: list[dict] = []
-    for n in notes:
+    for idx, n in enumerate(notes):
         if not isinstance(n, dict):
             continue
         n_t = float(n.get('time', 0.0) or 0.0)
         n_d = float(n.get('duration', 0.0) or 0.0)
         p = int(n.get('pitch', 0) or 0)
-        norm_notes.append({'time': n_t, 'end': n_t + n_d, 'pitch': p})
+        hand_raw = str(n.get('hand', 'l') or 'l')
+        hand_key = 'l' if hand_raw == 'l' else 'r'
+        norm_notes.append({
+            'time': n_t,
+            'end': n_t + n_d,
+            'duration': n_d,
+            'pitch': p,
+            'hand': hand_key,
+            'id': int(n.get('_id', 0) or 0),
+            'idx': int(idx),
+            'raw': n,
+        })
 
     key_positions = _build_key_positions(1, PIANO_KEY_AMOUNT, semitone_mm)
     page_lines: list[dict] = []
     key_to_x_for_line: dict[int, object] = {}
+    pitch_to_x_for_line: dict[int, object] = {}
+    rpitch_to_x_for_line: dict[int, object] = {}
+    time_to_y_for_line: dict[int, object] = {}
 
     for line_index, line in enumerate(page_lines_map or []):
         x_start = float(line.get('x_start', 0.0) or 0.0)
@@ -283,7 +305,7 @@ def _build_stave_layout_data(score: SCORE, page_lines_map: list[dict], notation_
         t0 = float(line.get('time_start', 0.0) or 0.0)
         t1 = float(line.get('time_end', t0) or t0)
 
-        lb = line_break_by_time.get(round(t0, 6), {})
+        lb = _line_break_for_time(t0)
         stave_range = lb.get('stave_range', 'auto')
         if stave_range is True:
             stave_range = 'auto'
@@ -300,7 +322,8 @@ def _build_stave_layout_data(score: SCORE, page_lines_map: list[dict], notation_
                 n_t = float(item.get('time', 0.0) or 0.0)
                 n_end = float(item.get('end', 0.0) or 0.0)
                 p = int(item.get('pitch', 0) or 0)
-                if n_t < float(w1) and n_end > float(w0):
+                # Use Operator for time window overlap
+                if op.less(n_t, w1) and op.greater(n_end, w0):
                     if p < 1 or p > PIANO_KEY_AMOUNT:
                         continue
                     lo = p if lo is None else min(lo, p)
@@ -310,12 +333,12 @@ def _build_stave_layout_data(score: SCORE, page_lines_map: list[dict], notation_
         def _auto_line_keys_and_bounds(w0: float, w1: float) -> tuple[list[int], int, int]:
             lo, hi = _note_range_for_window(w0, w1)
             if lo is None or hi is None:
-                grp = line_groups[clef_group_index]
+                grp = stave_line_groups[clef_group_index]
                 keys = list(grp['keys'])
                 return keys, int(keys[0]), int(keys[-1])
             groups = _visible_line_groups_for_range(int(lo), int(hi), include_clef=True)
             if not groups:
-                grp = line_groups[clef_group_index]
+                grp = stave_line_groups[clef_group_index]
                 keys = list(grp['keys'])
                 return keys, int(keys[0]), int(keys[-1])
             keys: list[int] = []
@@ -331,7 +354,7 @@ def _build_stave_layout_data(score: SCORE, page_lines_map: list[dict], notation_
             requested_lo = int(manual[0])
             groups = _visible_line_groups_for_range(manual[0], manual[1], include_clef=False)
             if not groups:
-                groups = [line_groups[clef_group_index]]
+                groups = [stave_line_groups[clef_group_index]]
             visible_keys = []
             for grp in groups:
                 visible_keys.extend(grp['keys'])
@@ -352,13 +375,45 @@ def _build_stave_layout_data(score: SCORE, page_lines_map: list[dict], notation_
                 break
         a0_ledger_mode = bool(low_key_present and int(natural_bound_left) > 2)
 
+        line_notes: list[dict] = []
+        for item in norm_notes:
+            n_t = float(item.get('time', 0.0) or 0.0)
+            n_end = float(item.get('end', 0.0) or 0.0)
+            p = int(item.get('pitch', 0) or 0)
+            # Use Operator for time window overlap
+            if op.greater_or_equal(n_t, t1) or op.less_or_equal(n_end, t0):
+                continue
+            if p < 1 or p > PIANO_KEY_AMOUNT:
+                continue
+            line_notes.append(item)
+
         origin = float(key_positions.get(bound_left, 0.0))
 
+        # --- Mini piano visibility logic (match legacy engraver.py) ---
+        visual_first_line = (line_index == len(page_lines_map) - 1) if horizontal_read_direction else (line_index == 0)
+        mini_piano_enabled = bool(layout.get('mini_piano_visible', True)) and page_index == 0 and visual_first_line
+        mini_piano_height_mm = (7.0 * float(semitone_mm)) if mini_piano_enabled else 0.0
+        # `y_bottom` in `page_lines_map` already comes from legacy page geometry.
+        # Do not shorten again here, otherwise first-line stave and mini piano shift up.
+        mini_piano_y_top = float(y_bottom)
+        mini_piano_y_bottom = float(
+            line.get(
+                'mini_piano_y_bottom',
+                (mini_piano_y_top + mini_piano_height_mm) if mini_piano_enabled else mini_piano_y_top,
+            )
+            or ((mini_piano_y_top + mini_piano_height_mm) if mini_piano_enabled else mini_piano_y_top)
+        )
         page_lines.append({
             'stave_visible': True,
             'y_top': y_top,
             'y_bottom': y_bottom,
+            'mini_piano_visible': bool(mini_piano_enabled),
+            'mini_piano_height_mm': float(mini_piano_height_mm),
+            'mini_piano_y_top': mini_piano_y_top,
+            'mini_piano_y_bottom': mini_piano_y_bottom,
             'line_x_start': x_start,
+            'time_start': float(t0),
+            'time_end': float(t1),
             'range': [int(bound_left), int(bound_right)],
             'bound_left': int(bound_left),
             'bound_right': int(bound_right),
@@ -368,16 +423,30 @@ def _build_stave_layout_data(score: SCORE, page_lines_map: list[dict], notation_
             'low_key_left': bool(low_key_present),
             'a0_ledger_mode': bool(a0_ledger_mode),
             'stave_range': stave_range,
+            'notes': line_notes,
         })
 
         key_to_x_for_line[line_index] = (
             lambda key, _x_start=x_start, _origin=origin:
             _x_start + (float(key_positions.get(int(key), 0.0)) - _origin)
         )
+        pitch_to_x_for_line[line_index] = key_to_x_for_line[line_index]
+        rpitch_to_x_for_line[line_index] = (
+            lambda rpitch, _pitch_to_x=key_to_x_for_line[line_index], _semitone_mm=semitone_mm:
+            _pitch_to_x(40) + (float(rpitch) * _semitone_mm)
+        )
+        time_to_y_for_line[line_index] = (
+            lambda ticks, _t0=t0, _t1=t1, _y0=y_top, _y1=y_bottom:
+            _y0 + ((_y1 - _y0) * max(0.0, min(1.0, (float(ticks) - float(_t0)) / max(1e-6, float(_t1) - float(_t0)))))
+        )
 
     return {
         'page_lines': page_lines,
+        'stave_line_groups': stave_line_groups,
         'key_to_x_for_line': key_to_x_for_line,
+        'pitch_to_x_for_line': pitch_to_x_for_line,
+        'rpitch_to_x_for_line': rpitch_to_x_for_line,
+        'time_to_y_for_line': time_to_y_for_line,
         'key_positions': key_positions,
         'line_keys': list(BLACK_KEYS),
         'semitone_mm': semitone_mm,
@@ -433,7 +502,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
     print_time_map = list(getattr(scratch_du, 'print_time_map', []) or [])
     for page_index, page_lines_map in enumerate(print_time_map):
         du.set_current_page(int(page_index))
-        layout_data = _build_stave_layout_data(score or {}, list(page_lines_map or []), notation_color)
+        layout_data = _build_stave_layout_data(score or {}, list(page_lines_map or []), notation_color, page_index)
         layout_data['paper_color'] = paper_color
         context = EngravingContext(
             score=score or {},
@@ -444,8 +513,8 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
             du=du,
             drawer_caches={},
         )
-        PaperDrawer(context).draw()
-        StaveDrawer(context).draw()
+        for Drawer in DRAWER_PIPELINE:
+            Drawer(context).draw()
 
     if du.page_count() > 0:
         target_index = max(0, min(int(pageno), du.page_count() - 1))

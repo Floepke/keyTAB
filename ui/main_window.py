@@ -80,6 +80,9 @@ class MainWindow(QtWidgets.QMainWindow):
             self._show_tooltips_in_panel = True
         self._playhead_last_visible_measure: int | None = None
         self._last_engraver_error_signature: str | None = None
+        # Load persisted engraver backend choice before menus are created so
+        # the Help menu checkbox starts with the correct checked state.
+        self._use_new_engraver = self._get_use_new_engraver_from_appdata()
         
         # Install error-backup hook early so any unhandled exception triggers a backup
         self.file_manager.install_error_backup_hook()
@@ -113,9 +116,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
         self.print_view = DrawUtilView(self.du)
         self.print_view.set_page_turn_callbacks(self._previous_page, self._next_page)
-        
-        # Engraver backend toggle (legacy/new)
-        self._use_new_engraver = self._get_use_new_engraver_from_appdata()
+
         # Engraver instance (single active backend)
         self.engraver = self._create_engraver_instance()
 
