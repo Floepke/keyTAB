@@ -6,6 +6,7 @@ from .notehead import (
 )
 from .geometry import (
     sheared_notehead_outline_points,
+    support_point_from_outline_points,
     support_v_from_outline_points,
     sheared_notehead_support_v,
 )
@@ -16,6 +17,7 @@ __all__ = [
     "resolve_notehead_spec",
     "normalize_notehead_literal",
     "sheared_notehead_outline_points",
+    "support_point_from_outline_points",
     "support_v_from_outline_points",
     "sheared_notehead_support_v",
 ]

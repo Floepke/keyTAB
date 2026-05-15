@@ -94,6 +94,33 @@ def support_v_from_outline_points(
     return float(v_max if bool(is_up) else v_min)
 
 
+def support_point_from_outline_points(
+    points: tuple[tuple[float, float], ...],
+    *,
+    m_line: float,
+    choose_max: bool,
+) -> tuple[float, float]:
+    """Return the outline point on the extreme parallel support line.
+
+    For the line family y = m*x + b, this returns the point whose
+    support value v = y - m*x is maximal or minimal.
+    """
+    m = float(m_line)
+    best_point = (0.0, 0.0)
+    best_v = float("-inf") if bool(choose_max) else float("inf")
+    for x_l, y_l in points:
+        v = float(y_l - (m * x_l))
+        if bool(choose_max):
+            if v > best_v:
+                best_v = v
+                best_point = (float(x_l), float(y_l))
+        else:
+            if v < best_v:
+                best_v = v
+                best_point = (float(x_l), float(y_l))
+    return best_point
+
+
 def sheared_notehead_support_v(
     *,
     hand: str,

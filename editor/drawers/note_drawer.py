@@ -193,6 +193,9 @@ class NoteDrawerMixin:
             y2 = time_to_mm(n_end)
             self._draw_single_note(du, n, x, y1, y2, draw_mode=draw_mode)
 
+        # Draw stems in one batched pass to avoid per-note duplicates.
+        self._draw_stem(du, draw_mode=draw_mode)
+
         # Do not clear caches here; when using shared cache, Editor manages lifecycle
 
     def _draw_single_note(self, du: DrawUtil, n, x: float, y1: float, y2: float, draw_mode: str = 'note') -> None:
@@ -201,7 +204,6 @@ class NoteDrawerMixin:
         if getattr(self, 'is_tiny_mode', None) and self.is_tiny_mode():
             self._draw_notehead(du, n, x, y1, draw_mode)
             self._draw_midinote(du, n, x, y1, y2, draw_mode)
-            self._draw_stem(du, n, x, y1, draw_mode)
             self._draw_note_accidental(du, n, x, y1)
             try:
                 w = float(self.semitone_dist or 0.5)
@@ -209,7 +211,7 @@ class NoteDrawerMixin:
                 spec = resolve_notehead_spec(n, default_black_above=self._black_note_above_stem(n, layout))
                 y_top = float(y1)
                 if bool(getattr(spec, 'is_up', False)):
-                    y_top = float(y1) - (w * 2.0)
+                    y_top -= w * 2.0
                 rect_id = int(getattr(n, '_id', 0) or 0)
                 self.register_hit_rect('note', rect_id, float(x - w), float(y_top), float(x + w), float(y1 + (w * 2.0)))
             except Exception:
@@ -220,10 +222,8 @@ class NoteDrawerMixin:
         self._draw_midinote(du, n, x, y1, y2, draw_mode)
         self._draw_notehead(du, n, x, y1, draw_mode)
         self._draw_notestop(du, n, x, y2, draw_mode)
-        self._draw_stem(du, n, x, y1, draw_mode)
         self._draw_note_accidental(du, n, x, y1)
         self._draw_note_continuation_dot(du, n, x, y1, y2, draw_mode)
-        self._draw_connect_stem(du, n, x, y1, draw_mode)
 
     def _midinote_color(self, n, draw_mode: str) -> tuple[float, float, float, float]:
         if draw_mode in ('cursor', 'edit', 'selected'):
@@ -234,6 +234,7 @@ class NoteDrawerMixin:
         return (float(r) / 255.0, float(g) / 255.0, float(b) / 255.0, 1.0)
 
     def _draw_midinote(self, du: DrawUtil, n, x: float, y1: float, y2: float, draw_mode: str) -> None:
+        '''Draw the MIDI note rectangle for visualizing note durations'''
         self = cast("Editor", self)
         fill = self._midinote_color(n, draw_mode)
         w = float(self.semitone_dist or 0.5)
@@ -254,7 +255,7 @@ class NoteDrawerMixin:
         )
         # Register a clickable rectangle covering the full note (notehead top to note end).
         # Sub-zone detection (notehead vs body) is handled in note_tool by comparing
-        # cursor Y against note_start_mm + 2*semitone_dist.
+        # cursor Y against note_start_mm + 2 * semitone_dist.
         x_left = x - max(w, head_half_w)
         x_right = x + max(w, head_half_w)
         y_top = y1           # top of notehead
@@ -262,58 +263,10 @@ class NoteDrawerMixin:
         layout = score.layout if score else None
         spec = resolve_notehead_spec(n, default_black_above=self._black_note_above_stem(n, layout))
         if bool(getattr(spec, 'is_up', False)):
-            y_top = float(y1) - (w * 2.0)
+            y_top -= w * 2.0
         y_bottom = y2        # actual end of note polygon
         rect_id = int(getattr(n, '_id', 0) or 0)
         self.register_hit_rect('note', rect_id, float(x_left), float(y_top), float(x_right), float(y_bottom))
-
-    def _draw_hand_split_indicator(self, du: DrawUtil, n, x: float, y1: float) -> None:
-        self = cast("Editor", self)
-        barlines = self._cached_barline_positions or []
-        if not barlines:
-            return
-        t = float(getattr(n, 'time', 0.0) or 0.0)
-        on_barline = False
-        for bt in barlines:
-            if self._time_op.eq(float(bt), t):
-                on_barline = True
-                break
-        if not on_barline:
-            return
-        w = float(self.semitone_dist or 0.5)
-        stem_len = self._layout_stem_length_mm()
-        thickness = self._editor_line_width_mm()
-        hand = getattr(n, 'hand', 'l')
-        if hand == 'l':
-            x1 = x
-            x2 = x + (w * 2.0)
-            x3 = x - stem_len
-        else:
-            x1 = x
-            x2 = x - (w * 2.0)
-            x3 = x + stem_len
-        du.add_line(
-            x1,
-            y1,
-            x2,
-            y1,
-            color=self._editor_background_rgba(),
-            width_mm=thickness,
-            line_cap="butt",
-            id=0,
-            tags=["stem_hand_split"],
-        )
-        du.add_line(
-            x3,
-            y1,
-            x2,
-            y1,
-            color=self._editor_background_rgba(),
-            width_mm=thickness,
-            line_cap="butt",
-            id=0,
-            tags=["stem_hand_split"],
-        )
 
     def _draw_notehead(self, du: DrawUtil, n, x: float, y1: float, draw_mode: str) -> None:
         self = cast("Editor", self)
@@ -367,31 +320,87 @@ class NoteDrawerMixin:
             tags=["stop_sign"],
         )
 
-    def _draw_stem(self, du: DrawUtil, n, x: float, y1: float, draw_mode: str) -> None:
+    def _draw_stem(self, du: DrawUtil, draw_mode: str = 'note') -> None:
         self = cast("Editor", self)
-        # Arpeggio notes: the arpeggio diagonal line serves as the shared chord stem.
-        # Suppress individual horizontal stems so they don't cross the diagonal.
-        arp_chord_ids: set[int] = getattr(self, '_arpeggio_chord_note_ids', set()) or set()
-        if arp_chord_ids and int(getattr(n, '_id', 0) or 0) in arp_chord_ids:
+        score = self.current_score()
+        layout = score.layout if score else None
+        if layout is None:
             return
+
+        notes_view = list(self._cached_notes_view or [])
+        if not notes_view:
+            return
+
+        # Reuse hand-grouped notes from shared render cache when available.
+        cache = getattr(self, '_draw_cache', None) or {}
+        cached_by_hand = cache.get('notes_by_hand') or {}
+
         stem_len = self._layout_stem_length_mm()
-        scale = self.current_score().layout.scale if self.current_score() and self.current_score().layout else 1.0
-        stem_w = self.current_score().layout.note_stem_thickness_mm * scale if self.current_score() and self.current_score().layout else 0.8
-        # Stem direction based on hand
-        if getattr(n, 'hand', 'l') == 'l':
-            x2 = x - stem_len
-        else:
-            x2 = x + stem_len
-        du.add_line(
-            x,
-            y1,
-            x2,
-            y1,
-            color=self.notation_color,
-            width_mm=stem_w,
-            id=0,
-            tags=["stem"],
-        )
+        scale = layout.scale
+        stem_w = layout.note_stem_thickness_mm * scale
+        arp_y_overrides: dict[int, float] = getattr(self, '_arpeggio_y_overrides', {}) or {}
+
+        for hand_key in ('l', 'r'):
+            hand_notes = list(cached_by_hand.get(hand_key, []) or [])
+            if not hand_notes:
+                # Fallback when cache is unavailable/incomplete.
+                hand_notes = [
+                    n for n in notes_view
+                    if ('l' if str(getattr(n, 'hand', 'l') or 'l') == 'l' else 'r') == hand_key
+                ]
+            if not hand_notes:
+                continue
+            hand_notes_sorted = sorted(hand_notes, key=lambda n: (float(getattr(n, 'time', 0.0) or 0.0), int(getattr(n, 'pitch', 0) or 0)))
+
+            i = 0
+            while i < len(hand_notes_sorted):
+                t0 = float(getattr(hand_notes_sorted[i], 'time', 0.0) or 0.0)
+                cluster: list = [hand_notes_sorted[i]]
+                j = i + 1
+                while j < len(hand_notes_sorted):
+                    tj = float(getattr(hand_notes_sorted[j], 'time', 0.0) or 0.0)
+                    if not self._time_op.eq(tj, t0):
+                        break
+                    cluster.append(hand_notes_sorted[j])
+                    j += 1
+
+                # Arpeggio chords own their diagonal stem; skip overridden notes.
+                cluster_no_arp: list = []
+                for n in cluster:
+                    nid = int(getattr(n, '_id', 0) or 0)
+                    if nid in arp_y_overrides:
+                        continue
+                    cluster_no_arp.append(n)
+
+                if cluster_no_arp:
+                    x_values = [float(self.pitch_to_x(int(getattr(n, 'pitch', 0) or 0))) for n in cluster_no_arp]
+                    y_values = [float(self.time_to_mm(float(getattr(n, 'time', 0.0) or 0.0))) for n in cluster_no_arp]
+                    y_line = float(y_values[0])
+
+                    if len(cluster_no_arp) == 1:
+                        x_center = float(x_values[0])
+                        x_tip = float(x_center - stem_len) if hand_key == 'l' else float(x_center + stem_len)
+                        x1, x2 = (x_center, x_tip)
+                    else:
+                        x_low = float(min(x_values))
+                        x_high = float(max(x_values))
+                        if hand_key == 'l':
+                            x1, x2 = (float(x_low - stem_len), x_high)
+                        else:
+                            x1, x2 = (x_low, float(x_high + stem_len))
+
+                    du.add_line(
+                        x1,
+                        y_line,
+                        x2,
+                        y_line,
+                        color=self.notation_color,
+                        width_mm=stem_w,
+                        id=0,
+                        tags=["stem"],
+                    )
+
+                i = j
 
     def _draw_note_continuation_dot(self, du: DrawUtil, n, x: float, y1: float, y2: float, draw_mode: str) -> None:
         self = cast("Editor", self)
@@ -470,37 +479,6 @@ class NoteDrawerMixin:
                 id=0,
                 tags=["left_dot"],
             )
-
-    def _draw_connect_stem(self, du: DrawUtil, n, x: float, y1: float, draw_mode: str) -> None:
-        self = cast("Editor", self)
-        # Arpeggio chords: notes are already drawn at their projected Y positions along
-        # the arpeggio diagonal — a flat horizontal connector makes no sense there.
-        # The arpeggio_drawer owns the diagonal line that visually connects them.
-        arp_chord_ids: set[int] = getattr(self, '_arpeggio_chord_note_ids', set()) or set()
-        if arp_chord_ids and int(getattr(n, '_id', 0) or 0) in arp_chord_ids:
-            return
-        # Connect notes in a chord (same start time, same hand)
-        layout = self.current_score().layout
-        stem_w = layout.note_stem_thickness_mm * layout.scale
-        hand = getattr(n, 'hand', 'l')
-        t = float(n.time)
-        same_time = self._notes_starting_at_time(float(t), hand=hand)
-        if len(same_time) < 2:
-            return
-        lowest = min(same_time, key=lambda m: m.pitch)
-        highest = max(same_time, key=lambda m: m.pitch)
-        x1 = self.pitch_to_x(lowest.pitch)
-        x2 = self.pitch_to_x(highest.pitch)
-        du.add_line(
-            x1,
-            y1,
-            x2,
-            y1,
-            color=self.notation_color,
-            width_mm=stem_w,
-            id=0,
-            tags=["chord_connect"],
-        )
 
     def _editor_background_rgba(self) -> Tuple[float, float, float, float]:
         """Return the editor background as RGBA floats (0..1), alpha=1.0.

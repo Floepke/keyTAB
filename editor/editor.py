@@ -52,7 +52,12 @@ from utils.CONSTANT import PIANO_KEY_AMOUNT, BLACK_KEYS
 from utils.operator import Operator
 from editor.hit_testing import HitTestingMixin
 from ui.widgets.draw_util import DrawUtil
-from symbol_design.noteheads import resolve_notehead_spec, sheared_notehead_support_v
+from symbol_design.noteheads import (
+    resolve_notehead_spec,
+    sheared_notehead_support_v,
+    sheared_notehead_outline_points,
+    support_point_from_outline_points,
+)
 from midi.player import Player
 
 if TYPE_CHECKING:
@@ -215,9 +220,7 @@ class Editor(QtCore.QObject,
         self._note_time_cache_values: tuple[list, list[float], list[float], list[tuple[float, int]], list[float]] | None = None
         # Per-frame arpeggio Y-override data (populated by _build_render_cache).
         # arpeggio_y_overrides: note_id → projected y_mm for notes in an arpeggio chord.
-        # arpeggio_chord_note_ids: set of all note IDs belonging to any arpeggio chord.
         self._arpeggio_y_overrides: dict[int, float] = {}
-        self._arpeggio_chord_note_ids: set[int] = set()
         # Tiny mode: toggled by viewport width (stage 1: simplified drawing,
         # stage 2: skip drawing). tiny_mode_alpha is a continuous fade factor
         # (1.0 = fully opaque, 0.0 = fully transparent) used by the view to
@@ -462,6 +465,114 @@ class Editor(QtCore.QObject,
 
     def clear_single_note_timing_dirty(self) -> None:
         self._single_note_timing_dirty = None
+
+    def sync_arpeggios_with_notes(self) -> bool:
+        """Keep arpeggio events consistent with current note time/pitch data.
+
+        Rules:
+        - Resolve each arpeggio to the best matching (time, hand) note cluster.
+        - Update arpeggio.time and arpeggio.note_pitches from that live cluster.
+        - Remove arpeggios with fewer than 2 resolved pitches.
+        - De-duplicate by (time, note_pitches) to prevent stale duplicates.
+        """
+        score: SCORE | None = self.current_score()
+        if score is None:
+            return False
+
+        arps = list(getattr(score.events, 'arpeggio', []) or [])
+        if not arps:
+            return False
+
+        changed = False
+        op = Operator(float(SHORTEST_DURATION))
+        notes = list(getattr(score.events, 'note', []) or [])
+        notes_by_hand: dict[str, list[object]] = {}
+        for note in notes:
+            hand = str(getattr(note, 'hand', 'l') or 'l')
+            notes_by_hand.setdefault(hand, []).append(note)
+
+        clusters: list[tuple[float, str, set[int]]] = []
+        for hand, hand_notes in notes_by_hand.items():
+            ordered = sorted(
+                hand_notes,
+                key=lambda n: (float(getattr(n, 'time', 0.0) or 0.0), int(getattr(n, 'pitch', 0) or 0)),
+            )
+            active_time: float | None = None
+            active_pitches: set[int] = set()
+            for note in ordered:
+                try:
+                    note_time = float(getattr(note, 'time', 0.0) or 0.0)
+                    note_pitch = int(getattr(note, 'pitch', 0) or 0)
+                except Exception:
+                    continue
+                if note_pitch <= 0:
+                    continue
+                if active_time is None or not op.eq(note_time, active_time):
+                    if active_time is not None and active_pitches:
+                        clusters.append((float(active_time), str(hand), set(active_pitches)))
+                    active_time = float(note_time)
+                    active_pitches = set()
+                active_pitches.add(int(note_pitch))
+            if active_time is not None and active_pitches:
+                clusters.append((float(active_time), str(hand), set(active_pitches)))
+
+        new_arps = []
+        seen_keys: list[tuple[float, tuple[int, ...]]] = []
+
+        for arp in arps:
+            try:
+                old_time = float(getattr(arp, 'time', 0.0) or 0.0)
+                old_pitches = sorted(set(int(p) for p in (getattr(arp, 'note_pitches', []) or []) if int(p) > 0))
+            except Exception:
+                changed = True
+                continue
+
+            if len(old_pitches) < 2:
+                changed = True
+                continue
+
+            old_pitch_set = set(old_pitches)
+            best: tuple[int, float, float, str, set[int]] | None = None
+            for t_value, hand, cluster_pitches in clusters:
+                overlap = len(cluster_pitches.intersection(old_pitch_set))
+                if overlap <= 0:
+                    continue
+                dist = abs(float(t_value) - float(old_time))
+                # Max overlap first, then nearest time.
+                cand = (int(overlap), -float(dist), float(t_value), str(hand), cluster_pitches)
+                if best is None or cand > best:
+                    best = cand
+
+            if best is None:
+                changed = True
+                continue
+
+            _overlap, _neg_dist, new_time, _hand, cluster_pitches = best
+            new_pitches = sorted(int(p) for p in cluster_pitches if int(p) > 0)
+            if len(new_pitches) < 2:
+                changed = True
+                continue
+
+            if not op.eq(float(getattr(arp, 'time', 0.0) or 0.0), new_time):
+                arp.time = new_time
+                changed = True
+            if list(getattr(arp, 'note_pitches', []) or []) != new_pitches:
+                arp.note_pitches = list(new_pitches)
+                changed = True
+
+            uniq_pitches = tuple(new_pitches)
+            duplicate = any(op.eq(float(existing_t), float(new_time)) and existing_p == uniq_pitches for existing_t, existing_p in seen_keys)
+            if duplicate:
+                changed = True
+                continue
+            seen_keys.append((float(new_time), uniq_pitches))
+            new_arps.append(arp)
+
+        if len(new_arps) != len(arps):
+            score.events.arpeggio = new_arps
+            changed = True
+
+        return changed
 
     def _apply_single_note_timing_cache_update(self, notes: list) -> tuple[list, list[float], list[float], list[tuple[float, int]], list[float]] | None:
         dirty = getattr(self, '_single_note_timing_dirty', None)
@@ -839,6 +950,7 @@ class Editor(QtCore.QObject,
         stave_length_mm = (total_time_ticks / float(QUARTER_NOTE_UNIT)) * zpq
         top_bottom_mm = float(self.margin or 0.0) * 6.0
         height_mm = max(10.0, stave_length_mm + top_bottom_mm)
+        self.editor_height = height_mm
         return height_mm
 
     def update_score_length(self, edited_event=None) -> None:
@@ -854,6 +966,9 @@ class Editor(QtCore.QObject,
         score: SCORE | None = self.current_score()
         if score is None or not getattr(score, 'base_grid', None):
             return
+
+        # Keep arpeggio model data synced while notes are edited in time/pitch.
+        self.sync_arpeggios_with_notes()
 
         current_end = float(self._calc_base_grid_list_total_length())
         bg_list = score.base_grid
@@ -1116,14 +1231,18 @@ class Editor(QtCore.QObject,
         # Build per-frame arpeggio Y-override lookup so note_drawer can position
         # arpeggiated noteheads along the arpeggio diagonal without any coupling.
         arpeggio_y_overrides: dict[int, float] = {}
-        arpeggio_chord_note_ids: set[int] = set()
         arps_all = list(getattr(score.events, 'arpeggio', []) or [])
         if arps_all:
-            # Build (round(time), pitch) → note lookup for stable arpeggio resolution
-            notes_by_time_pitch: dict[tuple[int, int], object] = {
-                (int(round(float(getattr(n, 'time', 0.0) or 0.0))), int(getattr(n, 'pitch', 0) or 0)): n
-                for n in notes_sorted
-            }
+            op_arp = Operator(float(SHORTEST_DURATION))
+            notes_by_pitch: dict[int, list[object]] = {}
+            for n in notes_sorted:
+                try:
+                    pitch_key = int(getattr(n, 'pitch', 0) or 0)
+                except Exception:
+                    continue
+                if pitch_key <= 0:
+                    continue
+                notes_by_pitch.setdefault(pitch_key, []).append(n)
             margin_mm = float(self.margin or 0.0)
             zpq_arp = float(getattr(score.app_state, 'zoom_mm_per_quarter', 25.0) or 25.0)
             semi_arp = float(self.semitone_dist or 0.5)
@@ -1147,15 +1266,23 @@ class Editor(QtCore.QObject,
                 # Skip arpeggio suppression/overrides so note stems redraw immediately.
                 if abs(rtime1) <= 1e-9 and abs(rtime2) <= 1e-9:
                     continue
-                base_time_key = int(round(base_time))
                 pitches = [int(p) for p in (getattr(arp, 'note_pitches', []) or []) if int(p) > 0]
                 if len(pitches) < 2:
                     continue
-                chord_notes = [notes_by_time_pitch[(base_time_key, p)] for p in pitches if (base_time_key, p) in notes_by_time_pitch]
+                chord_notes: list[object] = []
+                for pitch in pitches:
+                    matches = notes_by_pitch.get(int(pitch), [])
+                    match_note = None
+                    for candidate in matches:
+                        candidate_time = float(getattr(candidate, 'time', 0.0) or 0.0)
+                        if op_arp.eq(candidate_time, base_time):
+                            match_note = candidate
+                            break
+                    if match_note is not None:
+                        chord_notes.append(match_note)
                 if len(chord_notes) < 2:
                     continue
                 chord_sorted = sorted(chord_notes, key=lambda n: int(getattr(n, 'pitch', 0) or 0))
-                span = max(1, len(chord_sorted) - 1)
                 y_start = _t2mm(base_time + rtime1)
                 y_end = _t2mm(base_time + rtime2)
                 stem_xs: list[float] = []
@@ -1168,19 +1295,49 @@ class Editor(QtCore.QObject,
                 dx_line = float(x_line_end - x_line_start)
                 dy_line = float(y_end - y_start)
                 m_line = float(dy_line / dx_line) if abs(dx_line) > 1e-9 else 0.0
+                angle = math.atan2(float(y_end - y_start), float(x_line_end - x_line_start))
+                hand_chord = str(getattr(chord_sorted[0], 'hand', 'l') or 'l') if chord_sorted else 'l'
+                # Compute the same hand-dependent stem-end support point as arpeggio drawer.
+                if hand_chord == 'l':
+                    anchor_note = chord_sorted[-1]
+                    anchor_x = float(stem_xs[-1])
+                    anchor_y = float(y_end)
+                else:
+                    anchor_note = chord_sorted[0]
+                    anchor_x = float(stem_xs[0])
+                    anchor_y = float(y_start)
+                hand_anchor = str(getattr(anchor_note, 'hand', 'l') or 'l')
+                try:
+                    default_black_above_anchor = bool(self._black_note_above_stem(anchor_note, layout_arp))
+                except Exception:
+                    default_black_above_anchor = True
+                spec_anchor = resolve_notehead_spec(anchor_note, default_black_above=default_black_above_anchor)
+                is_up_anchor = bool(getattr(spec_anchor, 'is_up', False))
+                outline_anchor = sheared_notehead_outline_points(
+                    hand=hand_anchor,
+                    is_up=is_up_anchor,
+                    semitone_space_mm=semi_arp,
+                    width_scale=width_scale_arp,
+                    height_scale=height_scale_arp,
+                    base_tilt=base_tilt_arp,
+                    sample_count=128,
+                )
+                edge_anchor = support_point_from_outline_points(
+                    outline_anchor,
+                    m_line=m_line,
+                    choose_max=bool(is_up_anchor),
+                )
+                stem_end_x = float(anchor_x + edge_anchor[0])
+                stem_end_y = float(anchor_y + edge_anchor[1])
+                b_line = float(stem_end_y - (m_line * stem_end_x))
                 support_cache: dict[tuple[str, bool], float] = {}
                 for i, (note_obj, x_stem) in enumerate(zip(chord_sorted, stem_xs)):
                     nid = int(getattr(note_obj, '_id', 0) or 0)
-                    if abs(x_line_end - x_line_start) <= 1e-6:
-                        ratio = float(i) / float(span)
-                    else:
-                        ratio = (float(x_stem) - x_line_start) / float(x_line_end - x_line_start)
-                    ratio = max(0.0, min(1.0, ratio))
-
-                    # Keep X stable at note center and offset Y only by exact notehead outline support.
-                    # y1 = y_line - support_v where support is taken on the correct side
-                    # (up noteheads use max support, down noteheads use min support).
-                    y_line = float(y_start + (y_end - y_start) * ratio)
+                    y_line = float((m_line * float(x_stem)) + b_line)
+                    # For left hand: highest notehead never offset. For right hand: lowest notehead never offset.
+                    if (hand_chord == 'l' and i == len(chord_sorted) - 1) or (hand_chord == 'r' and i == 0):
+                        arpeggio_y_overrides[nid] = float(y_end if hand_chord == 'l' else y_start)
+                        continue
                     hand_local = str(getattr(note_obj, 'hand', 'l') or 'l')
                     try:
                         default_black_above_local = bool(self._black_note_above_stem(note_obj, layout_arp))
@@ -1202,9 +1359,7 @@ class Editor(QtCore.QObject,
                         )
                     v_support = float(support_cache[cache_key])
                     arpeggio_y_overrides[nid] = float(y_line - v_support)
-                    arpeggio_chord_note_ids.add(nid)
         self._arpeggio_y_overrides = arpeggio_y_overrides
-        self._arpeggio_chord_note_ids = arpeggio_chord_note_ids
 
         self._draw_cache = {
             'time_begin': time_begin,

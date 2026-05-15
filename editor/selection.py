@@ -202,6 +202,7 @@ class SelectionMixin:
 
     def transpose_selected_notes(self, delta_semitones: int) -> bool:
         """Move selected notes and selected slur/text X by semitone steps."""
+        
         score: SCORE | None = self.current_score()
         if score is None or not self._selection_active:
             return False
@@ -241,6 +242,8 @@ class SelectionMixin:
 
         if not updated:
             return False
+        if hasattr(self, 'sync_arpeggios_with_notes'):
+            self.sync_arpeggios_with_notes()
         self._sel_min_pitch = max(1, min(88, int(self._sel_min_pitch) + delta))
         self._sel_max_pitch = max(1, min(88, int(self._sel_max_pitch) + delta))
         self._sel_anchor_pitch = max(1, min(88, int(self._sel_anchor_pitch) + delta))

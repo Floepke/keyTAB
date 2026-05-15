@@ -17,6 +17,8 @@ from symbol_design.noteheads import (
     Notehead,
     normalize_notehead_literal,
     resolve_notehead_spec,
+    sheared_notehead_outline_points,
+    support_point_from_outline_points,
     sheared_notehead_support_v,
 )
 from symbol_design.pedal import draw_pedal_symbol
@@ -1766,32 +1768,67 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
 
                     y_start = float(_time_to_y(base_time + rtime1))
                     y_end = float(_time_to_y(base_time + rtime2))
-                    x_start = float(_key_to_x(int(chord_sorted[0].get('pitch', 0) or 0)))
-                    x_end = float(_key_to_x(int(chord_sorted[-1].get('pitch', 0) or 0)))
-                    dx_seg = float(x_end - x_start)
+                    x_low = float(_key_to_x(int(chord_sorted[0].get('pitch', 0) or 0)))
+                    x_high = float(_key_to_x(int(chord_sorted[-1].get('pitch', 0) or 0)))
+                    dx_seg = float(x_high - x_low)
                     dy_seg = float(y_end - y_start)
                     seg_len = float(math.hypot(dx_seg, dy_seg))
                     if seg_len <= 1e-9:
                         ux_seg, uy_seg = (1.0, 0.0)
                     else:
                         ux_seg, uy_seg = (dx_seg / seg_len, dy_seg / seg_len)
+                    m_line = float(dy_seg / dx_seg) if abs(dx_seg) > 1e-9 else 0.0
 
                     if chord_hand == 'l':
-                        tip_x = float(x_start - (ux_seg * stem_len_mm_for_barlines))
-                        tip_y = float(y_start - (uy_seg * stem_len_mm_for_barlines))
-                        points = [
-                            (tip_x, tip_y),
-                            (x_start, y_start),
-                            (x_end, y_end),
-                        ]
+                        anchor_note = chord_sorted[-1]
+                        anchor_x = x_high
+                        anchor_y = y_end
+                        side_pitch = int(chord_sorted[0].get('pitch', 0) or 0)
                     else:
-                        tip_x = float(x_end + (ux_seg * stem_len_mm_for_barlines))
-                        tip_y = float(y_end + (uy_seg * stem_len_mm_for_barlines))
-                        points = [
-                            (x_start, y_start),
-                            (x_end, y_end),
-                            (tip_x, tip_y),
-                        ]
+                        anchor_note = chord_sorted[0]
+                        anchor_x = x_low
+                        anchor_y = y_start
+                        side_pitch = int(chord_sorted[-1].get('pitch', 0) or 0)
+
+                    p_anchor = int(anchor_note.get('pitch', 0) or 0)
+                    default_black_above_anchor = (
+                        p_anchor in BLACK_KEYS
+                        and _black_note_above_stem(anchor_note, black_rule, line_notes_for_barlines)
+                    )
+                    spec_anchor = resolve_notehead_spec(
+                        anchor_note.get('raw', {}) or {},
+                        default_black_above=default_black_above_anchor,
+                    )
+                    is_up_anchor = bool(getattr(spec_anchor, 'is_up', False))
+                    outline_anchor = sheared_notehead_outline_points(
+                        hand=str(anchor_note.get('hand', 'l') or 'l'),
+                        is_up=is_up_anchor,
+                        semitone_space_mm=semitone_mm,
+                        width_scale=max(0.05, float(layout.get('note_width_scaling', 1.0) or 1.0)),
+                        height_scale=max(0.1, float(layout.get('notehead_height_scaling', 1.0) or 1.0)),
+                        base_tilt=max(-1.0, min(1.0, float(layout.get('notehead_tilt', 0.0) or 0.0))),
+                        sample_count=128,
+                    )
+                    edge_anchor = support_point_from_outline_points(
+                        outline_anchor,
+                        m_line=m_line,
+                        choose_max=bool(is_up_anchor),
+                    )
+                    stem_end_x = float(anchor_x + edge_anchor[0])
+                    stem_end_y = float(anchor_y + edge_anchor[1])
+
+                    base_x = float(_key_to_x(side_pitch))
+                    base_y = float(stem_end_y + (base_x - stem_end_x) * m_line)
+                    if chord_hand == 'l':
+                        tip_x = float(base_x - (ux_seg * stem_len_mm_for_barlines))
+                        tip_y = float(base_y - (uy_seg * stem_len_mm_for_barlines))
+                    else:
+                        tip_x = float(base_x + (ux_seg * stem_len_mm_for_barlines))
+                        tip_y = float(base_y + (uy_seg * stem_len_mm_for_barlines))
+                    points = [
+                        (stem_end_x, stem_end_y),
+                        (tip_x, tip_y),
+                    ]
 
                     arpeggio_segments_for_barlines.append(
                         {
@@ -2467,7 +2504,6 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
 
                     active_arpeggio_chord_keys_line.add(chord_key)
 
-                    span = max(1, len(chord_sorted) - 1)
                     y0_arp = float(_time_to_y(base_time + rtime1))
                     y1_arp = float(_time_to_y(base_time + rtime2))
                     stem_xs: list[float] = [
@@ -2481,16 +2517,64 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                     dx_line = float(x_line_end - x_line_start)
                     dy_line = float(y1_arp - y0_arp)
                     m_line = float(dy_line / dx_line) if abs(dx_line) > 1e-9 else 0.0
+                    seg_len = float(math.hypot(dx_line, dy_line))
+                    if seg_len <= 1e-9:
+                        ux_line, uy_line = (1.0, 0.0)
+                    else:
+                        ux_line, uy_line = (dx_line / seg_len, dy_line / seg_len)
+
+                    if chord_hand == 'l':
+                        anchor_note = chord_sorted[-1]
+                        anchor_x = float(stem_xs[-1])
+                        anchor_y = float(y1_arp)
+                        side_pitch = int(chord_sorted[0].get('pitch', 0) or 0)
+                    else:
+                        anchor_note = chord_sorted[0]
+                        anchor_x = float(stem_xs[0])
+                        anchor_y = float(y0_arp)
+                        side_pitch = int(chord_sorted[-1].get('pitch', 0) or 0)
+
+                    p_anchor = int(anchor_note.get('pitch', 0) or 0)
+                    default_black_above_anchor = (
+                        p_anchor in BLACK_KEYS
+                        and _black_note_above_stem(anchor_note, black_rule, line_notes)
+                    )
+                    spec_anchor = resolve_notehead_spec(
+                        anchor_note.get('raw', {}) or {},
+                        default_black_above=default_black_above_anchor,
+                    )
+                    is_up_anchor = bool(getattr(spec_anchor, 'is_up', False))
+                    outline_anchor = sheared_notehead_outline_points(
+                        hand=str(anchor_note.get('hand', 'l') or 'l'),
+                        is_up=is_up_anchor,
+                        semitone_space_mm=semitone_mm,
+                        width_scale=width_scale_arp,
+                        height_scale=height_scale_arp,
+                        base_tilt=base_tilt_arp,
+                        sample_count=128,
+                    )
+                    edge_anchor = support_point_from_outline_points(
+                        outline_anchor,
+                        m_line=m_line,
+                        choose_max=bool(is_up_anchor),
+                    )
+                    stem_end_x = float(anchor_x + edge_anchor[0])
+                    stem_end_y = float(anchor_y + edge_anchor[1])
+                    b_line = float(stem_end_y - (m_line * stem_end_x))
 
                     support_cache: dict[tuple[str, bool], float] = {}
                     for i, (note_item, x_stem) in enumerate(zip(chord_sorted, stem_xs)):
                         note_idx = int(note_item.get('idx', -1) or -1)
-                        if abs(x_line_end - x_line_start) <= 1e-6:
-                            ratio = float(i) / float(span)
-                        else:
-                            ratio = (float(x_stem) - x_line_start) / float(x_line_end - x_line_start)
-                        ratio = max(0.0, min(1.0, ratio))
-                        y_line = float(y0_arp + (y1_arp - y0_arp) * ratio)
+                        y_line = float((m_line * float(x_stem)) + b_line)
+
+                        if (chord_hand == 'l' and i == len(chord_sorted) - 1):
+                            arpeggio_y_overrides_line[note_idx] = float(y1_arp)
+                            arpeggio_chord_note_ids_line.add(note_idx)
+                            continue
+                        if (chord_hand == 'r' and i == 0):
+                            arpeggio_y_overrides_line[note_idx] = float(y0_arp)
+                            arpeggio_chord_note_ids_line.add(note_idx)
+                            continue
 
                         p_local = int(note_item.get('pitch', 0) or 0)
                         default_black_above_local = (
@@ -2519,28 +2603,21 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                         arpeggio_y_overrides_line[note_idx] = float(y_line - v_support)
                         arpeggio_chord_note_ids_line.add(note_idx)
 
-                    seg_len = float(math.hypot(dx_line, dy_line))
-                    if seg_len <= 1e-9:
-                        ux_line, uy_line = (1.0, 0.0)
-                    else:
-                        ux_line, uy_line = (dx_line / seg_len, dy_line / seg_len)
-
                     if chord_hand == 'l':
-                        tip_x = float(x_line_start - (ux_line * stem_len_mm))
-                        tip_y = float(y0_arp - (uy_line * stem_len_mm))
-                        stem_points = [
-                            (tip_x, tip_y),
-                            (x_line_start, y0_arp),
-                            (x_line_end, y1_arp),
-                        ]
+                        base_x = float(_key_to_x(int(chord_sorted[0].get('pitch', 0) or 0)))
+                        base_y = float(stem_end_y + (base_x - stem_end_x) * m_line)
+                        tip_x = float(base_x - (ux_line * stem_len_mm))
+                        tip_y = float(base_y - (uy_line * stem_len_mm))
                     else:
-                        tip_x = float(x_line_end + (ux_line * stem_len_mm))
-                        tip_y = float(y1_arp + (uy_line * stem_len_mm))
-                        stem_points = [
-                            (x_line_start, y0_arp),
-                            (x_line_end, y1_arp),
-                            (tip_x, tip_y),
-                        ]
+                        base_x = float(_key_to_x(int(chord_sorted[-1].get('pitch', 0) or 0)))
+                        base_y = float(stem_end_y + (base_x - stem_end_x) * m_line)
+                        tip_x = float(base_x + (ux_line * stem_len_mm))
+                        tip_y = float(base_y + (uy_line * stem_len_mm))
+
+                    stem_points = [
+                        (stem_end_x, stem_end_y),
+                        (tip_x, tip_y),
+                    ]
 
                     line_arpeggio_stems.append(
                         {

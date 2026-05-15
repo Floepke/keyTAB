@@ -26,7 +26,8 @@ from settings_manager import open_preferences, get_preferences_manager
 from appdata_manager import get_appdata_manager
 from utils.CONSTANT import UTILS_SAVE_DIR, QUARTER_NOTE_UNIT
 from utils.restart import restart_current_process
-from engraver.engraver import Engraver
+from engraver.engraver import Engraver as LegacyEngraver
+from engraver.engraver2 import Engraver as NewEngraver
 from editor.tool_manager import ToolManager
 from editor.editor import Editor
 from scripting.engine import ScriptEngine
@@ -113,8 +114,10 @@ class MainWindow(QtWidgets.QMainWindow):
         self.print_view = DrawUtilView(self.du)
         self.print_view.set_page_turn_callbacks(self._previous_page, self._next_page)
         
-        # Engraver instance (single)
-        self.engraver = Engraver(self.du, self)
+        # Engraver backend toggle (legacy/new)
+        self._use_new_engraver = self._get_use_new_engraver_from_appdata()
+        # Engraver instance (single active backend)
+        self.engraver = self._create_engraver_instance()
 
         # When engraving completes, refresh analysis then re-render the print view
         self.engraver.engraved.connect(self._on_engraver_finished)
@@ -763,7 +766,14 @@ class MainWindow(QtWidgets.QMainWindow):
         about_qt_act = QtGui.QAction(tr("About Qt"), self)
         about_qt_act.setToolTip(tr("Show information about the Qt framework."))
         about_qt_act.triggered.connect(lambda: QtWidgets.QMessageBox.aboutQt(self))
+        self._use_new_engraver_act = QtGui.QAction(tr("Use new engraver"), self)
+        self._use_new_engraver_act.setToolTip(tr("Toggle between legacy engraver and the new engraver backend."))
+        self._use_new_engraver_act.setCheckable(True)
+        self._use_new_engraver_act.setChecked(bool(getattr(self, '_use_new_engraver', False)))
+        self._use_new_engraver_act.triggered.connect(self._switch_engraver_backend)
         help_menu.addAction(shortcuts_act)
+        help_menu.addSeparator()
+        help_menu.addAction(self._use_new_engraver_act)
         help_menu.addSeparator()
         help_menu.addAction(about_act)
         help_menu.addSeparator()
@@ -1424,6 +1434,52 @@ class MainWindow(QtWidgets.QMainWindow):
         if sys.platform.startswith('win'):
             return self.tr("Playback using WinMM")
         return self.tr("Playback using System Synth")
+
+    def _get_use_new_engraver_from_appdata(self) -> bool:
+        adm = get_appdata_manager()
+        return bool(adm.get("use_new_engraver", False))
+
+    def _set_use_new_engraver_to_appdata(self, enabled: bool) -> None:
+        adm = get_appdata_manager()
+        adm.set("use_new_engraver", bool(enabled))
+        adm.save()
+
+    def _create_engraver_instance(self):
+        engraver_cls = NewEngraver if bool(getattr(self, "_use_new_engraver", False)) else LegacyEngraver
+        return engraver_cls(self.du, self)
+
+    def _switch_engraver_backend(self, use_new: bool) -> None:
+        use_new = bool(use_new)
+        if bool(getattr(self, "_use_new_engraver", False)) == use_new:
+            return
+
+        old_engraver = getattr(self, "engraver", None)
+        if old_engraver is not None:
+            try:
+                old_engraver.engraved.disconnect(self._on_engraver_finished)
+            except Exception:
+                pass
+            try:
+                old_engraver.failed.disconnect(self._on_engraver_failed)
+            except Exception:
+                pass
+            try:
+                old_engraver.shutdown()
+            except Exception:
+                pass
+
+        self._use_new_engraver = use_new
+        self._set_use_new_engraver_to_appdata(use_new)
+        self.engraver = self._create_engraver_instance()
+        self.engraver.engraved.connect(self._on_engraver_finished)
+        self.engraver.failed.connect(self._on_engraver_failed)
+
+        mode_text = self.tr("new") if use_new else self.tr("legacy")
+        self._status(self.tr("Switched to %1 engraver").replace("%1", mode_text), 3000)
+        try:
+            self.engraver.engrave(self._current_score_dict(), pageno=int(getattr(self, '_page_counter', 0)))
+        except Exception:
+            pass
 
     def _get_playback_mode_from_appdata(self) -> str:
         adm = get_appdata_manager()

@@ -610,6 +610,7 @@ class NoteTool(BaseTool):
         note = self.edit_note
         prev_time = float(getattr(note, 'time', 0.0) or 0.0)
         prev_duration = float(getattr(note, 'duration', 0.0) or 0.0)
+        prev_pitch = int(getattr(note, 'pitch', 0) or 0)
         cur_t_raw = float(self._editor.widget_px_to_time(x, y))
         cur_t_snap = float(self._editor.snap_time(cur_t_raw))
         cur_pitch = int(self._editor.widget_px_to_pitch(x, y))
@@ -682,6 +683,10 @@ class NoteTool(BaseTool):
             if hasattr(self._editor, 'mark_single_note_timing_dirty'):
                 self._editor.mark_single_note_timing_dirty(note, prev_time, prev_duration)
             self._editor.update_score_length(note)
+        else:
+            new_pitch = int(getattr(note, 'pitch', 0) or 0)
+            if new_pitch != prev_pitch and hasattr(self._editor, 'sync_arpeggios_with_notes'):
+                self._editor.sync_arpeggios_with_notes()
 
     def on_left_drag_end(self, x: float, y: float) -> None:
         super().on_left_drag_end(x, y)
