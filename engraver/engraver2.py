@@ -6,7 +6,8 @@ Renders notation using a stateless pipeline:
 3. Instantiate drawers with shared EngravingContext
 4. Each drawer renders its notation element independently
 
-Currently delegates to legacy engraver for A/B testing. Gradual porting via Help menu toggle.
+The renderer now computes its own page layout and then feeds that into the
+drawer pipeline.
 """
 
 from __future__ import annotations
@@ -26,7 +27,7 @@ from utils.CONSTANT import PIANO_KEY_AMOUNT, BE_KEYS, BLACK_KEYS, SHORTEST_DURAT
 from utils.operator import Operator
 
 from engraver.engraver import Engraver as _LegacyEngraver
-from engraver.engraver import do_engrave as _legacy_do_engrave
+from engraver.layout_builder import build_layout_bundle
 
 # Import all drawer classes
 from engraver.drawers.paper_drawer import PaperDrawer
@@ -460,24 +461,27 @@ def _build_stave_layout_data(score: SCORE, page_lines_map: list[dict], notation_
 def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = False) -> None:
     """New engraver entry point with drawer-based pipeline.
 
-    This is intentionally API-compatible with engraver.engraver.do_engrave so
-    callers can switch backends at runtime while the new pipeline is migrated.
-    
-    For the first migration step this runs the StaveDrawer pipeline on top of
-    legacy-computed page geometry so the new backend can be tested incrementally.
+    This computes page layout locally, then feeds the packed pages into the
+    drawer pipeline.
     """
-    scratch_du = DrawUtil()
-    _legacy_do_engrave(score, scratch_du, pageno=pageno, pdf_export=pdf_export)
+    layout_bundle = build_layout_bundle(score or {})
+    pages = list(layout_bundle.get('pages', []) or [])
+    print_time_map = list(layout_bundle.get('print_time_map', []) or [])
+    page_w = float(layout_bundle.get('page_width_mm', 210.0) or 210.0)
+    page_h = float(layout_bundle.get('page_height_mm', 297.0) or 297.0)
+    horizontal_read_direction = bool(layout_bundle.get('horizontal_read_direction', False))
 
-    if scratch_du.page_count() <= 0:
-        _legacy_do_engrave(score, du, pageno=pageno, pdf_export=pdf_export)
-        return
-
-    _reset_drawutil_pages(du, scratch_du)
-    du.print_time_map = getattr(scratch_du, 'print_time_map', [])
-    du.total_height_mm = float(getattr(scratch_du, 'total_height_mm', 0.0) or 0.0)
-    du.max_stave_width_mm = float(getattr(scratch_du, 'max_stave_width_mm', 0.0) or 0.0)
-    du._stave_time_spans_by_page = getattr(scratch_du, '_stave_time_spans_by_page', [])
+    du._pages = []
+    du._current_index = -1
+    for _page in pages:
+        du.new_page(page_w, page_h)
+        if horizontal_read_direction:
+            du.set_current_page_rotation_deg(-90.0)
+    du.print_time_map = print_time_map
+    du._stave_time_spans_by_page = print_time_map
+    du.analysis = layout_bundle.get('analysis')
+    du.total_height_mm = float(page_h * max(1, len(pages)))
+    du.max_stave_width_mm = float(page_w)
 
     notation_rgb = Style.get_notation_color()
     paper_rgb = Style.get_paper_color()
@@ -497,7 +501,6 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
         notation_color = (0.0, 0.0, 0.0, 1.0)
         paper_color = (1.0, 1.0, 1.0, 1.0)
 
-    print_time_map = list(getattr(scratch_du, 'print_time_map', []) or [])
     for page_index, page_lines_map in enumerate(print_time_map):
         du.set_current_page(int(page_index))
         layout_data = _build_stave_layout_data(score or {}, list(page_lines_map or []), notation_color, page_index)

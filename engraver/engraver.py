@@ -51,34 +51,37 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
     rendering calls, then records only DrawUtil primitives.
     """
     score: SCORE = score or {}
-    meta_data = (score.get('meta_data', {}) or {})
-    layout = (score.get('layout', {}) or {})
-    info = (score.get('info', {}) or {})
-    default_info = Info()
-    events = (score.get('events', {}) or {})
-    base_grid = list(score.get('base_grid', []) or [])
-    line_breaks = list(events.get('line_break', []) or [])
-    notes = list(events.get('note', []) or [])
-    grace_notes = list(events.get('grace_note', []) or [])
-    count_lines = list(events.get('count_line', []) or [])
-    beam_markers = list(events.get('beam', []) or [])
-    slurs = list(events.get('slur', []) or [])
-    texts = list(events.get('text', []) or [])
-    crescendos = list(events.get('crescendo', []) or [])
-    decrescendos = list(events.get('decrescendo', []) or [])
-    dynamic_symbols = list(events.get('dynamic_symbol', []) or [])
-    start_repeats = list(events.get('start_repeat', []) or [])
-    end_repeats = list(events.get('end_repeat', []) or [])
-    double_bars = list(events.get('double_bar', []) or [])
-    tempos = list(events.get('tempo', []) or [])
-    pedals = list(events.get('pedal', []) or [])
-    arpeggios = list(events.get('arpeggio', []) or [])
+    meta_data: dict = (score.get('meta_data', {}) or {})
+    layout: Layout = (score.get('layout', {}) or {})
+    info: Info = (score.get('info', {}) or {})
+    default_info: Info = Info()
+    events: dict = (score.get('events', {}) or {})
+    base_grid: list = list(score.get('base_grid', []) or [])
+    line_breaks: list = list(events.get('line_break', []) or [])
+    notes: list = list(events.get('note', []) or [])
+    grace_notes: list = list(events.get('grace_note', []) or [])
+    count_lines: list = list(events.get('count_line', []) or [])
+    beam_markers: list = list(events.get('beam', []) or [])
+    slurs: list = list(events.get('slur', []) or [])
+    texts: list = list(events.get('text', []) or [])
+    crescendos: list = list(events.get('crescendo', []) or [])
+    decrescendos: list = list(events.get('decrescendo', []) or [])
+    dynamic_symbols: list = list(events.get('dynamic_symbol', []) or [])
+    start_repeats: list = list(events.get('start_repeat', []) or [])
+    end_repeats: list = list(events.get('end_repeat', []) or [])
+    double_bars: list = list(events.get('double_bar', []) or [])
+    tempos: list = list(events.get('tempo', []) or [])
+    pedals: list = list(events.get('pedal', []) or [])
+    arpeggios: list = list(events.get('arpeggio', []) or [])
 
     # Theme colors
     notation_rgb = Style.get_notation_color()
     paper_rgb = Style.get_paper_color()
     notation_color = (notation_rgb[0] / 255.0, notation_rgb[1] / 255.0, notation_rgb[2] / 255.0, 1.0)
     paper_color = (paper_rgb[0] / 255.0, paper_rgb[1] / 255.0, paper_rgb[2] / 255.0, 1.0)
+
+    # layout values
+    black_rule = str(layout.get('black_note_rule', 'below_stem') or 'below_stem')
 
     if pdf_export:
         # PDF export must stay pure black ink on white paper and preserve raw MIDI colors.
@@ -2451,7 +2454,6 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
 
             stem_len_units = float(layout.get('note_stem_length_semitone', 3) or 3)
             stem_len_mm = stem_len_units * semitone_mm
-            black_rule = str(layout.get('black_note_rule', 'below_stem') or 'below_stem')
 
             arpeggio_y_overrides_line: dict[int, float] = {}
             arpeggio_chord_note_ids_line: set[int] = set()
