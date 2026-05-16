@@ -83,6 +83,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
     paper_color = (paper_rgb[0] / 255.0, paper_rgb[1] / 255.0, paper_rgb[2] / 255.0, 1.0)
 
     # layout values
+    scale = float(layout.get('scale', 1.0) or 1.0)
     black_rule = str(layout.get('black_note_rule', 'below_stem') or 'below_stem')
     page_orientation = str(layout.get('page_orientation', 'portrait') or 'portrait').strip().lower()
     read_direction = str(layout.get('read_direction', 'vertical') or 'vertical').strip().lower()
@@ -92,6 +93,20 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
     user_page_right = float(layout.get('page_right_margin_mm', 5.0) or 5.0)
     user_page_top = float(layout.get('page_top_margin_mm', 10.0) or 10.0)
     user_page_bottom = float(layout.get('page_bottom_margin_mm', 10.0) or 10.0)
+    stave_two_w = float(layout.get('stave_two_line_thickness_mm', 0.5) or 0.5) * scale
+    stave_three_w = float(layout.get('stave_three_line_thickness_mm', 0.5) or 0.5) * scale
+    stave_clef_w = float(layout.get('stave_clef_line_thickness_mm', 0.5) or 0.5) * scale
+    stave_ledger_len = float(layout.get('stave_ledger_line_length_mm', 7.0) or 7.0) * scale
+    clef_dash = list(getattr(Layout(), 'stave_clef_line_dash_pattern_mm', [3.0]) or [3.0])
+    clef_dash = _scaled_dash_pattern_with_default(
+        clef_dash,
+        clef_dash,
+        scale,
+    )
+    grid_dash_mm = list(getattr(Layout(), 'grid_gridline_dash_pattern_mm', [2.5, 4.0]) or [2.5, 4.0])
+    grid_bands = list(layout.get('grid_band_track', []) or [])
+    grid_band_start_phase = str(layout.get('grid_band_start_phase', 'dark') or 'dark').strip().lower()
+    ts_lane_width_mm = layout['time_signature_indicator_lane_width_mm'] * scale
 
     if pdf_export:
         # PDF export must stay pure black ink on white paper and preserve raw MIDI colors.
@@ -416,20 +431,6 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
         page_top = user_page_top
         page_bottom = user_page_bottom
 
-    scale = float(layout.get('scale', 1.0) or 1.0)
-    stave_two_w = float(layout.get('stave_two_line_thickness_mm', 0.5) or 0.5) * scale
-    stave_three_w = float(layout.get('stave_three_line_thickness_mm', 0.5) or 0.5) * scale
-    stave_clef_w = float(layout.get('stave_clef_line_thickness_mm', 0.5) or 0.5) * scale
-    stave_ledger_len = float(layout.get('stave_ledger_line_length_mm', 7.0) or 7.0) * scale
-
-    default_clef_dash_mm = list(getattr(Layout(), 'stave_clef_line_dash_pattern_mm', [3.0]) or [3.0])
-    default_grid_dash_mm = list(getattr(Layout(), 'grid_gridline_dash_pattern_mm', [2.5, 4.0]) or [2.5, 4.0])
-    clef_dash = _scaled_dash_pattern_with_default(
-        layout.get('stave_clef_line_dash_pattern_mm', default_clef_dash_mm),
-        default_clef_dash_mm,
-        scale,
-    )
-
     op_time = Operator(SHORTEST_DURATION)
     barline_positions: list[float] = []
     group_boundary_times: list[float] = []
@@ -467,8 +468,6 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
     all_barlines = sorted(list(dict.fromkeys([0.0] + [float(v) for v in barline_positions] + [float(cur_bar)])))
 
     # Get grid band track from layout and precompute dark intervals for efficient lookup during engraving.
-    grid_bands = list(layout.get('grid_band_track', []) or [])
-    grid_band_start_phase = str(layout.get('grid_band_start_phase', 'dark') or 'dark').strip().lower()
     grid_bands_start_dark = bool(grid_band_start_phase != 'light')
     grid_dark_intervals_global = _build_grid_band_dark_intervals(
         grid_bands,
@@ -1000,8 +999,6 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
             and op_time.lt(float(seg.get('start', 0.0) or 0.0), float(line['time_end']))
         ]
         if ts_segments_in_line:
-            ts_lane_width_raw = layout.get('time_signature_indicator_lane_width_mm', 22.0)
-            ts_lane_width = float(ts_lane_width_raw or 22.0) * scale
             ts_lane_padding_mm = 1  # Hard-coded right padding so lane ends before the stave.
             min_pitch = None
             for seg in ts_segments_in_line:
@@ -1685,7 +1682,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
             grid_band_split_x = max(float(grid_left), min(float(grid_right), float(grid_band_split_x)))
             ts_right_margin = max(0.0, 1.5 * scale)
             ts_lane_padding_mm = float(line.get('ts_lane_padding_mm', 0.0) or 0.0)
-            ts_lane_width = float(line.get('ts_lane_width', 0.0) or 0.0)
+            ts_lane_width = ts_lane_width_mm
             if ts_lane_width > 0.0:
                 ts_lane_right = line_x_start + float(line.get('ts_lane_right_offset', 0.0) or 0.0) - ts_lane_padding_mm
                 ts_lane_left = ts_lane_right - ts_lane_width
@@ -1706,8 +1703,8 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
             barline_visible = bool(layout.get('barline_visible', True))
             grid_line_visible = bool(layout.get('grid_line_visible', True))
             dash_pattern = _scaled_dash_pattern_with_default(
-                layout.get('grid_gridline_dash_pattern_mm', default_grid_dash_mm),
-                default_grid_dash_mm,
+                layout.get('grid_gridline_dash_pattern_mm', grid_dash_mm),
+                grid_dash_mm,
                 scale,
             )
 
@@ -2692,8 +2689,8 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
             # Allow an explicit measure-numbering guide dash style, with
             # fallback to the global grid line pattern for backward compatibility.
             default_measure_guide_dash_mm = list(
-                getattr(Layout(), 'measure_numbering_guide_dash_pattern_mm', default_grid_dash_mm)
-                or default_grid_dash_mm
+                getattr(Layout(), 'measure_numbering_guide_dash_pattern_mm', grid_dash_mm)
+                or grid_dash_mm
             )
             measure_guide_dash_pattern = _scaled_dash_pattern_with_default(
                 layout.get('measure_numbering_guide_dash_pattern_mm', default_measure_guide_dash_mm),
