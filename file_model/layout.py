@@ -19,18 +19,10 @@ class Layout:
     black_note_rule: Literal['above_stem', 'below_stem', 'above_stem_if_collision', 'above_stem_if_chord_and_white_note', 'above_stem_if_chord_and_white_note_same_hand'] = 'above_stem'
 
     # Note appearance
-    note_head_visible: bool = True
-    note_stem_visible: bool = True
-    accidental_visible: bool = True
-    chord_connect_visible: bool = True
-    note_stop_visible: bool = True
     note_stem_length_semitone: int = 7
     note_stem_thickness_mm: float = 0.8 # Thickness of the stem as well the notehead outline width
     note_stopsign_thickness_mm: float = 1.0
-    note_leftdot_visible: bool = False
-    note_continuation_dot_visible: bool = True
     note_continuation_dot_size_mm: float = 2.5
-    note_midinote_visible: bool = True
     note_midinote_left_color: str = '#ccc'
     note_midinote_right_color: str = '#ccc'
     note_width_scaling: float = 1.0 # Scaling factor for the horizontal size of the noteheads, to make them wider or narrower.
@@ -38,12 +30,10 @@ class Layout:
     notehead_tilt: float = 0.30 # Diagonal shear tilt of noteheads (0 = perfect circle/oval, higher = traditional tilted notehead, lower = traditional tilted notehead in the opposite direction).
 
     # Beam appearance
-    beam_visible: bool = True
     beam_thickness_mm: float = 2.5
     beam_corner_radius_mm: float = 0.75
 
     # Grace note appearance
-    grace_note_visible: bool = True
     grace_note_outline_width_mm: float = 0.8
     grace_note_scale: float = 0.75
 
@@ -52,41 +42,29 @@ class Layout:
     pedal_background_padding_mm: float = 1.0
 
     # Text appearance
-    text_visible: bool = True
     text_background_padding_mm: float = 0.5
 
     # Slur appearance
-    slur_visible: bool = True
     slur_width_sides_mm: float = 0.75
     slur_width_middle_mm: float = 2.0
 
     # Hairpin (crescendo / decrescendo) appearance
-    hairpin_visible: bool = True
     hairpin_line_width_mm: float = 1.0
     hairpin_width_mm: float = 10.0  # width of the open end of the hairpin in mm
     dynamic_symbol_font_size_pt: float = 35.0  # Font size for standalone dynamic symbols
     dynamic_symbol_background_padding_mm: float = 1.5
     dynamic_rotation: float = 0.0
-    dynamic_symbol_visible: bool = True
 
     # Repeat markers
-    repeat_start_visible: bool = True
-    repeat_end_visible: bool = True
-    double_barline_visible: bool = True
     
     # Measure grouping (prefill for line break tool; not applied automatically)
     measure_grouping: str = ""
 
     # Count line
-    countline_visible: bool = True
     countline_dash_pattern: list[float] = field(default_factory=lambda: [0.0, 3.0])  # Dash pattern for count lines (e.g., [dash_length, gap_length])
     countline_thickness_mm: float = 1.5
 
     # Grid lines
-    stave_visible: bool = True
-    barline_visible: bool = True
-    grid_line_visible: bool = True
-    grid_band_visible: bool = True
     grid_band_track: list[GridBand] = field(default_factory=list) # Grid Band track. Single track for alternating bands.
     grid_barline_thickness_mm: float = 1.25
     grid_gridline_thickness_mm: float = 1.0
@@ -95,7 +73,6 @@ class Layout:
     grid_band_start_phase: Literal['dark', 'light'] = 'dark'
 
     # Time signature indicator type (global)
-    time_signature_visible: bool = True
     time_signature_indicator_type: Literal['classical', 'klavarskribo', 'classical & klavarskribo'] = 'classical & klavarskribo'
     
     # Time signature indicator lane (left of stave)
@@ -116,9 +93,6 @@ class Layout:
     measure_numbering_guide_dash_pattern_mm: list[float] = field(default_factory=lambda: [2.0])
     # 'system': number at top of each system; 'barline': number at every barline
     measure_numbering_placement: Literal['system', 'barline'] = 'barline'
-    measure_numbering_guide_visible: bool = True
-    measure_numbers_visible: bool = True
-    tempo_indicator_visible: bool = True
     measure_numbering_font: Font = field(default_factory=lambda: Font(
         family="Edwin",
         size_pt=25.0,
@@ -165,9 +139,36 @@ class Layout:
     stave_clef_line_dash_pattern_mm: list[float] = field(default_factory=lambda: [4.0, 3.0])  # Dash pattern for clef lines (e.g., [dash_length, gap_length])
 
     # Mini piano keyboard in engraver
-    mini_piano_visible: bool = True
     mini_piano_octave_numbering: bool = True
     mini_piano_color: str = '#ccc'
+    
+    # Visibility toggles for different elements
+    note_head_visible: bool = True
+    note_stem_visible: bool = True
+    accidental_visible: bool = True
+    note_stop_visible: bool = True
+    note_leftdot_visible: bool = False
+    note_continuation_dot_visible: bool = True
+    note_midinote_visible: bool = True
+    beam_visible: bool = True
+    grace_note_visible: bool = True
+    text_visible: bool = True
+    slur_visible: bool = True
+    hairpin_visible: bool = True
+    dynamic_symbol_visible: bool = True
+    repeat_start_visible: bool = True
+    repeat_end_visible: bool = True
+    double_barline_visible: bool = True
+    countline_visible: bool = True
+    stave_visible: bool = True
+    barline_visible: bool = True
+    grid_line_visible: bool = True
+    grid_band_visible: bool = True
+    time_signature_visible: bool = True
+    measure_numbering_guide_visible: bool = True
+    measure_numbers_visible: bool = True
+    tempo_indicator_visible: bool = True
+    mini_piano_visible: bool = True
 
 LAYOUT_FLOAT_CONFIG: dict[str, dict[str, float]] = {
     'page_width_mm': {'min': 50.0, 'max': 5_000.0, 'step': 0.5},
@@ -185,7 +186,7 @@ LAYOUT_FLOAT_CONFIG: dict[str, dict[str, float]] = {
     'note_continuation_dot_size_mm': {'min': 0.05, 'max': 10.0, 'step': 0.05},
     'note_width_scaling': {'min': 0.05, 'max': 2.0, 'step': 0.01},
     'notehead_height_scaling': {'min': 0.1, 'max': 3.0, 'step': 0.01},
-    'notehead_tilt': {'min': 0.0, 'max': 1.0, 'step': 0.01},
+    'notehead_tilt': {'min': 0.0, 'max': 0.5, 'step': 0.01},
     'beam_thickness_mm': {'min': 0.05, 'max': 5.0, 'step': 0.05},
     'beam_corner_radius_mm': {'min': 0.0, 'max': 5.0, 'step': 0.05},
     'grace_note_outline_width_mm': {'min': 0.05, 'max': 5.0, 'step': 0.05},

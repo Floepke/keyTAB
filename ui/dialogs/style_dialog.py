@@ -566,21 +566,20 @@ class StyleDialog(QtWidgets.QDialog):
             'header_height_mm': self.tr('Header height (mm)'),
             'footer_height_mm': self.tr('Footer height (mm)'),
             'black_note_rule': self.tr('Black note rule'),
-            'note_head_visible': self.tr('Note head visible'),
-            'note_stem_visible': self.tr('Note stem visible'),
-            'accidental_visible': self.tr('Accidental line visible'),
-            'chord_connect_visible': self.tr('Chord connector visible'),
-            'note_stop_visible': self.tr('Note stop visible'),
+            'note_head_visible': self.tr('Notehead visible'),
+            'note_stem_visible': self.tr('Stem visible'),
+            'accidental_visible': self.tr('Accidental visible'),
+            'note_stop_visible': self.tr('Stop symbol visible'),
             'note_stem_length_semitone': self.tr('Note stem length (semitones)'),
             'note_stem_thickness_mm': self.tr('Note stem thickness (mm) (Applies to both stem and the lines of the notehead symbol)'),
-            'note_stopsign_thickness_mm': self.tr('Note stop thickness (mm)'),
-            'note_leftdot_visible': self.tr('Left handed centered note symbol dot visible'),
+            'note_stopsign_thickness_mm': self.tr('Stop symbol thickness (mm)'),
+            'note_leftdot_visible': self.tr('Left dot visible (indicates the left handed notes with a tiny dot in case of unreadable hand split point)'),
             'note_continuation_dot_visible': self.tr('Continuation dot visible'),
             'note_continuation_dot_size_mm': self.tr('Continuation dot size (mm)'),
             'note_midinote_visible': self.tr('MIDI note blocks visible'),
             'note_midinote_left_color': self.tr('MIDI note color (left hand)'),
             'note_midinote_right_color': self.tr('MIDI note color (right hand)'),
-            'note_width_scaling': self.tr('Noot width scaling (1 = Perfectly rounded)'),
+            'note_width_scaling': self.tr('Note width scaling (1 = Perfectly rounded)'),
             'notehead_height_scaling': self.tr('Notehead height scaling (1.0 = square, higher = taller)'),
             'notehead_tilt': self.tr('Notehead tilt (-1..1, 0 = circle/oval, negative = opposite direction)'),
             'beam_visible': self.tr('Beam visible'),
@@ -756,13 +755,14 @@ class StyleDialog(QtWidgets.QDialog):
 
         tab_order = [
             self.tr("Page"),
+            self.tr("Fonts"),
             self.tr("Stave"),
             self.tr("Grid"),
             self.tr("Grid band"),
             self.tr("Time signature"),
+            self.tr("Tempo"),
             self.tr("Measure Numbering"),
             self.tr("Barline Symbols"),
-            self.tr("Fonts"),
             self.tr("Note"),
             self.tr("Grace note"),
             self.tr("Beam"),
@@ -907,7 +907,7 @@ class StyleDialog(QtWidgets.QDialog):
             'measure_numbering_font': 'Measure Numbering',
             'measure_numbering_guide_visible': 'Measure Numbering',
             'measure_numbers_visible': 'Measure Numbering',
-            'tempo_indicator_visible': 'Visibility',
+            'tempo_indicator_visible': 'Tempo',
             # Repeat
             'repeat_start_visible': 'Barline Symbols',
             'repeat_end_visible': 'Barline Symbols',
@@ -1073,25 +1073,37 @@ class StyleDialog(QtWidgets.QDialog):
         self.values_changed.emit()
 
     def _add_visibility_mirror_controls(self, tab_forms: dict[str, QtWidgets.QVBoxLayout], field_labels: dict[str, str]) -> None:
+        '''the visibillity tab contains a set of mirrored toggles for all boolean visibility toggles.
+        Toggling any of them will toggle all other checkboxes for the same field across the UI, and update the main layout value.
+        '''
         visibility_tab = tab_forms.get(self.tr('Visibility'))
-        if visibility_tab is None:
-            return
+
+        # add a group box to hold the visibility toggles
+        vis_box = QtWidgets.QGroupBox(self.tr('Visibility Toggles'), self)
+        vis_box_layout = QtWidgets.QVBoxLayout(vis_box)
+        vis_box_layout.setContentsMargins(6, 2, 6, 6)
+        vis_box_layout.setSpacing(0)
+
         for f in fields(Layout):
             name = f.name
             field_type = self._type_hints.get(name, f.type)
-            if field_type is not bool:
-                continue
-            label = field_labels.get(name, self.tr(name.replace('_', ' ').capitalize()))
-            mirror = QtWidgets.QCheckBox(self)
-            mirror.setChecked(bool(getattr(self._layout, name, False)))
-            mirror.stateChanged.connect(lambda _state, field_name=name, cb=mirror: self._on_bool_widget_changed(field_name, bool(cb.isChecked())))
-            self._register_bool_widget(name, mirror)
-            box = QtWidgets.QGroupBox(label, self)
-            box_layout = QtWidgets.QVBoxLayout(box)
-            box_layout.setContentsMargins(6, 2, 6, 6)
-            box_layout.setSpacing(0)
-            box_layout.addWidget(mirror)
-            visibility_tab.addWidget(box)
+
+            if field_type is not bool or name in ("mini_piano_octave_numbering"):
+                continue # Not a boolean field or not a visibility toggle, skip
+            
+            # create checkbox mirror
+            label = field_labels.get(name, self.tr(name.replace('_', ' ').capitalize())).replace('visible', '')
+            mirror_checkbox = QtWidgets.QCheckBox(self)
+            mirror_checkbox.setText(label)
+            mirror_checkbox.setChecked(bool(getattr(self._layout, name, False)))
+            mirror_checkbox.stateChanged.connect(lambda _state, field_name=name, cb=mirror_checkbox: self._on_bool_widget_changed(field_name, bool(cb.isChecked())))
+            self._register_bool_widget(name, mirror_checkbox)
+            
+            # add to box
+            vis_box_layout.addWidget(mirror_checkbox)
+        
+        # add to visibility tab
+        visibility_tab.addWidget(vis_box)
 
     def _pstyle_dir(self) -> Path:
         root = Path.home() / ".keyTAB" / "pstyle"

@@ -24,6 +24,7 @@ def draw_circle_notehead(
     tags: list[str],
     stroke_color_override: tuple[float, float, float, float] | None = None,
     fill_color_override: tuple[float, float, float, float] | None = None,
+    apply_tilt: bool = True,
 ) -> None:
     half_w = float(symbol.semitone_space_mm) * float(symbol.note_width_scaling)
     full_h = float(symbol.semitone_space_mm) * 2.0 * float(symbol.notehead_height_scaling)
@@ -31,19 +32,14 @@ def draw_circle_notehead(
 
     stroke_color = stroke_color_override if stroke_color_override is not None else symbol.notation_color
     fill_color = fill_color_override if fill_color_override is not None else symbol.notation_color
-    tilt = float(symbol.notehead_tilt)
+    tilt = float(symbol.notehead_tilt) if apply_tilt else 0.0
     note_obj: Note = getattr(symbol, "note", None)
     hand = "l"
     if note_obj is not None:
-        # set tilt
         if isinstance(note_obj, dict):
             hand = str(note_obj.get("hand", "") or "").lower()
         else:
             hand = str(getattr(note_obj, "hand", "") or "").lower()
-        if hand == "r":
-            tilt = -tilt
-        else:
-            tilt = tilt
 
     if abs(tilt) <= 1e-9:
         if filled:
@@ -78,7 +74,8 @@ def draw_circle_notehead(
             semitone_space_mm=float(symbol.semitone_space_mm),
             width_scale=float(symbol.note_width_scaling),
             height_scale=float(symbol.notehead_height_scaling),
-            base_tilt=float(symbol.notehead_tilt),
+            # Hand-direction tilt sign is applied in geometry.py.
+            base_tilt=float(symbol.notehead_tilt) if apply_tilt else 0.0,
             sample_count=64,
         )
         pts = [(float(x_mm) + float(px), float(y_mm) + float(py)) for (px, py) in local_pts]

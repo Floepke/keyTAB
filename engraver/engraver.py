@@ -50,6 +50,8 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
     It converts the score model into page/line geometry without any Qt
     rendering calls, then records only DrawUtil primitives.
     """
+
+    # gather all score data
     score: SCORE = score or {}
     meta_data: dict = (score.get('meta_data', {}) or {})
     layout: Layout = (score.get('layout', {}) or {})
@@ -82,6 +84,14 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
 
     # layout values
     black_rule = str(layout.get('black_note_rule', 'below_stem') or 'below_stem')
+    page_orientation = str(layout.get('page_orientation', 'portrait') or 'portrait').strip().lower()
+    read_direction = str(layout.get('read_direction', 'vertical') or 'vertical').strip().lower()
+    raw_page_w = float(layout.get('page_width_mm', 210.0) or 210.0)
+    raw_page_h = float(layout.get('page_height_mm', 297.0) or 297.0)
+    user_page_left = float(layout.get('page_left_margin_mm', 5.0) or 5.0)
+    user_page_right = float(layout.get('page_right_margin_mm', 5.0) or 5.0)
+    user_page_top = float(layout.get('page_top_margin_mm', 10.0) or 10.0)
+    user_page_bottom = float(layout.get('page_bottom_margin_mm', 10.0) or 10.0)
 
     if pdf_export:
         # PDF export must stay pure black ink on white paper and preserve raw MIDI colors.
@@ -372,19 +382,16 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                 pedal_down_id = 0
 
     # Problem solved: materialize layout values early to keep math predictable.
-    page_orientation = str(layout.get('page_orientation', 'portrait') or 'portrait').strip().lower()
+    
     # Backward compatibility with earlier horizontal/vertical orientation values.
     if page_orientation == 'vertical':
         page_orientation = 'portrait'
     elif page_orientation == 'horizontal':
         page_orientation = 'landscape'
 
-    read_direction = str(layout.get('read_direction', 'vertical') or 'vertical').strip().lower()
     horizontal_read_direction = read_direction == 'horizontal'
 
     landscape_page_orientation = page_orientation == 'landscape'
-    raw_page_w = float(layout.get('page_width_mm', 210.0) or 210.0)
-    raw_page_h = float(layout.get('page_height_mm', 297.0) or 297.0)
     # In horizontal read mode the page is rotated for presentation, so the
     # drawing-space swap must be inverted to keep final portrait/landscape
     # output matching the selected page orientation.
@@ -395,10 +402,6 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
     else:
         page_w = raw_page_w
         page_h = raw_page_h
-    user_page_left = float(layout.get('page_left_margin_mm', 5.0) or 5.0)
-    user_page_right = float(layout.get('page_right_margin_mm', 5.0) or 5.0)
-    user_page_top = float(layout.get('page_top_margin_mm', 10.0) or 10.0)
-    user_page_bottom = float(layout.get('page_bottom_margin_mm', 10.0) or 10.0)
 
     # In horizontal read mode the page is rotated after drawing.
     # Remap user-facing margins to drawing-space so final output margins match user settings.
@@ -1753,7 +1756,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                     chord_pitch_key = tuple(int(n.get('pitch', 0) or 0) for n in chord_sorted)
                     chord_key = (base_time_key, chord_hand, chord_pitch_key)
 
-                    if abs(rtime1) <= 1e-9 and abs(rtime2) <= 1e-9:
+                    if abs(rtime1) <= SHORTEST_DURATION and abs(rtime2) <= SHORTEST_DURATION:
                         continue
 
                     active_arpeggio_chord_keys_for_barlines.add(chord_key)
@@ -2264,23 +2267,20 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                         is_invisible = bool(invisible_raw)
                     if is_invisible:
                         continue
-                    
-                    try:
-                        draw_pedal_symbol(
-                            du,
-                            pedal_ev,
-                            time_to_y_mm=_pedal_time_to_y,
-                            rpitch_to_x_mm=_pedal_rpitch_to_x,
-                            color=notation_color,
-                            background_color=paper_color,
-                            width_mm=pedal_thickness_mm,
-                            semitone_space_mm=semitone_mm,
-                            layout=layout,
-                            id=int(_read_pedal_field(pedal_ev, '_id', _read_pedal_field(pedal_ev, 'id', 0)) or 0),
-                            tags=['pedal_symbol'],
-                        )
-                    except Exception:
-                        pass
+
+                    draw_pedal_symbol(
+                        du,
+                        pedal_ev,
+                        time_to_y_mm=_pedal_time_to_y,
+                        rpitch_to_x_mm=_pedal_rpitch_to_x,
+                        color=notation_color,
+                        background_color=paper_color,
+                        width_mm=pedal_thickness_mm,
+                        semitone_space_mm=semitone_mm,
+                        layout=layout,
+                        id=int(_read_pedal_field(pedal_ev, '_id', _read_pedal_field(pedal_ev, 'id', 0)) or 0),
+                        tags=['pedal_symbol'],
+                    )
 
             # Problem solved: render count lines as lightweight guides.
             if bool(layout.get('countline_visible', True)) and count_lines:
@@ -2490,7 +2490,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                     chord_pitch_key = tuple(int(n.get('pitch', 0) or 0) for n in chord_sorted)
                     chord_key = (base_time_key, chord_hand, chord_pitch_key)
 
-                    if abs(rtime1) <= 1e-9 and abs(rtime2) <= 1e-9:
+                    if abs(rtime1) <= SHORTEST_DURATION and abs(rtime2) <= SHORTEST_DURATION:
                         continue
 
                     active_arpeggio_chord_keys_line.add(chord_key)
@@ -3731,6 +3731,8 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                 except Exception:
                     r_i, g_i, b_i = (204, 204, 204)
                 fill = _midi_fill_from_rgb((int(r_i), int(g_i), int(b_i)))
+                
+                '''MIDI note drawing'''
                 if bool(layout.get('note_midinote_visible', True)):
                     midi_poly = [
                         (x, y_midi_top),
