@@ -573,7 +573,6 @@ class StyleDialog(QtWidgets.QDialog):
             'note_stem_length_semitone': self.tr('Note stem length (semitones)'),
             'note_stem_thickness_mm': self.tr('Note stem thickness (mm) (Applies to both stem and the lines of the notehead symbol)'),
             'note_stopsign_thickness_mm': self.tr('Stop symbol thickness (mm)'),
-            'note_leftdot_visible': self.tr('Left dot visible (indicates the left handed notes with a tiny dot in case of unreadable hand split point)'),
             'note_continuation_dot_visible': self.tr('Continuation dot visible'),
             'note_continuation_dot_size_mm': self.tr('Continuation dot size (mm)'),
             'note_midinote_visible': self.tr('MIDI note blocks visible'),
@@ -831,7 +830,6 @@ class StyleDialog(QtWidgets.QDialog):
             'note_stem_visible': 'Note',
             'note_stop_visible': 'Note',
             'note_continuation_dot_visible': 'Note',
-            'note_leftdot_visible': 'Note',
             'note_midinote_visible': 'Note',
             # Beam
             'beam_thickness_mm': 'Beam',

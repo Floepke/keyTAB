@@ -107,6 +107,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
     grid_bands = list(layout.get('grid_band_track', []) or [])
     grid_band_start_phase = str(layout.get('grid_band_start_phase', 'dark') or 'dark').strip().lower()
     ts_lane_width_mm = layout['time_signature_indicator_lane_width_mm'] * scale
+    leftdot_visible = bool(layout.get('measure_numbering_guide_visible', True))
 
     if pdf_export:
         # PDF export must stay pure black ink on white paper and preserve raw MIDI colors.

@@ -147,7 +147,6 @@ class Layout:
     note_stem_visible: bool = True
     accidental_visible: bool = True
     note_stop_visible: bool = True
-    note_leftdot_visible: bool = False
     note_continuation_dot_visible: bool = True
     note_midinote_visible: bool = True
     beam_visible: bool = True

@@ -767,7 +767,7 @@ class MainWindow(QtWidgets.QMainWindow):
         about_qt_act = QtGui.QAction(tr("About Qt"), self)
         about_qt_act.setToolTip(tr("Show information about the Qt framework."))
         about_qt_act.triggered.connect(lambda: QtWidgets.QMessageBox.aboutQt(self))
-        self._use_new_engraver_act = QtGui.QAction(tr("Use new engraver"), self)
+        self._use_new_engraver_act = QtGui.QAction(tr("Use new engraver (unfinished)"), self)
         self._use_new_engraver_act.setToolTip(tr("Toggle between legacy engraver and the new engraver backend."))
         self._use_new_engraver_act.setCheckable(True)
         self._use_new_engraver_act.setChecked(bool(getattr(self, '_use_new_engraver', False)))

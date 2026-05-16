@@ -111,6 +111,9 @@ def draw_circle_left_dot(
     symbol: "Notehead",
 ) -> None:
     hand = str(getattr(symbol, "hand", "") or "")
+    # The left dot is removed from the project design but we keep the code for it in case we want to re-enable it in the future as an option.
+    if True:
+        return
     if hand != "l":
         return
     if not bool(symbol._layout_value("note_leftdot_visible", False)):
