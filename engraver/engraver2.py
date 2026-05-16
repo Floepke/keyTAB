@@ -33,7 +33,6 @@ from engraver.drawers.paper_drawer import PaperDrawer
 from engraver.drawers.stave_drawer import StaveDrawer
 from engraver.drawers.grid_drawer import GridDrawer
 from engraver.drawers.note_drawer import NoteheadDrawer
-from engraver.drawers.beam_drawer import BeamDrawer
 from engraver.drawers.arpeggio_drawer import ArpeggioDrawer
 from engraver.drawers.slur_drawer import SlurDrawer
 from engraver.drawers.dynamic_drawer import DynamicDrawer
@@ -57,16 +56,15 @@ DRAWER_PIPELINE = [
     TimeSignatureDrawer,     # Time signatures
     HeaderFooterDrawer,      # Header/footer
     CountLineDrawer,         # Count guides
+    GraceNoteDrawer,         # Grace notes
 
     NoteheadDrawer,          # Notes (with per-note ledgers)
-    # BeamDrawer,           # Beams (disabled for now)
-    # ArpeggioDrawer,       # Arpeggios (disabled for now)
-    # GraceNoteDrawer,      # Grace notes (disabled for now)
-
-    # SlurDrawer,           # Slurs (disabled for now)
-    # DynamicDrawer,        # Dynamics and hairpins (disabled for now)
-    # PedalDrawer,          # Pedal symbols (disabled for now)
-    # TextDrawer,           # Text annotations (disabled for now)
+    ArpeggioDrawer,          # Arpeggios
+    SlurDrawer,              # Slurs
+    DynamicDrawer,           # Dynamics and hairpins
+    TextDrawer,              # Text annotations + tempos
+    RepeatDrawer,            # Repeat symbols
+    PedalDrawer,             # Pedal symbols
 
     MiniPianoDrawer,         # Mini piano (last, on top)
 ]
