@@ -5,7 +5,7 @@ import bisect
 from utils.CONSTANT import SHORTEST_DURATION, PIANO_KEY_AMOUNT, BLACK_KEYS, QUARTER_NOTE_UNIT
 from utils.operator import Operator
 from symbol_design.noteheads import resolve_notehead_spec, sheared_notehead_outline_points
-from engraver.helpers import black_note_above_stem
+from engraver.helpers import black_note_above_stem, time_to_y
 from file_model.base_grid import resolve_grid_layer_offsets
 
 class NoteheadDrawer:
@@ -106,14 +106,15 @@ class NoteheadDrawer:
             if not notes:
                 continue
             key_to_x = key_to_x_map.get(line_index)
-            time_to_y = time_to_y_map.get(line_index)
-            if not callable(key_to_x) or not callable(time_to_y):
+            if not callable(key_to_x):
                 continue
             layout = self.layout_data.get('layout', {})
             semitone_mm = float(self.layout_data.get('semitone_mm', 2.0) or 2.0)
             note_width_scale = float(layout.get('note_width_scaling', 0.75) or 0.75)
             note_height_scale = float(layout.get('notehead_height_scaling', 1.0) or 1.0)
             note_tilt = float(layout.get('notehead_tilt', 0.0) or 0.0)
+            stem_len = float(layout.get('note_stem_length_semitone', 3) or 3) * semitone_mm
+            stem_w = float(layout.get('note_stem_thickness_mm', 0.5) or 0.5) * self.scale
             black_rule = str(layout.get('black_note_rule', 'below_stem') or 'below_stem')
             line_start = float(line.get('time_start', 0.0) or 0.0)
             line_end = float(line.get('time_end', line_start) or line_start)
@@ -123,6 +124,25 @@ class NoteheadDrawer:
                 end_t = float(note_dict.get('end', 0.0) or 0.0)
                 return op.gt(float(line_start), start_t) and op.gt(end_t, float(line_start))
 
+            # Build per-hand stem groups where each group is either a single
+            # note or a chord (multiple notes with equal start time by Operator).
+            stem_groups_by_hand: dict[str, list[dict]] = {'l': [], 'r': []}
+            for candidate in sorted(notes, key=lambda n: float(n.get('time', 0.0) or 0.0)):
+                if _is_line_continuation(candidate):
+                    continue
+                hand_norm = 'l' if str(candidate.get('hand', 'l') or 'l') == 'l' else 'r'
+                t = float(candidate.get('time', 0.0) or 0.0)
+                groups = stem_groups_by_hand[hand_norm]
+                match = None
+                for grp in groups:
+                    if op.eq(float(grp.get('time', 0.0) or 0.0), t):
+                        match = grp
+                        break
+                if match is None:
+                    match = {'time': t, 'notes': []}
+                    groups.append(match)
+                match['notes'].append(candidate)
+
             for note in notes:
                 pitch = int(note.get('pitch', 0) or 0)
                 time = float(note.get('time', 0.0) or 0.0)
@@ -131,8 +151,8 @@ class NoteheadDrawer:
                 if pitch < 1 or pitch > PIANO_KEY_AMOUNT:
                     continue
                 x = key_to_x(pitch)
-                y = time_to_y(time)
-                y_end = time_to_y(n_end)
+                y = time_to_y(line, time)
+                y_end = time_to_y(line, n_end)
                 # Use legacy notehead spec logic
                 default_black_above = bool(
                     pitch in BLACK_KEYS and black_note_above_stem(note, black_rule, notes)
@@ -151,11 +171,12 @@ class NoteheadDrawer:
                 points = [(x + dx, y + dy) for (dx, dy) in outline]
                 # Use notation color for now (MIDI color can be added later)
                 self.du.add_polygon(
-                    points, 
-                    fill_color=self.notation_color if note.get('pitch') in BLACK_KEYS else self.paper_color, 
+                    points,
+                    fill_color=self.notation_color if note.get('pitch') in BLACK_KEYS else self.paper_color,
                     stroke_color=self.notation_color,
+                    stroke_width_mm=max(0.05, stem_w),
                     id=0,
-                    tags=["notehead"]
+                    tags=["notehead"],
                 )
 
                 continues_from_prev_line = _is_line_continuation(note)
@@ -195,7 +216,7 @@ class NoteheadDrawer:
                     dot_x = float(x)
                     min_collision_gap = max(0.0, float(semitone_mm) * 2.0 - 1e-6)
                     for t in sorted(set(dot_times)):
-                        y_center = time_to_y(float(t)) + float(semitone_mm)
+                        y_center = time_to_y(line, float(t)) + float(semitone_mm)
                         if any(op.eq(float(t), dbt) for dbt in double_bar_ticks):
                             y_center += float(semitone_mm)
 
@@ -252,3 +273,32 @@ class NoteheadDrawer:
                         id=0,
                         tags=['stop_sign'],
                     )
+
+            # draw stems
+            if bool(layout.get('note_stem_visible', True)):
+                for hand_norm in ('l', 'r'):
+                    for grp in stem_groups_by_hand.get(hand_norm, []):
+                        chord_notes = list(grp.get('notes', []) or [])
+                        if not chord_notes:
+                            continue
+                        highest = max(chord_notes, key=lambda n: int(n.get('pitch', 0) or 0))
+                        lowest = min(chord_notes, key=lambda n: int(n.get('pitch', 0) or 0))
+                        y = time_to_y(line, float(grp.get('time', 0.0) or 0.0))
+
+                        if hand_norm == 'l':
+                            x_start = float(key_to_x(int(highest.get('pitch', 0) or 0)))
+                            x_end = float(key_to_x(int(lowest.get('pitch', 0) or 0))) - float(stem_len)
+                        else:
+                            x_start = float(key_to_x(int(lowest.get('pitch', 0) or 0)))
+                            x_end = float(key_to_x(int(highest.get('pitch', 0) or 0))) + float(stem_len)
+
+                        self.du.add_line(
+                            float(x_start),
+                            float(y),
+                            float(x_end),
+                            float(y),
+                            color=self.notation_color,
+                            width_mm=float(stem_w),
+                            id=0,
+                            tags=['stem'],
+                        )

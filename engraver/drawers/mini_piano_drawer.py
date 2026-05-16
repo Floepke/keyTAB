@@ -41,7 +41,7 @@ class MiniPianoDrawer:
             if kb_x2 <= kb_x1:
                 continue
 
-            bar_width_mm = max(0.01, float(1.125 * scale))
+            piano_outline_width_mm = float(1.125 * scale) # hard coded
             key_len_mm = float(semitone_mm) * 4.0
             black_key_width_mm = float(semitone_mm)
             black_key_set = set(BLACK_KEYS)
@@ -138,7 +138,7 @@ class MiniPianoDrawer:
                 kb_x2 + semitone_mm,
                 kb_y2,
                 stroke_color=notation_color,
-                stroke_width_mm=bar_width_mm,
+                stroke_width_mm=piano_outline_width_mm,
                 corner_radius=0.75 * scale,
                 fill_color=None,
                 id=0,

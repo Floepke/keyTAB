@@ -31,7 +31,7 @@ from engraver.engraver import do_engrave as _legacy_do_engrave
 # Import all drawer classes
 from engraver.drawers.paper_drawer import PaperDrawer
 from engraver.drawers.stave_drawer import StaveDrawer
-from engraver.drawers.barline_drawer import BarlineDrawer
+from engraver.drawers.grid_drawer import GridDrawer
 from engraver.drawers.note_drawer import NoteheadDrawer
 from engraver.drawers.beam_drawer import BeamDrawer
 from engraver.drawers.arpeggio_drawer import ArpeggioDrawer
@@ -52,7 +52,7 @@ from engraver.drawers.count_line_drawer import CountLineDrawer
 DRAWER_PIPELINE = [
     PaperDrawer,             # Paper background
     GridBandDrawer,          # Background first
-    BarlineDrawer,           # Grid structure
+    GridDrawer,              # Grid structure
     StaveDrawer,             # Stave lines (vertical per key)
     TimeSignatureDrawer,     # Time signatures
     HeaderFooterDrawer,      # Header/footer

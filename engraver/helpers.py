@@ -389,3 +389,14 @@ def should_tune_under_stem_black_width(item: dict, rule: str, notes: list[dict])
         if abs(int(n.get('pitch', 0) or 0) - p0) == 1:
             return True
     return False
+
+
+def time_to_y(line: dict, ticks: float) -> float:
+    """Convert time (ticks) to y coordinate for a given line dict."""
+    t0 = float(line.get('time_start', 0.0) or 0.0)
+    t1 = float(line.get('time_end', t0) or t0)
+    y0 = float(line.get('y_top', 0.0) or 0.0)
+    y1 = float(line.get('y_bottom', y0) or y0)
+    denom = max(1e-6, t1 - t0)
+    rel = max(0.0, min(1.0, (float(ticks) - t0) / denom))
+    return y0 + ((y1 - y0) * rel)
