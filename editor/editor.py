@@ -184,7 +184,7 @@ class Editor(QtCore.QObject,
         # Cache for key x-positions (index by piano key number 1..88)
         self._x_positions: Optional[list[float]] = None
 
-        # View metrics for fast pixel↔mm conversions
+        # View metrics for fast pixel <--> mm conversions
         self._px_per_mm: float = 1.0            # device px per mm
         self._widget_px_per_mm: float = 1.0     # logical (Qt) px per mm
         self._dpr: float = 1.0                  # device pixel ratio
@@ -192,7 +192,8 @@ class Editor(QtCore.QObject,
         self._view_y_mm_offset: float = 0.0
         # Viewport height (mm) of the visible clip
         self._viewport_h_mm: float = 0.0
-        # Extra time (ticks) to extend viewport cache at the bottom for beam continuity
+        # Extra time (half note) to extend viewport cache at the bottom for beam continuity.
+        # NOTE if a beam is longer then a half note it disappears partly on the bottom of the viewport.
         self.viewport_bottom_bleed: float = QUARTER_NOTE_UNIT * 2
 
         # cursor

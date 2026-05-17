@@ -6,6 +6,7 @@ from dataclasses import fields
 import os
 import sys
 from datetime import datetime
+from PySide6.QtCore import QCoreApplication
 
 from PySide6.QtWidgets import QFileDialog, QMessageBox, QWidget
 from ui.error_dialog import show_error_dialog
@@ -401,8 +402,8 @@ class FileManager:
             return True
         msg = QMessageBox(self._parent)
         msg.setIcon(QMessageBox.Question)
-        msg.setWindowTitle("Save changes?")
-        msg.setText(f"Do you want to save changes before {action_description}?")
+        msg.setWindowTitle(QCoreApplication.translate("FileManager", "Save changes?"))
+        msg.setText(QCoreApplication.translate("FileManager", f"Do you want to save changes before {action_description}?"))
         msg.setStandardButtons(QMessageBox.Yes | QMessageBox.No | QMessageBox.Cancel)
         msg.setDefaultButton(QMessageBox.Yes)
         result = msg.exec()
@@ -636,8 +637,8 @@ class FileManager:
 
         msg = QMessageBox(self._parent)
         msg.setIcon(QMessageBox.Question)
-        msg.setWindowTitle("Save before exiting?")
-        msg.setText("Do you want to save changes before quitting?")
+        msg.setWindowTitle(QCoreApplication.translate("FileManager", "Save before exiting?"))
+        msg.setText(QCoreApplication.translate("FileManager", "Do you want to save changes before quitting?"))
         msg.setStandardButtons(QMessageBox.Yes | QMessageBox.No | QMessageBox.Cancel)
         msg.setDefaultButton(QMessageBox.Yes)
         result = msg.exec()

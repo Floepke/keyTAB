@@ -197,6 +197,24 @@
     </message>
   </context>
   <context>
+    <name>FileManager</name>
+    <message>
+      <location filename="../file_model/file_manager.py" line="405" />
+      <source>Save changes?</source>
+      <translation>Wijzigingen opslaan?</translation>
+    </message>
+    <message>
+      <location filename="../file_model/file_manager.py" line="640" />
+      <source>Save before exiting?</source>
+      <translation>Opslaan voor afsluiten?</translation>
+    </message>
+    <message>
+      <location filename="../file_model/file_manager.py" line="641" />
+      <source>Do you want to save changes before quitting?</source>
+      <translation>Wilt u de wijzigingen eerst opslaan voordat u afsluit?</translation>
+    </message>
+  </context>
+  <context>
     <name>FluidSynthReverbConfigDialog</name>
     <message>
       <location filename="../ui/dialogs/fluidsynth_reverb_config_dialog.py" line="20" />
@@ -1925,32 +1943,32 @@ Kies 'Overslaan' om een track volledig uit te sluiten.</translation>
   <context>
     <name>NoteTool</name>
     <message>
-      <location filename="../editor/tool/note_tool.py" line="80" />
+      <location filename="../editor/tool/note_tool.py" line="75" />
       <source>Click to write right hand notes (shortcut: . ).</source>
       <translation>Klik om noten voor de rechterhand te schrijven (sneltoets: . ).</translation>
     </message>
     <message>
-      <location filename="../editor/tool/note_tool.py" line="87" />
+      <location filename="../editor/tool/note_tool.py" line="82" />
       <source>Click to write left hand notes (shortcut: , ).</source>
       <translation>Klik om noten voor de linkerhand te schrijven (sneltoets: , ).</translation>
     </message>
     <message>
-      <location filename="../editor/tool/note_tool.py" line="93" />
+      <location filename="../editor/tool/note_tool.py" line="88" />
       <source>Set selected notes to right hand (shortcut: ] )</source>
       <translation>Stel de geselecteerde noten in op de rechterhand (sneltoets: ] )</translation>
     </message>
     <message>
-      <location filename="../editor/tool/note_tool.py" line="99" />
+      <location filename="../editor/tool/note_tool.py" line="94" />
       <source>Set selected notes to left hand (shortcut: [ )</source>
       <translation>Stel de geselecteerde noten in op de linkerhand (sneltoets: [ )</translation>
     </message>
     <message>
-      <location filename="../editor/tool/note_tool.py" line="107" />
+      <location filename="../editor/tool/note_tool.py" line="102" />
       <source>Velocity editing is on. Toggle on/off to edit the note velocities using the sliders on the sides of the editor.</source>
       <translation>Volumebewerking is ingeschakeld. Schakel aan/uit om de notenvolumes te bewerken met behulp van de schuifregelaars aan de zijkanten van de editor.</translation>
     </message>
     <message>
-      <location filename="../editor/tool/note_tool.py" line="107" />
+      <location filename="../editor/tool/note_tool.py" line="102" />
       <source>Velocity editing is off. Toggle on/off to edit the note velocities using the sliders on the sides of the editor.</source>
       <translation>Volumebewerking is uitgeschakeld. Schakel aan/uit om de notenvolumes te bewerken met behulp van de schuifregelaars aan de zijkanten van de editor.</translation>
     </message>
