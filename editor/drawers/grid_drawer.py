@@ -6,6 +6,7 @@ Handles drawing barlines, measure numbers, and gridlines.
 
 from __future__ import annotations
 from typing import TYPE_CHECKING, cast
+from editor.editor_defaults import SCALE
 from file_model.SCORE import SCORE
 from file_model.base_grid import resolve_grid_layer_offsets
 from ui.widgets.draw_util import DrawUtil
@@ -77,9 +78,8 @@ class GridDrawerMixin:
             meas_family = getattr(meas_font, 'family', 'Courier New') if meas_font is not None else 'Courier New'
         meas_size = 20.0
         color = self.notation_color
-        style_scale = float(getattr(layout, 'scale', 1.0) or 1.0) if layout is not None else 1.0
-        bar_width_mm = max(0.01, float(getattr(self, 'editor_line_width_global', 0.1) or 0.1))
-        grid_width_mm = (float(getattr(layout, 'grid_gridline_thickness_mm', 0.15) or 0.15) * style_scale) if layout is not None else 0.15
+        bar_width_mm = max(0.01, float(getattr(layout, 'grid_barline_thickness_mm', 0.1) or 0.1)) * SCALE
+        grid_width_mm = (float(getattr(layout, 'grid_gridline_thickness_mm', 0.15) or 0.15) * SCALE) if layout is not None else 0.15
 
         cache = getattr(self, '_draw_cache', None) or {}
         grid_den_times = list(cache.get('grid_den_times') or [])
@@ -120,9 +120,9 @@ class GridDrawerMixin:
         semitone_mm = float(self.semitone_dist or 0.5)
         stem_len_mm = float(getattr(layout, 'note_stem_length_semitone', 3) or 3) * semitone_mm if layout is not None else (3.0 * semitone_mm)
         note_head_half_w = semitone_mm * float(getattr(layout, 'note_width_scaling', 0.75) or 0.75) if layout is not None else (semitone_mm * 0.75)
-        stem_collision_pad = max(0.15, float(getattr(layout, 'note_stem_thickness_mm', 0.5) or 0.5) * style_scale) if layout is not None else 0.5
+        stem_collision_pad = max(0.15, float(getattr(layout, 'note_stem_thickness_mm', 0.5) or 0.5) * SCALE) if layout is not None else 0.5
         head_collision_pad = max(0.15, semitone_mm * 0.15)
-        beam_collision_pad = max(0.2, float(getattr(layout, 'beam_thickness_mm', 1.0) or 1.0) * style_scale * 0.7) if layout is not None else 0.2
+        beam_collision_pad = max(0.2, float(getattr(layout, 'beam_thickness_mm', 1.0) or 1.0) * SCALE * 0.7) if layout is not None else 0.2
         barline_symbol_gap_mm = max(0.0, semitone_mm)
         barline_time_eps = 1e-4
         barline_time_op = Operator(float(SHORTEST_DURATION))
@@ -355,7 +355,7 @@ class GridDrawerMixin:
             barline_cut_cache[tick_key] = merged
             return merged
 
-        def _draw_barline_segments(y_mm: float, cuts: list[tuple[float, float]], width_mm: float, tags: list[str], item_id: int = 0) -> None:
+        def _draw_line_around_chords(y_mm: float, cuts: list[tuple[float, float]], width_mm: float, tags: list[str], item_id: int = 0, dash_pattern=None) -> None:
             if not cuts:
                 du.add_line(
                     stave_left,
@@ -366,7 +366,7 @@ class GridDrawerMixin:
                     width_mm=width_mm,
                     id=item_id,
                     tags=tags,
-                    dash_pattern=None,
+                    dash_pattern=dash_pattern,
                 )
                 return
             x_cursor_seg = float(stave_left)
@@ -382,7 +382,7 @@ class GridDrawerMixin:
                         width_mm=width_mm,
                         id=item_id,
                         tags=tags,
-                        dash_pattern=None,
+                        dash_pattern=dash_pattern,
                     )
                 x_cursor_seg = max(x_cursor_seg, c1)
             if float(stave_right) - x_cursor_seg > min_seg:
@@ -395,20 +395,25 @@ class GridDrawerMixin:
                     width_mm=width_mm,
                     id=item_id,
                     tags=tags,
-                    dash_pattern=None,
+                    dash_pattern=dash_pattern,
                 )
 
         def _draw_barline_constructive(ticks: float, width_mm: float, tags: list[str]) -> None:
             y_mm = float(self.time_to_mm(float(ticks)))
             cuts = _barline_cut_intervals(float(ticks))
-            _draw_barline_segments(float(y_mm), cuts, float(width_mm), tags, 0)
+            _draw_line_around_chords(float(y_mm), cuts, float(width_mm), tags, 0)
 
         def _draw_double_bar_constructive(ticks: float, width_mm: float, gap_mm: float, ev_id: int) -> None:
             y_mm = float(self.time_to_mm(float(ticks)))
             cuts = _barline_cut_intervals(float(ticks))
-            gap = max(0.1, float(gap_mm))
-            tags = ["barline", "double_barline"]
-            _draw_barline_segments(float(y_mm + gap), cuts, float(width_mm), tags, int(ev_id))
+            tags = ["double_barline"]
+            _draw_line_around_chords(float(y_mm + gap_mm), cuts, float(width_mm), tags, int(ev_id))
+        
+        def _draw_grid_line_constructive(ticks: float, width_mm: float, gap_mm: float, ev_id: int) -> None:
+            y_mm = float(self.time_to_mm(float(ticks)))
+            cuts = _barline_cut_intervals(float(ticks))
+            tags = ["double_barline"]
+            _draw_line_around_chords(float(y_mm + gap_mm), cuts, float(width_mm), tags, int(ev_id), dash_pattern=[2.0, 2.0])
         
         # Draw measure numbers at each measure start except final end barline.
         for t in barline_times[:-1]:
@@ -433,17 +438,18 @@ class GridDrawerMixin:
                 if round(float(t), 6) in barline_keys:
                     continue
                 y_mm = float(self.time_to_mm(float(t)))
-                du.add_line(
-                    stave_left_position,
-                    y_mm,
-                    stave_right_position,
-                    y_mm,
-                    color=color,
-                    width_mm=grid_width_mm,
-                    id=0,
-                    tags=["grid_line"],
-                    dash_pattern=[2.0, 2.0],
-                )
+                _draw_grid_line_constructive(float(t), float(grid_width_mm), 0.0, 0)
+                # du.add_line(
+                #     stave_left_position,
+                #     y_mm,
+                #     stave_right_position,
+                #     y_mm,
+                #     color=color,
+                #     width_mm=grid_width_mm,
+                #     id=0,
+                #     tags=["grid_line"],
+                #     dash_pattern=[2.0, 2.0],
+                # )
 
         # Draw regular barlines; draw final end barline twice as thick.
         if barline_visible:

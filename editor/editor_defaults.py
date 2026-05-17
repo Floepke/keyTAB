@@ -8,7 +8,7 @@ constants for readability and predictability.
 """
 
 # Core styling
-SCALE = 0.35
+SCALE = 0.5
 EDITOR_LINE_WIDTH_MM = 0.1  # used as global editor stroke width
 
 # Note appearance

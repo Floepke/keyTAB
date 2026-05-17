@@ -3,6 +3,7 @@ from typing import TYPE_CHECKING, cast
 from ui.widgets.draw_util import DrawUtil
 from utils.operator import Operator
 from utils.CONSTANT import QUARTER_NOTE_UNIT, SHORTEST_DURATION
+from editor.editor_defaults import SCALE
 from file_model.base_grid import resolve_grid_layer_offsets
 import bisect
 import math
@@ -12,59 +13,6 @@ if TYPE_CHECKING:
 
 
 class BeamDrawerMixin:
-    _STEM_WIDTH_FACTOR: float = 1.0
-
-    def _editor_line_width_mm(self) -> float:
-        return max(0.1, float(getattr(self, 'editor_line_width_global', .5) or .5))
-
-    def _beam_layout_metrics(self) -> tuple[float, float, float, float]:
-        self = cast("Editor", self)
-        score = self.current_score()
-        layout = score.layout if score else None
-        scale = float(getattr(layout, 'scale', 1.0) or 1.0) if layout is not None else 1.0
-        semitone_mm = float(self.semitone_dist or 0.5)
-        stem_len_units = float(getattr(layout, 'note_stem_length_semitone', 3) or 3) if layout is not None else 3.0
-        stem_len = stem_len_units * semitone_mm
-        beam_w = float(getattr(layout, 'beam_thickness_mm', 1.0) or 1.0) * scale if layout is not None else max(0.1, self.editor_line_width_global)
-        stem_w = float(getattr(layout, 'note_stem_thickness_mm', 0.5) or 0.5) * scale if layout is not None else self.editor_line_width_global
-        return stem_len, beam_w, stem_w, semitone_mm
-
-    def _draw_beam(self, du: DrawUtil, x1: float, y1: float, x2: float, y2: float, beam_w: float, tags: list[str]) -> None:
-        """Draw a beam as a single rounded-cap line with endpoint compensation.
-
-        Round caps extend by half the line width at both ends; shorten the baseline
-        by that amount so visual extents stay close to the original beam polygon.
-        """
-        width = max(0.1, float(beam_w))
-        cap_ext = width * 0.5
-
-        x1f = float(x1)
-        y1f = float(y1)
-        x2f = float(x2)
-        y2f = float(y2)
-
-        dx = x2f - x1f
-        dy = y2f - y1f
-        seg_len = float(math.hypot(dx, dy))
-        if seg_len > (2.0 * cap_ext + 1e-6):
-            ux = dx / seg_len
-            uy = dy / seg_len
-            x1f += ux * cap_ext
-            y1f += uy * cap_ext
-            x2f -= ux * cap_ext
-            y2f -= uy * cap_ext
-
-        du.add_line(
-            x1f,
-            y1f,
-            x2f,
-            y2f,
-            color=self.notation_color,
-            width_mm=width,
-            line_cap="round",
-            id=0,
-            tags=tags,
-        )
 
     def draw_beam(self, du: DrawUtil) -> None:
         self = cast("Editor", self)
@@ -384,12 +332,17 @@ class BeamDrawerMixin:
                         tags=["beam_marker", f"beam_marker_{hand_key}"],
                     )
 
+        # Retrieve layout metrics for beam drawing
+        stem_len = float(getattr(layout, 'note_stem_length_semitone', 1.0) or 1.0)
+        semitone_mm = float(self.semitone_dist or 0.5)
+        beam_w = float(getattr(layout, 'beam_thickness_mm', 1.0) or 1.0) * SCALE
+        stem_w = float(getattr(layout, 'note_stem_thickness_mm', 0.5) or 0.5) * SCALE
+        
         # ---- Actual beam line drawing (right hand) ----
         # For each right-hand group, draw a slightly diagonal beam line
         # from the first note time (y1) to the last note time (y2).
         # X positions: start at the highest pitch's stem tip (pitch_x + stem_len),
         # and end at x1 + semitone_dist to give a gentle diagonal.
-        stem_len, _beam_w, stem_w, semitone_mm = self._beam_layout_metrics()
 
         # Iterate windows in lockstep with groups for right hand
         right_groups = groups_all.get('r') or []
@@ -412,12 +365,12 @@ class BeamDrawerMixin:
             # Highest pitch in the group (including spanning notes)
             highest = max(grp, key=lambda n: int(getattr(n, 'pitch', 0)))
             # x1 at the highest pitch notehead (not stem tip) to avoid covering dots
-            x1 = float(self.pitch_to_x(int(getattr(highest, 'pitch', 0)))) + float(stem_len)
+            x1 = float(self.pitch_to_x(int(getattr(highest, 'pitch', 0)))) + float(stem_len * semitone_mm)
             # x2 uses same base as x1 plus semitone_dist to preserve diagonal
             x2 = x1 + float(semitone_mm)
             y1 = float(self.time_to_mm(t_first))
             y2 = float(self.time_to_mm(t_last))
-            self._draw_beam(du, x1, y1, x2, y2, _beam_w, tags=["beam_line_right"])
+            self._draw_beam(du, x1, y1, x2, y2, beam_w, tags=["beam_line_right"])
             # Connect each note's stem tip to the beam line at that note's time
             for m in grp:
                 mt = float(getattr(m, 'time', t_first))
@@ -465,12 +418,12 @@ class BeamDrawerMixin:
             t_last = max(starts_in)
             # Lowest and highest pitch in the group
             lowest = min(grp, key=lambda n: int(getattr(n, 'pitch', 0)))
-            x1 = float(self.pitch_to_x(int(getattr(lowest, 'pitch', 0)))) - float(stem_len)
+            x1 = float(self.pitch_to_x(int(getattr(lowest, 'pitch', 0)))) - float(stem_len * semitone_mm)
             # x2 uses same base as x1 minus semitone_dist to preserve diagonal
             x2 = x1 - float(semitone_mm)
             y1 = float(self.time_to_mm(t_first))
             y2 = float(self.time_to_mm(t_last))
-            self._draw_beam(du, x1, y1, x2, y2, _beam_w, tags=["beam_line_left"])
+            self._draw_beam(du, x1, y1, x2, y2, beam_w, tags=["beam_line_left"])
             # Connect each note's stem tip to the beam line at that note's time
             for m in grp:
                 mt = float(getattr(m, 'time', t_first))
@@ -493,3 +446,40 @@ class BeamDrawerMixin:
                     id=0,
                     tags=["beam_connect_left"],
                 )
+    
+    def _draw_beam(self, du: DrawUtil, x1: float, y1: float, x2: float, y2: float, beam_w: float, tags: list[str]) -> None:
+        """Draw a beam as a single rounded-cap line with endpoint compensation.
+
+        Round caps extend by half the line width at both ends; shorten the baseline
+        by that amount so visual extents stay close to the original beam polygon.
+        """
+        width = max(0.1, float(beam_w))
+        cap_ext = width * 0.5
+
+        x1f = float(x1)
+        y1f = float(y1)
+        x2f = float(x2)
+        y2f = float(y2)
+
+        dx = x2f - x1f
+        dy = y2f - y1f
+        seg_len = float(math.hypot(dx, dy))
+        if seg_len > (2.0 * cap_ext + 1e-6):
+            ux = dx / seg_len
+            uy = dy / seg_len
+            x1f += ux * cap_ext
+            y1f += uy * cap_ext
+            x2f -= ux * cap_ext
+            y2f -= uy * cap_ext
+
+        du.add_line(
+            x1f,
+            y1f,
+            x2f,
+            y2f,
+            color=self.notation_color,
+            width_mm=width,
+            line_cap="round",
+            id=0,
+            tags=tags,
+        )

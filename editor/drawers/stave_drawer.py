@@ -1,6 +1,7 @@
 from __future__ import annotations
 from file_model.SCORE import SCORE
 from settings_manager import get_preferences
+from editor.editor_defaults import SCALE
 from ui.style import Style
 from ui.widgets.draw_util import DrawUtil
 from utils.CONSTANT import BLACK_KEYS, QUARTER_NOTE_UNIT
@@ -43,16 +44,16 @@ class StaveDrawerMixin:
                 is_clef_line = key in (41, 43)  # C# and D# around middle C
                 is_three_line = key in FGA_keys
                 if is_clef_line:
-                    width_mm = max(0.05, semitone_dx / 5.0)
+                    width_mm = score.layout.stave_clef_line_thickness_mm * SCALE
                     dash = [2]
                     tag = "stave_clef_line"
                 elif is_three_line:
-                    width_mm = max(0.05, semitone_dx / 3.0)
+                    width_mm = score.layout.stave_three_line_thickness_mm * SCALE
                     dash = None
                     tag = "stave_three_line"
                 else:
                     # two line
-                    width_mm = max(0.05, semitone_dx / 10.0)
+                    width_mm = score.layout.stave_two_line_thickness_mm * SCALE
                     dash = None
                     tag = "stave_two_line"
                 

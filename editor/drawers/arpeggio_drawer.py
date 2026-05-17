@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, cast
 
+from editor.editor_defaults import SCALE
+from file_model.SCORE import SCORE
 from symbol_design.noteheads import (
     resolve_notehead_spec,
     sheared_notehead_support_v,
@@ -49,18 +51,16 @@ class ArpeggioDrawerMixin:
 
     def draw_arpeggio(self, du: DrawUtil) -> None:
         self = cast("Editor", self)
-        score = self.current_score()
+        score: SCORE = self.current_score()
         if score is None:
             return
 
         arps = list(getattr(score.events, "arpeggio", []) or [])
 
         notes_all = list(getattr(score.events, "note", []) or [])
-        semi = float(self.semitone_dist or 0.5)
-        layout = getattr(score, "layout", None)
-        scale = float(getattr(layout, "scale", 1.0) or 1.0) if layout is not None else 1.0
-        stem_w = float(getattr(layout, "note_stem_thickness_mm", 0.8) or 0.8) * scale if layout is not None else 0.8
-        stem_len = float(getattr(layout, "note_stem_length_semitone", 3.0) or 3.0) * semi
+        layout = score.layout
+        stem_w = layout.note_stem_thickness_mm * SCALE
+        stem_len = layout.note_stem_length_semitone * self.semitone_dist
         width_scale = max(0.05, float(getattr(layout, "note_width_scaling", 1.0) or 1.0)) if layout is not None else 1.0
         height_scale = max(0.1, float(getattr(layout, "notehead_height_scaling", 1.0) or 1.0)) if layout is not None else 1.0
         base_tilt = float(getattr(layout, "notehead_tilt", 0.0) or 0.0) if layout is not None else 0.0
@@ -151,7 +151,7 @@ class ArpeggioDrawerMixin:
                             support_cache[cache_key] = sheared_notehead_support_v(
                                 hand=hand_local,
                                 is_up=is_up_local,
-                                semitone_space_mm=semi,
+                                semitone_space_mm=self.semitone_dist,
                                 width_scale=width_scale,
                                 height_scale=height_scale,
                                 base_tilt=base_tilt,
@@ -190,7 +190,7 @@ class ArpeggioDrawerMixin:
                 outline_anchor = sheared_notehead_outline_points(
                     hand=hand_anchor,
                     is_up=is_up_anchor,
-                    semitone_space_mm=semi,
+                    semitone_space_mm=self.semitone_dist,
                     width_scale=width_scale,
                     height_scale=height_scale,
                     base_tilt=base_tilt,
@@ -213,24 +213,49 @@ class ArpeggioDrawerMixin:
                 stem_end_x = anchor_x + edge_anchor[0]
                 stem_end_y = anchor_y + edge_anchor[1]
 
-                # --- Step 2: Solve the line point on the opposite pitch side ---
+                # --- Step 2: Find the matching outline contact point on the opposite notehead ---
                 if hand_first == "l":
-                    side_pitch = min(int(p) for p in arp_pitches)
+                    side_idx = 0
                 else:
-                    side_pitch = max(int(p) for p in arp_pitches)
-                base_x = float(self.pitch_to_x(side_pitch))
-                base_y = stem_end_y + (base_x - stem_end_x) * math.tan(angle)
+                    side_idx = -1
 
-                # --- Step 3: Extend outward from that point by one stem length ---
-                stem_len = float(getattr(layout, "note_stem_length_semitone", 7)) * semi
+                side_note = chord_sorted[side_idx]
+                side_center_x = float(stem_x_positions[side_idx])
+                side_center_y = float(projected[side_idx][1])
+
+                hand_side = str(getattr(side_note, "hand", "l") or "l")
+                default_black_above_side = bool(self._black_note_above_stem(side_note, layout))
+                spec_side = resolve_notehead_spec(side_note, default_black_above=default_black_above_side)
+                is_up_side = bool(getattr(spec_side, "is_up", False))
+                outline_side = sheared_notehead_outline_points(
+                    hand=hand_side,
+                    is_up=is_up_side,
+                    semitone_space_mm=self.semitone_dist,
+                    width_scale=width_scale,
+                    height_scale=height_scale,
+                    base_tilt=base_tilt,
+                    sample_count=128,
+                )
+
+                # Use the current stem-end to opposite-center direction to query the true support point.
+                side_angle = math.atan2(side_center_y - stem_end_y, side_center_x - stem_end_x)
+                side_m_line = float(math.tan(side_angle)) if abs(math.cos(side_angle)) > 1e-9 else 0.0
+                edge_side = support_point_from_outline_points(
+                    outline_side,
+                    m_line=side_m_line,
+                    choose_max=bool(is_up_side),
+                )
+                base_x = side_center_x + edge_side[0]
+                base_y = side_center_y + edge_side[1]
+
+                # Recompute direction from anchor stem-end to opposite outline contact point.
+                angle = math.atan2(base_y - stem_end_y, base_x - stem_end_x)
+
+                # --- Step 3: Extend outward from that handle point by one stem length ---
                 ux = math.cos(angle)
                 uy = math.sin(angle)
-                if hand_first == "l":
-                    tip_x = base_x - (ux * stem_len)
-                    tip_y = base_y - (uy * stem_len)
-                else:
-                    tip_x = base_x + (ux * stem_len)
-                    tip_y = base_y + (uy * stem_len)
+                tip_x = base_x + (ux * stem_len)
+                tip_y = base_y + (uy * stem_len)
 
                 # --- Step 4: Draw the full stem as a single line ---
                 du.add_line(
@@ -238,7 +263,7 @@ class ArpeggioDrawerMixin:
                     color=self.notation_color,
                     width_mm=stem_w,
                     id=arp_id,
-                    tags=["chord_connect"],
+                    tags=["stem"],
                 )
 
             x_values = [p[0] for p in projected]
@@ -246,15 +271,15 @@ class ArpeggioDrawerMixin:
             self.register_hit_rect(
                 "arpeggio",
                 arp_id,
-                min(x_values) - (semi * 0.5),
-                min(y_values) - (semi * 0.5),
-                max(x_values) + (semi * 0.5),
-                max(y_values) + (semi * 0.5),
+                min(x_values) - (self.semitone_dist * 0.5),
+                min(y_values) - (self.semitone_dist * 0.5),
+                max(x_values) + (self.semitone_dist * 0.5),
+                max(y_values) + (self.semitone_dist * 0.5),
                 handle="body",
             )
 
             if show_handles:
-                handle_r = semi
+                handle_r = self.semitone_dist
                 hand_first = str(getattr(chord_sorted[0], "hand", "l") or "l") if chord_sorted else "l"
                 # Always use rtime1/y0 for low, rtime2/y1 for high
                 x_low = float(stem_x_positions[0])
@@ -338,7 +363,7 @@ class ArpeggioDrawerMixin:
                 continue
 
             y_flat = float(self.time_to_mm(base_time))
-            handle_r = semi
+            handle_r = self.semitone_dist
             for handle_name, hx in (("low", stem_x_positions[0]), ("high", stem_x_positions[-1])):
                 du.add_oval(
                     hx - handle_r,

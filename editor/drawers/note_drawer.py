@@ -10,7 +10,7 @@ from utils.operator import Operator
 from typing import Tuple
 from ui.style import Style
 from symbol_design.noteheads import Notehead, normalize_notehead_literal, resolve_notehead_spec
-from editor.editor_defaults import NOTE_WIDTH_SCALING
+from editor.editor_defaults import NOTE_WIDTH_SCALING, SCALE
 
 if TYPE_CHECKING:
     from editor.editor import Editor
@@ -279,8 +279,7 @@ class NoteDrawerMixin:
         self = cast("Editor", self)
         layout = self.current_score().layout
         is_narrow = self._should_tune_under_stem_black_width(n, layout)
-        scale = layout.scale if layout else 1.0
-        outline_w = layout.note_stem_thickness_mm * scale if layout else 0.8
+        outline_w = layout.note_stem_thickness_mm * SCALE
         paper_r, paper_g, paper_b = Style.get_named_rgb('paper', (255, 255, 255))
         bg_fill = (paper_r / 255.0, paper_g / 255.0, paper_b / 255.0, 1.0)
         notehead = Notehead.from_note(
@@ -343,8 +342,7 @@ class NoteDrawerMixin:
         cached_by_hand = cache.get('notes_by_hand') or {}
 
         stem_len = self._layout_stem_length_mm()
-        scale = layout.scale
-        stem_w = layout.note_stem_thickness_mm * scale
+        stem_w = layout.note_stem_thickness_mm * SCALE
         arp_y_overrides: dict[int, float] = getattr(self, '_arpeggio_y_overrides', {}) or {}
 
         for hand_key in ('l', 'r'):
