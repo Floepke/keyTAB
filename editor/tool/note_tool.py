@@ -49,11 +49,6 @@ class NoteTool(BaseTool):
         except Exception:
             return True
 
-    def _adjust_session_note_counter(self, delta: int) -> None:
-        """Track net notes created during this app session on the editor instance."""
-        current = int(getattr(self._editor, '_session_note_delta', 0) or 0)
-        setattr(self._editor, '_session_note_delta', int(current + int(delta)))
-
     def _audition_pitch(self, pitch: int) -> None:
         if not self._play_note_on_edit_enabled():
             return
@@ -298,12 +293,16 @@ class NoteTool(BaseTool):
         self._hand = str(getattr(self._editor, 'hand_cursor', 'l') or 'l')
 
         # Rectangle-based hit detection for precise clickable area
+        found: Note | None = None
         found, hit_rect, y_mm_abs = self._hit_note_and_rect(score, x, y)
         mode = "existing" if found else "new"
         if mode == "existing" and found is not None and found.pitch == self._editor.pitch_cursor:
-            # Edit existing note
+            '''Edit existing note'''
             self.edit_note = found
             self._editing_existing = True
+            # the hand cursor is set to the other hand based on edit note hand because it feels more intuitive.
+            self._editor.hand_cursor = self.edit_note.hand
+            # update accidental
             self._apply_active_accidental_to_note(found)
             self._move_pitch_time_mode = False
             try:
@@ -326,11 +325,10 @@ class NoteTool(BaseTool):
                 notehead_end_mm = note_start_mm + notehead_len_mm
                 self._move_pitch_time_mode = bool(notehead_len_mm > 0.0 and y_mm_abs <= notehead_end_mm)
         else:
-            # Create a new note at the snapped press time with minimum duration = snap size
-            units = float(max(1e-6, getattr(self._editor, 'snap_size_units', 8.0)))
+            '''create new note'''
+            units = float(getattr(self._editor, 'snap_size_units', SHORTEST_DURATION)) or SHORTEST_DURATION
             acc_preview = int(self.preview_accidental_for_pitch(int(pitch_press)))
             self.edit_note = score.new_note(pitch=pitch_press, time=t_press_snap, duration=units, hand=self._hand, acc=acc_preview)
-            self._adjust_session_note_counter(1)
             self._editing_existing = False
             self._orig_duration = float(units)
             self._press_start_time = float(t_press_snap)

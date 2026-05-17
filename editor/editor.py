@@ -138,8 +138,6 @@ class Editor(QtCore.QObject,
         self._pending_right_double_release: bool = False
         self._pending_left_double_pos: tuple[float, float] | None = None
         self._pending_right_double_pos: tuple[float, float] | None = None
-        # Net notes created this app session (increment on create, decrement on delete).
-        self._session_note_delta: int = 0
 
         # layout metrics (mm)
         self.margin: float = None
@@ -222,7 +220,7 @@ class Editor(QtCore.QObject,
         # arpeggio_y_overrides: note_id → projected y_mm for notes in an arpeggio chord.
         self._arpeggio_y_overrides: dict[int, float] = {}
         # Tiny mode: toggled by viewport width (stage 1: simplified drawing,
-        # stage 2: skip drawing). tiny_mode_alpha is a continuous fade factor
+        # stage 2: skip parts of drawing). tiny_mode_alpha is a continuous fade factor
         # (1.0 = fully opaque, 0.0 = fully transparent) used by the view to
         # Per-frame hit rectangles (all types) in absolute mm coordinates; reset each frame
         self._hit_rects: list[dict] = []
@@ -241,7 +239,7 @@ class Editor(QtCore.QObject,
         # Gesture mode (locked on press so mid-drag modifier changes don't misclassify edits)
         self._left_selection_mode: bool = False
         self._right_selection_mode: bool = False
-        # Optional player for auditioning
+        # player for auditioning
         self.player: Player = None
 
     # ---- Drawing via mixins ----
