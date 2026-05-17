@@ -898,45 +898,18 @@ class StyleDialog(QtWidgets.QDialog):
         self._field_tabs = field_tabs
         field_labels = self._style_field_labels()
 
-        # First pass: process all bool fields (visibility toggles) first
+        # build editors for each field in the Layout dataclass
         for f in fields(Layout):
             name = f.name
             if name in _hide_fields:
                 continue
             field_type = type_hints.get(name, f.type)
-            # Skip non-bool fields in first pass
-            if field_type is not bool:
-                continue
             
-            fallback_label = name.replace('_', ' ').capitalize()
-            label = field_labels.get(name, self.tr(fallback_label))
-            value = getattr(self._layout, name)
-            editor = self._make_editor(field_type, value, name)
-            if editor is None:
-                continue
-            self._editors[name] = editor
-            if field_type is bool and isinstance(editor, QtWidgets.QCheckBox):
-                self._register_bool_widget(name, editor)
-            tab_name = self.tr(field_tabs.get(name, 'Page'))
-            vbox = tab_forms.get(tab_name, tab_forms[self.tr('Page')])
-            box = QtWidgets.QGroupBox(label, self)
-            box_layout = QtWidgets.QVBoxLayout(box)
-            box_layout.setContentsMargins(6, 2, 6, 6)
-            box_layout.setSpacing(0)
-            box_layout.addWidget(editor)
-            vbox.addWidget(box)
-            self._wire_editor_change(editor)
-
-        # Second pass: process all non-bool fields
-        for f in fields(Layout):
-            name = f.name
-            if name in _hide_fields:
-                continue
-            field_type = type_hints.get(name, f.type)
-            # Skip bool fields in second pass (already processed)
+            # Skip bool fields
             if field_type is bool:
                 continue
             
+            # Build editor for non-bool fields and add to the appropriate tab
             fallback_label = name.replace('_', ' ').capitalize()
             label = field_labels.get(name, self.tr(fallback_label))
             value = getattr(self._layout, name)
@@ -944,8 +917,8 @@ class StyleDialog(QtWidgets.QDialog):
             if editor is None:
                 continue
             self._editors[name] = editor
-            if field_type is bool and isinstance(editor, QtWidgets.QCheckBox):
-                self._register_bool_widget(name, editor)
+            
+            # build and add widget to the appropriate tab based on the field_tabs mapping, defaulting to 'Page' tab
             tab_name = self.tr(field_tabs.get(name, 'Page'))
             vbox = tab_forms.get(tab_name, tab_forms[self.tr('Page')])
             box = QtWidgets.QGroupBox(label, self)
@@ -956,12 +929,15 @@ class StyleDialog(QtWidgets.QDialog):
             vbox.addWidget(box)
             self._wire_editor_change(editor)
 
-        self._add_visibility_mirror_controls(tab_forms, field_labels)
+        # Build visibility tab that holds all visibillity toggles in one place
+        self._build_visibility_tab(tab_forms, field_labels)
+        
+        # Add all fonts combo to the Fonts tab
         self._add_all_fonts_control(tab_forms.get(self.tr('Fonts')))  # type: ignore[arg-type]
 
         # Add stretch to each tab's layout to push groupboxes to the top
         for vbox in tab_forms.values():
-            vbox.addStretch(1)
+            vbox.addStretch(10)
 
         # Style file actions
         actions_row = QtWidgets.QHBoxLayout()
@@ -1024,9 +1000,6 @@ class StyleDialog(QtWidgets.QDialog):
             return 0
         return int(max(0, category_list.currentRow()))
 
-    def _register_bool_widget(self, field_name: str, widget: QtWidgets.QCheckBox) -> None:
-        self._bool_field_widgets.setdefault(field_name, []).append(widget)
-
     def _sync_bool_widgets(self, field_name: str, value: bool) -> None:
         for widget in self._bool_field_widgets.get(field_name, []):
             blocked = widget.blockSignals(True)
@@ -1036,14 +1009,11 @@ class StyleDialog(QtWidgets.QDialog):
                 widget.blockSignals(blocked)
 
     def _on_bool_widget_changed(self, field_name: str, value: bool) -> None:
-        try:
-            setattr(self._layout, field_name, bool(value))
-        except Exception:
-            pass
+        setattr(self._layout, field_name, bool(value))
         self._sync_bool_widgets(field_name, bool(value))
         self.values_changed.emit()
 
-    def _add_visibility_mirror_controls(self, tab_forms: dict[str, QtWidgets.QVBoxLayout], field_labels: dict[str, str]) -> None:
+    def _build_visibility_tab(self, tab_forms: dict[str, QtWidgets.QVBoxLayout], field_labels: dict[str, str]) -> None:
         '''the visibillity tab contains a set of mirrored toggles for all boolean visibility toggles.
         Toggling any of them will toggle all other checkboxes for the same field across the UI, and update the main layout value.
         '''
@@ -1068,7 +1038,6 @@ class StyleDialog(QtWidgets.QDialog):
             mirror_checkbox.setText(label)
             mirror_checkbox.setChecked(bool(getattr(self._layout, name, False)))
             mirror_checkbox.stateChanged.connect(lambda _state, field_name=name, cb=mirror_checkbox: self._on_bool_widget_changed(field_name, bool(cb.isChecked())))
-            self._register_bool_widget(name, mirror_checkbox)
             
             # add to box
             vis_box_layout.addWidget(mirror_checkbox)
@@ -1097,12 +1066,6 @@ class StyleDialog(QtWidgets.QDialog):
     def _layout_from_dict(self, data: dict) -> Layout:
         if not isinstance(data, dict):
             raise ValueError("Invalid style payload")
-        data = dict(data)
-        if 'dynamic_symbol_background_padding_mm' not in data:
-            if 'dynamic_symbol_background_padding' in data:
-                data['dynamic_symbol_background_padding_mm'] = data.get('dynamic_symbol_background_padding')
-            elif 'dynamic_background_padding' in data:
-                data['dynamic_symbol_background_padding_mm'] = data.get('dynamic_background_padding')
         # Coerce known LayoutFont fields back to dataclasses to keep typing consistent
         fixed: dict[str, Any] = {}
         defaults = Layout()
@@ -1116,20 +1079,6 @@ class StyleDialog(QtWidgets.QDialog):
                 except Exception:
                     val = getattr(defaults, name)
             fixed[name] = val
-        # Backwards compatibility: migrate legacy text_font_family/size into font_text if missing
-        if "font_text" not in data and ("text_font_family" in data or "text_font_size_pt" in data):
-            try:
-                fam = str(data.get("text_font_family", "Edwin"))
-                size = float(data.get("text_font_size_pt", 12.0))
-                fixed["font_text"] = Font(family=fam, size_pt=size)
-            except Exception:
-                pass
-        # Legacy migration: merge left/right grid band tracks into the unified track
-        if not fixed.get("grid_band_track"):
-            legacy_left = data.get("grid_band_left_track", []) or []
-            legacy_right = data.get("grid_band_right_track", []) or []
-            if legacy_left or legacy_right:
-                fixed["grid_band_track"] = list(legacy_left) + list(legacy_right)
         return Layout(**fixed)
 
     def _load_layout_from_file(self, stem: str | None) -> Layout:
@@ -1192,11 +1141,10 @@ class StyleDialog(QtWidgets.QDialog):
                 'landscape': self.tr('Landscape'),
                 'vertical': self.tr('Vertical'),
                 'horizontal': self.tr('Horizontal'),
-                'above_stem': self.tr('Above stem (Klavarskribo)'),
-                'below_stem': self.tr('Below stem'),
-                'above_stem_if_collision': self.tr('Above stem if collision'),
-                'above_stem_if_chord_and_white_note': self.tr('Above stem if chord and white note'),
-                'above_stem_if_chord_and_white_note_same_hand': self.tr('Above stem if chord and white note same hand'),
+                'above_stem': self.tr('Above stem (Klavarskribo default)'),
+                'below_stem': self.tr('Below stem (keyTAB uses 30% \'notehead narrowing\' for colliding noteheads)'),
+                'above_stem_if_collision': self.tr('Above stem if a white note is written directly next to a black note'),
+                'above_stem_if_chord_and_white_note_same_hand': self.tr('Only chords with 1 or more white notes get the \'black above stem\' treatment'),
                 'dark': self.tr('Dark'),
                 'light': self.tr('Light'),
                 'classical': self.tr('Classical'),
@@ -1220,7 +1168,7 @@ class StyleDialog(QtWidgets.QDialog):
 
         if field_type is int:
             sb = QtWidgets.QSpinBox(self)
-            sb.setRange(-1000000, 1000000)
+            sb.setRange(0, 100) # NOTE: change default spinbox range here
             sb.setValue(int(value))
             # Ensure immediate updates while typing
             sb.setKeyboardTracking(True)

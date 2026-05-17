@@ -320,11 +320,14 @@ def group_by_beam_markers(notes: list[dict], markers: list[dict], start: float, 
 
 def black_note_above_stem(item: dict, rule: str, notes: list[dict]) -> bool:
     op = Operator(SHORTEST_DURATION)
+    
     if rule == 'above_stem':
         return True
+    
     p0 = int(item.get('pitch', 0) or 0)
     t0 = float(item.get('time', 0.0) or 0.0)
     idx0 = int(item.get('idx', -1) or -1)
+    
     if rule == 'above_stem_if_collision':
         for n in notes:
             if int(n.get('idx', -2) or -2) == idx0:
@@ -334,16 +337,12 @@ def black_note_above_stem(item: dict, rule: str, notes: list[dict]) -> bool:
             if abs(int(n.get('pitch', 0) or 0) - p0) == 1:
                 return True
         return False
+    
+    # NOTE: the original 'above_stem_if_chord_and_white_note' rule 
+    # is removed to minimize the available options + it seemed unnecessary.
     if rule == 'above_stem_if_chord_and_white_note':
-        for n in notes:
-            if int(n.get('idx', -2) or -2) == idx0:
-                continue
-            if not op.eq(float(n.get('time', 0.0) or 0.0), t0):
-                continue
-            np = int(n.get('pitch', 0) or 0)
-            if np not in BLACK_KEYS and np != p0:
-                return True
-        return False
+        rule = 'above_stem_if_chord_and_white_note_same_hand'
+    
     if rule != 'above_stem_if_chord_and_white_note_same_hand':
         return False
     hand0 = str(item.get('hand', 'l') or 'l')

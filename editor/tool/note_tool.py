@@ -452,14 +452,14 @@ class NoteTool(BaseTool):
 
         parent = QtWidgets.QApplication.activeWindow()
         layout = getattr(score, 'layout', None)
-        default_black_above = self._black_note_above_stem(score, found)
+        is_black_above_stem = self._editor._black_note_above_stem(found, layout)
         selected, accepted = NoteheadDialog.get_notehead(
             note=found,
             layout=layout,
             semitone_space_mm=float(getattr(self._editor, 'semitone_dist', 0.5) or 0.5),
             notation_color=self._editor.notation_color,
             paper_color=self._editor.paper_color,
-            default_black_above=default_black_above,
+            default_black_above=is_black_above_stem,
             parent=parent,
         )
         self._notehead_dialog_active = False
@@ -549,63 +549,13 @@ class NoteTool(BaseTool):
         except Exception:
             pass
 
-    def _black_note_above_stem(self, score: SCORE, note: Note) -> bool:
-        # get data for black note rule
-        layout = getattr(score, 'layout', None)
-        rule = str(getattr(layout, 'black_note_rule', 'below_stem') or 'below_stem')
-
-        # Simple rule: all black notes above stem
-        if rule == 'above_stem':
-            return True
-        
-        # get cache and note list for collision checks; prefer draw cache for fast lookup.
-        cache = getattr(self._editor, '_draw_cache', None) or {}
-        notes_view = cache.get('notes_view') or None
-        note_list = notes_view if notes_view is not None else (getattr(score.events, 'note', []) or [])
-        t0 = float(getattr(note, 'time', 0.0) or 0.0)
-        p0 = int(getattr(note, 'pitch', 0) or 0)
-        note_id = int(getattr(note, '_id', -1) or -1)
-        op = Operator(SHORTEST_DURATION)
-        if rule in ('above_stem_if_collision', 'only_above_stem_if_collision'):
-            for other in note_list:
-                if int(getattr(other, '_id', -2) or -2) == note_id:
-                    continue
-                if not op.eq(float(getattr(other, 'time', 0.0) or 0.0), t0):
-                    continue
-                if abs(int(getattr(other, 'pitch', 0) or 0) - p0) == 1:
-                    return True
-            return False
-        if rule == 'above_stem_if_chord_and_white_note':
-            for other in note_list:
-                if int(getattr(other, '_id', -2) or -2) == note_id:
-                    continue
-                if not op.eq(float(getattr(other, 'time', 0.0) or 0.0), t0):
-                    continue
-                other_pitch = int(getattr(other, 'pitch', 0) or 0)
-                if other_pitch not in BLACK_KEYS and other_pitch != p0:
-                    return True
-            return False
-        if rule != 'above_stem_if_chord_and_white_note_same_hand':
-            return False
-        hand0 = str(getattr(note, 'hand', 'l') or 'l')
-        for other in note_list:
-            if int(getattr(other, '_id', -2) or -2) == note_id:
-                continue
-            if not op.eq(float(getattr(other, 'time', 0.0) or 0.0), t0):
-                continue
-            if str(getattr(other, 'hand', 'l') or 'l') != hand0:
-                continue
-            other_pitch = int(getattr(other, 'pitch', 0) or 0)
-            if other_pitch not in BLACK_KEYS and other_pitch != p0:
-                return True
-        return False
-
     def _notehead_vertical_bounds_mm(self, score: SCORE, note: Note) -> tuple[float, float]:
         note_start_mm = float(self._editor.time_to_mm(float(getattr(note, 'time', 0.0) or 0.0)))
         layout = score.layout if score else None
         notehead_height_scaling = float(getattr(layout, 'notehead_height_scaling', 1.2) or 1.2) if layout else 1.2
         notehead_h_mm = float(getattr(self._editor, 'semitone_dist', 0.5) or 0.5) * 2.0 * notehead_height_scaling
-        spec = resolve_notehead_spec(note, default_black_above=self._black_note_above_stem(score, note))
+        is_black_above_stem = self._editor._black_note_above_stem(note, layout)
+        spec = resolve_notehead_spec(note, default_black_above=is_black_above_stem)
         if bool(getattr(spec, 'is_up', False)):
             return (float(note_start_mm - notehead_h_mm), float(note_start_mm))
         return (float(note_start_mm), float(note_start_mm + notehead_h_mm))

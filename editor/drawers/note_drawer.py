@@ -501,34 +501,43 @@ class NoteDrawerMixin:
         return (r / 255.0, g / 255.0, b / 255.0, 1.0)
 
     def _black_note_above_stem(self, n, layout) -> bool:
+        '''
+            Rules:
+            - above_stem: all black notes above stem according to Klavarskribo tradition
+            - below_stem: all black notes below stem according to keyTAB modern convention that makes black notes narrower if needed
+            - above_stem_if_collision: only black notes above stem if a note starts at same time on adjacent pitch (including across hands)
+            - above_stem_if_chord_and_white_note_same_hand: only black notes above stem if 1 or more white chord notes in same hand
+        '''
         rule = str(getattr(layout, 'black_note_rule', 'below_stem') or 'below_stem')
+        
         if rule == 'above_stem':
             return True
-        t0 = float(getattr(n, 'time', 0.0) or 0.0)
-        p0 = int(getattr(n, 'pitch', 0) or 0)
+        
+        n_time = float(getattr(n, 'time', 0.0) or 0.0)
+        n_pitch = int(getattr(n, 'pitch', 0) or 0)
+        
         if rule in ('above_stem_if_collision', 'only_above_stem_if_collision'):
-            for note in self._notes_starting_at_time(float(t0), hand=None):
-                if getattr(note, '_id', None) == getattr(n, '_id', None):
+            for other_note in self._notes_starting_at_time(float(n_time), hand=None):
+                if getattr(other_note, '_id', None) == getattr(n, '_id', None):
                     continue
-                if abs(int(getattr(note, 'pitch', 0) or 0) - p0) == 1:
+                if abs(int(getattr(other_note, 'pitch', 0) or 0) - n_pitch) == 1:
                     return True
             return False
+        
+        # NOTE: the original 'above_stem_if_chord_and_white_note' rule 
+        # is removed to minimize the available options + it seemed unnecessary.
         if rule == 'above_stem_if_chord_and_white_note':
-            for note in self._notes_starting_at_time(float(t0), hand=None):
-                if getattr(note, '_id', None) == getattr(n, '_id', None):
-                    continue
-                mp = int(getattr(note, 'pitch', 0) or 0)
-                if mp not in BLACK_KEYS and mp != p0:
-                    return True
-            return False
+            # correction for any old .piano files using the old rule name
+            rule = 'above_stem_if_chord_and_white_note_same_hand'
+        
         if rule != 'above_stem_if_chord_and_white_note_same_hand':
             return False
         hand0 = str(getattr(n, 'hand', 'l') or 'l')
-        for note in self._notes_starting_at_time(float(t0), hand=hand0):
-            if getattr(note, '_id', None) == getattr(n, '_id', None):
+        for other_note in self._notes_starting_at_time(float(n_time), hand=hand0):
+            other_note: Note
+            if getattr(other_note, '_id', None) == getattr(n, '_id', None):
                 continue
-            mp = int(getattr(note, 'pitch', 0) or 0)
-            if mp not in BLACK_KEYS and mp != p0:
+            if other_note.pitch not in BLACK_KEYS and other_note.pitch != n_pitch:
                 return True
         return False
 
@@ -550,7 +559,7 @@ class NoteDrawerMixin:
         if rule not in ('under_stem', 'below_stem'):
             return False
 
-        # Custom noteheads that explicitly point above the stem should not be
+        # TODO: Custom noteheads that explicitly point below the stem should be
         # narrowed by the under-stem collision rule.
         custom_notehead = normalize_notehead_literal(getattr(n, 'notehead', 'auto'))
         if custom_notehead != 'auto':

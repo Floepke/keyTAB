@@ -16,10 +16,10 @@ class Layout:
     page_left_margin_mm: float = 10.0
     page_right_margin_mm: float = 10.0
 
-    black_note_rule: Literal['above_stem', 'below_stem', 'above_stem_if_collision', 'above_stem_if_chord_and_white_note', 'above_stem_if_chord_and_white_note_same_hand'] = 'above_stem'
+    black_note_rule: Literal['above_stem', 'below_stem', 'above_stem_if_collision', 'above_stem_if_chord_and_white_note_same_hand'] = 'above_stem'
 
     # Note appearance
-    note_stem_length_semitone: int = 7
+    note_stem_length_semitone: float = 7.0
     note_stem_thickness_mm: float = 0.8 # Thickness of the stem as well the notehead outline width
     note_stopsign_thickness_mm: float = 1.0
     note_continuation_dot_size_mm: float = 2.5
@@ -179,7 +179,7 @@ LAYOUT_FLOAT_CONFIG: dict[str, dict[str, float]] = {
     'header_height_mm': {'min': 0.0, 'max': 100.0, 'step': 0.05},
     'footer_height_mm': {'min': 0.0, 'max': 100.0, 'step': 0.05},
     'scale': {'min': 0.25, 'max': 1.0, 'step': 0.005},
-    'note_stem_length_semitone': {'min': 1.0, 'max': 20.0, 'step': 1.0},
+    'note_stem_length_semitone': {'min': 3.0, 'max': 20.0, 'step': 0.05},
     'note_stem_thickness_mm': {'min': 0.05, 'max': 5.0, 'step': 0.05},
     'note_stopsign_thickness_mm': {'min': 0.05, 'max': 5.0, 'step': 0.05},
     'note_continuation_dot_size_mm': {'min': 0.05, 'max': 10.0, 'step': 0.05},
