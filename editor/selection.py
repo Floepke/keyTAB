@@ -454,6 +454,7 @@ class SelectionMixin:
 
     def get_selected_note_ids_cached(self, score: SCORE | None = None) -> set[int]:
         """Return selected note IDs using draw-cache data when possible."""
+        # ensure selection is active and score is available
         if not bool(getattr(self, '_selection_active', False)):
             return set()
         if score is None:
@@ -461,11 +462,13 @@ class SelectionMixin:
         if score is None:
             return set()
 
+        # Compute selection signature for caching
         a, b = self._selection_window_time_bounds(self._sel_start_units, self._sel_end_units)
         min_p = max(1, min(88, int(getattr(self, '_sel_min_pitch', 1))))
         max_p = max(1, min(88, int(getattr(self, '_sel_max_pitch', 88))))
         op = Operator(SHORTEST_DURATION)
 
+        # Check cache validity
         cache = getattr(self, '_draw_cache', None) or {}
         sel_sig = (round(a, 6), round(b, 6), int(min_p), int(max_p))
         cached_sig = cache.get('selected_note_ids_sig') if isinstance(cache, dict) else None
@@ -473,6 +476,7 @@ class SelectionMixin:
         if cached_sig == sel_sig and isinstance(cached_ids, set):
             return cached_ids
 
+        # Cache miss: detect selected notes from model and update cache
         t_begin = float(cache.get('time_begin', float('inf'))) if isinstance(cache, dict) else float('inf')
         t_end = float(cache.get('time_end', float('-inf'))) if isinstance(cache, dict) else float('-inf')
         if a >= t_begin and b <= t_end and isinstance(cache, dict):

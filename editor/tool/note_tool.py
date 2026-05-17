@@ -132,7 +132,10 @@ class NoteTool(BaseTool):
         if hit_rect is None:
             return None, None, y_mm
         hit_id = int(hit_rect.get('_id', -1) or -1)
-        for n in getattr(score.events, 'note', []) or []:
+        cache = getattr(self._editor, '_draw_cache', None) or {}
+        notes_view = cache.get('notes_view') or None
+        note_list = notes_view if notes_view is not None else (getattr(score.events, 'note', []) or [])
+        for n in note_list:
             if int(getattr(n, '_id', -1) or -1) == hit_id:
                 return n, hit_rect, y_mm
         return None, hit_rect, y_mm
@@ -143,10 +146,7 @@ class NoteTool(BaseTool):
         primary_id = int(getattr(primary, '_id', 0) or 0)
         selected_ids: set[int] = set()
         if hasattr(self._editor, 'get_selected_note_ids_cached'):
-            try:
-                selected_ids = set(self._editor.get_selected_note_ids_cached(score) or set())
-            except Exception:
-                selected_ids = set()
+            selected_ids = set(self._editor.get_selected_note_ids_cached(score) or set())
         if primary_id > 0 and primary_id in selected_ids:
             out = [n for n in (getattr(score.events, 'note', []) or []) if int(getattr(n, '_id', 0) or 0) in selected_ids]
             if out:
@@ -216,12 +216,19 @@ class NoteTool(BaseTool):
         note_id = int(getattr(note, '_id', -1) or -1)
         op = Operator(float(SHORTEST_DURATION))
 
-        for other in getattr(score.events, 'note', []) or []:
+        hand = str(getattr(note, 'hand', 'l') or 'l')
+        cache = getattr(self._editor, '_draw_cache', None) or {}
+        notes_view = cache.get('notes_view') or None
+        note_list = notes_view if notes_view is not None else (getattr(score.events, 'note', []) or [])
+        for other in note_list:
             other_id = int(getattr(other, '_id', -2) or -2)
             if other_id == note_id:
                 continue
             other_pitch = int(getattr(other, 'pitch', 0) or 0)
             if other_pitch != pitch:
+                continue
+            other_hand = str(getattr(other, 'hand', 'l') or 'l')
+            if other_hand != hand:
                 continue
             other_start = float(getattr(other, 'time', 0.0) or 0.0)
             if op.less(start_t, other_start) and op.less(other_start, end_t):
@@ -238,11 +245,18 @@ class NoteTool(BaseTool):
         end_t = float(start_t + duration)
         op = Operator(float(SHORTEST_DURATION))
 
-        for other in getattr(score.events, 'note', []) or []:
+        hand = str(getattr(note, 'hand', 'l') or 'l')
+        cache = getattr(self._editor, '_draw_cache', None) or {}
+        notes_view = cache.get('notes_view') or None
+        note_list = notes_view if notes_view is not None else (getattr(score.events, 'note', []) or [])
+        for other in note_list:
             other_id = int(getattr(other, '_id', -2) or -2)
             if other_id == note_id:
                 continue
             if int(getattr(other, 'pitch', 0) or 0) != int(candidate_pitch):
+                continue
+            other_hand = str(getattr(other, 'hand', 'l') or 'l')
+            if other_hand != hand:
                 continue
             other_start = float(getattr(other, 'time', 0.0) or 0.0)
             other_duration = float(getattr(other, 'duration', 0.0) or 0.0)
@@ -411,7 +425,10 @@ class NoteTool(BaseTool):
             return
 
         found = None
-        for n in getattr(score.events, 'note', []) or []:
+        cache = getattr(self._editor, '_draw_cache', None) or {}
+        notes_view = cache.get('notes_view') or None
+        note_list = notes_view if notes_view is not None else (getattr(score.events, 'note', []) or [])
+        for n in note_list:
             if int(getattr(n, '_id', -1) or -1) == int(note_id):
                 found = n
                 break
@@ -538,16 +555,24 @@ class NoteTool(BaseTool):
             pass
 
     def _black_note_above_stem(self, score: SCORE, note: Note) -> bool:
+        # get data for black note rule
         layout = getattr(score, 'layout', None)
         rule = str(getattr(layout, 'black_note_rule', 'below_stem') or 'below_stem')
+
+        # Simple rule: all black notes above stem
         if rule == 'above_stem':
             return True
+        
+        # get cache
+        cache = getattr(self._editor, '_draw_cache', None) or {}
+        notes_view = cache.get('notes_view') or None
+        note_list = notes_view if notes_view is not None else (getattr(score.events, 'note', []) or [])
         t0 = float(getattr(note, 'time', 0.0) or 0.0)
         p0 = int(getattr(note, 'pitch', 0) or 0)
         note_id = int(getattr(note, '_id', -1) or -1)
-        op = Operator(7)
+        op = Operator(SHORTEST_DURATION)
         if rule in ('above_stem_if_collision', 'only_above_stem_if_collision'):
-            for other in getattr(score.events, 'note', []) or []:
+            for other in note_list:
                 if int(getattr(other, '_id', -2) or -2) == note_id:
                     continue
                 if not op.eq(float(getattr(other, 'time', 0.0) or 0.0), t0):
@@ -556,7 +581,7 @@ class NoteTool(BaseTool):
                     return True
             return False
         if rule == 'above_stem_if_chord_and_white_note':
-            for other in getattr(score.events, 'note', []) or []:
+            for other in note_list:
                 if int(getattr(other, '_id', -2) or -2) == note_id:
                     continue
                 if not op.eq(float(getattr(other, 'time', 0.0) or 0.0), t0):
@@ -568,7 +593,7 @@ class NoteTool(BaseTool):
         if rule != 'above_stem_if_chord_and_white_note_same_hand':
             return False
         hand0 = str(getattr(note, 'hand', 'l') or 'l')
-        for other in getattr(score.events, 'note', []) or []:
+        for other in note_list:
             if int(getattr(other, '_id', -2) or -2) == note_id:
                 continue
             if not op.eq(float(getattr(other, 'time', 0.0) or 0.0), t0):
@@ -722,26 +747,27 @@ class NoteTool(BaseTool):
 
         deleted_any = False
         if target is not None:
-            notes_list = getattr(score.events, 'note', None)
-            if isinstance(notes_list, list):
-                # Fast path: remove the exact detected note object by identity.
-                target_index = -1
-                for i, note_item in enumerate(notes_list):
+            cache = getattr(self._editor, '_draw_cache', None) or {}
+            notes_view = cache.get('notes_view') or None
+            cached_notes_list = notes_view if notes_view is not None else None
+            notes_list = getattr(score.events, 'note', []) or []
+
+            # Fast path: remove the exact detected note object by identity and use cache.
+            if cached_notes_list is not None:
+                for i, note_item in enumerate(cached_notes_list):
                     if note_item is target:
-                        target_index = i
+                        notes_list.remove(note_item)
+                        deleted_any = True
                         break
-                if target_index >= 0:
-                    notes_list.pop(target_index)
-                    deleted_any = True
-                else:
-                    # Fallback for stale references: remove first note with matching id.
-                    tid = int(getattr(target, '_id', -1) or -1)
-                    if tid >= 0:
-                        for i, note_item in enumerate(notes_list):
-                            if int(getattr(note_item, '_id', -2) or -2) == tid:
-                                notes_list.pop(i)
-                                deleted_any = True
-                                break
+            else:
+                # Fallback to ID-based removal if cache is not available, use whole note list.
+                tid = int(getattr(target, '_id', -1) or -1)
+                if tid >= 0:
+                    for i, note_item in enumerate(notes_list):
+                        if int(getattr(note_item, '_id', -2) or -2) == tid:
+                            notes_list.remove(note_item)
+                            deleted_any = True
+                            break
         if deleted_any:
             # Keep base_grid in sync and trigger engrave via snapshot.
             self._editor.update_score_length()
