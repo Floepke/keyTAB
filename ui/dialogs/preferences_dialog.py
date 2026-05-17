@@ -20,7 +20,7 @@ class PreferencesDialog(QtWidgets.QDialog):
         self.setWindowFlags(self.windowFlags())
         self.setWindowTitle(tr("Preferences"))
         self.setModal(False)
-        self.resize(768, 768)
+        self.resize(768, 400)
 
         self._pm = get_preferences_manager()
         self._initial_values = dict(self._pm._values)

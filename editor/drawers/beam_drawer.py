@@ -25,8 +25,8 @@ class BeamDrawerMixin:
         semitone_mm = float(self.semitone_dist or 0.5)
         stem_len_units = float(getattr(layout, 'note_stem_length_semitone', 3) or 3) if layout is not None else 3.0
         stem_len = stem_len_units * semitone_mm
-        beam_w = float(getattr(layout, 'beam_thickness_mm', 1.0) or 1.0) * scale if layout is not None else max(0.1, self._editor_line_width_mm())
-        stem_w = float(getattr(layout, 'note_stem_thickness_mm', 0.5) or 0.5) * scale if layout is not None else self._editor_line_width_mm()
+        beam_w = float(getattr(layout, 'beam_thickness_mm', 1.0) or 1.0) * scale if layout is not None else max(0.1, self.editor_line_width_global)
+        stem_w = float(getattr(layout, 'note_stem_thickness_mm', 0.5) or 0.5) * scale if layout is not None else self.editor_line_width_global
         return stem_len, beam_w, stem_w, semitone_mm
 
     def _draw_beam(self, du: DrawUtil, x1: float, y1: float, x2: float, y2: float, beam_w: float, tags: list[str]) -> None:

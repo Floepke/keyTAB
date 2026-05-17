@@ -161,10 +161,7 @@ class NoteTool(BaseTool):
         if not targets:
             targets = [self._velocity_target]
         for n in targets:
-            try:
-                n.velocity = new_vel
-            except Exception:
-                continue
+            n.velocity = new_vel
         t = float(getattr(self._velocity_target, 'time', 0.0) or 0.0)
         self._velocity_display_y_mm = float(self._editor.time_to_mm(t))
         self._velocity_display_value = new_vel
@@ -563,7 +560,7 @@ class NoteTool(BaseTool):
         if rule == 'above_stem':
             return True
         
-        # get cache
+        # get cache and note list for collision checks; prefer draw cache for fast lookup.
         cache = getattr(self._editor, '_draw_cache', None) or {}
         notes_view = cache.get('notes_view') or None
         note_list = notes_view if notes_view is not None else (getattr(score.events, 'note', []) or [])

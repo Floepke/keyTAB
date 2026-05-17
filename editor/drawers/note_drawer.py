@@ -2,6 +2,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, cast, Iterable
 import bisect
 from file_model.SCORE import SCORE
+from file_model.events.note import Note
 from utils.CONSTANT import BLACK_KEYS, QUARTER_NOTE_UNIT, BE_KEYS, SHORTEST_DURATION
 from ui.widgets.draw_util import DrawUtil
 from utils.tiny_tool import key_class_filter
@@ -40,13 +41,6 @@ class NoteDrawerMixin:
     _start_times_by_hand: dict[str, list[float]] | None = None
     _end_times_by_hand: dict[str, list[float]] | None = None
     _end_notes_by_hand: dict[str, list] | None = None
-    _STEM_WIDTH_FACTOR: float = 1.0
-
-    def _editor_line_width_mm(self) -> float:
-        try:
-            return max(0.01, float(getattr(self, 'editor_line_width_global', 0.1) or 0.1))
-        except Exception:
-            return 0.1
 
     def _layout_stem_length_mm(self) -> float:
         self = cast("Editor", self)
@@ -115,6 +109,12 @@ class NoteDrawerMixin:
         if self._notes_by_hand_lookup is None or self._start_times_by_hand is None or self._end_times_by_hand is None or self._end_notes_by_hand is None:
             return []
 
+        op = self._time_op
+        t0f = float(t0)
+        t1f = float(t1)
+        if not op.lt(t0f, t1f):
+            return []
+
         hk = 'l' if str(hand or 'l') == 'l' else 'r'
         if by_end:
             times = self._end_times_by_hand.get(hk, [])
@@ -123,9 +123,15 @@ class NoteDrawerMixin:
             times = self._start_times_by_hand.get(hk, [])
             notes = self._notes_by_hand_lookup.get(hk, [])
 
-        lo = bisect.bisect_right(times, float(t0))
-        hi = bisect.bisect_left(times, float(t1))
-        return notes[lo:hi] if hi > lo else []
+        thr = float(op.threshold)
+        lo = bisect.bisect_left(times, t0f - thr)
+        hi = bisect.bisect_right(times, t1f + thr)
+        out: list = []
+        for i in range(lo, hi):
+            tv = float(times[i])
+            if op.gt(tv, t0f) and op.lt(tv, t1f):
+                out.append(notes[i])
+        return out
 
     def draw_note(self, du: DrawUtil) -> None:
         """Editor drawer entry point as used by draw_all()."""
@@ -205,17 +211,18 @@ class NoteDrawerMixin:
             self._draw_notehead(du, n, x, y1, draw_mode)
             self._draw_midinote(du, n, x, y1, y2, draw_mode)
             self._draw_note_accidental(du, n, x, y1)
-            try:
-                w = float(self.semitone_dist or 0.5)
-                layout = self.current_score().layout
-                spec = resolve_notehead_spec(n, default_black_above=self._black_note_above_stem(n, layout))
-                y_top = float(y1)
-                if bool(getattr(spec, 'is_up', False)):
-                    y_top -= w * 2.0
-                rect_id = int(getattr(n, '_id', 0) or 0)
-                self.register_hit_rect('note', rect_id, float(x - w), float(y_top), float(x + w), float(y1 + (w * 2.0)))
-            except Exception:
-                pass
+            # NOTE: not sure what this code block is good for... it seems unnecessary.
+            # try:
+            #     w = float(self.semitone_dist or 0.5)
+            #     layout = self.current_score().layout
+            #     spec = resolve_notehead_spec(n, default_black_above=self._black_note_above_stem(n, layout))
+            #     y_top = float(y1)
+            #     if bool(getattr(spec, 'is_up', False)):
+            #         y_top -= w * 2.0
+            #     rect_id = int(getattr(n, '_id', 0) or 0)
+            #     self.register_hit_rect('note', rect_id, float(x - w), float(y_top), float(x + w), float(y1 + (w * 2.0)))
+            # except Exception:
+            #     pass
             return
 
         # Draw all parts of the note
@@ -402,7 +409,7 @@ class NoteDrawerMixin:
 
                 i = j
 
-    def _draw_note_continuation_dot(self, du: DrawUtil, n, x: float, y1: float, y2: float, draw_mode: str) -> None:
+    def _draw_note_continuation_dot(self, du: DrawUtil, n: Note, x: float, y1: float, y2: float, draw_mode: str) -> None:
         self = cast("Editor", self)
         if getattr(self, 'is_tiny_mode', None) and self.is_tiny_mode():
             return
@@ -415,12 +422,12 @@ class NoteDrawerMixin:
 
         # Collect dot times from indexed hand-specific starts/ends in (start, end).
         dot_times: list[float] = []
-        for m in self._notes_in_open_time_interval(hand, start, end, by_end=False):
-            if int(getattr(m, '_id', -1) or -1) != int(getattr(n, '_id', -2) or -2):
-                dot_times.append(float(getattr(m, 'time', 0.0) or 0.0))
-        for m in self._notes_in_open_time_interval(hand, start, end, by_end=True):
-            if int(getattr(m, '_id', -1) or -1) != int(getattr(n, '_id', -2) or -2):
-                dot_times.append(float(getattr(m, 'time', 0.0) or 0.0) + float(getattr(m, 'duration', 0.0) or 0.0))
+        for other in self._notes_in_open_time_interval(hand, start, end, by_end=False):
+            if int(getattr(other, '_id', -1) or -1) != int(getattr(n, '_id', -2) or -2):
+                dot_times.append(float(getattr(other, 'time', 0.0) or 0.0))
+        for other in self._notes_in_open_time_interval(hand, start, end, by_end=True):
+            if int(getattr(other, '_id', -1) or -1) != int(getattr(n, '_id', -2) or -2):
+                dot_times.append(float(getattr(other, 'time', 0.0) or 0.0) + float(getattr(other, 'duration', 0.0) or 0.0))
 
         # Add a continuation dot at any crossed barline.
         barlines = self._cached_barline_positions or self._get_barline_positions()
@@ -428,6 +435,7 @@ class NoteDrawerMixin:
             bt = float(bt)
             if self._time_op.gt(bt, start) and self._time_op.lt(bt, end):
                 dot_times.append(bt)
+
         if not dot_times:
             return
 
@@ -435,6 +443,7 @@ class NoteDrawerMixin:
         dot_d = w * 0.8
         dot_pitch = int(getattr(n, 'pitch', 0) or 0)
         layout = self.current_score().layout
+        
         # Build a set of double-barline tick positions to avoid overlap.
         _double_bar_ticks: set[float] = {
             float(getattr(ev, 'time', 0.0) or 0.0)
@@ -452,14 +461,14 @@ class NoteDrawerMixin:
             # If another note starts at this exact time on adjacent pitch,
             # push continuation dot forward two semitone distances to avoid overlap.
             has_adjacent_start = False
-            for m in self._notes_starting_at_time(float(t), hand=None):
-                if int(getattr(m, '_id', -1) or -1) == int(getattr(n, '_id', -2) or -2):
+            for other in self._notes_starting_at_time(float(t), hand=None):
+                if int(getattr(other, '_id', -1) or -1) == int(getattr(n, '_id', -2) or -2):
                     continue
-                mp = int(getattr(m, 'pitch', 0) or 0)
+                mp = int(getattr(other, 'pitch', 0) or 0)
                 if abs(mp - dot_pitch) == 1:
                     # Black adjacent notes drawn above stem do not collide with the
                     # default continuation-dot position.
-                    if mp in BLACK_KEYS and self._black_note_above_stem(m, layout):
+                    if mp in BLACK_KEYS and self._black_note_above_stem(other, layout):
                         continue
                     other_x = float(self.pitch_to_x(mp))
                     if abs(other_x - dot_x) >= min_collision_gap:
