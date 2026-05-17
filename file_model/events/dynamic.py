@@ -12,5 +12,5 @@ class DynamicSymbol:
     time: float = 0.0
     x_rpitch: int = 0
     symbol: str = ""
-    rotation: float | None = None
+    rotation: float = 0.0
     _id: int = 0

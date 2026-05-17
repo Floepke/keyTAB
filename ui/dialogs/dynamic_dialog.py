@@ -43,9 +43,6 @@ class DynamicSymbolDialog(QtWidgets.QDialog):
         rotation_layout = QtWidgets.QVBoxLayout(rotation_box)
         rotation_layout.setContentsMargins(8, 8, 8, 8)
         rotation_layout.setSpacing(6)
-        self._custom_rotation_checkbox = QtWidgets.QCheckBox(self.tr('Custom Rotation'), rotation_box)
-        self._custom_rotation_checkbox.setChecked(self._custom_rotation_enabled)
-        rotation_layout.addWidget(self._custom_rotation_checkbox)
         self._rotation_edit = FloatSliderEdit(self._rotation_value, 0.0, 360.0, 1.0, rotation_box)
         self._rotation_edit.setVisible(self._custom_rotation_enabled)
         rotation_layout.addWidget(self._rotation_edit)
@@ -59,7 +56,6 @@ class DynamicSymbolDialog(QtWidgets.QDialog):
         buttons.rejected.connect(self.reject)
         root.addWidget(buttons, 0)
 
-        self._custom_rotation_checkbox.toggled.connect(self._on_custom_rotation_toggled)
         self.resize(560, 480)
 
     def _on_symbol_selected(self, glyph: str) -> None:
@@ -69,9 +65,6 @@ class DynamicSymbolDialog(QtWidgets.QDialog):
         self._selected_glyph = str(glyph or '')
         self.accept()
 
-    def _on_custom_rotation_toggled(self, checked: bool) -> None:
-        self._rotation_edit.setVisible(bool(checked))
-
     def selected_glyph(self) -> str:
         current = self._grid.selected_glyph()
         if current:
@@ -79,8 +72,8 @@ class DynamicSymbolDialog(QtWidgets.QDialog):
         return str(self._selected_glyph or '')
 
     def rotation_value(self) -> float | None:
-        if not self._custom_rotation_checkbox.isChecked():
-            return None
+        # if not self._custom_rotation_checkbox.isChecked():
+        #     return None
         return float(self._rotation_edit.value())
 
     @classmethod
