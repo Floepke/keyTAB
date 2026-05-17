@@ -39,19 +39,21 @@ class FileManager:
         "MusicXML File (*.musicxml *.mxl *.xml);;"
     )
     # Save dialog: allow .piano, MIDI, and MusicXML export
-    SAVE_FILE_FILTER = "keyTAB Score (*.piano);;MIDI File (*.mid *.midi);;MusicXML File (*.musicxml *.xml)"
+    SAVE_FILE_FILTER = (
+        "keyTAB Score (*.piano);;"
+        "MIDI File (*.mid *.midi);;"
+        "MusicXML File [unusable in its current state] (*.musicxml *.xml);;"
+    )
 
     def __init__(self, parent: Optional[QWidget] = None) -> None:
         self._parent: Optional[QWidget] = parent
         self._current: SCORE = SCORE().new()
         self._path: Optional[Path] = None
-        # Initialize last_dir from appdata if available, else home
-        try:
-            adm = get_appdata_manager()
-            last_dir_str = str(adm.get("last_file_dialog_dir", "") or "")
-            self._last_dir: Path = Path(last_dir_str) if last_dir_str else Path.home()
-        except Exception:
-            self._last_dir: Path = Path.home()
+        # Initialize last_dir from appdata if available, else home directory
+        adm = get_appdata_manager()
+        last_dir_str = str(adm.get("last_file_dialog_dir", "") or "")
+        self._last_dir: Path = Path(last_dir_str) if last_dir_str else Path.home()
+        # Track whether the current SCORE has unsaved changes since the last save/load
         self._dirty: bool = False
         self._last_autosave_ts: datetime | None = None
         self._before_save_hook: Callable[[SCORE], None] | None = None
@@ -72,20 +74,13 @@ class FileManager:
         self._before_save_hook = hook
 
     def _apply_before_save_hook(self) -> None:
-        try:
-            if hasattr(self._current, 'set_before_save_hook'):
-                self._current.set_before_save_hook(self._before_save_hook)
-        except Exception:
-            pass
+        if hasattr(self._current, 'set_before_save_hook'):
+            self._current.set_before_save_hook(self._before_save_hook)
 
     # Core operations
     def new(self) -> SCORE:
         """Create a new SCORE and clear the current path."""
         self._current = SCORE().new()
-        adm = get_appdata_manager()
-        template = adm.get("score_template", {})
-        if isinstance(template, dict) and template:
-            self._apply_score_template(template)
         # Load default style if it exists
         self._apply_default_style()
         self._path = None
@@ -121,12 +116,6 @@ class FileManager:
                 comment=comment,
             )
 
-        layout_data = data.get('layout')
-        if isinstance(layout_data, dict):
-            if 'hairpin_font_size_pt' not in layout_data and 'hairpin_text_size_pt' in layout_data:
-                layout_data = dict(layout_data)
-                layout_data['hairpin_font_size_pt'] = layout_data.get('hairpin_text_size_pt')
-            score.layout = Layout(**_merge_with_defaults(Layout, layout_data, 'layout'))
         score.info = _build_info(data.get('info', {}) if isinstance(data.get('info', {}), dict) else {})
         editor_data = data.get('editor')
         if isinstance(editor_data, dict) and 'zoom_mm_per_quarter' in editor_data:
@@ -148,14 +137,10 @@ class FileManager:
 
     def _apply_default_style(self) -> None:
         """Load and apply the default style to the current score if it exists."""
-        try:
-            from ui.dialogs.style_dialog import load_default_style
-            default_layout = load_default_style()
-            if default_layout is not None:
-                self._current.layout = default_layout
-        except Exception:
-            # If loading default style fails, just use the template/default layout
-            pass
+        from ui.dialogs.style_dialog import load_default_style
+        default_layout = load_default_style()
+        if default_layout is not None:
+            self._current.layout = default_layout
 
     def replace_current(self, new_score: SCORE) -> None:
         """Replace the current SCORE instance (used by undo/redo)."""

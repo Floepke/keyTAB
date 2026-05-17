@@ -90,7 +90,7 @@ change_log = '''
 - update to 1.1.0 because the interface changes and new features are significant enough to warrant a minor version bump, even though there are no breaking file format changes
 - the contextual toolbar is on the left of the main window now as a second vertical toolbar, this allows for more space for the editor and print preview and also gives a better visual connection between tool selector and contextual toolbar.
 - added Keyboard Shortcut Card and updated the main window help/shortcut flow
-- improved Escape exit confirmation dialog behavior
+- added Escape exit confirmation dialog to prevent accidental exits
 - added MusicXML export support in File -> Save As, including a new piano-to-MusicXML converter (first version, some data may not be fully supported yet, but the basics are there)
 - MusicXML export now preserves note accidental semantics from keyTAB notes
 - MusicXML export writes classic grand staff piano output (treble + bass staves)
