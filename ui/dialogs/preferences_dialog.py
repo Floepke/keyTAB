@@ -136,6 +136,13 @@ class PreferencesDialog(DialogGeometryMixin, QtWidgets.QDialog):
                 (self.tr("Horizontal"), "horizontal"),
             ]
             return self._build_radio_group(options, str(value)), "editor_orientation"
+        if key == "focus_on_playhead_during_playback":
+            options = [
+                (self.tr("Focus per measure"), "measure"),
+                (self.tr("Focus animated"), "animated"),
+                (self.tr("Disabled"), "disabled"),
+            ]
+            return self._build_radio_group(options, str(value)), "focus_on_playhead_during_playback"
         if isinstance(pref.default, bool):
             checkbox = QtWidgets.QCheckBox()
             checkbox.setChecked(bool(value))
@@ -206,7 +213,7 @@ class PreferencesDialog(DialogGeometryMixin, QtWidgets.QDialog):
     def _apply_changes(self) -> None:
         for key, (kind, widget) in self._fields.items():
             try:
-                if kind in ("theme", "ui_language", "editor_orientation"):
+                if kind in ("theme", "ui_language", "editor_orientation", "focus_on_playhead_during_playback"):
                     value = next(
                         (stored for btn, stored in widget._radio_data if btn.isChecked()),
                         widget._radio_data[0][1] if widget._radio_data else "",

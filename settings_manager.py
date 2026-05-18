@@ -359,8 +359,11 @@ def get_preferences_manager() -> PreferencesManager:
         )
         pm.register(
             key="focus_on_playhead_during_playback",
-            default=True,
-            description="Focus the editor view on the playhead during playback.",
+            default="measure",
+            description=(
+                "Editor playhead focus mode during playback: "
+                "'measure' (jump per measure), 'animated' (smoothly keep playhead centered), or 'disabled'."
+            ),
         )
         pm.register(
             key="editor_orientation",
@@ -390,6 +393,33 @@ def get_preferences_manager() -> PreferencesManager:
         if ("play_note_on_edit" not in raw) and ("audition_during_note_input" in raw):
             pm.set("play_note_on_edit", bool(raw.get("audition_during_note_input", True)))
             pm.save()
+        # Migrate playhead focus from legacy bool values to mode strings.
+        try:
+            old_focus = raw.get("focus_on_playhead_during_playback", None)
+            if isinstance(old_focus, bool):
+                pm.set("focus_on_playhead_during_playback", "measure" if old_focus else "disabled")
+                pm.save()
+            elif old_focus is not None:
+                focus_txt = str(old_focus).strip().lower()
+                if focus_txt in ("true", "1", "yes", "on"):
+                    pm.set("focus_on_playhead_during_playback", "measure")
+                    pm.save()
+                elif focus_txt in ("false", "0", "no", "off"):
+                    pm.set("focus_on_playhead_during_playback", "disabled")
+                    pm.save()
+                elif focus_txt not in ("measure", "animated", "disabled"):
+                    pm.set("focus_on_playhead_during_playback", "measure")
+                    pm.save()
+        except Exception:
+            pass
+        # Legacy fallback key from older builds.
+        if ("focus_on_playhead_during_playback" not in raw) and ("center_view_on_playhead" in raw):
+            try:
+                legacy = bool(raw.get("center_view_on_playhead", True))
+                pm.set("focus_on_playhead_during_playback", "measure" if legacy else "disabled")
+                pm.save()
+            except Exception:
+                pass
         _prefs_manager = pm
     return _prefs_manager
 

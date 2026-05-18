@@ -1,5 +1,6 @@
 from __future__ import annotations
 import json
+import re
 from pathlib import Path
 from dataclasses import asdict, fields
 from typing import Any, get_args, get_origin, get_type_hints, Literal, TYPE_CHECKING
@@ -554,7 +555,9 @@ class StyleDialog(DialogGeometryMixin, QtWidgets.QDialog):
     values_changed = QtCore.Signal()
     tab_changed = QtCore.Signal(int)
 
-    def _style_field_labels(self) -> dict[str, str]:
+    _TITLE_PAREN_UNITS = {"mm", "pt", "degrees"}
+
+    def _style_field_labels(self) -> dict[str, str | tuple[str, str]]:
         return {
             'scale': self.tr('Scale'),
             'page_orientation': self.tr('Page orientation'),
@@ -567,25 +570,54 @@ class StyleDialog(DialogGeometryMixin, QtWidgets.QDialog):
             'page_right_margin_mm': self.tr('Right margin (mm)'),
             'header_height_mm': self.tr('Header height (mm)'),
             'footer_height_mm': self.tr('Footer height (mm)'),
-            'black_note_rule': self.tr('Black note rule'),
+            'black_note_rule': (
+                self.tr('Black note rule'),
+                self.tr((
+                    'Controls how black notes are positioned on the stem.\n\n'
+                    'Above stem: black notes are placed above the stem according to Klavarskribo default.\n\n'
+                    'Below stem, avoiding collisions: keyTAB uses 30% \'black note narrowing\' for colliding noteheads.\n\n'
+                    'Chords above stem: black notes are placed above the stem, but only for chords with 1 or more white notes.\n'
+                    )),
+            ),
             'note_head_visible': self.tr('Notehead'),
             'note_stem_visible': self.tr('Stem'),
             'accidental_visible': self.tr('Accidental'),
             'note_stop_visible': self.tr('Stop symbol'),
-            'note_stem_length_semitone': self.tr('Note stem length (semitones)'),
-            'note_stem_thickness_mm': self.tr('Note thickness (mm) (Applies the stem and the notehead outline)'),
+            'note_stem_length_semitone': (
+                self.tr('Note stem length in semitones'),
+                self.tr('Distance from notehead to the end of the stem.'),
+            ),
+            'note_stem_thickness_mm': (
+                self.tr('Note thickness (mm)'),
+                self.tr('Applies to the stem and the notehead outline.'),
+            ),
             'note_stopsign_thickness_mm': self.tr('Stop symbol thickness (mm)'),
             'note_continuation_dot_visible': self.tr('Continuation dot'),
             'note_continuation_dot_size_mm': self.tr('Continuation dot size (mm)'),
-            'note_midinote_visible': self.tr('MIDI note blocks'),
-            'note_midinote_left_color': self.tr('MIDI note color (left hand)'),
-            'note_midinote_right_color': self.tr('MIDI note color (right hand)'),
-            'note_width_scaling': self.tr('Note width scaling (1 = Perfectly rounded)'),
-            'notehead_height_scaling': self.tr('Notehead height scaling (1.0 = square, higher = taller)'),
-            'notehead_tilt': self.tr('Notehead tilt (-1..1, 0 = circle/oval, negative = opposite direction)'),
+            'note_midinote_visible': (
+                self.tr('MIDI note blocks'),
+                self.tr('Visualize MIDI notes as colored duration blocks.'),
+            ),
+            'note_midinote_left_color': self.tr('MIDI note color left hand'),
+            'note_midinote_right_color': self.tr('MIDI note color right hand'),
+            'note_width_scaling': (
+                self.tr('Note width scaling'),
+                self.tr('1 = default width, higher = wider, lower = narrower'),
+            ),
+            'notehead_height_scaling': (
+                self.tr('Notehead height scaling'),
+                self.tr('1.0 = default height, higher = taller, lower = shorter'),
+            ),
+            'notehead_tilt': (
+                self.tr('Notehead tilt'),
+                self.tr('0 = circle/oval, 1 = fully tilted'),
+            ),
             'beam_visible': self.tr('Beam'),
             'beam_thickness_mm': self.tr('Beam thickness (mm)'),
-            'beam_corner_radius_mm': self.tr('Beam corner radius (mm) (rounded corners)'),
+            'beam_corner_radius_mm': (
+                self.tr('Beam corner radius (mm)'),
+                self.tr('Sets the beam\'s rounded corner radius. 0 for sharp corners, higher for more rounded.'),
+            ),
             'grace_note_visible': self.tr('Grace note'),
             'grace_note_outline_width_mm': self.tr('Grace note outline thickness (mm)'),
             'grace_note_scale': self.tr('Grace note scale'),
@@ -600,9 +632,15 @@ class StyleDialog(DialogGeometryMixin, QtWidgets.QDialog):
             'hairpin_line_width_mm': self.tr('Hairpin line thickness (mm)'),
             'hairpin_width_mm': self.tr('Hairpin width (mm)'),
             'hairpin_text_gap_mm': self.tr('Hairpin text gap (mm)'),
-            'dynamic_symbol_font_size_pt': self.tr('Dynamic symbol font size (pt)'),
+            'dynamic_symbol_font_size_pt': (
+                self.tr('Dynamic symbol font size'),
+                self.tr('pt'),
+            ),
             'dynamic_symbol_background_padding_mm': self.tr('Dynamic symbol background padding (mm)'),
-            'dynamic_rotation': self.tr('Dynamic symbol rotation (degrees)'),
+            'dynamic_rotation': (
+                self.tr('Dynamic symbol rotation'),
+                self.tr('degrees'),
+            ),
             'dynamic_symbol_visible': self.tr('Dynamic symbol'),
             'repeat_start_visible': self.tr('Start repeat'),
             'repeat_end_visible': self.tr('End repeat'),
@@ -648,6 +686,43 @@ class StyleDialog(DialogGeometryMixin, QtWidgets.QDialog):
             'mini_piano_octave_numbering': self.tr('Mini piano octave numbering'),
             'mini_piano_color': self.tr('Mini piano color'),
         }
+
+    def _get_label_and_description(self, field_name: str, raw_label: str | tuple[str, str]) -> tuple[str, str]:
+        """Resolve a field label into (title, description).
+
+        Preferred format in `_style_field_labels()` is:
+        field_name: (self.tr("Title"), self.tr("Description"))
+
+        Legacy plain-string labels remain supported; for those we auto-extract
+        an explanatory trailing parenthetical when it is not a simple unit,
+        e.g. "Foo (mm) (explanation)" -> title "Foo (mm)", description
+        "explanation".
+        """
+        if isinstance(raw_label, tuple):
+            title = str(raw_label[0] or '').strip()
+            desc = str(raw_label[1] or '').strip()
+            return (title, desc)
+
+        text = str(raw_label or '').strip()
+        matches = list(re.finditer(r'\(([^()]*)\)\s*$', text))
+        if not matches:
+            return (text, '')
+
+        match = matches[-1]
+        inner = str(match.group(1) or '').strip()
+        if not inner:
+            return (text, '')
+
+        # Keep plain unit suffixes in the title.
+        if inner.lower() in self._TITLE_PAREN_UNITS:
+            return (text, '')
+
+        # Keep compact token-like parentheticals in the title.
+        if not any(ch.isspace() for ch in inner) and all(ch.isalnum() or ch in '.-+' for ch in inner):
+            return (text, '')
+
+        title = text[:match.start()].rstrip()
+        return (title or text, inner)
 
     def _coerce_layout_fonts(self, layout_obj: Layout) -> None:
         """Ensure all LayoutFont-typed fields are dataclass instances, not dict payloads."""
@@ -912,6 +987,7 @@ class StyleDialog(DialogGeometryMixin, QtWidgets.QDialog):
             # Build editor for non-bool fields and add to the appropriate tab
             fallback_label = name.replace('_', ' ').capitalize()
             label = field_labels.get(name, self.tr(fallback_label))
+            title_text, description_text = self._get_label_and_description(name, label)
             value = getattr(self._layout, name)
             editor = self._make_editor(field_type, value, name)
             if editor is None:
@@ -921,10 +997,15 @@ class StyleDialog(DialogGeometryMixin, QtWidgets.QDialog):
             # build and add widget to the appropriate tab based on the field_tabs mapping, defaulting to 'Page' tab
             tab_name = self.tr(field_tabs.get(name, 'Page'))
             vbox = tab_forms.get(tab_name, tab_forms[self.tr('Page')])
-            box = QtWidgets.QGroupBox(label, self)
+            box = QtWidgets.QGroupBox(title_text, self)
             box_layout = QtWidgets.QVBoxLayout(box)
             box_layout.setContentsMargins(6, 2, 6, 6)
-            box_layout.setSpacing(0)
+            box_layout.setSpacing(4)
+            if description_text:
+                desc_label = QtWidgets.QLabel(description_text, box)
+                desc_label.setWordWrap(True)
+                desc_label.setAlignment(QtCore.Qt.AlignmentFlag.AlignLeft | QtCore.Qt.AlignmentFlag.AlignTop)
+                box_layout.addWidget(desc_label)
             box_layout.addWidget(editor)
             vbox.addWidget(box)
             self._wire_editor_change(editor)
@@ -1042,8 +1123,9 @@ class StyleDialog(DialogGeometryMixin, QtWidgets.QDialog):
             
             # create checkbox mirror
             label = field_labels.get(name, self.tr(name.replace('_', ' ').capitalize()))
+            title_text, _description_text = self._get_label_and_description(name, label)
             mirror_checkbox = QtWidgets.QCheckBox(self)
-            mirror_checkbox.setText(label)
+            mirror_checkbox.setText(title_text)
             mirror_checkbox.setChecked(bool(getattr(self._layout, name, False)))
             self._bool_field_widgets.setdefault(name, []).append(mirror_checkbox)
             mirror_checkbox.stateChanged.connect(lambda _state, field_name=name, cb=mirror_checkbox: self._on_bool_widget_changed(field_name, bool(cb.isChecked())))
@@ -1152,10 +1234,10 @@ class StyleDialog(DialogGeometryMixin, QtWidgets.QDialog):
                 'landscape': self.tr('Landscape'),
                 'vertical': self.tr('Vertical'),
                 'horizontal': self.tr('Horizontal'),
-                'above_stem': self.tr('Above stem (Klavarskribo default)'),
-                'below_stem': self.tr('Below stem (keyTAB uses 30% \'notehead narrowing\' for colliding noteheads)'),
-                'above_stem_if_collision': self.tr('Above stem if a white note is written directly next to a black note'),
-                'above_stem_if_chord_and_white_note_same_hand': self.tr('Only chords with 1 or more white notes get the \'black above stem\' treatment'),
+                'above_stem': self.tr('Above stem'),
+                'below_stem': self.tr('Below stem'),
+                'above_stem_if_collision': self.tr('Below stem, avoiding collisions'),
+                'above_stem_if_chord_and_white_note_same_hand': self.tr('Chords above stem'),
                 'dark': self.tr('Dark'),
                 'light': self.tr('Light'),
                 'classical': self.tr('Classical'),

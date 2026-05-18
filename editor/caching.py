@@ -248,7 +248,9 @@ class CachingMixin:
         marker_windows_all: dict[str, list[tuple[float, float]]] = {"l": [], "r": []}
 
         for hand_key in ("l", "r"):
-            notes = sorted(list(notes_by_hand.get(hand_key, []) or []), key=lambda n: float(getattr(n, "time", 0.0) or 0.0))
+            # notes_by_hand is built from time-sorted notes_view and preserves order,
+            # so this avoids an extra per-frame sort per hand.
+            notes = list(notes_by_hand.get(hand_key, []) or [])
             starts = [float(getattr(n, "time", 0.0) or 0.0) for n in notes]
             markers = list(beam_by_hand.get(hand_key, []) or [])
 
@@ -339,7 +341,12 @@ class CachingMixin:
         back_lo = bisect.bisect_left(starts, float(time_begin - viewport_len - slack))
 
         span_cut = bisect.bisect_right(starts, time_begin)
-        span_indices = [i for i in range(max(0, span_cut)) if ends[i] >= time_end]
+        # Long-span notes: started before viewport and end at/after viewport end.
+        # Build from end_pairs slice instead of scanning all indices < span_cut.
+        span_pairs_lo = bisect.bisect_left(end_values, time_end)
+        span_indices = sorted(
+            idx for _end, idx in end_pairs[span_pairs_lo:] if int(idx) < int(span_cut)
+        )
 
         start_range = range(max(0, back_lo), max(0, hi_start))
         candidate_indices: list[int] = []

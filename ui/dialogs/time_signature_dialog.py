@@ -11,6 +11,7 @@ VALID_DENOMS = [1, 2, 4, 8, 16, 32, 64, 128]
 
 class TimeSignatureDialog(DialogGeometryMixin, QtWidgets.QDialog):
     DIALOG_KEY = "time_signature"
+
     def __init__(
         self,
         parent=None,
@@ -36,6 +37,7 @@ class TimeSignatureDialog(DialogGeometryMixin, QtWidgets.QDialog):
             self._denom = 4
         self._grid_positions: list[float] = [float(v) for v in (initial_grid_positions or []) if isinstance(v, (int, float))]
         self._indicator_enabled = bool(initial_indicator_enabled if initial_indicator_enabled is not None else True)
+        self._enforcing_min_height = False
 
         lay = QtWidgets.QVBoxLayout(self)
         lay.setContentsMargins(8, 8, 8, 8)
@@ -55,6 +57,23 @@ class TimeSignatureDialog(DialogGeometryMixin, QtWidgets.QDialog):
         self.indicator_enabled_cb.setChecked(self._indicator_enabled)
         lay.addWidget(self.indicator_enabled_cb)
 
+        self.expl_label = QtWidgets.QLabel(
+            self.tr(
+                "INFO:\n"
+                "Base-grid lines can technically be placed at any time position, but they are intended "
+                "to be placed on time-signature beats. "
+                "\nThe time-signature change uses a Klavarskribo count system that responds to beat lines "
+                "placed on those beats."
+                "\n\nLeft click for adding a line, right click for removing. "
+                "You can add or remove base-grid lines only in the time-signature change measure. "
+                "The base-grid structure is repeated in each measure, so you only need to set it up once per time signature. "
+            ),
+            self,
+        )
+        self.expl_label.setWordWrap(True)
+        self.expl_label.setAlignment(QtCore.Qt.AlignmentFlag.AlignLeft | QtCore.Qt.AlignmentFlag.AlignTop)
+        lay.addWidget(self.expl_label)
+
         self.msg_label = QtWidgets.QLabel("", self)
         pal = self.msg_label.palette()
         pal.setColor(QtGui.QPalette.WindowText, QtGui.QColor(200, 0, 0))
@@ -72,6 +91,33 @@ class TimeSignatureDialog(DialogGeometryMixin, QtWidgets.QDialog):
         self._install_validators()
         self._on_any_changed()
         QtCore.QTimer.singleShot(0, self._focus_entry)
+        QtCore.QTimer.singleShot(0, self._apply_dynamic_minimum_height)
+
+    def resizeEvent(self, event: QtGui.QResizeEvent) -> None:  # type: ignore[override]
+        super().resizeEvent(event)
+        self._apply_dynamic_minimum_height()
+
+    def _apply_dynamic_minimum_height(self) -> None:
+        if self._enforcing_min_height:
+            return
+        lay = self.layout()
+        if lay is None:
+            return
+
+        # Keep the wrapped explanation text fully visible for the current width.
+        inner_w = max(1, int(self.contentsRect().width()))
+        needed_h = int(lay.totalHeightForWidth(inner_w))
+        if needed_h <= 0:
+            needed_h = int(lay.sizeHint().height())
+        needed_h = max(needed_h, int(lay.minimumSize().height()))
+
+        self._enforcing_min_height = True
+        try:
+            self.setMinimumHeight(needed_h)
+            if int(self.height()) < needed_h:
+                self.resize(int(self.width()), needed_h)
+        finally:
+            self._enforcing_min_height = False
 
     def _install_validators(self) -> None:
         ts_rx = QtCore.QRegularExpression(r"^[0-9/ ]*$")

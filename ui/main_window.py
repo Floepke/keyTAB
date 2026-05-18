@@ -67,12 +67,14 @@ class MainWindow(QtWidgets.QMainWindow):
         # View options
         try:
             pm = get_preferences_manager()
-            self._center_playhead_enabled = bool(
-                pm.get("focus_on_playhead_during_playback", pm.get("center_view_on_playhead", True))
-            )
+            raw_mode = str(pm.get("focus_on_playhead_during_playback", "measure") or "measure").strip().lower()
+            if raw_mode not in ("measure", "animated", "disabled"):
+                raw_mode = "measure"
+            self._playhead_focus_mode = raw_mode
         except Exception:
-            self._center_playhead_enabled = True
+            self._playhead_focus_mode = "measure"
         self._playhead_anchor_measure: int | None = None
+        self._playhead_animated_scroll_px: float | None = None
         try:
             pm_tt = get_preferences_manager()
             self._show_tooltips_in_panel = bool(pm_tt.get("show_tooltips", True))
@@ -3247,9 +3249,12 @@ class MainWindow(QtWidgets.QMainWindow):
             units = self.player.get_playhead_time(sc) if hasattr(self.player, 'get_playhead_time') else None
             # Update editor playhead and trigger overlay refresh
             self.editor_controller.playhead_time = units
-            # Center the playhead in the viewport while playing
-            if getattr(self, "_center_playhead_enabled", True):
+            # Apply editor playhead focus mode during playback.
+            focus_mode = str(getattr(self, "_playhead_focus_mode", "measure") or "measure").lower()
+            if focus_mode == "measure":
                 self._center_playhead_scroll(units)
+            elif focus_mode == "animated":
+                self._center_playhead_scroll_animated(units)
             if hasattr(self.editor_canvas, 'request_overlay_refresh'):
                 self.editor_canvas.request_overlay_refresh()
             else:
@@ -3358,6 +3363,51 @@ class MainWindow(QtWidgets.QMainWindow):
         except Exception:
             pass
 
+    def _center_playhead_scroll_animated(self, units: Optional[float]) -> None:
+        """Smoothly scroll so the playhead stays around viewport center."""
+        if units is None:
+            return
+        try:
+            ed = getattr(self, 'editor_controller', None)
+            if ed is None:
+                return
+
+            vp_h_mm = float(getattr(ed, '_viewport_h_mm', 0.0) or 0.0)
+            px_per_mm = float(getattr(ed, '_px_per_mm', 0.0) or 0.0)
+            dpr = float(getattr(ed, '_dpr', 1.0) or 1.0)
+            if vp_h_mm <= 0.0 or px_per_mm <= 0.0:
+                return
+
+            playhead_mm = float(ed.time_to_mm(float(units)))
+            target_top_mm = max(0.0, playhead_mm - (0.5 * vp_h_mm))
+            target_scroll_px = int(round(target_top_mm * px_per_mm / max(1e-6, dpr)))
+            max_scroll = int(self.editor_vscroll.maximum()) if hasattr(self, 'editor_vscroll') else target_scroll_px
+            target_scroll_px = max(0, min(int(target_scroll_px), int(max_scroll)))
+
+            current_px = int(self.editor_vscroll.value()) if hasattr(self, 'editor_vscroll') else int(target_scroll_px)
+            state_px = self._playhead_animated_scroll_px
+            if state_px is None:
+                state_px = float(current_px)
+            # Simple critically damped feel with low-cost interpolation.
+            alpha = 0.24
+            state_px = float(state_px + (float(target_scroll_px) - float(state_px)) * alpha)
+            if abs(float(target_scroll_px) - float(state_px)) < 0.75:
+                state_px = float(target_scroll_px)
+            self._playhead_animated_scroll_px = float(state_px)
+
+            next_px = int(round(state_px))
+            if next_px != current_px:
+                if hasattr(self, 'editor_vscroll') and self.editor_vscroll is not None:
+                    self.editor_vscroll.setValue(int(next_px))
+                elif hasattr(self, 'editor_canvas') and self.editor_canvas is not None:
+                    self.editor_canvas.set_scroll_logical_px(int(next_px))
+
+            # Reset measure-anchor mode state while animated mode is active.
+            self._playhead_anchor_measure = None
+            self._playhead_last_visible_measure = None
+        except Exception:
+            pass
+
     def _barlines_with_terminal(self, ed) -> list[float]:
         """Return barline starts plus final end position (ticks)."""
         try:
@@ -3419,6 +3469,7 @@ class MainWindow(QtWidgets.QMainWindow):
             pass
         self._playhead_anchor_measure = None
         self._playhead_last_visible_measure = None
+        self._playhead_animated_scroll_px = None
 
     # FX/editor hooks removed; FluidSynth is the single backend
     def _open_fx_editor(self) -> None:
