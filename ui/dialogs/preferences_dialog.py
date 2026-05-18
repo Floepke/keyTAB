@@ -3,12 +3,14 @@ from __future__ import annotations
 import sys
 
 from PySide6 import QtCore, QtGui, QtWidgets
+from ui.dialogs import DialogGeometryMixin
 
 from settings_manager import get_preferences_manager
 from utils.restart import restart_current_process
 
 
-class PreferencesDialog(QtWidgets.QDialog):
+class PreferencesDialog(DialogGeometryMixin, QtWidgets.QDialog):
+    DIALOG_KEY = "preferences"
     # Tweak this value to adjust the shared width of all first-column descriptions.
     FIRST_COLUMN_WIDTH = 350
 

@@ -5,6 +5,7 @@ from typing import Any, Optional
 
 import cairo
 from PySide6 import QtCore, QtGui, QtWidgets
+from ui.dialogs import DialogGeometryMixin
 
 from file_model.events.note import Note
 from symbol_design.noteheads import Notehead, normalize_notehead_literal, resolve_notehead_spec
@@ -52,7 +53,8 @@ class _NoteheadDelegate(QtWidgets.QStyledItemDelegate):
         return QtCore.QSize(max(220, option.rect.width()), 60)
 
 
-class NoteheadDialog(QtWidgets.QDialog):
+class NoteheadDialog(DialogGeometryMixin, QtWidgets.QDialog):
+    DIALOG_KEY = "notehead"
     _PREVIEW_LAYERING = ["preview_background", "preview_stem", "notehead_white", "notehead_black", "left_dot"]
 
     def _translated_choice_label(self, literal: str, fallback: str) -> str:

@@ -4,9 +4,11 @@ from __future__ import annotations
 from PySide6 import QtCore, QtWidgets
 
 from appdata_manager import get_appdata_manager
+from ui.dialogs import DialogGeometryMixin
 
 
-class FluidSynthReverbConfigDialog(QtWidgets.QDialog):
+class FluidSynthReverbConfigDialog(DialogGeometryMixin, QtWidgets.QDialog):
+    DIALOG_KEY = "fluidsynth_reverb_config"
     """Dialog for configuring FluidSynth settings."""
 
     # Signal emitted when settings are applied

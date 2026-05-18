@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 from PySide6 import QtCore, QtWidgets
+from ui.dialogs import DialogGeometryMixin
 
 
-class MidiImportDialog(QtWidgets.QDialog):
+class MidiImportDialog(DialogGeometryMixin, QtWidgets.QDialog):
+    DIALOG_KEY = "midi_import"
     """Dialog for assigning MIDI tracks to left/right hand before import.
 
     Displays a table with one row per non-empty, non-drum track.

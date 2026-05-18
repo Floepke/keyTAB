@@ -6,9 +6,11 @@ from PySide6 import QtCore, QtWidgets
 from file_model.info import Info
 from file_model.analysis import Analysis
 from file_model.SCORE import SCORE, MetaData
+from ui.dialogs import DialogGeometryMixin
 
 
-class InfoDialog(QtWidgets.QDialog):
+class InfoDialog(DialogGeometryMixin, QtWidgets.QDialog):
+    DIALOG_KEY = "info"
     @staticmethod
     def _pitch_to_text(pitch_value: int) -> str:
         pitch = int(pitch_value or 0)
@@ -26,10 +28,21 @@ class InfoDialog(QtWidgets.QDialog):
         self.setWindowFlags(self.windowFlags())
         self.setWindowTitle(self.tr("Titles, info & analysis"))
         self.setModal(False)
-        self.resize(768, 768)
         self._score = score
 
-        layout = QtWidgets.QVBoxLayout(self)
+        # Outer layout: scroll area (stretching) + buttons (fixed at bottom)
+        outer_layout = QtWidgets.QVBoxLayout(self)
+        outer_layout.setContentsMargins(8, 8, 8, 8)
+        outer_layout.setSpacing(6)
+
+        scroll = QtWidgets.QScrollArea(self)
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QtWidgets.QFrame.Shape.NoFrame)
+        scroll_contents = QtWidgets.QWidget()
+        layout = QtWidgets.QVBoxLayout(scroll_contents)
+        layout.setContentsMargins(2, 2, 2, 2)
+        scroll.setWidget(scroll_contents)
+        outer_layout.addWidget(scroll, stretch=1)
 
         info_group = QtWidgets.QGroupBox(self.tr("Info"), self)
         info_form = QtWidgets.QFormLayout(info_group)
@@ -110,7 +123,7 @@ class InfoDialog(QtWidgets.QDialog):
         )
         buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)
-        layout.addWidget(buttons)
+        outer_layout.addWidget(buttons)
 
         self._load_from_score()
 

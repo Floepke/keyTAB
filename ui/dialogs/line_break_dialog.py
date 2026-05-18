@@ -1,6 +1,7 @@
 from __future__ import annotations
 from typing import Callable, Optional, Tuple
 from PySide6 import QtCore, QtGui, QtWidgets
+from ui.dialogs import DialogGeometryMixin
 
 from utils.CONSTANT import BE_KEYS, CF_KEYS, QUARTER_NOTE_UNIT
 
@@ -125,7 +126,8 @@ class FlexibleDoubleSpinBox(QtWidgets.QDoubleSpinBox):
         super().keyPressEvent(ev)
 
 
-class LineBreakDialog(QtWidgets.QDialog):
+class LineBreakDialog(DialogGeometryMixin, QtWidgets.QDialog):
+    DIALOG_KEY = "line_break"
     valuesChanged = QtCore.Signal()
     def __init__(self,
                  parent=None,

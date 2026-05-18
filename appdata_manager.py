@@ -278,14 +278,17 @@ def get_appdata_manager() -> AppDataManager:
         adm.register("window_maximized", True, "Start maximized; updated on exit")
         adm.register("window_geometry", "", "Base64-encoded Qt window geometry for normal state")
         adm.register("left_panel_width_px", 220, "Last width of the left docked panel area in pixels")
-        adm.register("style_dialog_width", 768, "Last width of the Style dialog in pixels")
-        adm.register("style_dialog_height", 512, "Last height of the Style dialog in pixels")
-        adm.register("style_dialog_x", -1, "Last X position of the Style dialog in pixels (-1 means unset)")
-        adm.register("style_dialog_y", -1, "Last Y position of the Style dialog in pixels (-1 means unset)")
-        adm.register("line_break_dialog_width", 900, "Last width of the Line Break dialog in pixels")
-        adm.register("line_break_dialog_height", 700, "Last height of the Line Break dialog in pixels")
-        adm.register("line_break_dialog_x", -1, "Last X position of the Line Break dialog in pixels (-1 means unset)")
-        adm.register("line_break_dialog_y", -1, "Last Y position of the Line Break dialog in pixels (-1 means unset)")
+        # Dialog geometry (base64-encoded Qt saveGeometry() output, one key per dialog)
+        adm.register("style_dialog_geometry", "", "Base64-encoded Qt geometry for the Style dialog")
+        adm.register("info_dialog_geometry", "", "Base64-encoded Qt geometry for the Info dialog")
+        adm.register("line_break_dialog_geometry", "", "Base64-encoded Qt geometry for the Line Break dialog")
+        adm.register("preferences_dialog_geometry", "", "Base64-encoded Qt geometry for the Preferences dialog")
+        adm.register("fluidsynth_reverb_config_dialog_geometry", "", "Base64-encoded Qt geometry for the FluidSynth Reverb Config dialog")
+        adm.register("dynamic_symbol_dialog_geometry", "", "Base64-encoded Qt geometry for the Dynamic Symbol dialog")
+        adm.register("text_dialog_geometry", "", "Base64-encoded Qt geometry for the Text dialog")
+        adm.register("time_signature_dialog_geometry", "", "Base64-encoded Qt geometry for the Time Signature dialog")
+        adm.register("midi_import_dialog_geometry", "", "Base64-encoded Qt geometry for the MIDI Import dialog")
+        adm.register("notehead_dialog_geometry", "", "Base64-encoded Qt geometry for the Notehead dialog")
         adm.register("score_template", {}, "Default score template for new scores (dict of score fields except events)")
         adm.register("fonts_install_ok", False, "True when all required embedded fonts are installed to the user font directory")
         adm.register("user_soundfont_path", "", "Absolute path to last selected user soundfont (.sf2/.sf3)")
@@ -297,6 +300,13 @@ def get_appdata_manager() -> AppDataManager:
         if removed is not None:
             adm.save()
         for legacy_key in ("user_styles", "selected_style_name", "user_styles_version"):
+            adm._values.pop(legacy_key, None)
+        for legacy_key in (
+            "style_dialog_width", "style_dialog_height",
+            "style_dialog_x", "style_dialog_y",
+            "line_break_dialog_width", "line_break_dialog_height",
+            "line_break_dialog_x", "line_break_dialog_y",
+        ):
             adm._values.pop(legacy_key, None)
         for legacy_key in (
             "edwin_font_installed",

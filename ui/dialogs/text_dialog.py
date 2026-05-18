@@ -5,10 +5,12 @@ from copy import deepcopy
 from PySide6 import QtCore, QtWidgets
 
 from file_model.font import Font
+from ui.dialogs import DialogGeometryMixin
 from ui.dialogs.style_dialog import FontPicker, FloatSliderEdit
 
 
-class TextDialog(QtWidgets.QDialog):
+class TextDialog(DialogGeometryMixin, QtWidgets.QDialog):
+    DIALOG_KEY = "text"
     valueChanged = QtCore.Signal()
 
     def _add_labeled_row(self, form: QtWidgets.QFormLayout, label_text: str, field: QtWidgets.QWidget, tooltip: str) -> QtWidgets.QLabel:

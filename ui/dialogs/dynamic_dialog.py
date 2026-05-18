@@ -3,6 +3,7 @@ from typing import Callable, Optional
 
 from PySide6 import QtCore, QtWidgets, QtGui
 
+from ui.dialogs import DialogGeometryMixin
 from ui.dialogs.style_dialog import FloatSliderEdit
 from fonts import register_font_from_bytes
 
@@ -132,7 +133,9 @@ class DynamicSymbolGrid(QtWidgets.QListWidget):
         return str(item.data(QtCore.Qt.ItemDataRole.UserRole) or '')
 
 
-class DynamicSymbolDialog(QtWidgets.QDialog):
+class DynamicSymbolDialog(DialogGeometryMixin, QtWidgets.QDialog):
+    DIALOG_KEY = "dynamic_symbol"
+
     def __init__(
         self,
         parent: Optional[QtWidgets.QWidget] = None,
@@ -147,7 +150,6 @@ class DynamicSymbolDialog(QtWidgets.QDialog):
         self._selected_glyph = str(current_value or '')
         self._default_rotation = float(default_rotation or 0.0)
         self._rotation_value = float(rotation if rotation is not None else self._default_rotation)
-        self._custom_rotation_enabled = rotation is not None
 
         root = QtWidgets.QVBoxLayout(self)
         root.setContentsMargins(10, 10, 10, 10)
@@ -168,7 +170,6 @@ class DynamicSymbolDialog(QtWidgets.QDialog):
         rotation_layout.setContentsMargins(8, 8, 8, 8)
         rotation_layout.setSpacing(6)
         self._rotation_edit = FloatSliderEdit(self._rotation_value, 0.0, 360.0, 1.0, rotation_box)
-        self._rotation_edit.setVisible(self._custom_rotation_enabled)
         rotation_layout.addWidget(self._rotation_edit)
         root.addWidget(rotation_box, 0)
 

@@ -4,11 +4,13 @@ from typing import Optional
 
 from PySide6 import QtCore, QtGui, QtWidgets
 from utils.CONSTANT import QUARTER_NOTE_UNIT
+from ui.dialogs import DialogGeometryMixin
 
 VALID_DENOMS = [1, 2, 4, 8, 16, 32, 64, 128]
 
 
-class TimeSignatureDialog(QtWidgets.QDialog):
+class TimeSignatureDialog(DialogGeometryMixin, QtWidgets.QDialog):
+    DIALOG_KEY = "time_signature"
     def __init__(
         self,
         parent=None,

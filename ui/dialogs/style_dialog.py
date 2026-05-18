@@ -3,6 +3,7 @@ import json
 from pathlib import Path
 from dataclasses import asdict, fields
 from typing import Any, get_args, get_origin, get_type_hints, Literal, TYPE_CHECKING
+from ui.dialogs import DialogGeometryMixin
 
 from PySide6 import QtCore, QtGui, QtWidgets
 
@@ -548,7 +549,8 @@ class RadioGroupWidget(QtWidgets.QWidget):
         return self._buttons[0][1] if self._buttons else ''
 
 
-class StyleDialog(QtWidgets.QDialog):
+class StyleDialog(DialogGeometryMixin, QtWidgets.QDialog):
+    DIALOG_KEY = "style"
     values_changed = QtCore.Signal()
     tab_changed = QtCore.Signal(int)
 
@@ -571,7 +573,7 @@ class StyleDialog(QtWidgets.QDialog):
             'accidental_visible': self.tr('Accidental'),
             'note_stop_visible': self.tr('Stop symbol'),
             'note_stem_length_semitone': self.tr('Note stem length (semitones)'),
-            'note_stem_thickness_mm': self.tr('Note stem thickness (mm) (Applies to both stem and the lines of the notehead symbol)'),
+            'note_stem_thickness_mm': self.tr('Note thickness (mm) (Applies the stem and the notehead outline)'),
             'note_stopsign_thickness_mm': self.tr('Stop symbol thickness (mm)'),
             'note_continuation_dot_visible': self.tr('Continuation dot'),
             'note_continuation_dot_size_mm': self.tr('Continuation dot size (mm)'),
@@ -756,7 +758,6 @@ class StyleDialog(QtWidgets.QDialog):
             self.tr("Page"),
             self.tr("Fonts"),
             self.tr("Stave"),
-            self.tr("Grid"),
             self.tr("Grid band"),
             self.tr("Time signature"),
             self.tr("Tempo"),
@@ -854,14 +855,13 @@ class StyleDialog(QtWidgets.QDialog):
             'time_signature_indicator_lane_width_mm': 'Time signature',
             'time_signature_indicator_guide_thickness_mm': 'Time signature',
             'time_signature_indicator_divide_guide_thickness_mm': 'Time signature',
-            # Grid
-            'grid_barline_thickness_mm': 'Grid',
-            'grid_gridline_thickness_mm': 'Grid',
-            'grid_gridline_dash_pattern_mm': 'Grid',
             # Grid band
             'grid_band_color': 'Grid band',
             'grid_band_start_phase': 'Grid band',
             # Stave
+            'grid_barline_thickness_mm': 'Stave',
+            'grid_gridline_thickness_mm': 'Stave',
+            'grid_gridline_dash_pattern_mm': 'Stave',
             'stave_two_line_thickness_mm': 'Stave',
             'stave_three_line_thickness_mm': 'Stave',
             'stave_clef_line_thickness_mm': 'Stave',
@@ -1008,6 +1008,14 @@ class StyleDialog(QtWidgets.QDialog):
             finally:
                 widget.blockSignals(blocked)
 
+    def _sync_all_bool_widgets(self, layout_obj: Layout) -> None:
+        for f in fields(Layout):
+            name = f.name
+            field_type = self._type_hints.get(name, f.type)
+            if field_type is not bool:
+                continue
+            self._sync_bool_widgets(name, bool(getattr(layout_obj, name, False)))
+
     def _on_bool_widget_changed(self, field_name: str, value: bool) -> None:
         setattr(self._layout, field_name, bool(value))
         self._sync_bool_widgets(field_name, bool(value))
@@ -1037,6 +1045,7 @@ class StyleDialog(QtWidgets.QDialog):
             mirror_checkbox = QtWidgets.QCheckBox(self)
             mirror_checkbox.setText(label)
             mirror_checkbox.setChecked(bool(getattr(self._layout, name, False)))
+            self._bool_field_widgets.setdefault(name, []).append(mirror_checkbox)
             mirror_checkbox.stateChanged.connect(lambda _state, field_name=name, cb=mirror_checkbox: self._on_bool_widget_changed(field_name, bool(cb.isChecked())))
             
             # add to box
@@ -1105,6 +1114,7 @@ class StyleDialog(QtWidgets.QDialog):
     def _apply_layout_object(self, layout_obj: Layout) -> None:
         self._layout = layout_obj
         self._apply_layout_to_editors(layout_obj)
+        self._sync_all_bool_widgets(layout_obj)
 
     def _apply_layout_to_tab(self, layout_obj: Layout, tab_name: str) -> None:
         if not tab_name:
@@ -1130,6 +1140,7 @@ class StyleDialog(QtWidgets.QDialog):
             self.values_changed.emit()
         except Exception:
             pass
+        self._sync_all_bool_widgets(self._layout)
 
     def _make_editor(self, field_type: Any, value: Any, field_name: str) -> QtWidgets.QWidget | None:
         origin = get_origin(field_type)
@@ -1392,6 +1403,7 @@ class StyleDialog(QtWidgets.QDialog):
             self._set_editor_value(editor, field_type, value)
             if field_type is bool:
                 self._sync_bool_widgets(name, bool(value))
+        self._sync_all_bool_widgets(layout_obj)
         if self._all_fonts_combo is not None:
             try:
                 self._all_fonts_combo.blockSignals(True)

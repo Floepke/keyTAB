@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING, cast
 from utils.operator import Operator as OP
 
 from ui.widgets.draw_util import DrawUtil
-from utils.CONSTANT import QUARTER_NOTE_UNIT, PIANO_KEY_AMOUNT
+from utils.CONSTANT import QUARTER_NOTE_UNIT, PIANO_KEY_AMOUNT, SHORTEST_DURATION
 
 if TYPE_CHECKING:
     from editor.editor import Editor
@@ -42,6 +42,10 @@ class SnapDrawerMixin:
         - We only draw the darker bands; the light bands are the editor background.
         - Follows SCORE.base_grid and current zoom to convert time → mm.
         """
+        # if the snap size < 8.0 units, skip drawing snap bands for performance
+        if self.snap_size_units < SHORTEST_DURATION:
+            return
+        
         self = cast("Editor", self)
         score = self.current_score()
         if score is None:
@@ -50,10 +54,6 @@ class SnapDrawerMixin:
         # Snap-size side bands are visible in all tools except Grid Band mode.
         active_tool = str(getattr(getattr(self, '_tool', None), 'TOOL_NAME', ''))
         if active_tool == 'grid_band':
-            return
-
-        # if the snap size < 8.0 units, skip drawing snap bands for performance
-        if self.snap_size_units < 8.0:
             return
 
         op = OP()
@@ -89,6 +89,12 @@ class SnapDrawerMixin:
         except Exception:
             left_fill_rgba = (0.9, 0.9, 0.9, 1.0)
 
+        top_mm = float(getattr(self, '_view_y_mm_offset', 0.0) or 0.0)
+        vp_h_mm = float(getattr(self, '_viewport_h_mm', 0.0) or 0.0)
+        has_viewport = vp_h_mm > 0.0
+        bottom_mm = top_mm + vp_h_mm
+        bleed_mm = max(2.0, snap_mm * 2.0)
+
         # Walk the base grid (measures) and draw darker rectangles on every other snap step
         time_cursor_mm = margin
         for bg in score.base_grid:
@@ -102,16 +108,35 @@ class SnapDrawerMixin:
             for _ in range(measure_amount):
                 sub_cursor = time_cursor_mm
                 measure_end_mm = sub_cursor + measure_len_mm
+
+                if has_viewport:
+                    if measure_end_mm < (top_mm - bleed_mm):
+                        time_cursor_mm += measure_len_mm
+                        continue
+                    if sub_cursor > (bottom_mm + bleed_mm):
+                        return
+
                 # Pattern starts with dark segment; index 0 is dark (draw), 1 is light (skip)
                 seg_index = 0
                 while op.less(sub_cursor, measure_end_mm):
                     h = min(snap_mm, measure_end_mm - sub_cursor)
+                    seg_start = sub_cursor
+                    seg_end = sub_cursor + h
+
+                    if has_viewport:
+                        if seg_start > (bottom_mm + bleed_mm):
+                            break
+                        if seg_end < (top_mm - bleed_mm):
+                            seg_index += 1
+                            sub_cursor += h
+                            continue
+
                     if (seg_index % 2) == 0:
                         du.add_rectangle(
                             left_x1,
-                            sub_cursor,
+                            seg_start,
                             right_x2,
-                            sub_cursor + h,
+                            seg_end,
                             stroke_color=None,
                             fill_color=left_fill_rgba,
                             id=0,
