@@ -17,7 +17,7 @@ if TYPE_CHECKING:
 
 
 class CrescendoDrawerMixin:
-    def _dynamic_symbol_bounds_lookup(self, du: DrawUtil, score) -> dict[tuple[float, int], dict]:
+    def _dynamic_symbol_bounds_lookup(self, du: DrawUtil, score, required_keys: set[tuple[float, int]] | None = None) -> dict[tuple[float, int], dict]:
         lookup: dict[tuple[float, int], dict] = {}
         dynamic_symbols = list(getattr(score.events, 'dynamic_symbol', []) or [])
         text_family = 'LelandText'
@@ -41,6 +41,9 @@ class CrescendoDrawerMixin:
         for sym in dynamic_symbols:
             sym_time = float(getattr(sym, 'time', 0.0) or 0.0)
             sym_rpitch = int(getattr(sym, 'x_rpitch', 0) or 0)
+            key = (round(sym_time, 6), int(sym_rpitch))
+            if required_keys is not None and key not in required_keys:
+                continue
             glyph = str(getattr(sym, 'symbol', '') or '')
             if not glyph:
                 continue
@@ -56,7 +59,7 @@ class CrescendoDrawerMixin:
             ang = math.radians(text_angle_deg)
             rot_half_h = abs(bg_half_w * math.sin(ang)) + abs(bg_half_h * math.cos(ang))
             x_mm = float(self.relative_c4pitch_to_x(sym_rpitch))
-            lookup[(round(sym_time, 6), int(sym_rpitch))] = {
+            lookup[key] = {
                 'glyph': glyph,
                 'x_mm': x_mm,
                 'y_mm': y_mm,
@@ -123,8 +126,6 @@ class CrescendoDrawerMixin:
         if not events:
             return
 
-        dynamic_lookup = self._dynamic_symbol_bounds_lookup(du, score)
-
         # Use hardcoded editor defaults for hairpin styling (not from file layout)
         lw = float(HAIRPIN_LINE_WIDTH_MM or 1.0) * float(SCALE or 1.0)
         spread = float(HAIRPIN_WIDTH_MM or 10.0) * float(SCALE or 1.0)
@@ -133,6 +134,26 @@ class CrescendoDrawerMixin:
         vp_h_mm = float(getattr(self, '_viewport_h_mm', 0.0) or 0.0)
         bottom_mm = top_mm + vp_h_mm
         bleed_mm = max(2.0, float(getattr(score.app_state, 'zoom_mm_per_quarter', 25.0) or 25.0) * 0.5)
+
+        visible_events = []
+        required_symbol_keys: set[tuple[float, int]] = set()
+        for ev in events:
+            t_start = float(getattr(ev, 'time', 0.0) or 0.0)
+            duration = float(getattr(ev, 'duration', 256.0) or 256.0)
+            t_end = t_start + duration
+            y_start = float(self.time_to_mm(t_start))
+            y_end = float(self.time_to_mm(t_end))
+            if y_end < (top_mm - bleed_mm) or y_start > (bottom_mm + bleed_mm):
+                continue
+            visible_events.append(ev)
+            x_rpitch = int(getattr(ev, 'x_rpitch', 0) or 0)
+            required_symbol_keys.add((round(float(t_start), 6), int(x_rpitch)))
+            required_symbol_keys.add((round(float(t_end), 6), int(x_rpitch)))
+
+        if not visible_events:
+            return
+
+        dynamic_lookup = self._dynamic_symbol_bounds_lookup(du, score, required_keys=required_symbol_keys)
 
         is_dynamic_tool = str(getattr(getattr(self, '_tool', None), 'TOOL_NAME', '')) == 'dynamic'
         # Match count-line handle geometry: side = 1.4 * max(2.0, semitone_dist)
@@ -145,7 +166,7 @@ class CrescendoDrawerMixin:
                 return val
             return max(0.0, min(float(val), float(page_w)))
 
-        for ev in events:
+        for ev in visible_events:
             t_start = float(getattr(ev, 'time', 0.0) or 0.0)
             duration = float(getattr(ev, 'duration', 256.0) or 256.0)
             t_end = t_start + duration
@@ -154,9 +175,6 @@ class CrescendoDrawerMixin:
 
             y_start = float(self.time_to_mm(t_start))
             y_end = float(self.time_to_mm(t_end))
-
-            if y_end < (top_mm - bleed_mm) or y_start > (bottom_mm + bleed_mm):
-                continue
 
             x_mm = clamp_x(float(self.relative_c4pitch_to_x(x_rpitch)))
             half_spread = spread * 0.5

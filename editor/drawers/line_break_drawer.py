@@ -41,6 +41,10 @@ class LineBreakDrawerMixin:
             is_page = bool(getattr(ev, 'page_break', False))
             y_mm = float(self.time_to_mm(t0))
 
+            # Fast anchor cull before expensive font extents.
+            if y_mm < (top_mm - bleed_mm) or y_mm > (bottom_mm + bleed_mm):
+                continue
+
             label = QtCore.QCoreApplication.translate('LineBreakDialog', 'P' if is_page else 'L')
             # Rectangle sized to text, top aligned at time position
             _, _, w_mm, h_mm = du._get_text_extents_mm(label, font_family, 18.0, False, True)

@@ -28,6 +28,11 @@ class TempoDrawerMixin:
         if not events:
             return
 
+        top_mm = float(getattr(self, '_view_y_mm_offset', 0.0) or 0.0)
+        vp_h_mm = float(getattr(self, '_viewport_h_mm', 0.0) or 0.0)
+        bottom_mm = top_mm + vp_h_mm
+        bleed_mm = max(2.0, float(getattr(score.app_state, 'zoom_mm_per_quarter', 25.0) or 25.0) * 0.5)
+
         notation_color = tuple(getattr(self, 'notation_color', (0.0, 0.0, 0.0, 1.0)))
         paper_color = tuple(getattr(self, 'paper_color', (1.0, 1.0, 1.0, 1.0)))
 
@@ -77,6 +82,8 @@ class TempoDrawerMixin:
             y1 = float(self.time_to_mm(t0 + du_ticks))
             if y1 < y0:
                 y0, y1 = y1, y0
+            if y1 < (top_mm - bleed_mm) or y0 > (bottom_mm + bleed_mm):
+                continue
             text = str(tempo_val)
             y_center = (y0 + y1) * 0.5
 

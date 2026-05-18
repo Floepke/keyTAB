@@ -1,10 +1,10 @@
 from __future__ import annotations
-from __future__ import annotations
 import math
 from typing import TYPE_CHECKING, cast
 from ui.widgets.draw_util import DrawUtil
-from utils.CONSTANT import SLUR_SEGMENT_COUNT
+from utils.CONSTANT import SLUR_SEGMENT_COUNT, SHORTEST_DURATION
 from editor.editor_defaults import SLUR_WIDTH_SIDES_MM, SLUR_WIDTH_MIDDLE_MM
+from utils.operator import Operator
 
 if TYPE_CHECKING:
     from editor.editor import Editor
@@ -24,17 +24,41 @@ class SlurDrawerMixin:
         if not slurs:
             return
 
+        cache = getattr(self, '_draw_cache', None) or {}
+        time_begin = cache.get('time_begin') if isinstance(cache, dict) else None
+        time_end = cache.get('time_end') if isinstance(cache, dict) else None
+        has_time_window = (time_begin is not None) and (time_end is not None)
+        op = cache.get('op') if isinstance(cache, dict) else None
+        if op is None:
+            op = Operator(float(SHORTEST_DURATION))
+        if has_time_window and float(time_begin) > float(time_end):
+            time_begin, time_end = time_end, time_begin
+
+        visible_slurs = []
+        for sl in slurs:
+            try:
+                t1 = float(getattr(sl, 'y1_time', 0.0) or 0.0)
+                t2 = float(getattr(sl, 'y2_time', 0.0) or 0.0)
+                t3 = float(getattr(sl, 'y3_time', 0.0) or 0.0)
+                t4 = float(getattr(sl, 'y4_time', 0.0) or 0.0)
+            except Exception:
+                continue
+            if has_time_window:
+                t_lo = float(min(t1, t2, t3, t4))
+                t_hi = float(max(t1, t2, t3, t4))
+                if op.lt(t_hi, float(time_begin)) or op.gt(t_lo, float(time_end)):
+                    continue
+            visible_slurs.append(sl)
+
+        if not visible_slurs:
+            return
+
         # Use hardcoded editor defaults for slur widths (not from file layout)
         side_w = float(SLUR_WIDTH_SIDES_MM or 0.75)
         mid_w = float(SLUR_WIDTH_MIDDLE_MM or 2.0)
         n_seg = max(2, int(SLUR_SEGMENT_COUNT))
 
-        is_slur_tool = False
-        try:
-            from editor.tool.slur_tool import SlurTool
-            is_slur_tool = isinstance(getattr(self, '_tool', None), SlurTool)
-        except Exception:
-            is_slur_tool = False
+        is_slur_tool = str(getattr(getattr(self, '_tool', None), 'TOOL_NAME', '') or '') == 'slur'
 
         def tri_interp(t: float) -> float:
             # Triangle profile peaking at t=0.5; 0 at t=0 and t=1
@@ -68,7 +92,7 @@ class SlurDrawerMixin:
                 return val
             return max(0.0, min(float(val), float(page_w)))
 
-        for sl in slurs:
+        for sl in visible_slurs:
             try:
                 x1_raw = float(self.relative_c4pitch_to_x(int(getattr(sl, 'x1_rpitch', 0) or 0)))
                 x2_raw = float(self.relative_c4pitch_to_x(int(getattr(sl, 'x2_rpitch', 0) or 0)))
