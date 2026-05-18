@@ -23,17 +23,22 @@ if TYPE_CHECKING:
 class ArpeggioDrawerMixin:
     _arp_time_op: Operator = Operator(float(SHORTEST_DURATION))
 
-    def _resolve_arpeggio_notes(self, arp: "Arpeggio", notes_all: list[object]) -> list[object]:
+    def _resolve_arpeggio_notes(
+        self,
+        arp: "Arpeggio",
+        notes_all: list[object],
+        notes_by_pitch: dict[int, list[object]] | None = None,
+    ) -> list[object]:
         """Resolve arpeggio member notes using float times with Operator tolerance."""
         base_time = arp.time
         pitches = [int(p) for p in (arp.note_pitches or []) if int(p) > 0]
         if len(pitches) < 2:
             return []
-        notes_by_pitch: dict[int, list[Note]] = {}
-        for note_obj in notes_all:
-            note_obj: Note
-            pitch = note_obj.pitch
-            notes_by_pitch.setdefault(note_obj.pitch, []).append(note_obj)
+        if notes_by_pitch is None:
+            notes_by_pitch = {}
+            for note_obj in notes_all:
+                note_obj: Note
+                notes_by_pitch.setdefault(int(note_obj.pitch), []).append(note_obj)
         resolved = []
         for pitch in pitches:
             note_obj = None
@@ -55,9 +60,33 @@ class ArpeggioDrawerMixin:
         if score is None:
             return
 
+        cache = getattr(self, "_draw_cache", None) or {}
+
         # get data
         arps = score.events.arpeggio
-        notes_all = score.events.note
+        notes_all = list(cache.get("notes_view") or []) if isinstance(cache, dict) else []
+        if not notes_all:
+            notes_all = list(score.events.note or [])
+        notes_by_pitch: dict[int, list[object]] = {}
+        for note_obj in notes_all:
+            note_obj: Note
+            notes_by_pitch.setdefault(int(getattr(note_obj, "pitch", 0) or 0), []).append(note_obj)
+
+        time_begin = cache.get("time_begin") if isinstance(cache, dict) else None
+        time_end = cache.get("time_end") if isinstance(cache, dict) else None
+        has_time_window = (time_begin is not None) and (time_end is not None)
+        if has_time_window and float(time_begin) > float(time_end):
+            time_begin, time_end = time_end, time_begin
+
+        def _arp_in_view(base_time: float, rtime1: float, rtime2: float) -> bool:
+            if not has_time_window:
+                return True
+            t0 = float(base_time) + float(rtime1)
+            t1 = float(base_time) + float(rtime2)
+            lo = float(min(t0, t1))
+            hi = float(max(t0, t1))
+            return self._arp_time_op.le(lo, float(time_end)) and self._arp_time_op.ge(hi, float(time_begin))
+
         layout = score.layout
         stem_w = layout.note_stem_thickness_mm * SCALE
         stem_len = layout.note_stem_length_semitone * self.semitone_dist
@@ -67,7 +96,7 @@ class ArpeggioDrawerMixin:
 
         active_tool_name = self._tool.TOOL_NAME
         show_handles = active_tool_name == "arpeggio"
-        arp_keys: list[tuple[float, tuple[int, ...]]] = []
+        arp_keys: set[tuple[float, tuple[int, ...]]] = set()
 
         for arp in arps:
             base_time = arp.time
@@ -75,11 +104,14 @@ class ArpeggioDrawerMixin:
             rtime2 = arp.rtime2
             arp_id = arp._id
 
+            if not _arp_in_view(float(base_time), float(rtime1), float(rtime2)):
+                continue
+
             arp_pitches = tuple(sorted(int(p) for p in (arp.note_pitches or []) if int(p) > 0))
             if len(arp_pitches) >= 2:
-                arp_keys.append((float(base_time), arp_pitches))
+                arp_keys.add((round(float(base_time), 6), arp_pitches))
 
-            chord_notes = self._resolve_arpeggio_notes(arp, notes_all)
+            chord_notes = self._resolve_arpeggio_notes(arp, notes_all, notes_by_pitch=notes_by_pitch)
             if len(chord_notes) < 2:
                 continue
 
@@ -345,7 +377,7 @@ class ArpeggioDrawerMixin:
             if len(pitches) < 2:
                 continue
 
-            if any(self._arp_time_op.eq(base_time, arp_time) and arp_p == pitches for arp_time, arp_p in arp_keys):
+            if (round(float(base_time), 6), pitches) in arp_keys:
                 continue
 
             chord_sorted = sorted(chord_notes, key=lambda n: int(getattr(n, "pitch", 0) or 0))

@@ -340,6 +340,7 @@ class NoteDrawerMixin:
         # Reuse hand-grouped notes from shared render cache when available.
         cache = getattr(self, '_draw_cache', None) or {}
         cached_by_hand = cache.get('notes_by_hand') or {}
+        stem_metrics_by_id: dict[int, dict[str, float | str]] = {}
 
         stem_len = self._layout_stem_length_mm()
         stem_w = layout.note_stem_thickness_mm * SCALE
@@ -382,6 +383,19 @@ class NoteDrawerMixin:
                     y_values = [float(self.time_to_mm(float(getattr(n, 'time', 0.0) or 0.0))) for n in cluster_no_arp]
                     y_line = float(y_values[0])
 
+                    for n_obj, x_center in zip(cluster_no_arp, x_values):
+                        nid = int(getattr(n_obj, '_id', 0) or 0)
+                        if nid <= 0:
+                            continue
+                        x_tip_note = float(x_center - stem_len) if hand_key == 'l' else float(x_center + stem_len)
+                        stem_metrics_by_id[nid] = {
+                            'x_center': float(x_center),
+                            'x_tip': float(x_tip_note),
+                            'y': float(y_line),
+                            'time': float(t0),
+                            'hand': str(hand_key),
+                        }
+
                     if len(cluster_no_arp) == 1:
                         x_center = float(x_values[0])
                         x_tip = float(x_center - stem_len) if hand_key == 'l' else float(x_center + stem_len)
@@ -406,6 +420,9 @@ class NoteDrawerMixin:
                     )
 
                 i = j
+
+        if isinstance(cache, dict):
+            cache['note_stem_metrics_by_id'] = stem_metrics_by_id
 
     def _draw_note_continuation_dot(self, du: DrawUtil, n: Note, x: float, y1: float, y2: float, draw_mode: str) -> None:
         self = cast("Editor", self)
