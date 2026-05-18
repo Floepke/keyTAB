@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING, cast
 
 from editor.editor_defaults import SCALE
 from file_model.SCORE import SCORE
+from file_model.events.note import Note
 from symbol_design.noteheads import (
     resolve_notehead_spec,
     sheared_notehead_support_v,
@@ -24,21 +25,20 @@ class ArpeggioDrawerMixin:
 
     def _resolve_arpeggio_notes(self, arp: "Arpeggio", notes_all: list[object]) -> list[object]:
         """Resolve arpeggio member notes using float times with Operator tolerance."""
-        base_time = float(getattr(arp, "time", 0.0) or 0.0)
-        pitches = [int(p) for p in (getattr(arp, "note_pitches", []) or []) if int(p) > 0]
+        base_time = arp.time
+        pitches = [int(p) for p in (arp.note_pitches or []) if int(p) > 0]
         if len(pitches) < 2:
             return []
-        notes_by_pitch: dict[int, list[object]] = {}
+        notes_by_pitch: dict[int, list[Note]] = {}
         for note_obj in notes_all:
-            pitch = int(getattr(note_obj, "pitch", 0) or 0)
-            if pitch <= 0:
-                continue
-            notes_by_pitch.setdefault(pitch, []).append(note_obj)
+            note_obj: Note
+            pitch = note_obj.pitch
+            notes_by_pitch.setdefault(note_obj.pitch, []).append(note_obj)
         resolved = []
         for pitch in pitches:
             note_obj = None
             for candidate in notes_by_pitch.get(int(pitch), []):
-                candidate_time = float(getattr(candidate, "time", 0.0) or 0.0)
+                candidate_time = candidate.time
                 if self._arp_time_op.eq(candidate_time, base_time):
                     note_obj = candidate
                     break
@@ -55,31 +55,27 @@ class ArpeggioDrawerMixin:
         if score is None:
             return
 
-        arps = list(getattr(score.events, "arpeggio", []) or [])
-
-        notes_all = list(getattr(score.events, "note", []) or [])
+        # get data
+        arps = score.events.arpeggio
+        notes_all = score.events.note
         layout = score.layout
         stem_w = layout.note_stem_thickness_mm * SCALE
         stem_len = layout.note_stem_length_semitone * self.semitone_dist
-        width_scale = max(0.05, float(getattr(layout, "note_width_scaling", 1.0) or 1.0)) if layout is not None else 1.0
-        height_scale = max(0.1, float(getattr(layout, "notehead_height_scaling", 1.0) or 1.0)) if layout is not None else 1.0
-        base_tilt = float(getattr(layout, "notehead_tilt", 0.0) or 0.0) if layout is not None else 0.0
-        base_tilt = max(-1.0, min(1.0, base_tilt))
+        width_scale = layout.note_width_scaling
+        height_scale = layout.notehead_height_scaling
+        base_tilt = layout.notehead_tilt
 
-        active_tool_name = str(getattr(getattr(self, "_tool", None), "TOOL_NAME", "") or "")
+        active_tool_name = self._tool.TOOL_NAME
         show_handles = active_tool_name == "arpeggio"
         arp_keys: list[tuple[float, tuple[int, ...]]] = []
 
         for arp in arps:
-            try:
-                base_time = float(getattr(arp, "time", 0.0) or 0.0)
-                rtime1 = float(getattr(arp, "rtime1", 0.0) or 0.0)
-                rtime2 = float(getattr(arp, "rtime2", 0.0) or 0.0)
-                arp_id = int(getattr(arp, "_id", 0) or 0)
-            except Exception:
-                continue
+            base_time = arp.time
+            rtime1 = arp.rtime1
+            rtime2 = arp.rtime2
+            arp_id = arp._id
 
-            arp_pitches = tuple(sorted(int(p) for p in (getattr(arp, "note_pitches", []) or []) if int(p) > 0))
+            arp_pitches = tuple(sorted(int(p) for p in (arp.note_pitches or []) if int(p) > 0))
             if len(arp_pitches) >= 2:
                 arp_keys.append((float(base_time), arp_pitches))
 
@@ -88,7 +84,7 @@ class ArpeggioDrawerMixin:
                 continue
 
             start_t, end_t = self._arpeggio_time_window(base_time, rtime1, rtime2)
-            chord_sorted = sorted(chord_notes, key=lambda n: int(getattr(n, "pitch", 0) or 0))
+            chord_sorted = sorted(chord_notes, key=lambda n: n.pitch)
             if len(chord_sorted) < 2:
                 continue
 

@@ -1,6 +1,7 @@
 from __future__ import annotations
 from typing import Literal, Optional, Tuple, Dict, Type, TYPE_CHECKING
 import math, bisect, heapq
+import time
 from PySide6 import QtCore, QtGui
 
 from editor.selection import SelectionMixin
@@ -254,15 +255,22 @@ class Editor(QtCore.QObject,
 
         We simply call all drawer methods; DrawUtil sorts items by tag layering.
         """
+        frame_start = time.perf_counter()
+        timing_rows: list[tuple[str, float]] = []
+
         # Reset hit rectangles for this frame; drawers will register rectangles
         self._hit_rects = []
+
         # In tiny stage 2, skip drawing to keep closing smooth
         if self.is_tiny_mode_ultra():
-            self._draw_cache = None
+            total_ms = (time.perf_counter() - frame_start) * 1000.0
+            print(f"[draw_all] total={total_ms:.3f} ms (tiny mode ultra skip)")
             return
 
         # Build shared render cache for this draw pass (fresh each frame)
+        cache_start = time.perf_counter()
         self._build_render_cache()
+        timing_rows.append(("build_render_cache", (time.perf_counter() - cache_start) * 1000.0))
 
         # Call drawer mixin methods in order
         methods = [
@@ -288,8 +296,17 @@ class Editor(QtCore.QObject,
             getattr(self, 'draw_line_break', None),
         ]
         for fn in methods:
-            if callable(fn):
-                fn(du)
+            if fn is None:
+                continue
+            drawer_start = time.perf_counter()
+            fn(du)
+            timing_rows.append((fn.__name__, (time.perf_counter() - drawer_start) * 1000.0))
+
+        total_ms = (time.perf_counter() - frame_start) * 1000.0
+        print("NEW FRAME TIMINGS:")
+        for name, elapsed_ms in timing_rows:
+            print(f"{name}={elapsed_ms:.3f} ms")
+        print(f"[draw_all] total={total_ms:.3f} ms")
 
         # Keep render cache available for hit detection until next frame rebuild
         # (cleared at the start of _build_render_cache)
@@ -574,7 +591,7 @@ class Editor(QtCore.QObject,
         return changed
 
     def _apply_single_note_timing_cache_update(self, notes: list) -> tuple[list, list[float], list[float], list[tuple[float, int]], list[float]] | None:
-        dirty = getattr(self, '_single_note_timing_dirty', None)
+        dirty = self._single_note_timing_dirty
         cached = self._note_time_cache_values
         if not dirty or cached is None:
             return None
@@ -1094,27 +1111,28 @@ class Editor(QtCore.QObject,
             return
         # Clear previous cache at start so callers don't read stale data
         self._draw_cache = None
+        
+        # get score data
         score: SCORE | None = self.current_score()
         if score is None:
-            self._draw_cache = None
             return
 
         # Compute viewport times (ticks) from mm offset and height
-        top_mm = float(getattr(self, '_view_y_mm_offset', 0.0) or 0.0)
-        vp_h_mm = float(getattr(self, '_viewport_h_mm', 0.0) or 0.0)
+        top_mm = self._view_y_mm_offset
+        vp_h_mm = self._viewport_h_mm
         bottom_mm = top_mm + vp_h_mm
         # Small bleed similar to prior behavior
-        zpq = float(getattr(score.app_state, 'zoom_mm_per_quarter', 25.0) or 25.0)
+        zpq = score.app_state.zoom_mm_per_quarter
         bleed_mm = max(2.0, zpq * 0.25)
         time_begin = float(self.mm_to_time(top_mm - bleed_mm))
-        bottom_bleed = max(0.0, float(getattr(self, 'viewport_bottom_bleed', 0.0) or 0.0))
+        bottom_bleed = self.viewport_bottom_bleed
         time_end = float(self.mm_to_time(bottom_mm + bleed_mm)) + bottom_bleed
 
         # Comparator with threshold of 7 ticks
-        op = Operator(7)
+        op = Operator(SHORTEST_DURATION)
 
         # Notes sorted/indexed by timing. Reuse persistent cache when note data is unchanged.
-        notes = list(getattr(score.events, 'note', []) or [])
+        notes = score.events.note
         patched_values = self._apply_single_note_timing_cache_update(notes)
         if patched_values is not None:
             notes_sorted, starts, ends, end_pairs, end_values = patched_values

@@ -70,18 +70,20 @@ class GridDrawerMixin:
             editor_orientation = 'vertical'
 
         # --------------- drawing the grid lines, barlines, measure numbers ---------------
-        measure_numbering_cursor = 1
         meas_font = getattr(score.layout, 'measure_numbering_font', None)
         if meas_font is not None and callable(getattr(meas_font, 'resolve_family', None)):
             meas_family = str(meas_font.resolve_family())
         else:
-            meas_family = getattr(meas_font, 'family', 'Courier New') if meas_font is not None else 'Courier New'
+            meas_family = getattr(meas_font, 'family', 'Edwin') if meas_font is not None else 'Edwin'
         meas_size = 20.0
         color = self.notation_color
         bar_width_mm = max(0.01, float(getattr(layout, 'grid_barline_thickness_mm', 0.1) or 0.1)) * SCALE
         grid_width_mm = (float(getattr(layout, 'grid_gridline_thickness_mm', 0.15) or 0.15) * SCALE) if layout is not None else 0.15
 
-        cache = getattr(self, '_draw_cache', None) or {}
+        cache = self._draw_cache
+        if cache is None:
+            cache = {}
+        
         grid_den_times = list(cache.get('grid_den_times') or [])
         barline_times = list(cache.get('barline_times') or [])
 
@@ -106,12 +108,23 @@ class GridDrawerMixin:
             if grid_den_times:
                 grid_den_times.append(float(cur_t))
 
-        barline_keys = {round(float(t), 6) for t in barline_times}
+        barline_key_set = {round(float(t), 6) for t in barline_times}
 
         # Build collision geometry so barlines are drawn constructively around symbols.
         op = cache.get('op') if isinstance(cache, dict) else None
         if op is None:
             op = Operator(SHORTEST_DURATION)
+        time_begin = cache.get('time_begin') if isinstance(cache, dict) else None
+        time_end = cache.get('time_end') if isinstance(cache, dict) else None
+        has_time_window = (time_begin is not None) and (time_end is not None)
+        if has_time_window and float(time_begin) > float(time_end):
+            time_begin, time_end = time_end, time_begin
+
+        def _is_time_in_viewport(t: float) -> bool:
+            if not has_time_window:
+                return True
+            return op.ge(float(t), float(time_begin)) and op.le(float(t), float(time_end))
+
         notes_view = list(cache.get('notes_view') or []) if isinstance(cache, dict) else []
         notes_by_hand_cache = dict(cache.get('notes_by_hand') or {}) if isinstance(cache, dict) else {}
         beam_markers = dict(cache.get('beam_by_hand') or {}) if isinstance(cache, dict) else {}
@@ -178,15 +191,23 @@ class GridDrawerMixin:
             return windows
 
         def _assign_groups(notes: list, windows: list[tuple[float, float]]) -> list[list]:
-            groups: list[list] = []
-            for w0, w1 in windows:
-                grp = []
-                for n in notes:
-                    nt = float(getattr(n, 'time', 0.0) or 0.0)
-                    starts_in = op.ge(float(nt), float(w0)) and op.lt(float(nt), float(w1))
-                    if starts_in:
-                        grp.append(n)
-                groups.append(grp)
+            # Windows are non-overlapping and sorted by time.
+            # Assign notes in a single linear pass instead of scanning all notes per window.
+            groups: list[list] = [[] for _ in windows]
+            if not notes or not windows:
+                return groups
+            sorted_notes = sorted(notes, key=lambda n: float(getattr(n, 'time', 0.0) or 0.0))
+            w_idx = 0
+            w_len = len(windows)
+            for n in sorted_notes:
+                nt = float(getattr(n, 'time', 0.0) or 0.0)
+                while w_idx < w_len and op.ge(float(nt), float(windows[w_idx][1])):
+                    w_idx += 1
+                if w_idx >= w_len:
+                    break
+                w0, w1 = windows[w_idx]
+                if op.ge(float(nt), float(w0)) and op.lt(float(nt), float(w1)):
+                    groups[w_idx].append(n)
             return groups
 
         beam_segments: list[dict[str, float]] = []
@@ -206,14 +227,18 @@ class GridDrawerMixin:
                 if not grp or idx >= len(windows):
                     continue
                 t0, t1 = windows[idx]
-                starts_in = [
-                    float(getattr(n, 'time', 0.0) or 0.0)
-                    for n in grp
-                    if op.ge(float(getattr(n, 'time', 0.0) or 0.0), float(t0)) and op.lt(float(getattr(n, 'time', 0.0) or 0.0), float(t1))
-                ]
-                if not starts_in:
+                s_min = None
+                s_max = None
+                for n in grp:
+                    nt = float(getattr(n, 'time', 0.0) or 0.0)
+                    if not (op.ge(float(nt), float(t0)) and op.lt(float(nt), float(t1))):
+                        continue
+                    if s_min is None or nt < s_min:
+                        s_min = nt
+                    if s_max is None or nt > s_max:
+                        s_max = nt
+                if s_min is None or s_max is None:
                     continue
-                s_min, s_max = min(starts_in), max(starts_in)
                 if op.eq(float(s_min), float(s_max)):
                     continue
                 t_first = float(s_min)
@@ -416,7 +441,11 @@ class GridDrawerMixin:
             _draw_line_around_chords(float(y_mm + gap_mm), cuts, float(width_mm), tags, int(ev_id), dash_pattern=[2.0, 2.0])
         
         # Draw measure numbers at each measure start except final end barline.
+        measure_numbering_cursor = 0
         for t in barline_times[:-1]:
+            measure_numbering_cursor += 1
+            if not _is_time_in_viewport(float(t)):
+                continue
             y_mm = float(self.time_to_mm(float(t)))
             du.add_text(
                 self.margin + self.stave_width + self.margin - 1.0,
@@ -430,14 +459,14 @@ class GridDrawerMixin:
                 family=meas_family,
                 angle_deg=0 if editor_orientation == 'vertical' else 90,
             )
-            measure_numbering_cursor += 1
 
         # Draw subgrid lines from cached grid times, excluding barline layer times.
         if grid_line_visible:
             for t in grid_den_times:
-                if round(float(t), 6) in barline_keys:
+                if round(float(t), 6) in barline_key_set:
                     continue
-                y_mm = float(self.time_to_mm(float(t)))
+                if not _is_time_in_viewport(float(t)):
+                    continue
                 _draw_grid_line_constructive(float(t), float(grid_width_mm), 0.0, 0)
                 # du.add_line(
                 #     stave_left_position,
@@ -454,11 +483,13 @@ class GridDrawerMixin:
         # Draw regular barlines; draw final end barline twice as thick.
         if barline_visible:
             for idx, t in enumerate(barline_times):
+                if not _is_time_in_viewport(float(t)):
+                    continue
                 is_last = idx == (len(barline_times) - 1)
                 _draw_barline_constructive(
                     float(t),
                     bar_width_mm * 2.0 if is_last else bar_width_mm,
-                    (["barline", "end_barline"] if is_last else ["barline"]),
+                    (["end_barline"] if is_last else ["barline"]),
                 )
 
         if barline_visible and layout is not None:
