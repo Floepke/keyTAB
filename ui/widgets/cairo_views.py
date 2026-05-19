@@ -9,6 +9,7 @@ from editor.editor import Editor
 from ui.widgets.draw_util import DrawUtil, make_image_surface, finalize_image_surface
 from ui.style import Style
 from settings_manager import get_preferences
+from utils.CONSTANT import ENABLE_MACOS_NATIVE_SCROLLING
 # Stripped renderer, tile cache, and spatial index for static viewport simplicity
 
 # Hardcoded editor-wide stroke multiplier. Adjust to tune all editor line widths at once.
@@ -61,6 +62,8 @@ class CairoEditorWidget(QtWidgets.QWidget):
         # External scroll (logical px), controlled by an external QScrollBar
         self._scroll_logical_px: int = 0
         self._scroll_step_logical_px: int = 1
+        self._wheel_scroll_angle_remainder: float = 0.0
+        self._wheel_scroll_pixel_remainder: float = 0.0
         # Track mouse button state to decide when overlay-only redraw is safe
         self._left_down: bool = False
         self._right_down: bool = False
@@ -437,16 +440,30 @@ class CairoEditorWidget(QtWidgets.QWidget):
             ev.accept()
             return
 
-        # Use pixel delta when available (smooth trackpad), otherwise angle delta.
-        if raw_pixel != 0:
+        use_native = bool(ENABLE_MACOS_NATIVE_SCROLLING and sys.platform == 'darwin' and raw_pixel != 0)
+        if use_native:
             delta_logical = -raw_pixel
-        elif raw_angle != 0:
-            step_logical_px = int(max(1, getattr(self, '_scroll_step_logical_px', 1) or 1))
-            steps = int(round(raw_angle / 120.0))
-            delta_logical = -steps * step_logical_px
         else:
-            ev.accept()
-            return
+            steps = 0
+            if raw_angle != 0:
+                acc = float(self._wheel_scroll_angle_remainder) + float(raw_angle)
+                steps = int(acc / 120.0)
+                self._wheel_scroll_angle_remainder = acc - float(steps) * 120.0
+                self._wheel_scroll_pixel_remainder = 0.0
+            elif raw_pixel != 0:
+                # Fallback for devices that emit pixel deltas only.
+                acc = float(self._wheel_scroll_pixel_remainder) + float(raw_pixel)
+                pixel_per_step = 40.0
+                steps = int(acc / pixel_per_step)
+                self._wheel_scroll_pixel_remainder = acc - float(steps) * pixel_per_step
+                self._wheel_scroll_angle_remainder = 0.0
+
+            if steps == 0:
+                ev.accept()
+                return
+
+            step_logical_px = int(max(1, getattr(self, '_scroll_step_logical_px', 1) or 1))
+            delta_logical = -steps * step_logical_px
 
         new_val = max(0, int(self._scroll_logical_px + delta_logical))
         max_scroll = self._max_scroll_logical_px()

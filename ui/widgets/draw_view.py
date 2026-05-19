@@ -1,9 +1,10 @@
 from __future__ import annotations
 from PySide6 import QtCore, QtGui, QtWidgets
 import cairo
+import sys
 from ui.widgets.draw_util import DrawUtil, make_image_surface, finalize_image_surface
 from ui.style import Style
-from utils.CONSTANT import ENGRAVER_LAYERING
+from utils.CONSTANT import ENGRAVER_LAYERING, ENABLE_MACOS_NATIVE_SCROLLING
 from engraver.engraver import do_engrave
 
 
@@ -99,6 +100,10 @@ class DrawUtilView(QtWidgets.QWidget):
         self._zoom_rerender_timer.setSingleShot(True)
         self._zoom_rerender_timer.setInterval(150)
         self._zoom_rerender_timer.timeout.connect(self._on_zoom_settle)
+        self._wheel_angle_remainder_x: float = 0.0
+        self._wheel_angle_remainder_y: float = 0.0
+        self._wheel_pixel_remainder_x: float = 0.0
+        self._wheel_pixel_remainder_y: float = 0.0
         self._suppress_fade_once: bool = False
         # Apply a dedicated background color for DrawUtil views
         try:
@@ -431,14 +436,41 @@ class DrawUtilView(QtWidgets.QWidget):
 
         pixel_delta = ev.pixelDelta()
         angle_delta = ev.angleDelta()
-        delta = pixel_delta.x() if use_horizontal else pixel_delta.y()
-        if delta == 0:
-            delta = angle_delta.x() if use_horizontal else angle_delta.y()
-        if delta == 0:
-            delta = angle_delta.y() if use_horizontal else angle_delta.x()
-        if delta != 0:
-            delta = delta / 2
-        if delta == 0:
+        axis_name = 'x' if use_horizontal else 'y'
+        raw_pixel = pixel_delta.x() if use_horizontal else pixel_delta.y()
+        raw_angle_primary = angle_delta.x() if use_horizontal else angle_delta.y()
+        raw_angle_secondary = angle_delta.y() if use_horizontal else angle_delta.x()
+        raw_angle = raw_angle_primary if raw_angle_primary != 0 else raw_angle_secondary
+
+        use_native = bool(ENABLE_MACOS_NATIVE_SCROLLING and sys.platform == 'darwin' and raw_pixel != 0)
+        if use_native:
+            delta = float(raw_pixel) / 2.0
+        else:
+            angle_attr = '_wheel_angle_remainder_x' if axis_name == 'x' else '_wheel_angle_remainder_y'
+            pixel_attr = '_wheel_pixel_remainder_x' if axis_name == 'x' else '_wheel_pixel_remainder_y'
+
+            delta_steps = 0
+            if raw_angle != 0:
+                acc = float(getattr(self, angle_attr, 0.0)) + float(raw_angle)
+                delta_steps = int(acc / 120.0)
+                acc -= float(delta_steps) * 120.0
+                setattr(self, angle_attr, acc)
+                setattr(self, pixel_attr, 0.0)
+            elif raw_pixel != 0:
+                # Fallback for devices that emit pixel deltas only.
+                acc = float(getattr(self, pixel_attr, 0.0)) + float(raw_pixel)
+                pixel_per_step = 40.0
+                delta_steps = int(acc / pixel_per_step)
+                acc -= float(delta_steps) * pixel_per_step
+                setattr(self, pixel_attr, acc)
+                setattr(self, angle_attr, 0.0)
+
+            if delta_steps == 0:
+                ev.accept()
+                return
+            delta = float(delta_steps) * 60.0
+
+        if delta == 0.0:
             ev.ignore()
             return
         if use_horizontal:

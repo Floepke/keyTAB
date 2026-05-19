@@ -287,10 +287,10 @@ class Editor(QtCore.QObject,
             timing_rows.append((fn.__name__, (time.perf_counter() - drawer_start) * 1000.0))
 
         total_ms = (time.perf_counter() - frame_start) * 1000.0
-        print("NEW FRAME TIMINGS:")
-        for name, elapsed_ms in timing_rows:
-            print(f"{name}={elapsed_ms:.3f} ms")
-        print(f"[draw_all] total={total_ms:.3f} ms")
+        # print("NEW FRAME:")
+        # for name, elapsed_ms in timing_rows:
+        #     print(f"{name}={elapsed_ms:.3f} ms")
+        # print(f"total={total_ms:.3f} ms")
 
         # Keep render cache available for hit detection until next frame rebuild
         # (cleared at the start of _build_render_cache)

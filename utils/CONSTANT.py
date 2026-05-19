@@ -19,6 +19,11 @@ QUARTER_NOTE_UNIT: float = 256.0
 # Used by drawer code only (not serialized in project files).
 EDITOR_SIDE_BAND_INSET_SEMITONES: int = 10
 
+# macOS smooth/native wheel scrolling can generate many tiny scroll events.
+# Keep this toggle for future optimization experiments; default off to keep
+# step-based behavior consistent with Linux/Windows.
+ENABLE_MACOS_NATIVE_SCROLLING: bool = False
+
 # Drawing orders (single sources of truth)
 # Each string corresponds to a tag name used in the Editor and Engraver for layering.
 # Update these lists to control layer stacking in the Editor and Engraver.

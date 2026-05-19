@@ -14,6 +14,8 @@ DIVISIONS_PER_QUARTER = 64
 _UNITS_PER_DIVISION = float(QUARTER_NOTE_UNIT) / float(DIVISIONS_PER_QUARTER)
 _EPS = 1e-6
 
+"""NOTE: It is practically not possible to represent all possible keyTAB midi file like rhythms in MusicXML.
+therefore, this converter is discontinued."""
 
 @dataclass
 class MeasureInfo:
