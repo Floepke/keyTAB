@@ -83,18 +83,6 @@ class NoteTool(BaseTool):
                 'rotation': 270.0 if editor_orientation == 'horizontal' else 0.0,
             },
             {
-                'name': 'selection_right',
-                'icon': 'selection_right',
-                'tooltip': QtCore.QCoreApplication.translate('NoteTool', 'Set selected notes to right hand (shortcut: ] )'),
-                'rotation': 270.0 if editor_orientation == 'horizontal' else 0.0,
-            },
-            {
-                'name': 'selection_left',
-                'icon': 'selection_left',
-                'tooltip': QtCore.QCoreApplication.translate('NoteTool', 'Set selected notes to left hand (shortcut: [ )'),
-                'rotation': 270.0 if editor_orientation == 'horizontal' else 0.0,
-            },
-            {
                 'name': 'velocity_toggle',
                 'icon': 'velocity',
                 'text': 'Vel',
@@ -793,16 +781,6 @@ class NoteTool(BaseTool):
             self._editor.hand_cursor = 'l'
         elif name == 'hand_right':
             self._editor.hand_cursor = 'r'
-        elif name == 'selection_left':
-            try:
-                self._editor.set_selected_notes_hand('l')
-            except Exception:
-                pass
-        elif name == 'selection_right':
-            try:
-                self._editor.set_selected_notes_hand('r')
-            except Exception:
-                pass
         elif name == 'velocity_toggle':
             self._velocity_mode = not self._velocity_mode
             self._velocity_dragging = False

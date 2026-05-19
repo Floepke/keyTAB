@@ -91,7 +91,7 @@ change_log = '''
 - ui change: moved the contextual toolbar to the left side of the editor as a second vertical toolbar.
   * the reason: to have more space for tool buttons on smaller screens.
   * the middle vertical toolbar holds button functions that are always available.
-  * the contextual toolbar holds tool-specific functions that only appear when a tool is active.
+  * the contextual toolbar holds tool-specific functions that belong to the active tool.
 - added: Keyboard Shortcut Card under menu 'Help > Keyboard Shortcut Card'.
 - added: Escape exit confirmation dialog to prevent accidental exits.
 - added: dynamic symbol custom rotation option, allowing symbols to be rotated by a custom angle.

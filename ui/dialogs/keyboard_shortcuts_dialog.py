@@ -58,8 +58,7 @@ class KeyboardShortcutsDialog(QtWidgets.QDialog):
         instr_font = instr_label.font()
         instr_font.setPointSize(10)
         instr_label.setFont(instr_font)
-        accent_color = Style.get_named_qcolor('accent')
-        instr_label.setStyleSheet(f"color: {accent_color.name()}; margin-bottom: 10px;")
+        instr_label.setStyleSheet(f"color: {text_color.name()}; margin-bottom: 10px;")
         card_layout.addWidget(instr_label)
         
         # Scrollable shortcuts area
@@ -143,7 +142,19 @@ class KeyboardShortcutsDialog(QtWidgets.QDialog):
                 (self.tr("Transpose Up"), transpose_up),
                 (self.tr("Move Earlier"), move_earlier),
                 (self.tr("Move Later"), move_later),
-                (self.tr("Quantize All"), "Q"),
+                (self.tr("Quantize"), "Q"),
+                (self.tr("Map Selected Notes to Left Hand"), "["),
+                (self.tr("Map Selected Notes to Right Hand"), "]"),
+                (self.tr("(in note tool) Switch Cursor to Left Hand"), ","),
+                (self.tr("(in note tool) Switch Cursor to Right Hand"), "."),
+                (self.tr("Set Snap Size to Whole Note Length"), "1"),
+                (self.tr("Set Snap Size to Half Note Length"), "2"),
+                (self.tr("Set Snap Size to Quarter Note Length"), "4"),
+                (self.tr("Set Snap Size to Eighth Note Length"), "8"),
+                (self.tr("Set Snap Size to Sixteenth Note Length"), "6"),
+                (self.tr("Set Snap Size Divider to 3"), "3"),
+                (self.tr("Set Snap Size Divider to 5"), "5"),
+                (self.tr("Set Snap Size Divider to 7"), "7"),
             ]),
             (self.tr("View & Display"), [
                 (self.tr("Zoom In"), "="),
@@ -171,7 +182,7 @@ class KeyboardShortcutsDialog(QtWidgets.QDialog):
         
         # Category header
         header = QtWidgets.QLabel(category_name)
-        header.setStyleSheet(f"font-weight: bold; font-size: 13px; color: {accent_color.name()}; margin-bottom: 8px;")
+        header.setStyleSheet(f"font-weight: bold; font-size: 13px; color: {text_color.name()}; margin-bottom: 8px;")
         layout.addWidget(header)
         
         # Shortcuts grid
@@ -190,7 +201,7 @@ class KeyboardShortcutsDialog(QtWidgets.QDialog):
             shortcut_label.setStyleSheet(
                 f"background-color: {alternate_bg.name()}; color: {text_color.name()}; font-family: 'Courier New', monospace; "
                 f"font-size: {shortcut_font_size}; padding: 5px 10px; border-radius: 4px; "
-                f"border: 1px solid {accent_color.name()}; font-weight: bold;"
+                f"border: 1px solid {text_color.name()}; font-weight: bold;"
             )
             shortcut_label.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
             shortcut_label.setMinimumWidth(80)
@@ -203,7 +214,7 @@ class KeyboardShortcutsDialog(QtWidgets.QDialog):
         # Style the category box
         bg_color = Style.get_named_qcolor('bg')
         widget.setStyleSheet(
-            f"QWidget {{ background-color: {bg_color.name()}; border: 1px solid {accent_color.name()}; "
+            f"QWidget {{ background-color: {bg_color.name()}; border: 1px solid {text_color.name()}; "
             "border-radius: 6px; padding: 0px; }"
         )
         

@@ -597,7 +597,16 @@ class FileManager:
         def _hook(exctype, value, tb):
             # Save timestamped error backup; format: dd-mm-YYYY-HH.MM.SS
             ts = datetime.now().strftime("%d-%m-%Y-%H.%M.%S")
-            fname = f"keyTAB_error_backup_{ts}.piano"
+            try:
+                info = getattr(self._current, 'info', None)
+                raw_title = str(getattr(info, 'title', '') or '').strip()
+            except Exception:
+                raw_title = ''
+            safe_title = ''.join(ch for ch in raw_title if ch not in r'\\/:*?"<>|').strip()
+            if not safe_title:
+                safe_title = 'Untitled'
+            safe_title = safe_title[:80]
+            fname = f"keyTAB_error_backup_{safe_title}_{ts}.piano"
             target = Path(UTILS_SAVE_DIR) / fname
             self._current.save(str(target))
             # Delegate to original hook to print traceback to terminal

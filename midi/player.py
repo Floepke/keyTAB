@@ -10,6 +10,7 @@ from typing import List, Optional, Tuple
 
 import mido
 import traceback
+from symbol_design.noteheads import resolve_notehead_spec, sheared_notehead_outline_points, sheared_notehead_support_v, support_point_from_outline_points
 
 fluidsynth = None
 _FLUIDSYNTH_AVAILABLE = True
@@ -986,13 +987,10 @@ class Player:
 
         playable: List[Tuple[float, float, int, int]] = []
         score_end_units = 0.0
-        for n, dur_units in self._iter_playable_events(score):
+        for start_units, dur_units, app_pitch, vel in self._iter_playable_note_specs(score):
             if dur_units < float(self._min_duration_units):
                 continue
-            start_units = float(getattr(n, 'time', 0.0) or 0.0)
             end_units = float(start_units + dur_units)
-            vel = int(getattr(n, 'velocity', 64) or 64)
-            app_pitch = int(getattr(n, 'pitch', 0))
             midi_pitch = max(0, min(127, app_pitch + self._pitch_offset))
             playable.append((start_units, end_units, midi_pitch, vel))
             if end_units > score_end_units:
@@ -1099,14 +1097,12 @@ class Player:
                 events.append(('cc', float(cc_t), 64, int(p_val)))
                 prev_src_time = float(p_time)
                 prev_src_val = int(p_val)
-        for n, dur_units in self._iter_playable_events(score):
-            start = float(getattr(n, 'time', 0.0) or 0.0)
+        for start, dur_units, app_pitch, vel in self._iter_playable_note_specs(score):
+            start = float(start)
             end = float(start + dur_units)
             if dur_units < float(self._min_duration_units):
                 continue
-            app_pitch = int(getattr(n, 'pitch', 0))
             midi_pitch = max(0, min(127, app_pitch + self._pitch_offset))
-            vel = int(getattr(n, 'velocity', 64) or 64)
             if not _time_op.greater(end, su):
                 continue
             if _time_op.less(start, su) and _time_op.greater(end, su):
@@ -1126,6 +1122,262 @@ class Player:
         except Exception:
             pass
         return events
+
+    def _iter_playable_note_specs(self, score):
+        """Yield normalized playable note specs as (start_units, duration_units, pitch, velocity).
+
+        Arpeggiated chords replace base note starts with arpeggio-adjusted starts so playback
+        follows rendered notehead offsets.
+        """
+        notes = list(getattr(getattr(score, 'events', None), 'note', []) or [])
+        arpeggio_starts = self._compute_arpeggio_note_starts(score, notes)
+
+        note_spans: List[Tuple[float, float, int]] = []
+        for n in notes:
+            base_start = float(getattr(n, 'time', 0.0) or 0.0)
+            start_units = float(arpeggio_starts.get(int(getattr(n, '_id', 0) or 0), base_start))
+            end_units = float(base_start + float(getattr(n, 'duration', 0.0) or 0.0))
+            dur_units = max(0.0, float(end_units - start_units))
+            pitch = int(getattr(n, 'pitch', 0) or 0)
+            vel = int(getattr(n, 'velocity', 64) or 64)
+            note_spans.append((start_units, float(start_units + dur_units), pitch))
+            yield start_units, dur_units, pitch, vel
+
+        for g in getattr(getattr(score, 'events', None), 'grace_note', []) or []:
+            dur_units = float(self._grace_duration_units)
+            start_units = float(getattr(g, 'time', 0.0) or 0.0)
+            overlap_end: Optional[float] = None
+            g_pitch = int(getattr(g, 'pitch', 0) or 0)
+            for s, e, p in note_spans:
+                if p == g_pitch and s <= start_units < e:
+                    overlap_end = e if overlap_end is None else max(overlap_end, e)
+            if overlap_end is not None:
+                dur_units = max(dur_units, float(overlap_end - start_units))
+            vel = int(getattr(g, 'velocity', 64) or 64)
+            yield start_units, dur_units, g_pitch, vel
+
+    def _compute_arpeggio_note_starts(self, score, notes: List[object]) -> dict[int, float]:
+        """Translate arpeggio notehead offsets into playback start-unit overrides.
+
+        Mirrors the editor/cache geometry so playback timing matches rendered arpeggios.
+        """
+        arps = list(getattr(getattr(score, 'events', None), 'arpeggio', []) or [])
+        if not arps or not notes:
+            return {}
+
+        layout = getattr(score, 'layout', None)
+        app_state = getattr(score, 'app_state', None)
+
+        try:
+            zoom_mm_per_quarter = float(getattr(app_state, 'zoom_mm_per_quarter', 25.0) or 25.0)
+        except Exception:
+            zoom_mm_per_quarter = 25.0
+        if zoom_mm_per_quarter <= 1e-6:
+            zoom_mm_per_quarter = 25.0
+
+        try:
+            page_width_mm = float(getattr(layout, 'page_width_mm', 210.0) or 210.0)
+        except Exception:
+            page_width_mm = 210.0
+        try:
+            x_zoom_factor = float(getattr(app_state, 'x_zoom_factor', 1.0) or 1.0)
+        except Exception:
+            x_zoom_factor = 1.0
+        x_zoom_factor = max(0.0, min(1.0, x_zoom_factor))
+
+        margin_divisor = 3.0 + (3.0 * x_zoom_factor)
+        margin_mm = float(page_width_mm) / max(1e-6, float(margin_divisor))
+        semitone_dist = float(page_width_mm - (2.0 * margin_mm)) / 101.0
+        if semitone_dist <= 1e-6:
+            return {}
+
+        def _time_to_mm(ticks: float) -> float:
+            return float(margin_mm) + (float(ticks) / float(QUARTER_NOTE_UNIT)) * float(zoom_mm_per_quarter)
+
+        def _mm_to_time(mm: float) -> float:
+            return ((float(mm) - float(margin_mm)) / float(zoom_mm_per_quarter)) * float(QUARTER_NOTE_UNIT)
+
+        def _build_x_positions() -> list[float]:
+            from utils.CONSTANT import BE_KEYS, PIANO_KEY_AMOUNT
+            be_set = set(BE_KEYS)
+            x_pos = float(margin_mm - semitone_dist)
+            xs = [x_pos]
+            for key in range(1, int(PIANO_KEY_AMOUNT) + 1):
+                if (key - 1) in be_set:
+                    x_pos += semitone_dist
+                x_pos += semitone_dist
+                xs.append(x_pos)
+            return xs
+
+        x_positions = _build_x_positions()
+
+        notes_by_pitch: dict[int, list[object]] = {}
+        for note_obj in notes:
+            p = int(getattr(note_obj, 'pitch', 0) or 0)
+            if p <= 0:
+                continue
+            notes_by_pitch.setdefault(p, []).append(note_obj)
+
+        notes_by_time_all = sorted(
+            list(notes),
+            key=lambda n: (
+                float(getattr(n, 'time', 0.0) or 0.0),
+                int(getattr(n, 'pitch', 0) or 0),
+            ),
+        )
+
+        def _black_note_above_stem(note_obj, same_time_notes: list[object]) -> bool:
+            rule = str(getattr(layout, 'black_note_rule', 'below_stem') or 'below_stem').strip().lower()
+            if rule == 'above_stem':
+                return True
+
+            n_pitch = int(getattr(note_obj, 'pitch', 0) or 0)
+            n_hand = str(getattr(note_obj, 'hand', 'l') or 'l')
+
+            if rule in ('above_stem_if_collision', 'only_above_stem_if_collision'):
+                for other in same_time_notes:
+                    if int(getattr(other, '_id', 0) or 0) == int(getattr(note_obj, '_id', 0) or 0):
+                        continue
+                    if abs(int(getattr(other, 'pitch', 0) or 0) - n_pitch) == 1:
+                        return True
+                return False
+
+            if rule == 'above_stem_if_chord_and_white_note':
+                rule = 'above_stem_if_chord_and_white_note_same_hand'
+
+            if rule != 'above_stem_if_chord_and_white_note_same_hand':
+                return False
+
+            from utils.CONSTANT import BLACK_KEYS
+            for other in same_time_notes:
+                if int(getattr(other, '_id', 0) or 0) == int(getattr(note_obj, '_id', 0) or 0):
+                    continue
+                if str(getattr(other, 'hand', 'l') or 'l') != n_hand:
+                    continue
+                op = Operator(float(SHORTEST_DURATION))
+                if not op.eq(float(getattr(other, 'time', 0.0) or 0.0), float(getattr(note_obj, 'time', 0.0) or 0.0)):
+                    continue
+                p = int(getattr(other, 'pitch', 0) or 0)
+                if p not in BLACK_KEYS and p != n_pitch:
+                    return True
+            return False
+
+        start_overrides: dict[int, float] = {}
+        op_arp = Operator(float(SHORTEST_DURATION))
+        width_scale = max(0.05, float(getattr(layout, 'note_width_scaling', 1.0) or 1.0)) if layout is not None else 1.0
+        height_scale = max(0.1, float(getattr(layout, 'notehead_height_scaling', 1.0) or 1.0)) if layout is not None else 1.0
+        base_tilt = float(getattr(layout, 'notehead_tilt', 0.0) or 0.0) if layout is not None else 0.0
+        base_tilt = max(-1.0, min(1.0, base_tilt))
+
+        for arp in arps:
+            base_time = float(getattr(arp, 'time', 0.0) or 0.0)
+            rtime1 = float(getattr(arp, 'rtime1', 0.0) or 0.0)
+            rtime2 = float(getattr(arp, 'rtime2', 0.0) or 0.0)
+            if abs(rtime1) <= 1e-9 and abs(rtime2) <= 1e-9:
+                continue
+
+            arp_pitches = [int(p) for p in (getattr(arp, 'note_pitches', []) or []) if int(p) > 0]
+            if len(arp_pitches) < 2:
+                continue
+
+            chord_notes: list[object] = []
+            for pitch in arp_pitches:
+                match_note = None
+                for candidate in notes_by_pitch.get(int(pitch), []):
+                    ctime = float(getattr(candidate, 'time', 0.0) or 0.0)
+                    if op_arp.eq(ctime, base_time):
+                        match_note = candidate
+                        break
+                if match_note is not None:
+                    chord_notes.append(match_note)
+
+            if len(chord_notes) < 2:
+                continue
+
+            chord_sorted = sorted(chord_notes, key=lambda n: int(getattr(n, 'pitch', 0) or 0))
+            y_start = _time_to_mm(base_time + rtime1)
+            y_end = _time_to_mm(base_time + rtime2)
+
+            stem_xs: list[float] = []
+            for note_obj in chord_sorted:
+                pitch = int(getattr(note_obj, 'pitch', 0) or 0)
+                if pitch < 1 or pitch >= len(x_positions):
+                    stem_xs.append(float(margin_mm))
+                else:
+                    stem_xs.append(float(x_positions[pitch]))
+
+            x_line_start = float(stem_xs[0])
+            x_line_end = float(stem_xs[-1])
+            dx_line = float(x_line_end - x_line_start)
+            dy_line = float(y_end - y_start)
+            m_line = float(dy_line / dx_line) if abs(dx_line) > 1e-9 else 0.0
+
+            hand_chord = str(getattr(chord_sorted[0], 'hand', 'l') or 'l')
+            if hand_chord == 'l':
+                anchor_note = chord_sorted[-1]
+                anchor_x = float(stem_xs[-1])
+                anchor_y = float(y_end)
+            else:
+                anchor_note = chord_sorted[0]
+                anchor_x = float(stem_xs[0])
+                anchor_y = float(y_start)
+
+            same_time_notes = [
+                n for n in notes_by_time_all
+                if op_arp.eq(float(getattr(n, 'time', 0.0) or 0.0), base_time)
+            ]
+
+            default_black_above_anchor = _black_note_above_stem(anchor_note, same_time_notes)
+            spec_anchor = resolve_notehead_spec(anchor_note, default_black_above=default_black_above_anchor)
+            is_up_anchor = bool(getattr(spec_anchor, 'is_up', False))
+            outline_anchor = sheared_notehead_outline_points(
+                hand=str(getattr(anchor_note, 'hand', 'l') or 'l'),
+                is_up=is_up_anchor,
+                semitone_space_mm=semitone_dist,
+                width_scale=width_scale,
+                height_scale=height_scale,
+                base_tilt=base_tilt,
+                sample_count=128,
+            )
+            edge_anchor = support_point_from_outline_points(
+                outline_anchor,
+                m_line=m_line,
+                choose_max=bool(is_up_anchor),
+            )
+            stem_end_x = float(anchor_x + edge_anchor[0])
+            stem_end_y = float(anchor_y + edge_anchor[1])
+            b_line = float(stem_end_y - (m_line * stem_end_x))
+
+            support_cache: dict[tuple[str, bool], float] = {}
+            for i, (note_obj, x_stem) in enumerate(zip(chord_sorted, stem_xs)):
+                nid = int(getattr(note_obj, '_id', 0) or 0)
+                if nid <= 0:
+                    continue
+                y_line = float((m_line * float(x_stem)) + b_line)
+
+                if (hand_chord == 'l' and i == len(chord_sorted) - 1) or (hand_chord == 'r' and i == 0):
+                    y_note_mm = float(y_end if hand_chord == 'l' else y_start)
+                else:
+                    default_black_above_local = _black_note_above_stem(note_obj, same_time_notes)
+                    spec_local = resolve_notehead_spec(note_obj, default_black_above=default_black_above_local)
+                    is_up_local = bool(getattr(spec_local, 'is_up', False))
+                    cache_key = (str(getattr(note_obj, 'hand', 'l') or 'l'), is_up_local)
+                    if cache_key not in support_cache:
+                        support_cache[cache_key] = sheared_notehead_support_v(
+                            hand=cache_key[0],
+                            is_up=is_up_local,
+                            semitone_space_mm=semitone_dist,
+                            width_scale=width_scale,
+                            height_scale=height_scale,
+                            base_tilt=base_tilt,
+                            m_line=m_line,
+                            sample_count=64,
+                        )
+                    y_note_mm = float(y_line - float(support_cache[cache_key]))
+
+                start_overrides[nid] = max(0.0, float(_mm_to_time(y_note_mm)))
+
+        return start_overrides
 
     def _iter_playable_events(self, score):
         """Yield (event, duration_units) for normal and grace notes."""

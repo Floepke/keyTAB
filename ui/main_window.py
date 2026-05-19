@@ -18,7 +18,7 @@ from ui.widgets.snap_size_selector import SnapSizeDock
 from ui.widgets.draw_util import DrawUtil
 from ui.widgets.draw_view import DrawUtilView
 from ui.about_dialog import AboutDialog
-from ui.keyboard_shortcuts_dialog import KeyboardShortcutsDialog
+from ui.dialogs.keyboard_shortcuts_dialog import KeyboardShortcutsDialog
 from ui.error_dialog import show_error_dialog
 from ui.style import Style
 from ui.dialogs.fluidsynth_reverb_config_dialog import FluidSynthReverbConfigDialog
@@ -356,6 +356,8 @@ class MainWindow(QtWidgets.QMainWindow):
         self.splitter.styleRequested.connect(self._open_style_dialog)
         self.splitter.infoRequested.connect(self._open_info_dialog)
         self.splitter.lineBreakRequested.connect(self._open_line_break_dialog)
+        self.splitter.selectionLeftRequested.connect(lambda: self._map_selected_notes_hand('l'))
+        self.splitter.selectionRightRequested.connect(lambda: self._map_selected_notes_hand('r'))
         # Any manual splitter movement should return print-view Ctrl/Cmd zoom to idle.
         self.splitter.splitterMoved.connect(self._on_splitter_moved)
         
@@ -2064,7 +2066,7 @@ class MainWindow(QtWidgets.QMainWindow):
     def _open_keyboard_shortcuts_dialog(self) -> None:
         """Show keyboard shortcuts reference card."""
         try:
-            dlg = KeyboardShortcutsDialog(self)
+            dlg = KeyboardShortcutsDialog(self, focus_target=self.editor_canvas)
             dlg.show()
         except Exception:
             pass
@@ -2715,6 +2717,10 @@ class MainWindow(QtWidgets.QMainWindow):
         self._refresh_views_from_score()
         self.editor_controller.set_score(self.file_manager.current())
         self.editor_controller.force_redraw_from_model()
+
+    def _map_selected_notes_hand(self, hand: str) -> None:
+        """Map selected notes to left/right hand through the same canvas path as [ and ]."""
+        self.editor_canvas.apply_selected_notes_hand(hand)
 
     def _edit_copy(self) -> None:
         try:

@@ -235,6 +235,29 @@ class ToolbarHandle(QtWidgets.QSplitterHandle):
         self.line_break_btn.setFixedSize(self._button_size, self._button_size)
         layout.addWidget(self.line_break_btn)
         self.line_break_btn.clicked.connect(parent.lineBreakRequested.emit)
+
+        self.selection_left_btn = QtWidgets.QToolButton(self)
+        self.selection_left_btn.setFocusPolicy(QtCore.Qt.FocusPolicy.NoFocus)
+        ic_selection_left = get_qicon('selection_left', size=(64, 64))
+        if ic_selection_left:
+            self.selection_left_btn.setIcon(ic_selection_left)
+        self.selection_left_btn.setIconSize(QtCore.QSize(self._button_size - 6, self._button_size - 6))
+        self.selection_left_btn.setFixedSize(self._button_size, self._button_size)
+        self.selection_left_btn.setToolTip(self.tr("Set selected notes to left hand. Shortcut: ["))
+        layout.addWidget(self.selection_left_btn)
+        self.selection_left_btn.clicked.connect(parent.selectionLeftRequested.emit)
+
+        self.selection_right_btn = QtWidgets.QToolButton(self)
+        self.selection_right_btn.setFocusPolicy(QtCore.Qt.FocusPolicy.NoFocus)
+        ic_selection_right = get_qicon('selection_right', size=(64, 64))
+        if ic_selection_right:
+            self.selection_right_btn.setIcon(ic_selection_right)
+        self.selection_right_btn.setIconSize(QtCore.QSize(self._button_size - 6, self._button_size - 6))
+        self.selection_right_btn.setFixedSize(self._button_size, self._button_size)
+        self.selection_right_btn.setToolTip(self.tr("Set selected notes to right hand. Shortcut: ]"))
+        layout.addWidget(self.selection_right_btn)
+        self.selection_right_btn.clicked.connect(parent.selectionRightRequested.emit)
+
         layout.addStretch(1)
 
         self.setStyleSheet(
@@ -271,6 +294,8 @@ class ToolbarSplitter(QtWidgets.QSplitter):
     styleRequested = QtCore.Signal()
     infoRequested = QtCore.Signal()
     lineBreakRequested = QtCore.Signal()
+    selectionLeftRequested = QtCore.Signal()
+    selectionRightRequested = QtCore.Signal()
 
     def __init__(self, orientation: QtCore.Qt.Orientation, parent=None):
         super().__init__(orientation, parent)

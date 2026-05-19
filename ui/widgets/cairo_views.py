@@ -110,6 +110,26 @@ class CairoEditorWidget(QtWidgets.QWidget):
     def set_scroll_step_logical_px(self, value: int) -> None:
         self._scroll_step_logical_px = max(1, int(value))
 
+    def apply_selected_notes_hand(self, hand: str) -> bool:
+        """Apply selected-notes hand mapping and refresh cached content.
+
+        Shared by keyboard shortcuts and toolbar buttons so both paths behave identically.
+        """
+        if self._editor is None:
+            return False
+        hand_key = 'l' if str(hand or 'l') == 'l' else 'r'
+        try:
+            changed = bool(self._editor.set_selected_notes_hand(hand_key))
+        except Exception:
+            return False
+        if not changed:
+            return False
+        # Force full redraw (not overlay-only) so note styling updates immediately.
+        self._content_cache_image = None
+        self._content_cache_key = None
+        self.update()
+        return True
+
     def _max_scroll_logical_px(self) -> int:
         scale = max(1.0, float(self._last_dpr))
         vp_px = int(max(1, self.size().width() * scale)) if self._is_horizontal_read_direction() else int(max(1, self.size().height() * scale))
@@ -657,11 +677,7 @@ class CairoEditorWidget(QtWidgets.QWidget):
             if key in (QtCore.Qt.Key_BracketLeft, QtCore.Qt.Key_BracketRight):
                 try:
                     hand = 'l' if key == QtCore.Qt.Key_BracketLeft else 'r'
-                    if self._editor.set_selected_notes_hand(hand):
-                        # Force full redraw (not overlay-only) so note styling updates immediately
-                        self._content_cache_image = None
-                        self._content_cache_key = None
-                        self.update()
+                    if self.apply_selected_notes_hand(hand):
                         ev.accept()
                         return
                 except Exception:
