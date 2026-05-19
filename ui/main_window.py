@@ -2065,11 +2065,8 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def _open_keyboard_shortcuts_dialog(self) -> None:
         """Show keyboard shortcuts reference card."""
-        try:
-            dlg = KeyboardShortcutsDialog(self, focus_target=self.editor_canvas)
-            dlg.show()
-        except Exception:
-            pass
+        dlg = KeyboardShortcutsDialog(self)
+        dlg.show()
 
     def _confirm_exit_to_os_then_close(self) -> None:
         """Ask for explicit OS exit confirmation, then run normal close flow."""
