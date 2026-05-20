@@ -86,7 +86,7 @@ change_log = '''
 - fix: enhance clipboard functionality by tracking start units for better alignment during cut/copy operations.
 - fix: on Windows tooltips now correctly display special characters and multiline text without issues.
 
-1.1.0 (2026-05-11)
+1.1.0beta (2026-05-11)
 - update to 1.1.0: the interface changes and new features are significant enough to warrant a minor version bump.
 - ui change: moved the contextual toolbar to the left side of the editor as a second vertical toolbar.
   * the reason: to have more space for tool buttons on smaller screens.
@@ -101,4 +101,8 @@ change_log = '''
 - improved note/beam rendering pipeline by sharing note stem metrics and reducing repeated geometry work.
 - style dialog visibility workflow updated: visibility toggles now live only in the Visibility tab and correctly sync on style load/apply.
 - general translation/string cleanup and internal drawing/refactor polish across related tools and dialogs.
+
+1.1.1 (2026-06-01)
+- changed under the hood: the editor's internal data structure supports multiple staves per system
+- rebuilded engraver from the ground up to support multiple staves per system
 '''

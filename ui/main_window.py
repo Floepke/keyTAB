@@ -28,7 +28,6 @@ from appdata_manager import get_appdata_manager
 from utils.CONSTANT import UTILS_SAVE_DIR, QUARTER_NOTE_UNIT
 from utils.restart import restart_current_process
 from engraver.engraver import Engraver as LegacyEngraver
-from engraver.engraver2 import Engraver as NewEngraver
 from editor.tool_manager import ToolManager
 from editor.editor import Editor
 from scripting.engine import ScriptEngine
@@ -83,9 +82,8 @@ class MainWindow(QtWidgets.QMainWindow):
             self._show_tooltips_in_panel = True
         self._playhead_last_visible_measure: int | None = None
         self._last_engraver_error_signature: str | None = None
-        # Load persisted engraver backend choice before menus are created so
-        # the Help menu checkbox starts with the correct checked state.
-        self._use_new_engraver = self._get_use_new_engraver_from_appdata()
+        # Keep a single engraver backend while engraver2 is retired.
+        self._use_new_engraver = False
         
         # Install error-backup hook early so any unhandled exception triggers a backup
         self.file_manager.install_error_backup_hook()
@@ -779,14 +777,7 @@ class MainWindow(QtWidgets.QMainWindow):
         about_qt_act = QtGui.QAction(tr("About Qt"), self)
         about_qt_act.setToolTip(tr("Show information about the Qt framework."))
         about_qt_act.triggered.connect(lambda: QtWidgets.QMessageBox.aboutQt(self))
-        self._use_new_engraver_act = QtGui.QAction(tr("Use new engraver (unfinished)"), self)
-        self._use_new_engraver_act.setToolTip(tr("Toggle between legacy engraver and the new engraver backend."))
-        self._use_new_engraver_act.setCheckable(True)
-        self._use_new_engraver_act.setChecked(bool(getattr(self, '_use_new_engraver', False)))
-        self._use_new_engraver_act.triggered.connect(self._switch_engraver_backend)
         help_menu.addAction(shortcuts_act)
-        help_menu.addSeparator()
-        help_menu.addAction(self._use_new_engraver_act)
         help_menu.addSeparator()
         help_menu.addAction(about_act)
         help_menu.addSeparator()
@@ -1487,74 +1478,8 @@ class MainWindow(QtWidgets.QMainWindow):
             return self.tr("Playback using WinMM")
         return self.tr("Playback using System Synth")
 
-    def _get_use_new_engraver_from_appdata(self) -> bool:
-        adm = get_appdata_manager()
-        raw = adm.get("use_new_engraver", False)
-        if isinstance(raw, bool):
-            return raw
-        if isinstance(raw, (int, float)):
-            return bool(raw)
-        if isinstance(raw, str):
-            val = raw.strip().lower()
-            if val in ("1", "true", "yes", "on"):
-                return True
-            if val in ("0", "false", "no", "off", ""):
-                return False
-        return bool(raw)
-
-    def _set_use_new_engraver_to_appdata(self, enabled: bool) -> None:
-        adm = get_appdata_manager()
-        adm.set("use_new_engraver", bool(enabled))
-        adm.save()
-
     def _create_engraver_instance(self):
-        engraver_cls = NewEngraver if bool(getattr(self, "_use_new_engraver", False)) else LegacyEngraver
-        return engraver_cls(self.du, self)
-
-    def _switch_engraver_backend(self, use_new: bool | None = None) -> None:
-        # For checkable QAction signals, trust the action's checked state so
-        # the Help menu label and behavior always stay in sync.
-        action = getattr(self, "_use_new_engraver_act", None)
-        if action is not None:
-            use_new = bool(action.isChecked())
-        else:
-            use_new = bool(use_new)
-        if bool(getattr(self, "_use_new_engraver", False)) == use_new:
-            return
-
-        old_engraver = getattr(self, "engraver", None)
-        if old_engraver is not None:
-            try:
-                old_engraver.engraved.disconnect(self._on_engraver_finished)
-            except Exception:
-                pass
-            try:
-                old_engraver.failed.disconnect(self._on_engraver_failed)
-            except Exception:
-                pass
-            try:
-                old_engraver.shutdown()
-            except Exception:
-                pass
-
-        self._use_new_engraver = use_new
-        if action is not None:
-            try:
-                old_block = bool(action.blockSignals(True))
-                action.setChecked(use_new)
-            finally:
-                action.blockSignals(old_block)
-        self._set_use_new_engraver_to_appdata(use_new)
-        self.engraver = self._create_engraver_instance()
-        self.engraver.engraved.connect(self._on_engraver_finished)
-        self.engraver.failed.connect(self._on_engraver_failed)
-
-        mode_text = self.tr("new") if use_new else self.tr("legacy")
-        self._status(self.tr("Switched to %1 engraver").replace("%1", mode_text), 3000)
-        try:
-            self.engraver.engrave(self._current_score_dict(), pageno=int(getattr(self, '_page_counter', 0)))
-        except Exception:
-            pass
+        return LegacyEngraver(self.du, self)
 
     def _get_playback_mode_from_appdata(self) -> str:
         adm = get_appdata_manager()
