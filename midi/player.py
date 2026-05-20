@@ -15,6 +15,7 @@ from symbol_design.noteheads import resolve_notehead_spec, sheared_notehead_outl
 fluidsynth = None
 _FLUIDSYNTH_AVAILABLE = True
 _FLUIDSYNTH_IMPORT_ERROR = ""
+_FLUIDSYNTH_GAIN_MAX = 4.0
 
 
 def _mido_io_backend():
@@ -284,14 +285,12 @@ class _FluidsynthBackend(_Backend):
                 for step in range(1, steps + 1):
                     if self._fs is not synth:
                         return
-                    synth.setting('synth.gain', float(target_gain) * (step / steps))
+                    # Use self._gain so any external update (e.g. loaded from appdata) is honoured.
+                    synth.setting('synth.gain', float(self._gain) * (step / steps))
                     time.sleep(0.02)
             except Exception:
-                try:
-                    if self._fs is synth:
-                        synth.setting('synth.gain', float(target_gain))
-                except Exception:
-                    pass
+                if self._fs is synth:
+                    synth.setting('synth.gain', float(self._gain))
 
         threading.Thread(target=_worker, name="fluidsynth-startup-unmute", daemon=True).start()
 
@@ -300,7 +299,7 @@ class _FluidsynthBackend(_Backend):
             self._fs.program_select(self._channel, self._sfid, 0, 0)
 
     def set_gain(self, gain: float) -> None:
-        self._gain = max(0.0, float(gain))
+        self._gain = max(0.0, min(_FLUIDSYNTH_GAIN_MAX, float(gain)))
         if self._fs is not None:
             self._fs.setting('synth.gain', self._gain)
 
@@ -782,8 +781,10 @@ class Player:
         self._min_duration_units: float = 4.0
         self._grace_duration_units: float = 32.0  # Default grace note length (32nd note)
 
+        self._load_gain_from_appdata()
         if self._backend is not None:
             self._backend.program_select()
+            self._backend.set_gain(self._gain)
 
         # Load and apply reverb settings for FluidSynth backend
         if self._backend_kind == "fluidsynth" and isinstance(self._backend, _FluidsynthBackend):
@@ -809,13 +810,22 @@ class Player:
         backend._init_synth()
 
     def set_gain(self, gain: float) -> None:
-        g = float(max(0.0, gain))
+        g = float(max(0.0, min(_FLUIDSYNTH_GAIN_MAX, gain)))
         self._gain = g
         if self._backend is not None:
             try:
                 self._backend.set_gain(g)
             except Exception:
                 pass
+
+    def _load_gain_from_appdata(self) -> None:
+        """Load FluidSynth gain from appdata with safe bounds."""
+        from appdata_manager import get_appdata_manager
+        adm = get_appdata_manager()
+        if adm is None:
+            return
+        gain = float(adm.get("fluidsynth_gain", self._gain))
+        self._gain = max(0.0, min(_FLUIDSYNTH_GAIN_MAX, gain))
 
     def _load_reverb_settings_from_appdata(self) -> None:
         """Load and apply reverb settings from appdata to the FluidSynth backend."""

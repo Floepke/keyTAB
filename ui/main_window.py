@@ -1688,6 +1688,7 @@ class MainWindow(QtWidgets.QMainWindow):
                     backend.set_reverb_damp(settings.get('damp', 0.4))
                     backend.set_reverb_width(settings.get('width', 3.0))
                     backend.set_reverb_level(settings.get('level', 0.9))
+                    self.player.set_gain(float(settings.get('gain', 0.35)))
                     self.player.set_playhead_sync_delay_ms(settings.get('playhead_sync_delay_ms', 0))
                     self._status("FluidSynth settings applied", 2000)
         except Exception as exc:

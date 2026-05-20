@@ -3,7 +3,39 @@ import os
 import shutil
 import subprocess
 import sys
+import threading
 import multiprocessing as mp
+
+
+def _install_fluidsynth_warning_filter() -> None:
+    """Globally filter 'fluidsynth: warning: ' lines from native stderr (fd 2)."""
+    saved = os.dup(2)
+    r_fd, w_fd = os.pipe()
+    os.dup2(w_fd, 2)
+    os.close(w_fd)
+
+    def _relay() -> None:
+        buf = b""
+        while True:
+            try:
+                chunk = os.read(r_fd, 4096)
+            except OSError:
+                break
+            if not chunk:
+                break
+            buf += chunk
+            while b"\n" in buf:
+                line, buf = buf.split(b"\n", 1)
+                if not line.startswith(b"fluidsynth: warning: "):
+                    try:
+                        os.write(saved, line + b"\n")
+                    except OSError:
+                        pass
+
+    threading.Thread(target=_relay, daemon=True).start()
+
+
+_install_fluidsynth_warning_filter()
 from pathlib import Path
 from PySide6 import QtCore, QtWidgets, QtGui
 from ui.main_window import MainWindow

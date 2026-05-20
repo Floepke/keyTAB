@@ -94,6 +94,17 @@ class FluidSynthReverbConfigDialog(DialogGeometryMixin, QtWidgets.QDialog):
         fluidsynth_layout = QtWidgets.QFormLayout(fluidsynth_group)
         fluidsynth_layout.setSpacing(12)
 
+        gain_layout = QtWidgets.QHBoxLayout()
+        self._gain_slider = QtWidgets.QSlider(QtCore.Qt.Orientation.Horizontal, self)
+        self._gain_slider.setRange(0, 400)
+        self._gain_slider.setValue(int(self._fluidsynth_gain * 100))
+        self._gain_label = QtWidgets.QLabel(f"{self._fluidsynth_gain:.2f}", self)
+        self._gain_label.setMinimumWidth(50)
+        gain_layout.addWidget(self._gain_slider)
+        gain_layout.addWidget(self._gain_label)
+        fluidsynth_layout.addRow(tr("Output Gain (0-4)"), gain_layout)
+        self._gain_slider.valueChanged.connect(self._update_gain_label)
+
         self._playhead_sync_delay_ms_spin = QtWidgets.QSpinBox(self)
         self._playhead_sync_delay_ms_spin.setRange(-2000, 2000)
         self._playhead_sync_delay_ms_spin.setSingleStep(10)
@@ -142,6 +153,12 @@ class FluidSynthReverbConfigDialog(DialogGeometryMixin, QtWidgets.QDialog):
         self._reverb_level = val
         self._level_label.setText(f"{val:.2f}")
 
+    def _update_gain_label(self, value: int) -> None:
+        """Update gain label and value."""
+        val = value / 100.0
+        self._fluidsynth_gain = val
+        self._gain_label.setText(f"{val:.2f}")
+
     def _reset_to_defaults(self) -> None:
         """Reset all reverb settings to defaults."""
         self._enabled_cb.setChecked(True)
@@ -149,6 +166,7 @@ class FluidSynthReverbConfigDialog(DialogGeometryMixin, QtWidgets.QDialog):
         self._damp_slider.setValue(40)  # 0.4
         self._width_slider.setValue(3)  # 3.0
         self._level_slider.setValue(90)  # 0.9
+        self._gain_slider.setValue(400)  # 4.0
         self._playhead_sync_delay_ms_spin.setValue(0)
 
     def _load_settings(self) -> None:
@@ -158,6 +176,7 @@ class FluidSynthReverbConfigDialog(DialogGeometryMixin, QtWidgets.QDialog):
         self._reverb_damp = float(self._adm.get("fluidsynth_reverb_damp", 0.4))
         self._reverb_width = float(self._adm.get("fluidsynth_reverb_width", 3.0))
         self._reverb_level = float(self._adm.get("fluidsynth_reverb_level", 0.9))
+        self._fluidsynth_gain = float(self._adm.get("fluidsynth_gain", 4.0))
         self._playhead_sync_delay_ms = int(self._adm.get("fluidsynth_playhead_sync_delay_ms", 0))
 
     def _save_settings(self) -> None:
@@ -167,6 +186,7 @@ class FluidSynthReverbConfigDialog(DialogGeometryMixin, QtWidgets.QDialog):
         self._adm.set("fluidsynth_reverb_damp", self._reverb_damp)
         self._adm.set("fluidsynth_reverb_width", self._reverb_width)
         self._adm.set("fluidsynth_reverb_level", self._reverb_level)
+        self._adm.set("fluidsynth_gain", float(self._fluidsynth_gain))
         self._adm.set("fluidsynth_playhead_sync_delay_ms", int(self._playhead_sync_delay_ms))
         self._adm.save()
 
@@ -174,6 +194,7 @@ class FluidSynthReverbConfigDialog(DialogGeometryMixin, QtWidgets.QDialog):
         """Apply settings but keep dialog open so user can hear the changes."""
         # Update from UI
         self._reverb_enabled = self._enabled_cb.isChecked()
+        self._fluidsynth_gain = self._gain_slider.value() / 100.0
         self._playhead_sync_delay_ms = int(self._playhead_sync_delay_ms_spin.value())
 
         # Save to appdata
@@ -186,6 +207,7 @@ class FluidSynthReverbConfigDialog(DialogGeometryMixin, QtWidgets.QDialog):
             'damp': self._reverb_damp,
             'width': self._reverb_width,
             'level': self._reverb_level,
+            'gain': float(self._fluidsynth_gain),
             'playhead_sync_delay_ms': int(self._playhead_sync_delay_ms),
         }
         self.reverb_settings_changed.emit(settings)
@@ -198,5 +220,6 @@ class FluidSynthReverbConfigDialog(DialogGeometryMixin, QtWidgets.QDialog):
             'damp': self._reverb_damp,
             'width': self._reverb_width,
             'level': self._reverb_level,
+            'gain': float(self._fluidsynth_gain),
             'playhead_sync_delay_ms': int(self._playhead_sync_delay_ms),
         }
