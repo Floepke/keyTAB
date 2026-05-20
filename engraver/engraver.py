@@ -59,22 +59,71 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
     default_info: Info = Info()
     events: dict = (score.get('events', {}) or {})
     base_grid: list = list(score.get('base_grid', []) or [])
-    line_breaks: list = list(events.get('line_break', []) or [])
-    notes: list = list(events.get('note', []) or [])
-    grace_notes: list = list(events.get('grace_note', []) or [])
-    count_lines: list = list(events.get('count_line', []) or [])
-    beam_markers: list = list(events.get('beam', []) or [])
-    slurs: list = list(events.get('slur', []) or [])
-    texts: list = list(events.get('text', []) or [])
-    crescendos: list = list(events.get('crescendo', []) or [])
-    decrescendos: list = list(events.get('decrescendo', []) or [])
-    dynamic_symbols: list = list(events.get('dynamic_symbol', []) or [])
-    start_repeats: list = list(events.get('start_repeat', []) or [])
-    end_repeats: list = list(events.get('end_repeat', []) or [])
-    double_bars: list = list(events.get('double_bar', []) or [])
-    tempos: list = list(events.get('tempo', []) or [])
-    pedals: list = list(events.get('pedal', []) or [])
-    arpeggios: list = list(events.get('arpeggio', []) or [])
+
+    staves_raw = list(score.get('staves', []) or [])
+    enabled_staves: list[dict] = []
+    for idx, st in enumerate(staves_raw):
+        if not isinstance(st, dict):
+            continue
+        if not bool(st.get('enabled', True)):
+            continue
+        ev = st.get('events', None)
+        if isinstance(ev, dict):
+            enabled_staves.append({'index': int(idx), 'events': ev})
+
+    if not enabled_staves and isinstance(events, dict):
+        enabled_staves = [{'index': 0, 'events': events}]
+
+    def _tagged_events(source_events: dict, key: str, stave_index: int) -> list[dict]:
+        out: list[dict] = []
+        for item in list(source_events.get(key, []) or []):
+            if not isinstance(item, dict):
+                continue
+            tagged = dict(item)
+            tagged['_stave_i'] = int(stave_index)
+            out.append(tagged)
+        return out
+
+    primary_events = enabled_staves[0]['events'] if enabled_staves else (events if isinstance(events, dict) else {})
+    line_breaks: list = list(primary_events.get('line_break', []) or [])
+    line_breaks_by_stave: dict[int, list] = {
+        int(st['index']): list((st.get('events', {}) or {}).get('line_break', []) or [])
+        for st in enabled_staves
+    }
+
+    notes: list = []
+    grace_notes: list = []
+    count_lines: list = []
+    beam_markers: list = []
+    slurs: list = []
+    texts: list = []
+    crescendos: list = []
+    decrescendos: list = []
+    dynamic_symbols: list = []
+    start_repeats: list = []
+    end_repeats: list = []
+    double_bars: list = []
+    tempos: list = []
+    pedals: list = []
+    arpeggios: list = []
+    for st in enabled_staves:
+        st_idx = int(st.get('index', 0) or 0)
+        st_events = st.get('events', {}) or {}
+        notes.extend(_tagged_events(st_events, 'note', st_idx))
+        grace_notes.extend(_tagged_events(st_events, 'grace_note', st_idx))
+        count_lines.extend(_tagged_events(st_events, 'count_line', st_idx))
+        beam_markers.extend(_tagged_events(st_events, 'beam', st_idx))
+        slurs.extend(_tagged_events(st_events, 'slur', st_idx))
+        texts.extend(_tagged_events(st_events, 'text', st_idx))
+        crescendos.extend(_tagged_events(st_events, 'crescendo', st_idx))
+        decrescendos.extend(_tagged_events(st_events, 'decrescendo', st_idx))
+        dynamic_symbols.extend(_tagged_events(st_events, 'dynamic_symbol', st_idx))
+        start_repeats.extend(_tagged_events(st_events, 'start_repeat', st_idx))
+        end_repeats.extend(_tagged_events(st_events, 'end_repeat', st_idx))
+        double_bars.extend(_tagged_events(st_events, 'double_bar', st_idx))
+        tempos.extend(_tagged_events(st_events, 'tempo', st_idx))
+        pedals.extend(_tagged_events(st_events, 'pedal', st_idx))
+        arpeggios.extend(_tagged_events(st_events, 'arpeggio', st_idx))
 
     # Theme colors
     notation_rgb = Style.get_notation_color()
@@ -154,6 +203,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
             'duration': n_d,
             'pitch': p,
             'hand': hand_key,
+            'stave_i': int(n.get('_stave_i', 0) or 0),
             'id': int(n.get('_id', 0) or 0),
             'idx': int(idx),
             'raw': n,
@@ -177,6 +227,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
         norm_grace.append({
             'time': g_t,
             'pitch': p,
+            'stave_i': int(g.get('_stave_i', 0) or 0),
             'id': int(g.get('_id', 0) or 0),
             'idx': int(idx),
             'raw': g,
@@ -188,6 +239,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
         if not isinstance(s, dict):
             continue
         norm_slurs.append({
+            'stave_i': int(s.get('_stave_i', 0) or 0),
             'x1_rpitch': int(s.get('x1_rpitch', 0) or 0),
             'y1_time': float(s.get('y1_time', 0.0) or 0.0),
             'x2_rpitch': int(s.get('x2_rpitch', 0) or 0),
@@ -205,13 +257,14 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
     # Build endpoint map for connected-slur detection.
     # Maps (x_rpitch, y_time_rounded_4dp) → list of slurs sharing that endpoint.
     # A slur is "connected" at an endpoint when ≥2 slurs share the same (x, y) position.
-    _slur_ep_map: dict[tuple[int, float], list[dict]] = {}
+    _slur_ep_map: dict[tuple[int, int, float], list[dict]] = {}
     for _sl in norm_slurs:
+        _stave_i = int(_sl.get('stave_i', 0) or 0)
         for _ep_x, _ep_t in (
             (int(_sl['x1_rpitch']), round(float(_sl['y1_time']), 4)),
             (int(_sl['x4_rpitch']), round(float(_sl['y4_time']), 4)),
         ):
-            _slur_ep_map.setdefault((_ep_x, _ep_t), []).append(_sl)
+            _slur_ep_map.setdefault((_stave_i, _ep_x, _ep_t), []).append(_sl)
 
     norm_texts: list[dict] = []
     for idx, t in enumerate(texts):
@@ -219,6 +272,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
             continue
         norm_texts.append({
             'time': float(t.get('time', 0.0) or 0.0),
+            'stave_i': int(t.get('_stave_i', 0) or 0),
             'x_rpitch': float(t.get('x_rpitch', 0) or 0),
             'rotation': float(t.get('rotation', 0.0) or 0.0),
             'x_offset_mm': float(t.get('x_offset_mm', 0.0) or 0.0),
@@ -242,6 +296,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
         dur = float(ev.get('duration', 0.0) or 0.0)
         norm_crescendos.append({
             'time': t0,
+            'stave_i': int(ev.get('_stave_i', 0) or 0),
             'duration': dur,
             'end': t0 + dur,
             'x_rpitch': float(ev.get('x_rpitch', 0) or 0),
@@ -259,6 +314,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
         dur = float(ev.get('duration', 0.0) or 0.0)
         norm_decrescendos.append({
             'time': t0,
+            'stave_i': int(ev.get('_stave_i', 0) or 0),
             'duration': dur,
             'end': t0 + dur,
             'x_rpitch': float(ev.get('x_rpitch', 0) or 0),
@@ -276,6 +332,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
         rotation = None if raw_rotation is None else float(raw_rotation)
         norm_dynamic_symbols.append({
             'time': float(ev.get('time', 0.0) or 0.0),
+            'stave_i': int(ev.get('_stave_i', 0) or 0),
             'x_rpitch': float(ev.get('x_rpitch', 0) or 0),
             'symbol': str(ev.get('symbol', '') or ''),
             'rotation': rotation,
@@ -285,12 +342,21 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
     if norm_dynamic_symbols:
         norm_dynamic_symbols = sorted(norm_dynamic_symbols, key=lambda m: float(m.get('time', 0.0) or 0.0))
 
+    all_norm_notes = list(norm_notes)
+    all_norm_grace = list(norm_grace)
+    all_norm_slurs = list(norm_slurs)
+    all_norm_texts = list(norm_texts)
+    all_norm_crescendos = list(norm_crescendos)
+    all_norm_decrescendos = list(norm_decrescendos)
+    all_norm_dynamic_symbols = list(norm_dynamic_symbols)
+
     norm_start_repeats: list[dict] = []
     for idx, ev in enumerate(start_repeats):
         if not isinstance(ev, dict):
             continue
         norm_start_repeats.append({
             'time': float(ev.get('time', 0.0) or 0.0),
+            'stave_i': int(ev.get('_stave_i', 0) or 0),
             'id': int(ev.get('_id', 0) or 0),
             'idx': int(idx),
         })
@@ -303,6 +369,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
             continue
         norm_end_repeats.append({
             'time': float(ev.get('time', 0.0) or 0.0),
+            'stave_i': int(ev.get('_stave_i', 0) or 0),
             'id': int(ev.get('_id', 0) or 0),
             'idx': int(idx),
         })
@@ -315,6 +382,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
             continue
         norm_double_bars.append({
             'time': float(ev.get('time', 0.0) or 0.0),
+            'stave_i': int(ev.get('_stave_i', 0) or 0),
             'id': int(ev.get('_id', 0) or 0),
             'idx': int(idx),
         })
@@ -330,6 +398,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
         tempo_val = int(ev.get('tempo', 60) or 60)
         norm_tempos.append({
             'time': t0,
+            'stave_i': int(ev.get('_stave_i', 0) or 0),
             'duration': dur,
             'end': t0 + dur,
             'tempo': tempo_val,
@@ -341,6 +410,11 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
     if norm_tempos:
         norm_tempos = sorted(norm_tempos, key=lambda m: float(m.get('time', 0.0) or 0.0))
 
+    all_norm_start_repeats = list(norm_start_repeats)
+    all_norm_end_repeats = list(norm_end_repeats)
+    all_norm_double_bars = list(norm_double_bars)
+    all_norm_tempos = list(norm_tempos)
+
     norm_pedals: list[dict] = []
     for idx, ev in enumerate(pedals):
         if not isinstance(ev, dict):
@@ -349,12 +423,16 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
         pedal_type = '^' if type_raw == '^' else 'v'
         norm_pedals.append({
             'time': float(ev.get('time', 0.0) or 0.0),
+            'stave_i': int(ev.get('_stave_i', 0) or 0),
             'type': pedal_type,
             'id': int(ev.get('_id', 0) or 0),
             'idx': int(idx),
         })
     if norm_pedals:
         norm_pedals = sorted(norm_pedals, key=lambda m: float(m.get('time', 0.0) or 0.0))
+
+    all_beam_markers = list(beam_markers)
+    all_count_lines = list(count_lines)
 
     norm_arpeggios: list[dict] = []
     for idx, ev in enumerate(arpeggios):
@@ -366,6 +444,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
         )
         norm_arpeggios.append({
             'time': float(ev.get('time', 0.0) or 0.0),
+            'stave_i': int(ev.get('_stave_i', 0) or 0),
             'rtime1': float(ev.get('rtime1', 0.0) or 0.0),
             'rtime2': float(ev.get('rtime2', 0.0) or 0.0),
             'note_pitches': pitches,
@@ -374,6 +453,8 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
         })
     if norm_arpeggios:
         norm_arpeggios = sorted(norm_arpeggios, key=lambda m: float(m.get('time', 0.0) or 0.0))
+
+    all_norm_arpeggios = list(norm_arpeggios)
 
     pedal_segments: list[dict] = []
     if norm_pedals:
@@ -775,7 +856,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                 return i
         return 0 if key <= line_groups[0]['range_low'] else len(line_groups) - 1
 
-    def _note_range_for_window(t0: float, t1: float) -> tuple[int | None, int | None]:
+    def _note_range_for_window(t0: float, t1: float, stave_index: int | None = None) -> tuple[int | None, int | None]:
         """Find the lowest and highest pitches overlapping a time window.
 
         Problem solved: auto range must reflect actual notes in the window.
@@ -783,6 +864,8 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
         lo = None
         hi = None
         for n in notes:
+            if stave_index is not None and int(n.get('_stave_i', 0) or 0) != int(stave_index):
+                continue
             n_t = float(n.get('time', 0.0) or 0.0)
             n_d = float(n.get('duration', 0.0) or 0.0)
             n_end = n_t + n_d
@@ -815,13 +898,13 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
 
         return [line_groups[gi] for gi in range(min_group, max_group + 1)]
 
-    def _auto_line_keys_and_bounds(t0: float, t1: float) -> tuple[list[dict], list[int], int, int, bool, str]:
+    def _auto_line_keys_and_bounds(t0: float, t1: float, stave_index: int | None = None) -> tuple[list[dict], list[int], int, int, bool, str]:
         """Choose stave keys and bounds automatically for a time window.
 
         Problem solved: auto range must include the clef group and handle
         empty windows without crashing.
         """
-        lo, hi = _note_range_for_window(t0, t1)
+        lo, hi = _note_range_for_window(t0, t1, stave_index=stave_index)
         if lo is None or hi is None:
             grp = line_groups[clef_group_index]
             keys = list(grp['keys'])
@@ -863,39 +946,57 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
 
     # Problem solved: convert line break events into contiguous line windows.
     lines = []
+    system_staves = [int(st.get('index', 0) or 0) for st in enabled_staves]
     for i, lb in enumerate(line_breaks):
         lb_time = float(lb.get('time', 0.0) or 0.0)
         next_time = float(line_breaks[i + 1].get('time', total_ticks) or total_ticks) if i + 1 < len(line_breaks) else total_ticks
         if op_time.lt(next_time, lb_time):
             next_time = lb_time
-        margin_mm = list(lb.get('margin_mm', [10.0, 10.0]) or [10.0, 10.0])
-        if len(margin_mm) < 2:
-            margin_mm = [margin_mm[0] if margin_mm else 10.0, 10.0]
-        stave_range = lb.get('stave_range', 'auto')
-        if stave_range is True:
-            stave_range = 'auto'
-        if isinstance(stave_range, list) and len(stave_range) >= 2:
-            r0 = int(stave_range[0])
-            r1 = int(stave_range[1])
-            if (r0 == 0 and r1 == 0) or (r0 == 1 and r1 == 1):
+        if not system_staves:
+            continue
+        for stave_order, stave_i in enumerate(system_staves):
+            lb_for_stave = lb
+            st_lbs = line_breaks_by_stave.get(int(stave_i), [])
+            if i < len(st_lbs) and isinstance(st_lbs[i], dict):
+                lb_for_stave = st_lbs[i]
+            margin_mm = list(lb_for_stave.get('margin_mm', [10.0, 10.0]) or [10.0, 10.0])
+            if len(margin_mm) < 2:
+                margin_mm = [margin_mm[0] if margin_mm else 10.0, 10.0]
+            stave_range = lb_for_stave.get('stave_range', 'auto')
+            if stave_range is True:
                 stave_range = 'auto'
-        line = {
-            'time_start': lb_time,
-            'time_end': next_time,
-            'margin_left': float(margin_mm[0]),
-            'margin_right': float(margin_mm[1]),
-            'stave_range': stave_range,
-            'page_break': bool(lb.get('page_break', False)),
-        }
-        lines.append(line)
+            if isinstance(stave_range, list) and len(stave_range) >= 2:
+                r0 = int(stave_range[0])
+                r1 = int(stave_range[1])
+                if (r0 == 0 and r1 == 0) or (r0 == 1 and r1 == 1):
+                    stave_range = 'auto'
+            line = {
+                'time_start': lb_time,
+                'time_end': next_time,
+                'margin_left': float(margin_mm[0]),
+                'margin_right': float(margin_mm[1]),
+                'stave_range': stave_range,
+                'page_break': bool(lb.get('page_break', False)),
+                'system_index': int(i),
+                'system_order': int(stave_order),
+                'system_size': int(len(system_staves)),
+                'stave_i': int(stave_i),
+            }
+            lines.append(line)
 
 
     # Problem solved: compute per-line horizontal geometry (margins, ranges).
     semitone_mm = 2 * scale
     key_positions = _build_key_positions(1, PIANO_KEY_AMOUNT, semitone_mm)
     for line in lines:
+        line_stave_i = int(line.get('stave_i', 0) or 0)
+        active_norm_notes = [it for it in norm_notes if int(it.get('stave_i', 0) or 0) == line_stave_i]
         if line['stave_range'] == 'auto':
-            groups, keys, bound_left, bound_right, _, pattern = _auto_line_keys_and_bounds(line['time_start'], line['time_end'])
+            groups, keys, bound_left, bound_right, _, pattern = _auto_line_keys_and_bounds(
+                line['time_start'],
+                line['time_end'],
+                stave_index=line_stave_i,
+            )
             line['visible_keys'] = keys
             line['pattern'] = pattern
         else:
@@ -919,7 +1020,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
         natural_bound_left = int(bound_left)  # stave left before any override
         natural_bound_right = int(bound_right)  # stave right before any override
         low_key_present = bool(bound_left <= 2 or line['stave_range'] != 'auto' and int(requested_lo) <= 2)
-        for item in norm_notes:
+        for item in active_norm_notes:
             n_t = float(item.get('time', 0.0) or 0.0)
             n_end = float(item.get('end', 0.0) or 0.0)
             p = int(item.get('pitch', 0) or 0)
@@ -942,7 +1043,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
         if isinstance(line.get('stave_range'), list):
             _manual_bound_group_low = _group_index_for_key(int(natural_bound_left))
             _manual_bound_group_high = _group_index_for_key(int(natural_bound_right))
-            for item in norm_notes:
+            for item in active_norm_notes:
                 n_t = float(item.get('time', 0.0) or 0.0)
                 n_end = float(item.get('end', 0.0) or 0.0)
                 p = int(item.get('pitch', 0) or 0)
@@ -1005,7 +1106,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
             for seg in ts_segments_in_line:
                 win_start = float(seg.get('start', 0.0) or 0.0)
                 win_end = win_start + float(seg.get('measure_len', 0.0) or 0.0)
-                for item in norm_notes:
+                for item in active_norm_notes:
                     n_t = float(item.get('time', 0.0) or 0.0)
                     n_end = float(item.get('end', 0.0) or 0.0)
                     if op_time.ge(n_t, float(line['time_end'])) or op_time.le(n_end, float(line['time_start'])):
@@ -1040,13 +1141,26 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
             page_w - page_left - page_right - left_reserve - right_reserve,
         )
 
+    systems: list[dict] = []
+    for line in lines:
+        if systems and int(systems[-1]['index']) == int(line.get('system_index', -1)):
+            systems[-1]['lines'].append(line)
+            systems[-1]['total_width'] += float(line.get('total_width', 0.0) or 0.0)
+        else:
+            systems.append({
+                'index': int(line.get('system_index', len(systems)) or len(systems)),
+                'page_break': bool(line.get('page_break', False)),
+                'lines': [line],
+                'total_width': float(line.get('total_width', 0.0) or 0.0),
+            })
+
     pages: list[list[dict]] = []
     cur_page: list[dict] = []
     cur_width = 0.0
-    for line in lines:
+    for system in systems:
         cur_page_index = len(pages)
         cur_available_width = _available_width_for_page(cur_page_index)
-        if line.get('page_break', False):
+        if bool(system.get('page_break', False)):
             if cur_page:
                 pages.append(cur_page)
             elif not pages:
@@ -1055,14 +1169,16 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
             cur_width = 0.0
             cur_page_index = len(pages)
             cur_available_width = _available_width_for_page(cur_page_index)
-        if cur_page and (cur_width + float(line['total_width'])) > cur_available_width:
+        sys_width = float(system.get('total_width', 0.0) or 0.0)
+        if cur_page and (cur_width + sys_width) > cur_available_width:
             pages.append(cur_page)
             cur_page = []
             cur_width = 0.0
             cur_page_index = len(pages)
             cur_available_width = _available_width_for_page(cur_page_index)
-        cur_page.append(line)
-        cur_width += float(line['total_width'])
+        sys_lines = list(system.get('lines', []) or [])
+        cur_page.extend(sys_lines)
+        cur_width += sys_width
     if cur_page:
         pages.append(cur_page)
 
@@ -1230,6 +1346,44 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
         gap = leftover / float(len(page_lines) + 1)
         x_cursor = page_left + line_axis_left_reserve + gap
         for line_index, line in enumerate(page_lines):
+            line_stave_i = int(line.get('stave_i', 0) or 0)
+            norm_notes = [it for it in all_norm_notes if int(it.get('stave_i', 0) or 0) == line_stave_i]
+            norm_grace = [it for it in all_norm_grace if int(it.get('stave_i', 0) or 0) == line_stave_i]
+            norm_slurs = [it for it in all_norm_slurs if int(it.get('stave_i', 0) or 0) == line_stave_i]
+            norm_texts = [it for it in all_norm_texts if int(it.get('stave_i', 0) or 0) == line_stave_i]
+            norm_crescendos = [it for it in all_norm_crescendos if int(it.get('stave_i', 0) or 0) == line_stave_i]
+            norm_decrescendos = [it for it in all_norm_decrescendos if int(it.get('stave_i', 0) or 0) == line_stave_i]
+            norm_dynamic_symbols = [it for it in all_norm_dynamic_symbols if int(it.get('stave_i', 0) or 0) == line_stave_i]
+            norm_start_repeats = [it for it in all_norm_start_repeats if int(it.get('stave_i', 0) or 0) == line_stave_i]
+            norm_end_repeats = [it for it in all_norm_end_repeats if int(it.get('stave_i', 0) or 0) == line_stave_i]
+            norm_double_bars = [it for it in all_norm_double_bars if int(it.get('stave_i', 0) or 0) == line_stave_i]
+            norm_tempos = [it for it in all_norm_tempos if int(it.get('stave_i', 0) or 0) == line_stave_i]
+            norm_arpeggios = [it for it in all_norm_arpeggios if int(it.get('stave_i', 0) or 0) == line_stave_i]
+            count_lines = [it for it in all_count_lines if int(it.get('_stave_i', 0) or 0) == line_stave_i]
+
+            beam_by_hand = {'l': [], 'r': []}
+            for b in all_beam_markers:
+                if int(b.get('_stave_i', 0) or 0) != line_stave_i:
+                    continue
+                bt = float(b.get('time', 0.0) or 0.0)
+                bd = float(b.get('duration', 0.0) or 0.0)
+                hand_raw = str(b.get('hand', 'l') or 'l')
+                hand_key = 'l' if hand_raw == 'l' else 'r'
+                beam_by_hand[hand_key].append({'time': bt, 'duration': bd})
+            for hk in beam_by_hand:
+                beam_by_hand[hk] = sorted(beam_by_hand[hk], key=lambda m: float(m.get('time', 0.0) or 0.0))
+
+            notes_by_hand = {'l': [], 'r': []}
+            starts_by_hand = {'l': [], 'r': []}
+            for item in norm_notes:
+                hand_key = 'l' if str(item.get('hand', 'l') or 'l') == 'l' else 'r'
+                notes_by_hand[hand_key].append(item)
+                starts_by_hand[hand_key].append(float(item.get('time', 0.0) or 0.0))
+            for hk in notes_by_hand:
+                notes_by_hand[hk] = sorted(notes_by_hand[hk], key=lambda m: float(m.get('time', 0.0) or 0.0))
+            for hk in starts_by_hand:
+                starts_by_hand[hk] = sorted(starts_by_hand[hk])
+
             # Shift line_x_start right by the left ledger overhang so left-side
             # ledger stubs land inside the allocated column width.
             _ledger_left_overhang = float(line.get('ledger_left_overhang', 0.0) or 0.0)
@@ -2355,7 +2509,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                     p1_t = float(sl.get('y1_time', 0.0) or 0.0)
                     if round(p1_t, 4) != round(line_end, 4):
                         continue
-                    p1_ep = (int(sl.get('x1_rpitch', 0) or 0), round(p1_t, 4))
+                    p1_ep = (int(line_stave_i), int(sl.get('x1_rpitch', 0) or 0), round(p1_t, 4))
                     if _slur_ep_map.get(p1_ep) and len(_slur_ep_map[p1_ep]) >= 2:
                         line_slur_end_indicators.append(sl)
                 # Connected-slur start-of-line indicators: connected slurs ending at line_start.
@@ -2363,7 +2517,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                     p4_t = float(sl.get('y4_time', 0.0) or 0.0)
                     if round(p4_t, 4) != round(line_start, 4):
                         continue
-                    p4_ep = (int(sl.get('x4_rpitch', 0) or 0), round(p4_t, 4))
+                    p4_ep = (int(line_stave_i), int(sl.get('x4_rpitch', 0) or 0), round(p4_t, 4))
                     if _slur_ep_map.get(p4_ep) and len(_slur_ep_map[p4_ep]) >= 2:
                         line_slur_start_indicators.append(sl)
 
