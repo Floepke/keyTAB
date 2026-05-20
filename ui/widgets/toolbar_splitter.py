@@ -92,18 +92,6 @@ class StaveSelector(QtWidgets.QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(2)
 
-        self.minus_btn = QtWidgets.QToolButton(self)
-        self.minus_btn.setFocusPolicy(QtCore.Qt.FocusPolicy.NoFocus)
-        self.minus_btn.setAutoRaise(True)
-        ic_minus = get_qicon('minus', size=(36, 36))
-        if ic_minus:
-            self.minus_btn.setIcon(ic_minus)
-        else:
-            self.minus_btn.setText('-')
-
-        self.label = QtWidgets.QLabel(self)
-        self.label.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
-
         self.plus_btn = QtWidgets.QToolButton(self)
         self.plus_btn.setFocusPolicy(QtCore.Qt.FocusPolicy.NoFocus)
         self.plus_btn.setAutoRaise(True)
@@ -113,6 +101,18 @@ class StaveSelector(QtWidgets.QWidget):
         else:
             self.plus_btn.setText('+')
 
+        self.label = QtWidgets.QLabel(self)
+        self.label.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
+
+        self.minus_btn = QtWidgets.QToolButton(self)
+        self.minus_btn.setFocusPolicy(QtCore.Qt.FocusPolicy.NoFocus)
+        self.minus_btn.setAutoRaise(True)
+        ic_minus = get_qicon('minus', size=(36, 36))
+        if ic_minus:
+            self.minus_btn.setIcon(ic_minus)
+        else:
+            self.minus_btn.setText('-')
+        
         _s = get_ui_scale()
         _btn = max(1, int(round(26 * _s)))
         _icon = max(1, int(round(17 * _s)))
@@ -122,9 +122,9 @@ class StaveSelector(QtWidgets.QWidget):
         self.plus_btn.setIconSize(QtCore.QSize(_icon, _icon))
         self.label.setMinimumHeight(max(1, int(round(20 * _s))))
 
-        layout.addWidget(self.minus_btn, 0, QtCore.Qt.AlignmentFlag.AlignCenter)
-        layout.addWidget(self.label, 0, QtCore.Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(self.plus_btn, 0, QtCore.Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(self.label, 0, QtCore.Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(self.minus_btn, 0, QtCore.Qt.AlignmentFlag.AlignCenter)
 
         self.minus_btn.clicked.connect(self._decrease)
         self.plus_btn.clicked.connect(self._increase)

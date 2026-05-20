@@ -437,8 +437,12 @@ class SCORE:
 				st.name = f'Stave {i + 1}'
 		return staves
 
-	def _sync_events_staves_legacy_bridge(self) -> None:
-		"""Sync current events into selected stave and keep a safe legacy fallback."""
+	def _sync_events_staves_legacy_bridge(self, commit_to_selected_stave: bool = False) -> None:
+		"""Bridge legacy self.events and stave events without destructive load-time overwrite.
+
+		- commit_to_selected_stave=True: write self.events into selected stave (save path)
+		- commit_to_selected_stave=False: read selected stave into self.events (load/new path)
+		"""
 		if not isinstance(getattr(self, 'staves', None), list) or not self.staves:
 			self.staves = [Stave(name=f'Stave {i + 1}', enabled=True) for i in range(DEFAULT_STAVE_COUNT)]
 		for i, st in enumerate(list(self.staves)):
@@ -451,7 +455,26 @@ class SCORE:
 			idx = int(raw_idx % max(1, len(self.staves)))
 		except Exception:
 			idx = 0
-		self.staves[idx].events = deepcopy(self.events)
+
+		if commit_to_selected_stave:
+			# Save path: commit working legacy container into selected stave.
+			if isinstance(getattr(self, 'events', None), Events):
+				op_load = Operator(float(SHORTEST_DURATION))
+				lb_list = list(getattr(self.events, 'line_break', []) or [])
+				if not lb_list:
+					self.events.line_break = [LineBreak(time=0.0)]
+				elif not any(op_load.eq(float(getattr(lb, 'time', 0.0) or 0.0), 0.0) for lb in lb_list):
+					lb_list.insert(0, LineBreak(time=0.0))
+					lb_list.sort(key=lambda lb: float(getattr(lb, 'time', 0.0) or 0.0))
+					self.events.line_break = lb_list
+			self.staves[idx].events = deepcopy(self.events)
+		else:
+			# Load/new path: never overwrite stave data from legacy container.
+			st_events = getattr(self.staves[idx], 'events', None)
+			if isinstance(st_events, Events):
+				self.events = deepcopy(st_events)
+			elif not isinstance(getattr(self, 'events', None), Events):
+				self.events = Events()
 		# Keep a non-empty legacy fallback stave at index 0.
 		if len(self.staves) > 1 and not isinstance(getattr(self.staves[0], 'events', None), Events):
 			self.staves[0].events = Events()
@@ -581,7 +604,7 @@ class SCORE:
 		# Update modification timestamp before writing
 		self.meta_data.modification_timestamp = _timestamp_now()
 		self.meta_data.extension = '.keytab'
-		self._sync_events_staves_legacy_bridge()
+		self._sync_events_staves_legacy_bridge(commit_to_selected_stave=True)
 		payload = self.get_dict()
 		if isinstance(payload, dict):
 			payload.pop('editor', None)
@@ -761,20 +784,36 @@ class SCORE:
 		return self
 
 	def _ensure_line_break_zero(self) -> None:
-		"""Ensure there is always a line break at time 0."""
-		stave = self.stave_at()
-		if stave is None or getattr(stave, 'events', None) is None:
-			return
-		lb_list = list(getattr(stave.events, 'line_break', []) or [])
-		if not lb_list:
-			stave.events.line_break = [LineBreak(time=0.0)]
-			self.sync_linked_line_breaks()
-			return
+		"""Ensure every stave has a line break at time 0 and keep linked breaks aligned."""
+		staves = list(getattr(self, 'staves', []) or [])
 		op_load = Operator(float(SHORTEST_DURATION))
-		if not any(op_load.eq(float(getattr(lb, 'time', 0.0) or 0.0), 0.0) for lb in lb_list):
-			stave.events.line_break.insert(0, LineBreak(time=0.0))
-		stave.events.line_break.sort(key=lambda lb: float(getattr(lb, 'time', 0.0) or 0.0))
-		self.sync_linked_line_breaks()
+
+		if not staves:
+			if getattr(self, 'events', None) is not None:
+				lb_list = list(getattr(self.events, 'line_break', []) or [])
+				if not lb_list:
+					self.events.line_break = [LineBreak(time=0.0)]
+				elif not any(op_load.eq(float(getattr(lb, 'time', 0.0) or 0.0), 0.0) for lb in lb_list):
+					lb_list.insert(0, LineBreak(time=0.0))
+					lb_list.sort(key=lambda lb: float(getattr(lb, 'time', 0.0) or 0.0))
+					self.events.line_break = lb_list
+			return
+
+		for stave in staves:
+			events = getattr(stave, 'events', None)
+			if events is None:
+				continue
+			lb_list = list(getattr(events, 'line_break', []) or [])
+			if not lb_list:
+				events.line_break = [LineBreak(time=0.0)]
+				continue
+			if not any(op_load.eq(float(getattr(lb, 'time', 0.0) or 0.0), 0.0) for lb in lb_list):
+				lb_list.insert(0, LineBreak(time=0.0))
+			lb_list.sort(key=lambda lb: float(getattr(lb, 'time', 0.0) or 0.0))
+			events.line_break = lb_list
+
+		# Use stave 0 as the canonical source to avoid skipping it when selected stave differs.
+		self.sync_linked_line_breaks(source_stave_index=0)
 
 	def _normalize_events_after_load(self) -> None:
 		"""Normalize event fields after parsing and convert short notes to grace notes."""

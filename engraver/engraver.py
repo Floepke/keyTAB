@@ -34,6 +34,20 @@ from engraver.helpers import (
     scaled_dash_pattern_with_default as _scaled_dash_pattern_with_default,
     should_tune_under_stem_black_width as _should_tune_under_stem_black_width,
 )
+from engraver.drawers.stave_drawer import stave_drawer
+from engraver.drawers.note_drawer import note_drawer
+from engraver.drawers.arpeggio_drawer import arpeggio_drawer
+from engraver.drawers.count_line_drawer import count_line_drawer
+from engraver.drawers.dynamic_drawer import dynamic_drawer
+from engraver.drawers.grace_note_drawer import grace_note_drawer
+from engraver.drawers.grid_band_drawer import grid_band_drawer
+from engraver.drawers.grid_drawer import grid_drawer
+from engraver.drawers.pedal_drawer import pedal_drawer
+from engraver.drawers.repeat_drawer import repeat_drawer
+from engraver.drawers.slur_drawer import slur_drawer
+from engraver.drawers.tempo_drawer import tempo_drawer
+from engraver.drawers.text_drawer import text_drawer
+from engraver.drawers.time_signature_drawer import time_signature_drawer
 
 _MP_CONTEXT = mp.get_context("spawn")
 
@@ -56,7 +70,23 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
     staves_raw: list = list(score.get('staves', []) or [])
     root_events: dict = dict(score.get('events', {}) or {})
 
+    scale = float(layout.get('scale', 1.0) or 1.0)
+    black_key_set = set(BLACK_KEYS)
+    fga_keys = set(key_class_filter('FGA'))
+    be_keys = set(BE_KEYS)
+    clef_low_key = 41
+    clef_high_key = 43
+
+    def _item_get(item, key: str, default=None):
+        if isinstance(item, dict):
+            return item.get(key, default)
+        return getattr(item, key, default)
+
+    def _scaled(value: float) -> float:
+        return float(value) * float(scale)
+
     def _page_dimensions() -> tuple[float, float, float, float, float, float]:
+        # Page dimensions and page margins are never multiplied by layout.scale.
         orientation = str(layout.get('page_orientation', 'portrait') or 'portrait').strip().lower()
         page_w = float(layout.get('page_width_mm', 210.0) or 210.0)
         page_h = float(layout.get('page_height_mm', 297.0) or 297.0)
@@ -68,33 +98,6 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
         page_bottom = float(layout.get('page_bottom_margin_mm', 10.0) or 10.0)
         return page_w, page_h, page_left, page_right, page_top, page_bottom
 
-    def _total_ticks(enabled_staves: list[dict]) -> float:
-        total = 0.0
-        for bg in base_grid:
-            numer = int(bg.get('numerator', 4) or 4)
-            denom = int(bg.get('denominator', 4) or 4)
-            measures = int(bg.get('measure_amount', 1) or 1)
-            measure_ticks = float(numer) * (4.0 / float(max(1, denom))) * float(QUARTER_NOTE_UNIT)
-            total += measure_ticks * float(max(0, measures))
-        if total > 0.0:
-            return total
-
-        max_end = 0.0
-        for st in enabled_staves:
-            for n in list((st.get('events', {}) or {}).get('note', []) or []):
-                if not isinstance(n, dict):
-                    continue
-                t0 = float(n.get('time', 0.0) or 0.0)
-                dur = float(n.get('duration', 0.0) or 0.0)
-                max_end = max(max_end, t0 + dur)
-        for n in list(root_events.get('note', []) or []):
-            if not isinstance(n, dict):
-                continue
-            t0 = float(n.get('time', 0.0) or 0.0)
-            dur = float(n.get('duration', 0.0) or 0.0)
-            max_end = max(max_end, t0 + dur)
-        return max(max_end, float(QUARTER_NOTE_UNIT))
-
     def _collect_enabled_staves() -> list[dict]:
         enabled: list[dict] = []
         for idx, st in enumerate(staves_raw):
@@ -105,187 +108,536 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
             st_events = st.get('events', None)
             if not isinstance(st_events, dict):
                 st_events = {}
-            enabled.append({'index': int(idx), 'stave': st, 'events': st_events})
+            st_scale = float(st.get('scale', 1.0) or 1.0)
+            enabled.append({'index': int(idx), 'events': st_events, 'stave_scale': st_scale})
         if not enabled:
-            enabled.append({'index': 0, 'stave': {}, 'events': root_events})
+            enabled.append({'index': 0, 'events': root_events, 'stave_scale': 1.0})
         return enabled
+
+    def _total_ticks(enabled_staves: list[dict]) -> float:
+        total = 0.0
+        for bg in base_grid:
+            numer = int(_item_get(bg, 'numerator', 4) or 4)
+            denom = int(_item_get(bg, 'denominator', 4) or 4)
+            measures = int(_item_get(bg, 'measure_amount', 1) or 1)
+            measure_ticks = float(numer) * (4.0 / float(max(1, denom))) * float(QUARTER_NOTE_UNIT)
+            total += measure_ticks * float(max(0, measures))
+        if total > 0.0:
+            return total
+        max_end = 0.0
+        for st in enabled_staves:
+            notes = list((st.get('events', {}) or {}).get('note', []) or [])
+            for n in notes:
+                t0 = float(_item_get(n, 'time', 0.0) or 0.0)
+                dur = float(_item_get(n, 'duration', 0.0) or 0.0)
+                max_end = max(max_end, t0 + dur)
+        return max(float(QUARTER_NOTE_UNIT), max_end)
+
+    def _normalize_line_breaks(events_dict: dict) -> list[dict]:
+        raw = list(events_dict.get('line_break', []) or [])
+        out: list[dict] = []
+        for lb in raw:
+            t = float(_item_get(lb, 'time', 0.0) or 0.0)
+            margin_raw = _item_get(lb, 'margin_mm', [5.0, 5.0])
+            if isinstance(margin_raw, (list, tuple)) and len(margin_raw) >= 2:
+                # Keep raw model values here; per-stave scaling is applied later.
+                margin_mm = [float(margin_raw[0] or 0.0), float(margin_raw[1] or 0.0)]
+            else:
+                margin_mm = [5.0, 5.0]
+            sr = _item_get(lb, 'stave_range', 'auto')
+            if isinstance(sr, (list, tuple)) and len(sr) >= 2:
+                lo = int(sr[0] or 1)
+                hi = int(sr[1] or PIANO_KEY_AMOUNT)
+                if hi < lo:
+                    lo, hi = hi, lo
+                stave_range = [max(1, lo), min(PIANO_KEY_AMOUNT, hi)]
+            else:
+                stave_range = 'auto'
+            out.append(
+                {
+                    'time': float(t),
+                    'margin_mm': margin_mm,
+                    'stave_range': stave_range,
+                    'page_break': bool(_item_get(lb, 'page_break', False)),
+                }
+            )
+        if not out:
+            out = [{'time': 0.0, 'margin_mm': [5.0, 5.0], 'stave_range': 'auto', 'page_break': False}]
+        out.sort(key=lambda x: float(x.get('time', 0.0) or 0.0))
+        if float(out[0].get('time', 0.0) or 0.0) > 0.0:
+            out.insert(0, {'time': 0.0, 'margin_mm': [5.0, 5.0], 'stave_range': 'auto', 'page_break': False})
+        return out
+
+    def _line_break_for_time(lb_list: list[dict], t: float) -> dict:
+        if not lb_list:
+            return {'time': 0.0, 'margin_mm': [5.0, 5.0], 'stave_range': 'auto', 'page_break': False}
+        active = lb_list[0]
+        for lb in lb_list:
+            if float(lb.get('time', 0.0) or 0.0) <= float(t):
+                active = lb
+            else:
+                break
+        return active
+
+    base_semitone_model_mm = 2.0
+
+    def _build_key_offsets(semitone_step_mm: float) -> dict[int, float]:
+        offsets: dict[int, float] = {}
+        x_pos = -float(semitone_step_mm)
+        for n in range(1, PIANO_KEY_AMOUNT + 1):
+            if (n - 1) in be_keys:
+                x_pos += float(semitone_step_mm)
+            x_pos += float(semitone_step_mm)
+            offsets[n] = float(x_pos)
+        return offsets
+
+    def _span_width_mm(lo_key: int, hi_key: int, key_offsets_local: dict[int, float], semitone_step_mm: float) -> float:
+        lo = max(1, min(PIANO_KEY_AMOUNT, int(lo_key)))
+        hi = max(1, min(PIANO_KEY_AMOUNT, int(hi_key)))
+        if hi < lo:
+            lo, hi = hi, lo
+        step = max(0.01, float(semitone_step_mm))
+        # Width uses key-to-key distance; adding an extra step here made
+        # system content/outer boxes appear exactly one semitone too wide.
+        return max(step, float(key_offsets_local[hi] - key_offsets_local[lo]))
+
+    groups: list[dict] = [{'kind': 'single', 'start': 1, 'end': 3}]
+    black_keys_sorted = sorted(list(black_key_set))
+    if black_keys_sorted:
+        run: list[int] = [int(black_keys_sorted[0])]
+        run_kind = 'three' if int(black_keys_sorted[0]) in fga_keys else 'two'
+        for key in black_keys_sorted[1:]:
+            k = int(key)
+            k_kind = 'three' if k in fga_keys else 'two'
+            # Group symbols follow black-key order by kind (two-line or three-line),
+            # not numeric adjacency of absolute key numbers.
+            if k_kind == run_kind:
+                run.append(k)
+            else:
+                groups.append({'kind': run_kind, 'start': int(min(run)), 'end': int(max(run))})
+                run = [k]
+                run_kind = k_kind
+        groups.append({'kind': run_kind, 'start': int(min(run)), 'end': int(max(run))})
+
+    black_keys_sorted = sorted([int(k) for k in black_keys_sorted])
+
+    def _nearest_black_floor(key: int) -> int:
+        k = max(1, min(PIANO_KEY_AMOUNT, int(key)))
+        floor_vals = [bk for bk in black_keys_sorted if bk <= k]
+        if floor_vals:
+            return int(floor_vals[-1])
+        return int(black_keys_sorted[0]) if black_keys_sorted else int(k)
+
+    def _nearest_black_ceil(key: int) -> int:
+        k = max(1, min(PIANO_KEY_AMOUNT, int(key)))
+        ceil_vals = [bk for bk in black_keys_sorted if bk >= k]
+        if ceil_vals:
+            return int(ceil_vals[0])
+        return int(black_keys_sorted[-1]) if black_keys_sorted else int(k)
+
+    def _nearest_black(key: int) -> int:
+        k = max(1, min(PIANO_KEY_AMOUNT, int(key)))
+        lo = _nearest_black_floor(k)
+        hi = _nearest_black_ceil(k)
+        if abs(int(k) - int(lo)) <= abs(int(hi) - int(k)):
+            return int(lo)
+        return int(hi)
+
+    def _expand_to_group_bounds(lo_key: int, hi_key: int) -> tuple[int, int, list[dict]]:
+        lo = max(1, min(PIANO_KEY_AMOUNT, int(lo_key)))
+        hi = max(1, min(PIANO_KEY_AMOUNT, int(hi_key)))
+        if hi < lo:
+            lo, hi = hi, lo
+        if black_keys_sorted:
+            # Snap each bound to the nearest black-key symbol center to avoid
+            # directional one-semitone bias at white-key boundaries.
+            lo = _nearest_black(lo)
+            hi = _nearest_black(hi)
+            if hi < lo:
+                lo, hi = hi, lo
+        selected = [g for g in groups if not (int(g['end']) < lo or int(g['start']) > hi)]
+        if not selected:
+            return lo, hi, []
+        out_lo = int(min(int(g['start']) for g in selected))
+        out_hi = int(max(int(g['end']) for g in selected))
+        return out_lo, out_hi, selected
+
+    def _build_lines(enabled_staves: list[dict], total_ticks: float, lb_by_stave: dict[int, list[dict]]) -> list[dict]:
+        starts: list[float] = []
+        for st in enabled_staves:
+            st_idx = int(st.get('index', 0) or 0)
+            starts.extend(float(lb.get('time', 0.0) or 0.0) for lb in lb_by_stave.get(st_idx, []))
+        starts = sorted(list(dict.fromkeys(starts)))
+        if not starts:
+            starts = [0.0]
+        if starts[0] > 0.0:
+            starts.insert(0, 0.0)
+        first_idx = int(enabled_staves[0].get('index', 0) or 0)
+        first_lbs = lb_by_stave.get(first_idx, [])
+        lines: list[dict] = []
+        for i, t0 in enumerate(starts):
+            t1 = starts[i + 1] if i + 1 < len(starts) else float(total_ticks)
+            if t1 <= t0:
+                continue
+            src = _line_break_for_time(first_lbs, t0)
+            lines.append({'start': float(t0), 'end': float(t1), 'page_break': bool(src.get('page_break', False))})
+        if not lines:
+            lines = [{'start': 0.0, 'end': float(total_ticks), 'page_break': False}]
+        return lines
+
+    def _event_in_line(event_type: str, ev, t0: float, t1: float) -> bool:
+        ev_t = float(_item_get(ev, 'time', 0.0) or 0.0)
+        ev_dur = float(_item_get(ev, 'duration', 0.0) or 0.0)
+        timed_spans = {'note', 'grace_note', 'slur', 'pedal', 'line'}
+        if event_type in timed_spans and ev_dur > 0.0:
+            ev_end = ev_t + ev_dur
+            return not (ev_end <= t0 or ev_t >= t1)
+        return t0 <= ev_t < t1
+
+    def _collect_events_for_line(st_events: dict, t0: float, t1: float) -> dict:
+        event_types = [
+            'note', 'arpeggio', 'count_line', 'dynamic', 'grace_note',
+            'grid_band', 'grid', 'pedal', 'start_repeat', 'end_repeat',
+            'slur', 'tempo', 'text', 'time_signature', 'crescendo', 'decrescendo',
+        ]
+        out: dict = {}
+        for ev_type in event_types:
+            items = list(st_events.get(ev_type, []) or [])
+            out[ev_type] = [ev for ev in items if _event_in_line(ev_type, ev, t0, t1)]
+        return out
 
     def _pre_calculate() -> dict:
         page_w, page_h, page_left, page_right, page_top, page_bottom = _page_dimensions()
-        semitone_mm = float(layout.get('semitone_mm', 2.5) or 2.5)
-        stem_length_mm = float(layout.get('stem_length_mm', 6.0) or 6.0)
-        beam_thickness_mm = float(layout.get('beam_thickness_mm', 1.0) or 1.0)
-
         enabled_staves = _collect_enabled_staves()
         total_ticks = _total_ticks(enabled_staves)
-        draw_top = page_top
-        draw_bottom = max(draw_top + 1.0, page_h - page_bottom)
-        draw_h = max(1.0, draw_bottom - draw_top)
 
-        def _time_to_y(tick_time: float) -> float:
-            frac = 0.0 if total_ticks <= 0.0 else max(0.0, min(1.0, float(tick_time) / total_ticks))
-            return draw_top + (frac * draw_h)
+        lb_by_stave: dict[int, list[dict]] = {}
+        for st in enabled_staves:
+            st_idx = int(st.get('index', 0) or 0)
+            lb_by_stave[st_idx] = _normalize_line_breaks(st.get('events', {}) or {})
 
-        stave_precalc: list[dict] = []
-        cursor_x = page_left
-        for st_info in enabled_staves:
-            st = st_info.get('stave', {}) or {}
-            st_events = st_info.get('events', {}) or {}
-            notes = [n for n in list(st_events.get('note', []) or []) if isinstance(n, dict)]
+        lines_raw = _build_lines(enabled_staves, total_ticks, lb_by_stave)
 
-            pitches = [int(n.get('pitch', 0) or 0) for n in notes if 1 <= int(n.get('pitch', 0) or 0) <= PIANO_KEY_AMOUNT]
-            if pitches:
-                key_min = int(min(pitches))
-                key_max = int(max(pitches))
-            else:
-                key_range = list(st.get('key_range', []) or [])
-                if len(key_range) >= 2:
-                    key_min = int(key_range[0])
-                    key_max = int(key_range[1])
-                    if key_max < key_min:
-                        key_min, key_max = key_max, key_min
+        y_start = float(page_top)
+        y_end = float(page_h - page_bottom)
+
+        measured_systems: list[dict] = []
+        for si, line in enumerate(lines_raw):
+            t0 = float(line.get('start', 0.0) or 0.0)
+            t1 = float(line.get('end', t0) or t0)
+            staves_system: list[dict] = []
+            system_reserved_width_mm = 0.0
+
+            for st in enabled_staves:
+                st_idx = int(st.get('index', 0) or 0)
+                st_events = st.get('events', {}) or {}
+                stave_scale = float(st.get('stave_scale', 1.0) or 1.0)
+                composite_scale = float(scale) * float(stave_scale)
+                semitone_mm_stave = float(base_semitone_model_mm) * float(composite_scale)
+                key_offsets_stave = _build_key_offsets(semitone_mm_stave)
+                lb = _line_break_for_time(lb_by_stave.get(st_idx, []), t0)
+                margin_vals = list(lb.get('margin_mm', [5.0, 5.0]) or [5.0, 5.0])
+                margin_left = float((margin_vals[0] if len(margin_vals) > 0 else 5.0) * composite_scale)
+                margin_right = float((margin_vals[1] if len(margin_vals) > 1 else 5.0) * composite_scale)
+
+                notes = list(st_events.get('note', []) or [])
+                pitches: list[int] = []
+                for n in notes:
+                    nt = float(_item_get(n, 'time', 0.0) or 0.0)
+                    nd = float(_item_get(n, 'duration', 0.0) or 0.0)
+                    ne = nt + nd
+                    if ne <= t0 or nt >= t1:
+                        continue
+                    p = int(_item_get(n, 'pitch', 0) or 0)
+                    if 1 <= p <= PIANO_KEY_AMOUNT:
+                        pitches.append(p)
+
+                note_low = int(min(pitches)) if pitches else clef_low_key
+                note_high = int(max(pitches)) if pitches else clef_high_key
+                raw_range = lb.get('stave_range', 'auto')
+
+                if raw_range == 'auto':
+                    mode = 'auto'
+                    base_low = min(note_low, clef_low_key)
+                    base_high = max(note_high, clef_high_key)
+                    manual_range = None
                 else:
-                    key_min, key_max = 1, PIANO_KEY_AMOUNT
+                    mode = 'manual'
+                    sr = list(raw_range if isinstance(raw_range, list) else [1, PIANO_KEY_AMOUNT])
+                    if len(sr) < 2:
+                        sr = [1, PIANO_KEY_AMOUNT]
+                    m_lo = max(1, min(PIANO_KEY_AMOUNT, int(sr[0] or 1)))
+                    m_hi = max(1, min(PIANO_KEY_AMOUNT, int(sr[1] or PIANO_KEY_AMOUNT)))
+                    if m_hi < m_lo:
+                        m_lo, m_hi = m_hi, m_lo
+                    manual_range = [int(m_lo), int(m_hi)]
+                    # Manual range is forced for stave drawing; do not expand by note range.
+                    base_low = int(m_lo)
+                    base_high = int(m_hi)
 
-            note_width_mm = max(semitone_mm, float((key_max - key_min + 1)) * semitone_mm)
-            margin_left_mm = float(st.get('margin_left_mm', 0.0) or 0.0)
-            margin_right_mm = float(st.get('margin_right_mm', 0.0) or 0.0)
+                stave_low, stave_high, stave_groups = _expand_to_group_bounds(base_low, base_high)
+                if mode == 'auto':
+                    # Keep exact existing auto behavior.
+                    span_low, span_high, _span_groups = _expand_to_group_bounds(min(note_low, stave_low), max(note_high, stave_high))
+                else:
+                    # In manual mode, drawing span follows forced stave range.
+                    span_low, span_high = int(stave_low), int(stave_high)
 
-            content_left = cursor_x + margin_left_mm
-            content_right = content_left + note_width_mm
+                stave_width = _span_width_mm(stave_low, stave_high, key_offsets_stave, semitone_mm_stave)
+                stave_content_span_width = _span_width_mm(span_low, span_high, key_offsets_stave, semitone_mm_stave)
+                reserve_left_overhang_mm = 0.0
+                reserve_right_overhang_mm = 0.0
+                total_block = margin_left + reserve_left_overhang_mm + stave_content_span_width + reserve_right_overhang_mm + margin_right
+                system_reserved_width_mm += float(total_block)
 
-            stave_precalc.append(
+                staves_system.append(
+                    {
+                        'stave_index': st_idx,
+                        'mode': mode,
+                        'manual_range': manual_range,
+                        'left_margin_mm': margin_left,
+                        'right_margin_mm': margin_right,
+                        'note_pitch_low': note_low,
+                        'note_pitch_high': note_high,
+                        'stave_low_key': stave_low,
+                        'stave_high_key': stave_high,
+                        'note_span_low_key': span_low,
+                        'note_span_high_key': span_high,
+                        'stave_width_mm': stave_width,
+                        'stave_content_span_width_mm': stave_content_span_width,
+                        'reserve_left_overhang_mm': reserve_left_overhang_mm,
+                        'reserve_right_overhang_mm': reserve_right_overhang_mm,
+                        'group_segments': list(stave_groups),
+                        'stave_scale': stave_scale,
+                        'composite_scale': composite_scale,
+                        'semitone_mm': semitone_mm_stave,
+                        'key_offsets': key_offsets_stave,
+                        'events_in_line': _collect_events_for_line(st_events, t0, t1),
+                    }
+                )
+
+            measured_systems.append(
                 {
-                    'stave_index': int(st_info.get('index', 0) or 0),
-                    'events': st_events,
-                    'notes': notes,
-                    'key_min': key_min,
-                    'key_max': key_max,
-                    'content_left_x_mm': float(content_left),
-                    'content_right_x_mm': float(content_right),
-                    'outer_left_x_mm': float(content_left),
-                    'outer_right_x_mm': float(content_right),
-                    'margin_left_mm': float(margin_left_mm),
-                    'margin_right_mm': float(margin_right_mm),
-                    'stave_width_mm': float(note_width_mm),
-                    'beam_segments': [],
+                    'system_index': int(si),
+                    'time_start': t0,
+                    'time_end': t1,
+                    'page_break': bool(line.get('page_break', False)),
+                    'system_reserved_width_mm': float(system_reserved_width_mm),
+                    'staves': staves_system,
+                    'y_start_mm': y_start,
+                    'y_end_mm': y_end,
                 }
             )
-            cursor_x = content_right + margin_right_mm
 
-        # Beam segments are pre-calculated as concrete draw coordinates.
-        for stv in stave_precalc:
-            notes = list(stv.get('notes', []) or [])
-            notes_by_time = sorted(notes, key=lambda n: float(n.get('time', 0.0) or 0.0))
-            beam_markers = [b for b in list((stv.get('events', {}) or {}).get('beam', []) or []) if isinstance(b, dict)]
+        available_w = float(page_w - page_left - page_right)
+        pages: list[dict] = []
+        current = {'page_index': 0, 'systems': [], 'used_width_mm': 0.0}
 
-            def _key_to_x(pitch: int) -> float:
-                pitch_clamped = max(1, min(PIANO_KEY_AMOUNT, int(pitch)))
-                return float(stv['content_left_x_mm']) + float(pitch_clamped - int(stv['key_min'])) * semitone_mm
+        for system in measured_systems:
+            if bool(system.get('page_break', False)):
+                pages.append(current)
+                current = {'page_index': len(pages), 'systems': [], 'used_width_mm': 0.0}
 
-            for marker in beam_markers:
-                t0 = float(marker.get('time', 0.0) or 0.0)
-                dur = float(marker.get('duration', 0.0) or 0.0)
-                t1 = t0 + max(0.0, dur)
-                hand = 'r' if str(marker.get('hand', 'l') or 'l') == 'r' else 'l'
+            system_w = float(system.get('system_reserved_width_mm', 0.0) or 0.0)
+            if current['systems'] and (float(current['used_width_mm']) + system_w > available_w):
+                pages.append(current)
+                current = {'page_index': len(pages), 'systems': [], 'used_width_mm': 0.0}
 
-                group = [
-                    n for n in notes_by_time
-                    if float(n.get('time', 0.0) or 0.0) >= t0 and float(n.get('time', 0.0) or 0.0) < t1
-                ]
-                if len(group) < 2:
-                    continue
+            current['systems'].append(system)
+            current['used_width_mm'] = float(current['used_width_mm']) + system_w
 
-                first_note = group[0]
-                last_note = group[-1]
-                if hand == 'r':
-                    ref_first = max(group, key=lambda n: int(n.get('pitch', 0) or 0))
-                    ref_last = ref_first
-                    x1 = _key_to_x(int(ref_first.get('pitch', 0) or 0)) + stem_length_mm
-                    x2 = _key_to_x(int(ref_last.get('pitch', 0) or 0)) + stem_length_mm
+        pages.append(current)
+
+        for page in pages:
+            used = float(page.get('used_width_mm', 0.0) or 0.0)
+            rest = float(available_w - used)
+            over = float(max(0.0, -rest))
+            rest = float(max(0.0, rest))
+            systems_on_page = list(page.get('systems', []) or [])
+            system_count = len(systems_on_page)
+            # Centering rule after system-level packing:
+            # distribute free width over (systems + 1) slots to create equal
+            # leading/inter-system/trailing spacing on the page.
+            rest_per_slot = (rest / float(system_count + 1)) if system_count > 0 else 0.0
+
+            x_cursor = float(page_left + rest_per_slot)
+            for sys in systems_on_page:
+                staves_sys = list(sys.get('staves', []) or [])
+                system_outer_left_mm = float(x_cursor)
+                local_x = float(system_outer_left_mm)
+                for stv in staves_sys:
+                    ml = float(stv.get('left_margin_mm', 0.0) or 0.0)
+                    mr = float(stv.get('right_margin_mm', 0.0) or 0.0)
+                    base_span_w = float(stv.get('stave_content_span_width_mm', 0.0) or 0.0)
+                    reserve_left = float(stv.get('reserve_left_overhang_mm', 0.0) or 0.0)
+                    reserve_right = float(stv.get('reserve_right_overhang_mm', 0.0) or 0.0)
+                    span_w = float(base_span_w + reserve_left + reserve_right)
+                    span_low = int(stv.get('note_span_low_key', 1) or 1)
+                    key_offsets_stave = dict(stv.get('key_offsets', {}) or {})
+                    composite_scale = float(stv.get('composite_scale', scale) or scale)
+
+                    span_left = float(local_x + ml - reserve_left)
+                    span_right = float(span_left + span_w)
+
+                    def _key_to_x(key: int) -> float:
+                        k = max(1, min(PIANO_KEY_AMOUNT, int(key)))
+                        if not key_offsets_stave:
+                            return float(span_left)
+                        return float(span_left + (key_offsets_stave[k] - key_offsets_stave[span_low]))
+
+                    stave_low = int(stv.get('stave_low_key', 1) or 1)
+                    stave_high = int(stv.get('stave_high_key', PIANO_KEY_AMOUNT) or PIANO_KEY_AMOUNT)
+                    black_lines = []
+                    for key in range(stave_low, stave_high + 1):
+                        if key not in black_key_set:
+                            continue
+                        if key in (clef_low_key, clef_high_key):
+                            kind = 'clef'
+                            width = float(float(layout.get('stave_clef_line_thickness_mm', 0.75) or 0.75) * composite_scale)
+                            dash = list(layout.get('stave_clef_line_dash_pattern_mm', [4.0, 3.0]) or [4.0, 3.0])
+                            dash = [max(0.01, float(d) * composite_scale) for d in dash]
+                        elif key in fga_keys:
+                            kind = 'three'
+                            width = float(float(layout.get('stave_three_line_thickness_mm', 1.1) or 1.1) * composite_scale)
+                            dash = None
+                        else:
+                            kind = 'two'
+                            width = float(float(layout.get('stave_two_line_thickness_mm', 0.5) or 0.5) * composite_scale)
+                            dash = None
+                        black_lines.append({'key': key, 'x_mm': _key_to_x(key), 'kind': kind, 'width_mm': width, 'dash': dash})
+
+                    stv['stave_content_span_left_mm'] = span_left
+                    stv['stave_left_mm'] = _key_to_x(stave_low)
+                    stv['black_lines'] = black_lines
+
+                    local_x = float(span_right + mr)
+
+                system_outer_width_mm = float(local_x - system_outer_left_mm)
+                if staves_sys:
+                    stave_lefts = [float(stv.get('stave_left_mm', system_outer_left_mm)) for stv in staves_sys]
+                    stave_rights = [
+                        float(stv.get('stave_left_mm', system_outer_left_mm))
+                        + float(stv.get('stave_width_mm', 0.0) or 0.0)
+                        for stv in staves_sys
+                    ]
+                    content_lefts = [float(stv.get('stave_content_span_left_mm', system_outer_left_mm)) for stv in staves_sys]
+                    content_rights = [
+                        float(stv.get('stave_content_span_left_mm', system_outer_left_mm))
+                        + float(stv.get('stave_content_span_width_mm', 0.0) or 0.0)
+                        for stv in staves_sys
+                    ]
+                    system_stave_left_mm = float(min(stave_lefts))
+                    system_stave_width_mm = float(max(stave_rights) - min(stave_lefts))
+                    system_content_left_mm = float(min(content_lefts))
+                    system_content_width_mm = float(max(content_rights) - min(content_lefts))
                 else:
-                    ref_first = min(group, key=lambda n: int(n.get('pitch', 0) or 0))
-                    ref_last = ref_first
-                    x1 = _key_to_x(int(ref_first.get('pitch', 0) or 0)) - stem_length_mm
-                    x2 = _key_to_x(int(ref_last.get('pitch', 0) or 0)) - stem_length_mm
+                    system_stave_left_mm = float(system_outer_left_mm)
+                    system_stave_width_mm = float(system_outer_width_mm)
+                    system_content_left_mm = float(system_outer_left_mm)
+                    system_content_width_mm = float(system_outer_width_mm)
 
-                y1 = _time_to_y(float(first_note.get('time', 0.0) or 0.0))
-                y2 = _time_to_y(float(last_note.get('time', 0.0) or 0.0))
-                seg = {
-                    'stave_index': int(stv.get('stave_index', 0) or 0),
-                    'hand': hand,
-                    'x1_mm': float(x1),
-                    'y1_mm': float(y1),
-                    'x2_mm': float(x2),
-                    'y2_mm': float(y2),
-                    'time_start': float(t0),
-                    'time_end': float(t1),
-                }
-                stv['beam_segments'].append(seg)
+                sys['system_outer_left_mm'] = float(system_outer_left_mm)
+                sys['system_outer_width_mm'] = float(system_outer_width_mm)
+                sys['system_stave_left_mm'] = float(system_stave_left_mm)
+                sys['system_stave_width_mm'] = float(system_stave_width_mm)
+                sys['system_content_left_mm'] = float(system_content_left_mm)
+                sys['system_content_width_mm'] = float(system_content_width_mm)
 
-                seg_left = min(float(x1), float(x2)) - beam_thickness_mm * 0.5
-                seg_right = max(float(x1), float(x2)) + beam_thickness_mm * 0.5
-                stv['outer_left_x_mm'] = min(float(stv['outer_left_x_mm']), seg_left)
-                stv['outer_right_x_mm'] = max(float(stv['outer_right_x_mm']), seg_right)
+                x_cursor = float(system_outer_left_mm + system_outer_width_mm + rest_per_slot)
 
-            stv['stave_outer_width_mm'] = float(stv['outer_right_x_mm']) - float(stv['outer_left_x_mm'])
-
-        if stave_precalc:
-            system_left = min(float(st['outer_left_x_mm']) for st in stave_precalc)
-            system_right = max(float(st['outer_right_x_mm']) for st in stave_precalc)
-        else:
-            system_left = page_left
-            system_right = page_left
+            page['rest_space_mm'] = rest
+            page['over_space_mm'] = over
+            page['rest_space_per_slot_mm'] = rest_per_slot
 
         return {
-            'page': {
-                'width_mm': float(page_w),
-                'height_mm': float(page_h),
-                'left_margin_mm': float(page_left),
-                'right_margin_mm': float(page_right),
-                'top_margin_mm': float(page_top),
-                'bottom_margin_mm': float(page_bottom),
-            },
-            'timeline': {
-                'total_ticks': float(total_ticks),
-                'draw_top_mm': float(draw_top),
-                'draw_bottom_mm': float(draw_bottom),
-            },
-            'staves': stave_precalc,
-            'system': {
-                'left_x_mm': float(system_left),
-                'right_x_mm': float(system_right),
-                'width_mm': max(0.0, float(system_right) - float(system_left)),
-            },
+            'page_width_mm': float(page_w),
+            'page_height_mm': float(page_h),
+            'page_left_margin_mm': float(page_left),
+            'page_right_margin_mm': float(page_right),
+            'page_top_margin_mm': float(page_top),
+            'page_bottom_margin_mm': float(page_bottom),
+            'layout': dict(layout),
+            'pages': pages,
         }
 
     def _draw(precalc: dict) -> None:
-        page = precalc.get('page', {}) or {}
-        system = precalc.get('system', {}) or {}
-        timeline = precalc.get('timeline', {}) or {}
-
-        page_w = float(page.get('width_mm', 210.0) or 210.0)
-        page_h = float(page.get('height_mm', 297.0) or 297.0)
-        y_top = float(timeline.get('draw_top_mm', 10.0) or 10.0)
-        y_bottom = float(timeline.get('draw_bottom_mm', page_h - 10.0) or (page_h - 10.0))
-        x_left = float(system.get('left_x_mm', 10.0) or 10.0)
-        x_right = float(system.get('right_x_mm', x_left) or x_left)
+        page_w = float(precalc.get('page_width_mm', 210.0) or 210.0)
+        page_h = float(precalc.get('page_height_mm', 297.0) or 297.0)
+        pages = list(precalc.get('pages', []) or [])
+        layout_ctx = dict(precalc.get('layout', {}) or {})
 
         du._pages = []
         du._current_index = -1
-        du.new_page(page_w, page_h)
 
-        du.add_rectangle(
-            x_left,
-            y_top,
-            x_right,
-            y_bottom,
-            stroke_color=(0.85, 0.2, 0.2, 0.95),
-            stroke_width_mm=0.5,
-            fill_color=None,
-            dash_pattern=[2.5, 1.5],
-            tags=['system-debug-rect'],
-        )
+        for page in pages:
+            du.new_page(page_w, page_h)
+            for system in list(page.get('systems', []) or []):
+                y0 = float(system.get('y_start_mm', 0.0) or 0.0)
+                y1 = float(system.get('y_end_mm', 0.0) or 0.0)
+                x0 = float(system.get('system_outer_left_mm', 0.0) or 0.0)
+                w0 = float(system.get('system_outer_width_mm', 0.0) or 0.0)
+                x1 = float(x0 + w0)
+                cx0 = float(system.get('system_content_left_mm', x0) or x0)
+                cw0 = float(system.get('system_content_width_mm', w0) or w0)
+                cx1 = float(cx0 + cw0)
+
+                # Red: full outer system footprint (including margins + rest-slot edges).
+                du.add_rectangle(
+                    x0,
+                    y0,
+                    x1,
+                    y1,
+                    stroke_color=(0.75, 0.25, 0.25, 0.75),
+                    stroke_width_mm=0.3,
+                    fill_color=None,
+                    dash_pattern=[1.5, 1.0],
+                    tags=['system-debug-rect'],
+                )
+                # # Green: inner content bounds where stave symbols are drawn.
+                # du.add_rectangle(
+                #     cx0,
+                #     y0,
+                #     cx1,
+                #     y1,
+                #     stroke_color=(0.15, 0.65, 0.25, 0.85),
+                #     stroke_width_mm=1,
+                #     fill_color=None,
+                #     dash_pattern=None,
+                #     tags=['system-debug-content-rect'],
+                # )
+
+                # Each drawer reads only pre-calculated data and DrawUtil.
+                drawer_payload = {
+                    'layout': layout_ctx,
+                    'page': page,
+                    'system': system,
+                    'y0': y0,
+                    'y1': y1,
+                    'system_outer_left_mm': x0,
+                    'system_outer_width_mm': w0,
+                    'system_content_left_mm': cx0,
+                    'system_content_width_mm': cw0,
+                }
+                stave_drawer(du, drawer_payload)
+                # grid_band_drawer(du, drawer_payload)
+                # grid_drawer(du, drawer_payload)
+                # count_line_drawer(du, drawer_payload)
+                # time_signature_drawer(du, drawer_payload)
+                # tempo_drawer(du, drawer_payload)
+                # text_drawer(du, drawer_payload)
+                # dynamic_drawer(du, drawer_payload)
+                # pedal_drawer(du, drawer_payload)
+                # repeat_drawer(du, drawer_payload)
+                # arpeggio_drawer(du, drawer_payload)
+                # slur_drawer(du, drawer_payload)
+                # grace_note_drawer(du, drawer_payload)
+                # note_drawer(du, drawer_payload)
+
+        if du.page_count() > 0:
+            try:
+                du.set_current_page(max(0, min(int(pageno), du.page_count() - 1)))
+            except Exception:
+                pass
 
     pre_calculated = _pre_calculate()
     _draw(pre_calculated)
