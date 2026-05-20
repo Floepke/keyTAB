@@ -148,7 +148,8 @@ class LineBreakDialog(DialogGeometryMixin, QtWidgets.QDialog):
         lay.setSpacing(8)
 
         self._score = score
-        self._line_breaks: list[LineBreak] = list(getattr(score.events, 'line_break', []) or []) if score is not None else []
+        self._active_stave_index = self._resolve_active_stave_index()
+        self._line_breaks: list[LineBreak] = []
         self._selected_line_break: Optional[LineBreak] = selected_line_break if selected_line_break in self._line_breaks else (self._line_breaks[0] if self._line_breaks else None)
         self._measure_resolver = measure_resolver
         self._on_change_cb = on_change
@@ -158,6 +159,9 @@ class LineBreakDialog(DialogGeometryMixin, QtWidgets.QDialog):
         self._measure_grouping_text = str(getattr(self._layout, 'measure_grouping', "") or "") if self._layout is not None else ""
         self._measure_starts_mm: list[float] = self._build_measure_starts()
         self._suppress_measure_change: bool = False
+
+        self.stave_label = QtWidgets.QLabel(self.tr("Editing stave 1 / 1"), self)
+        lay.addWidget(self.stave_label)
 
         list_label = QtWidgets.QLabel(self.tr("Line/Page break markers:"), self)
         self.break_table = QtWidgets.QTableWidget(self)
@@ -257,15 +261,100 @@ class LineBreakDialog(DialogGeometryMixin, QtWidgets.QDialog):
         self.valuesChanged.connect(self._on_values_changed)
 
         # Initialize
-        self._populate_break_list()
-        if self._selected_line_break is None and self._line_breaks:
-            self._selected_line_break = self._line_breaks[0]
-        self._select_line_break(self._selected_line_break)
+        self._reload_line_breaks(keep_row=False)
         self._validate_form()
 
         self.break_table.currentCellChanged.connect(lambda _r, _c, _pr, _pc: self._on_break_selected())
 
         QtCore.QTimer.singleShot(0, self._focus_first)
+
+        try:
+            parent = self.parent()
+            splitter = getattr(parent, 'splitter', None)
+            if splitter is not None and hasattr(splitter, 'staveSelectionRequested'):
+                splitter.staveSelectionRequested.connect(self.set_selected_stave_index)
+        except Exception:
+            pass
+    def _resolve_active_stave_index(self) -> int:
+        if self._score is None:
+            return 0
+        staves = list(getattr(self._score, 'staves', []) or [])
+        if not staves:
+            return 0
+        try:
+            raw = int(getattr(getattr(self._score, 'app_state', None), 'selected_stave_index', 0) or 0)
+        except Exception:
+            raw = 0
+        return int(raw % len(staves))
+
+    def _current_stave_events(self):
+        if self._score is None:
+            return None
+        staves = list(getattr(self._score, 'staves', []) or [])
+        if not staves:
+            return getattr(self._score, 'events', None)
+        idx = max(0, min(self._active_stave_index, len(staves) - 1))
+        stave = staves[idx]
+        return getattr(stave, 'events', None) or getattr(self._score, 'events', None)
+
+    def _current_stave_line_breaks(self) -> list[LineBreak]:
+        events = self._current_stave_events()
+        return list(getattr(events, 'line_break', []) or []) if events is not None else []
+
+    def _update_stave_label(self) -> None:
+        total = len(getattr(self._score, 'staves', []) or []) if self._score is not None else 0
+        stave_name = self.tr("Stave {idx}").format(idx=self._active_stave_index + 1)
+        if self._score is not None:
+            staves = list(getattr(self._score, 'staves', []) or [])
+            if 0 <= self._active_stave_index < len(staves):
+                candidate = str(getattr(staves[self._active_stave_index], 'name', '') or '').strip()
+                if candidate:
+                    stave_name = candidate
+        if total <= 0:
+            self.stave_label.setText(self.tr("Editing stave: {name}").format(name=stave_name))
+            return
+        self.stave_label.setText(
+            self.tr("Editing stave {idx} / {total}: {name}").format(
+                idx=self._active_stave_index + 1,
+                total=total,
+                name=stave_name,
+            )
+        )
+
+    def set_selected_stave_index(self, stave_index: int) -> None:
+        if self._score is None:
+            return
+        staves = list(getattr(self._score, 'staves', []) or [])
+        if not staves:
+            return
+        normalized = int(int(stave_index) % len(staves))
+        if normalized == self._active_stave_index and self._line_breaks:
+            return
+        self._active_stave_index = normalized
+        try:
+            app_state = getattr(self._score, 'app_state', None)
+            if app_state is not None:
+                app_state.selected_stave_index = int(normalized)
+        except Exception:
+            pass
+        self._reload_line_breaks(keep_row=True)
+
+    def _reload_line_breaks(self, keep_row: bool = True) -> None:
+        current_row = self.break_table.currentRow() if keep_row else -1
+        self._line_breaks = self._current_stave_line_breaks()
+        self._measure_starts_mm = self._build_measure_starts()
+        self._update_stave_label()
+        self._populate_break_list()
+        if self._line_breaks:
+            if keep_row and current_row >= 0:
+                row = max(0, min(current_row, len(self._line_breaks) - 1))
+                self._selected_line_break = self._line_breaks[row]
+            else:
+                self._selected_line_break = self._line_breaks[0]
+        else:
+            self._selected_line_break = None
+        self._select_line_break(self._selected_line_break)
+        self._validate_form()
 
     def _marker_label(self, is_page: bool) -> str:
         # Keep marker glyphs localizable (e.g. Dutch uses R for "Regel").
@@ -524,6 +613,8 @@ class LineBreakDialog(DialogGeometryMixin, QtWidgets.QDialog):
             lb.page_break = not bool(getattr(lb, 'page_break', False))
             type_btn.setText(self._marker_label(bool(lb.page_break)))
             type_btn.setToolTip(self.tr("Page break.") if lb.page_break else self.tr("Line break."))
+            if hasattr(self._score, 'sync_linked_line_breaks'):
+                self._score.sync_linked_line_breaks(self._active_stave_index)
             self.valuesChanged.emit()
 
         def _left_changed(val: float) -> None:
@@ -553,6 +644,8 @@ class LineBreakDialog(DialogGeometryMixin, QtWidgets.QDialog):
                     self._line_breaks.sort(key=lambda b: float(getattr(b, 'time', 0.0) or 0.0))
                 except Exception:
                     pass
+                if hasattr(self._score, 'sync_linked_line_breaks'):
+                    self._score.sync_linked_line_breaks(self._active_stave_index)
                 self._populate_break_list()
                 self._select_line_break(lb)
                 self.valuesChanged.emit()
@@ -578,13 +671,17 @@ class LineBreakDialog(DialogGeometryMixin, QtWidgets.QDialog):
                     return
                 if self._score is not None:
                     try:
-                        self._score.events.line_break.remove(lb)
+                        current_events = self._current_stave_events()
+                        if current_events is not None:
+                            current_events.line_break.remove(lb)
                     except Exception:
                         pass
                 try:
                     self._line_breaks.remove(lb)
                 except Exception:
                     pass
+                if hasattr(self._score, 'sync_linked_line_breaks'):
+                    self._score.sync_linked_line_breaks(self._active_stave_index)
                 self._populate_break_list()
                 self.valuesChanged.emit()
             except Exception:
@@ -627,22 +724,6 @@ class LineBreakDialog(DialogGeometryMixin, QtWidgets.QDialog):
             return
         self._selected_line_break = lb
 
-    def _reload_line_breaks(self) -> None:
-        if self._score is not None:
-            try:
-                self._line_breaks = list(getattr(self._score.events, 'line_break', []) or [])
-            except Exception:
-                self._line_breaks = []
-        self._measure_starts_mm = self._build_measure_starts()
-        self._populate_break_list()
-        if self._line_breaks:
-            self._selected_line_break = self._line_breaks[0]
-        else:
-            self._selected_line_break = None
-        self._select_line_break(self._selected_line_break)
-        self._validate_form()
-        self.valuesChanged.emit()
-
     def _parse_grouping(self, text: str) -> Optional[list[int]]:
         parts = [p for p in (text or "").strip().split() if p.strip()]
         if not parts:
@@ -675,6 +756,8 @@ class LineBreakDialog(DialogGeometryMixin, QtWidgets.QDialog):
         except Exception:
             ok = False
         if ok:
+            if hasattr(self._score, 'sync_linked_line_breaks'):
+                self._score.sync_linked_line_breaks(self._active_stave_index)
             self._reload_line_breaks()
         else:
             self.msg_label.setText(self.tr("Could not apply measure grouping."))
@@ -697,6 +780,8 @@ class LineBreakDialog(DialogGeometryMixin, QtWidgets.QDialog):
                 margin_mm[1] = float(val)
             lb.margin_mm = list(margin_mm)
         self._populate_break_list()
+        if hasattr(self._score, 'sync_linked_line_breaks'):
+            self._score.sync_linked_line_breaks(self._active_stave_index)
         self.valuesChanged.emit()
 
     def _prompt_margin_value(self, title: str, label: str, initial_value: float) -> Optional[float]:
@@ -808,5 +893,7 @@ class LineBreakDialog(DialogGeometryMixin, QtWidgets.QDialog):
             return
         self.msg_label.setText("")
         self._persist_measure_grouping()
+        if hasattr(self._score, 'sync_linked_line_breaks'):
+            self._score.sync_linked_line_breaks(self._active_stave_index)
         self.valuesChanged.emit()
         self.accept()

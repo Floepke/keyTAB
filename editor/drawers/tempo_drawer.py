@@ -14,6 +14,7 @@ class TempoDrawerMixin:
         score = self.current_score()
         if score is None:
             return
+        score_events = self.current_events(score)
 
         # Layout anchors
         margin = float(self.margin or 0.0)
@@ -24,7 +25,7 @@ class TempoDrawerMixin:
         page_w_mm = float(getattr(layout_obj, 'page_width_mm', 210.0) or 210.0)
 
         # Iterate tempo events
-        events = list(getattr(score.events, 'tempo', []) or [])
+        events = list(getattr(score_events, 'tempo', []) or [])
         if not events:
             return
 

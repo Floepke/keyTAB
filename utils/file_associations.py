@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Iterable
 
-DOCUMENT_EXTENSIONS = {".piano", ".mid", ".midi", ".musicxml", ".mxl", ".xml"}
+DOCUMENT_EXTENSIONS = {".keytab", ".piano", ".mid", ".midi", ".musicxml", ".mxl", ".xml"}
 
 
 def is_supported_document(path: str | Path) -> bool:

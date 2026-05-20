@@ -148,14 +148,17 @@ class SelectionMixin:
         score: SCORE | None = self.current_score()
         if score is None or not self._selection_active:
             return []
+        events = self.current_events(score)
+        if events is None:
+            return []
         a, b = self._selection_window_time_bounds(self._sel_start_units, self._sel_end_units)
         min_p = max(1, min(88, int(getattr(self, '_sel_min_pitch', 1))))
         max_p = max(1, min(88, int(getattr(self, '_sel_max_pitch', 88))))
         op = Operator(SHORTEST_DURATION)
         out = []
-        event_lists = [list(getattr(score.events, 'note', []) or [])]
+        event_lists = [list(getattr(events, 'note', []) or [])]
         if bool(include_grace):
-            event_lists.append(list(getattr(score.events, 'grace_note', []) or []))
+            event_lists.append(list(getattr(events, 'grace_note', []) or []))
 
         for lst in event_lists:
             for evt in lst:
@@ -376,11 +379,14 @@ class SelectionMixin:
         score: SCORE | None = self.current_score()
         if score is None:
             return False
+        events = self.current_events(score)
+        if events is None:
+            return False
         mode = str(qtype or 'start/end').strip().lower()
         if mode not in ('start/end', 'start', 'end'):
             mode = 'start/end'
         units = float(max(1e-6, getattr(self, 'snap_size_units', 0.0) or 0.0))
-        notes = list(getattr(score.events, 'note', []) or [])
+        notes = list(getattr(events, 'note', []) or [])
         if not notes:
             return False
 
@@ -482,7 +488,8 @@ class SelectionMixin:
         if a >= t_begin and b <= t_end and isinstance(cache, dict):
             candidates = list(cache.get('notes_view') or [])
         else:
-            candidates = list(getattr(score.events, 'note', []) or [])
+            events = self.current_events(score)
+            candidates = list(getattr(events, 'note', []) or []) if events is not None else []
 
         ids = set()
         for note in candidates:
@@ -507,12 +514,15 @@ class SelectionMixin:
         score: SCORE | None = self.current_score()
         if score is None:
             return {}
+        events = self.current_events(score)
+        if events is None:
+            return {}
         a, b = self._selection_window_time_bounds(start_units, end_units)
         op = Operator(SHORTEST_DURATION)
         min_p = max(1, min(88, int(getattr(self, '_sel_min_pitch', 1))))
         max_p = max(1, min(88, int(getattr(self, '_sel_max_pitch', 88))))
 
-        event_fields = [f.name for f in dataclasses.fields(type(score.events))]
+        event_fields = [f.name for f in dataclasses.fields(type(events))]
         event_fields = [name for name in event_fields if name not in ('tempo', 'line_break')]
 
         out = {name: [] for name in event_fields}
@@ -543,7 +553,7 @@ class SelectionMixin:
             if name == 'note' and cached_notes_view is not None:
                 event_list = list(cached_notes_view)
             else:
-                event_list = getattr(score.events, name, []) or []
+                event_list = getattr(events, name, []) or []
             if name == 'slur':
                 for event in event_list:
                     rpitches = [
@@ -586,15 +596,18 @@ class SelectionMixin:
         score: SCORE | None = self.current_score()
         if score is None:
             return None
+        events = self.current_events(score)
+        if events is None:
+            return None
         sel = self.copy_selection()
         if not sel:
             return None
         self.clipboard = sel
         for key in sel:
-            event_list = getattr(score.events, key, None)
+            event_list = getattr(events, key, None)
             if isinstance(event_list, list):
                 remain = [event for event in event_list if event not in sel[key]]
-                setattr(score.events, key, remain)
+                setattr(events, key, remain)
         self.update_score_length()
         self._snapshot_if_changed(coalesce=True, label='cut_selection')
         self.score_changed.emit()
@@ -605,15 +618,18 @@ class SelectionMixin:
         score: SCORE | None = self.current_score()
         if score is None or not self._selection_active:
             return False
+        events = self.current_events(score)
+        if events is None:
+            return False
         sel = self.detect_events_from_time_window(self._sel_start_units, self._sel_end_units)
         deleted_any = False
         for key in sel:
-            event_list = getattr(score.events, key, None)
+            event_list = getattr(events, key, None)
             if isinstance(event_list, list) and sel[key]:
                 remain = [event for event in event_list if event not in sel[key]]
                 if len(remain) != len(event_list):
                     deleted_any = True
-                setattr(score.events, key, remain)
+                setattr(events, key, remain)
         if deleted_any:
             self.update_score_length()
             self._snapshot_if_changed(coalesce=True, label='delete_selection')

@@ -32,16 +32,16 @@ class FileManager:
     - Provides new(), open(), save(), and save_as() methods
     """
 
-    # Open dialog: show .piano, MIDI, and MusicXML by default
+    # Open dialog: .keytab is native; .piano is import-only legacy format.
     OPEN_FILE_FILTER = (
-        "Supported Files (*.piano *.mid *.midi *.musicxml *.mxl *.xml);;"
-        "keyTAB Score (*.piano);;"
+        "Supported Files (*.keytab *.piano *.mid *.midi *.musicxml *.mxl *.xml);;"
+        "keyTAB Score (*.keytab *.piano);;"
         "MIDI File (*.mid *.midi);;"
         "MusicXML File (*.musicxml *.mxl *.xml);;"
     )
-    # Save dialog: allow .piano, MIDI, and MusicXML export
+    # Save dialog: native format is .keytab.
     SAVE_FILE_FILTER = (
-        "keyTAB Score (*.piano);;"
+        "keyTAB Score (*.keytab);;"
         "MIDI File (*.mid *.midi);;"
         "MusicXML File [unusable in its current state] (*.musicxml *.xml);;"
     )
@@ -152,7 +152,7 @@ class FileManager:
         self._dirty = True
 
     def load(self) -> Optional[SCORE]:
-        """Load a .piano file via a native file dialog and load into SCORE."""
+        """Load a keyTAB project file via a native file dialog."""
         start_dir = str(self._path.parent if self._path else self._last_dir)
         fname, _ = QFileDialog.getOpenFileName(
             self._parent,
@@ -226,14 +226,16 @@ class FileManager:
             self._show_load_checks_info(self._current)
             return self._current
         else:
-            # Native keyTAB file
+            # Native keyTAB JSON file (.keytab) or legacy .piano import.
             self._current = SCORE().load(fname)
-            self._path = Path(fname)
+            source_path = Path(fname)
+            self._path = source_path.with_suffix('.keytab') if source_path.suffix.lower() == '.piano' else source_path
             self._last_dir = self._path.parent
             adm = get_appdata_manager()
             adm.set("last_file_dialog_dir", str(self._last_dir))
             adm.save()
-            self._dirty = False
+            # Opening legacy .piano keeps project dirty until user saves .keytab.
+            self._dirty = source_path.suffix.lower() == '.piano'
             self.autosave_current()
             # Track last opened file in appdata
             adm = get_appdata_manager()
@@ -244,7 +246,7 @@ class FileManager:
             return self._current
 
     def open_path(self, path: str) -> Optional[SCORE]:
-        """Programmatically open a .piano file from a given path.
+        """Programmatically open a keyTAB project path.
 
         Returns the SCORE on success, None on failure.
         """
@@ -294,9 +296,10 @@ class FileManager:
             return self._current
         else:
             self._current = SCORE().load(path)
-            self._path = Path(path)
+            source_path = Path(path)
+            self._path = source_path.with_suffix('.keytab') if source_path.suffix.lower() == '.piano' else source_path
             self._last_dir = self._path.parent
-            self._dirty = False
+            self._dirty = source_path.suffix.lower() == '.piano'
             # Do NOT apply hook here: the UI hasn't restored yet so current
             # scroll/page values would overwrite the freshly-loaded app_state.
             self.autosave_current(apply_hook=False)
@@ -317,11 +320,16 @@ class FileManager:
             suffix = str(self._path.suffix or '').lower()
             if suffix in ('.mid', '.midi'):
                 return self.save_as(allow_export=False)
-            self._current.save(str(self._path))
+            target = self._path.with_suffix('.keytab') if suffix == '.piano' else self._path
+            old_path = str(self._path)
+            self._current.save(str(target))
+            self._path = target
             self._dirty = False
             adm = get_appdata_manager()
             adm.set("last_opened_file", str(self._path))
             adm.save()
+            if old_path != str(self._path):
+                self._replace_recent_file_path(old_path, str(self._path))
             return True
         except Exception as exc:
             self._show_error("Failed to save score", f"{exc}")
@@ -340,10 +348,10 @@ class FileManager:
                 title = 'untitled'
             # Basic sanitization: remove path separators
             safe = title.replace('/', ' ').replace('\\', ' ')
-            return f"{safe}.piano"
+            return f"{safe}.keytab"
 
         suggested = start_dir / _default_name()
-        file_filter = self.SAVE_FILE_FILTER if allow_export else "keyTAB Score (*.piano);;All Files (*)"
+        file_filter = self.SAVE_FILE_FILTER if allow_export else "keyTAB Score (*.keytab);;All Files (*)"
         fname, selected_filter = QFileDialog.getSaveFileName(
             self._parent,
             "Save Score As",
@@ -417,9 +425,9 @@ class FileManager:
             return False
 
     # Helpers
-    def _ensure_piano_suffix(self, p: Path) -> Path:
-        if p.suffix.lower() != ".piano":
-            p = p.with_suffix(".piano")
+    def _ensure_keytab_suffix(self, p: Path) -> Path:
+        if p.suffix.lower() != ".keytab":
+            p = p.with_suffix(".keytab")
         return p
 
     def _ensure_save_suffix(self, p: Path, selected_filter: str, allow_export: bool = True) -> Path:
@@ -433,9 +441,11 @@ class FileManager:
             if suffix not in ('.musicxml', '.xml'):
                 return p.with_suffix('.musicxml')
             return p
-        if suffix == '.piano':
+        if suffix == '.keytab':
             return p
-        return p.with_suffix('.piano')
+        if suffix == '.piano':
+            return p.with_suffix('.keytab')
+        return p.with_suffix('.keytab')
 
     def _show_error(self, title: str, text: str) -> None:
         if self._parent is None:
@@ -475,8 +485,8 @@ class FileManager:
 
     # Autosave and error-backup utilities
     def autosave_current(self, apply_hook: bool = True) -> None:
-        """Save the current SCORE to the session file in session.piano (JSON)."""
-        target = Path(UTILS_SAVE_DIR) / "session.piano"
+        """Save the current SCORE to the session file in session.keytab (JSON)."""
+        target = Path(UTILS_SAVE_DIR) / "session.keytab"
         if apply_hook:
             self._apply_before_save_hook()
         self._refresh_analysis()
@@ -606,7 +616,7 @@ class FileManager:
             if not safe_title:
                 safe_title = 'Untitled'
             safe_title = safe_title[:80]
-            fname = f"keyTAB_error_backup_{safe_title}_{ts}.piano"
+            fname = f"keyTAB_error_backup_{safe_title}_{ts}.keytab"
             target = Path(UTILS_SAVE_DIR) / fname
             self._current.save(str(target))
             # Delegate to original hook to print traceback to terminal
@@ -615,13 +625,17 @@ class FileManager:
         sys.excepthook = _hook
 
     def load_session_if_available(self) -> bool:
-        """Load session.piano from ~/.keyTAB folder into current score; keep path unset.
+        """Load session snapshot from ~/.keyTAB folder into current score; keep path unset.
 
         Returns True if a session was restored.
         """
-        session_path = Path(UTILS_SAVE_DIR) / "session.piano"
+        session_path = Path(UTILS_SAVE_DIR) / "session.keytab"
         if not session_path.exists():
-            return False
+            legacy_session_path = Path(UTILS_SAVE_DIR) / "session.piano"
+            if legacy_session_path.exists():
+                session_path = legacy_session_path
+            else:
+                return False
         sc = SCORE().load(str(session_path))
         # Do not treat the session file as the project path
         self._current = sc

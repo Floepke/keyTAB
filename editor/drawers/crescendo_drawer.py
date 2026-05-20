@@ -19,7 +19,8 @@ if TYPE_CHECKING:
 class CrescendoDrawerMixin:
     def _dynamic_symbol_bounds_lookup(self, du: DrawUtil, score, required_keys: set[tuple[float, int]] | None = None) -> dict[tuple[float, int], dict]:
         lookup: dict[tuple[float, int], dict] = {}
-        dynamic_symbols = list(getattr(score.events, 'dynamic_symbol', []) or [])
+        score_events = self.current_events(score)
+        dynamic_symbols = list(getattr(score_events, 'dynamic_symbol', []) or [])
         text_family = 'LelandText'
         text_size_pt = float(DYNAMIC_SYMBOL_FONT_SIZE_PT or 12.0)
         bg_pad = float(DYNAMIC_SYMBOL_BACKGROUND_PADDING_MM or 1.5)
@@ -121,8 +122,9 @@ class CrescendoDrawerMixin:
         score = getattr(self, 'current_score', lambda: None)()
         if score is None:
             return
+        score_events = self.current_events(score)
 
-        events = list(getattr(score.events, 'crescendo', []) or [])
+        events = list(getattr(score_events, 'crescendo', []) or [])
         if not events:
             return
 

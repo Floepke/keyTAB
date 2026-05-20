@@ -209,11 +209,14 @@ class TextTool(BaseTool):
         score = self._score()
         if score is None:
             return (None, None, None)
+        events = self._editor.current_events(score)
+        if events is None:
+            return (None, None, None)
         best_ev = None
         best_mode = None
         best_geom = None
         best_dist = float('inf')
-        for ev in list(getattr(score.events, 'text', []) or []):
+        for ev in list(getattr(events, 'text', []) or []):
             geom = self._text_geom(ev)
             if geom is None:
                 continue
@@ -296,8 +299,11 @@ class TextTool(BaseTool):
         score = self._score()
         if score is None:
             return None
+        events = self._editor.current_events(score)
+        if events is None:
+            return None
         try:
-            for ev in list(getattr(score.events, 'text', []) or []):
+            for ev in list(getattr(events, 'text', []) or []):
                 if int(getattr(ev, '_id', -1) or -1) == int(text_id):
                     return ev
         except Exception:
@@ -494,13 +500,16 @@ class TextTool(BaseTool):
         score = self._score()
         if score is None:
             return
+        events = self._editor.current_events(score)
+        if events is None:
+            return
         x_mm, y_mm = self._cursor_mm(x, y)
         hit, _mode, _ = self._hit_test(x_mm, y_mm)
         if hit is None:
             return
-        lst = list(getattr(score.events, 'text', []) or [])
+        lst = list(getattr(events, 'text', []) or [])
         lst = [t for t in lst if int(getattr(t, '_id', -1) or -1) != int(getattr(hit, '_id', -2) or -2)]
-        score.events.text = lst
+        events.text = lst
         self._editor._snapshot_if_changed(coalesce=True, label='text_delete')
         if hasattr(self._editor, 'force_redraw_from_model'):
             self._editor.force_redraw_from_model()

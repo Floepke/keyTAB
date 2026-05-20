@@ -56,9 +56,12 @@ class SlurTool(BaseTool):
         score = self._score()
         if score is None:
             return (None, None)
+        events = self._editor.current_events(score)
+        if events is None:
+            return (None, None)
         best = None
         best_dist = float('inf')
-        for sl in getattr(score.events, 'slur', []) or []:
+        for sl in getattr(events, 'slur', []) or []:
             pts = self._slur_points_mm(sl)
             for idx, (px, py) in enumerate(pts, start=1):
                 d = math.hypot(px - x_mm, py - y_mm)
@@ -202,12 +205,15 @@ class SlurTool(BaseTool):
         score = self._score()
         if score is None:
             return
+        events = self._editor.current_events(score)
+        if events is None:
+            return
         try:
-            score.events.slur.remove(sl)
+            events.slur.remove(sl)
         except ValueError:
             try:
                 sl_id = int(getattr(sl, '_id', -1) or -1)
-                score.events.slur = [s for s in score.events.slur if int(getattr(s, '_id', -2) or -2) != sl_id]
+                events.slur = [s for s in events.slur if int(getattr(s, '_id', -2) or -2) != sl_id]
             except Exception:
                 pass
         self._active_slur = None

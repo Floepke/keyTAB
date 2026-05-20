@@ -147,6 +147,7 @@ class TextDrawerMixin:
         score = getattr(self, 'current_score', lambda: None)()
         if score is None:
             return
+        score_events = self.current_events(score)
 
         def _coerce_font(value, default_font):
             if isinstance(value, Font):
@@ -163,7 +164,7 @@ class TextDrawerMixin:
                 )
             return default_font if isinstance(default_font, Font) else Font()
 
-        events = list(getattr(score.events, 'text', []) or [])
+        events = list(getattr(score_events, 'text', []) or [])
         if not events:
             return
 

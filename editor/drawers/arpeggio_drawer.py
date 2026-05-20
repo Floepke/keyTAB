@@ -59,14 +59,15 @@ class ArpeggioDrawerMixin:
         score: SCORE = self.current_score()
         if score is None:
             return
+        score_events = self.current_events(score)
 
         cache = getattr(self, "_draw_cache", None) or {}
 
         # get data
-        arps = score.events.arpeggio
+        arps = list(getattr(score_events, 'arpeggio', []) or [])
         notes_all = list(cache.get("notes_view") or []) if isinstance(cache, dict) else []
         if not notes_all:
-            notes_all = list(score.events.note or [])
+            notes_all = list(getattr(score_events, 'note', []) or [])
         notes_by_pitch: dict[int, list[object]] = {}
         for note_obj in notes_all:
             note_obj: Note

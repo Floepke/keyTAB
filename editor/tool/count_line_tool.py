@@ -64,6 +64,9 @@ class CountLineTool(BaseTool):
         score: SCORE = self._editor.current_score()
         if score is None:
             return
+        events = self._editor.current_events(score)
+        if events is None:
+            return
 
         self._editor.draw_frame()
 
@@ -187,8 +190,8 @@ class CountLineTool(BaseTool):
             return
 
         hit_id = int(getattr(hit, '_id', -1) or -1)
-        score.events.count_line = [
-            ev for ev in list(getattr(score.events, 'count_line', []) or [])
+        events.count_line = [
+            ev for ev in list(getattr(events, 'count_line', []) or [])
             if int(getattr(ev, '_id', -2) or -2) != hit_id
         ]
         if hasattr(self._editor, 'force_redraw_from_model'):

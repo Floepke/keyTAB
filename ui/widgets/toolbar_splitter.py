@@ -77,6 +77,96 @@ class DraggableToolButton(QtWidgets.QToolButton):
             super().mouseReleaseEvent(event)
 
 
+class StaveSelector(QtWidgets.QWidget):
+    """Compact vertical stave selector: [-] [label] [+]."""
+
+    selectedStaveChanged = QtCore.Signal(int)
+
+    def __init__(self, parent=None, max_staves: int = 4):
+        super().__init__(parent)
+        self._max_staves = max(1, int(max_staves))
+        self._stave_count = 1
+        self._selected = 0
+
+        layout = QtWidgets.QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(2)
+
+        self.minus_btn = QtWidgets.QToolButton(self)
+        self.minus_btn.setFocusPolicy(QtCore.Qt.FocusPolicy.NoFocus)
+        self.minus_btn.setAutoRaise(True)
+        ic_minus = get_qicon('minus', size=(36, 36))
+        if ic_minus:
+            self.minus_btn.setIcon(ic_minus)
+        else:
+            self.minus_btn.setText('-')
+
+        self.label = QtWidgets.QLabel(self)
+        self.label.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
+
+        self.plus_btn = QtWidgets.QToolButton(self)
+        self.plus_btn.setFocusPolicy(QtCore.Qt.FocusPolicy.NoFocus)
+        self.plus_btn.setAutoRaise(True)
+        ic_plus = get_qicon('plus', size=(36, 36))
+        if ic_plus:
+            self.plus_btn.setIcon(ic_plus)
+        else:
+            self.plus_btn.setText('+')
+
+        _s = get_ui_scale()
+        _btn = max(1, int(round(26 * _s)))
+        _icon = max(1, int(round(17 * _s)))
+        self.minus_btn.setFixedSize(_btn, _btn)
+        self.plus_btn.setFixedSize(_btn, _btn)
+        self.minus_btn.setIconSize(QtCore.QSize(_icon, _icon))
+        self.plus_btn.setIconSize(QtCore.QSize(_icon, _icon))
+        self.label.setMinimumHeight(max(1, int(round(20 * _s))))
+
+        layout.addWidget(self.minus_btn, 0, QtCore.Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(self.label, 0, QtCore.Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(self.plus_btn, 0, QtCore.Qt.AlignmentFlag.AlignCenter)
+
+        self.minus_btn.clicked.connect(self._decrease)
+        self.plus_btn.clicked.connect(self._increase)
+        self._update_ui()
+
+    def set_stave_count(self, count: int) -> None:
+        self._stave_count = max(1, min(self._max_staves, int(count or 1)))
+        if self._selected >= self._stave_count:
+            self._selected = self._stave_count - 1
+            self.selectedStaveChanged.emit(int(self._selected))
+        self._update_ui()
+
+    def set_selected_stave(self, index: int) -> None:
+        if self._stave_count <= 0:
+            self._selected = 0
+        else:
+            self._selected = max(0, min(self._stave_count - 1, int(index or 0)))
+        self._update_ui()
+
+    def _decrease(self) -> None:
+        if self._selected <= 0:
+            return
+        self._selected -= 1
+        self._update_ui()
+        self.selectedStaveChanged.emit(int(self._selected))
+
+    def _increase(self) -> None:
+        if self._selected >= (self._stave_count - 1):
+            return
+        self._selected += 1
+        self._update_ui()
+        self.selectedStaveChanged.emit(int(self._selected))
+
+    def _update_ui(self) -> None:
+        self.label.setText(f"{int(self._selected) + 1}")
+        self.minus_btn.setEnabled(self._selected > 0)
+        self.plus_btn.setEnabled(self._selected < (self._stave_count - 1))
+        self.minus_btn.setToolTip(self.tr("Select previous stave."))
+        self.plus_btn.setToolTip(self.tr("Select next stave."))
+        self.label.setToolTip(self.tr("Selected stave index (1-based)."))
+
+
 class ToolbarHandle(QtWidgets.QSplitterHandle):
     def __init__(self, orientation, parent):
         super().__init__(orientation, parent)
@@ -115,6 +205,19 @@ class ToolbarHandle(QtWidgets.QSplitterHandle):
             "Drag to move the splitter and resize the editor and print-preview. "
         ))
         layout.addWidget(self.fit_btn)
+
+        self._sep_after_fit_top = QtWidgets.QFrame(self)
+        self._sep_after_fit_top.setFrameShape(QtWidgets.QFrame.Shape.HLine)
+        self._sep_after_fit_top.setFrameShadow(QtWidgets.QFrame.Shadow.Sunken)
+        layout.addWidget(self._sep_after_fit_top)
+
+        self.stave_selector = StaveSelector(self, max_staves=4)
+        layout.addWidget(self.stave_selector, 0, QtCore.Qt.AlignmentFlag.AlignHCenter)
+
+        self._sep_after_fit_bottom = QtWidgets.QFrame(self)
+        self._sep_after_fit_bottom.setFrameShape(QtWidgets.QFrame.Shape.HLine)
+        self._sep_after_fit_bottom.setFrameShadow(QtWidgets.QFrame.Shadow.Sunken)
+        layout.addWidget(self._sep_after_fit_bottom)
 
         '''this button goes to the next page in the print view.'''
         self.next_btn = QtWidgets.QToolButton(self)
@@ -266,6 +369,14 @@ class ToolbarHandle(QtWidgets.QSplitterHandle):
 
         # Fit button toggles (emit False); double-click will force True
         self.fit_btn.clicked.connect(lambda: parent.fitRequested.emit(False))
+        self.stave_selector.selectedStaveChanged.connect(parent.staveSelectionRequested.emit)
+
+    def set_stave_selector_state(self, selected_index: int, stave_count: int) -> None:
+        try:
+            self.stave_selector.set_stave_count(int(stave_count))
+            self.stave_selector.set_selected_stave(int(selected_index))
+        except Exception:
+            pass
 
     def mouseDoubleClickEvent(self, ev: QtGui.QMouseEvent) -> None:
         # Forward double-click on the handle to request a fit action
@@ -296,6 +407,7 @@ class ToolbarSplitter(QtWidgets.QSplitter):
     lineBreakRequested = QtCore.Signal()
     selectionLeftRequested = QtCore.Signal()
     selectionRightRequested = QtCore.Signal()
+    staveSelectionRequested = QtCore.Signal(int)
 
     def __init__(self, orientation: QtCore.Qt.Orientation, parent=None):
         super().__init__(orientation, parent)
@@ -322,6 +434,11 @@ class ToolbarSplitter(QtWidgets.QSplitter):
         if hasattr(self, '_handle') and self._handle is not None:
             if hasattr(self._handle, 'set_buttons'):
                 self._handle.set_buttons(defs)
+
+    def set_stave_selector_state(self, selected_index: int, stave_count: int) -> None:
+        if hasattr(self, '_handle') and self._handle is not None:
+            if hasattr(self._handle, 'set_stave_selector_state'):
+                self._handle.set_stave_selector_state(int(selected_index), int(stave_count))
 
     def mouseDoubleClickEvent(self, ev: QtGui.QMouseEvent) -> None:
         # Only trigger fit when double-clicking the splitter handle

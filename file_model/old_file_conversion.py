@@ -1,5 +1,10 @@
 from __future__ import annotations
 
+from copy import deepcopy
+
+
+DEFAULT_STAVE_COUNT = 4
+
 
 def _normalize_hand_value(raw_hand: object) -> str:
     hand = str(raw_hand or 'l').strip()
@@ -84,7 +89,16 @@ def convert_legacy_piano_data(data: dict) -> dict:
 
     events = data.get('events', None)
     if not isinstance(events, dict):
-        return data
+        # Forward compatibility: allow files that only store staves[0].events.
+        staves = data.get('staves', None)
+        if isinstance(staves, list) and staves:
+            first = staves[0] if isinstance(staves[0], dict) else {}
+            first_events = first.get('events', None) if isinstance(first, dict) else None
+            if isinstance(first_events, dict):
+                data['events'] = deepcopy(first_events)
+                events = data.get('events', None)
+        if not isinstance(events, dict):
+            return data
 
     notes = events.get('note', None)
     if not isinstance(notes, list):
@@ -103,5 +117,55 @@ def convert_legacy_piano_data(data: dict) -> dict:
             if not isinstance(beam, dict):
                 continue
             beam['hand'] = _normalize_hand_value(beam.get('hand', 'l'))
+
+    # Legacy -> new structure bridge: ensure 4 default staves exist.
+    staves = data.get('staves', None)
+    if not isinstance(staves, list) or not staves:
+        staves = []
+        data['staves'] = staves
+        staves.append(
+            {
+                'name': 'Stave 1',
+                'scale': 1.0,
+                'enabled': True,
+                'events': deepcopy(events),
+            }
+        )
+    else:
+        first = staves[0] if isinstance(staves[0], dict) else {}
+        if not isinstance(first, dict):
+            first = {}
+            staves[0] = first
+        if 'name' not in first:
+            first['name'] = 'Stave 1'
+        if 'scale' not in first:
+            first['scale'] = 1.0
+        if 'enabled' not in first:
+            first['enabled'] = True
+        first['events'] = deepcopy(events)
+
+    # Ensure fixed-size stave list for editor (4 staves).
+    normalized = []
+    for idx, raw in enumerate(list(staves)[:DEFAULT_STAVE_COUNT]):
+        item = raw if isinstance(raw, dict) else {}
+        if 'name' not in item or not str(item.get('name', '') or '').strip():
+            item['name'] = f'Stave {idx + 1}'
+        if 'scale' not in item:
+            item['scale'] = 1.0
+        if 'enabled' not in item:
+            item['enabled'] = True
+        if 'events' not in item or not isinstance(item.get('events', None), dict):
+            item['events'] = deepcopy(events) if idx == 0 else {}
+        normalized.append(item)
+    for idx in range(len(normalized), DEFAULT_STAVE_COUNT):
+        normalized.append(
+            {
+                'name': f'Stave {idx + 1}',
+                'scale': 1.0,
+                'enabled': True,
+                'events': {} if idx > 0 else deepcopy(events),
+            }
+        )
+    data['staves'] = normalized
 
     return data

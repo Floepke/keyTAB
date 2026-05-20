@@ -84,19 +84,25 @@ class BarlineTool(BaseTool):
         return float(best)
 
     def _event_list(self, score):
+        events = self._editor.current_events(score)
+        if events is None:
+            return []
         if self._mode == self._MODE_START:
-            return list(getattr(score.events, "start_repeat", []) or [])
+            return list(getattr(events, "start_repeat", []) or [])
         if self._mode == self._MODE_END:
-            return list(getattr(score.events, "end_repeat", []) or [])
-        return list(getattr(score.events, "double_bar", []) or [])
+            return list(getattr(events, "end_repeat", []) or [])
+        return list(getattr(events, "double_bar", []) or [])
 
     def _set_event_list(self, score, lst: list) -> None:
+        events = self._editor.current_events(score)
+        if events is None:
+            return
         if self._mode == self._MODE_START:
-            score.events.start_repeat = lst
+            events.start_repeat = lst
         elif self._mode == self._MODE_END:
-            score.events.end_repeat = lst
+            events.end_repeat = lst
         else:
-            score.events.double_bar = lst
+            events.double_bar = lst
 
     def _create_event(self, score, t: float) -> None:
         if self._mode == self._MODE_START:
@@ -116,11 +122,14 @@ class BarlineTool(BaseTool):
     def _nearest_event_time(self, t: float) -> Optional[float]:
         """Find the time of the nearest placed barline event (any type) to t."""
         score = self._editor.current_score()
+        events = self._editor.current_events(score)
+        if events is None:
+            return None
         all_times: list[float] = []
         for ev_list in [
-            getattr(score.events, "start_repeat", []) or [],
-            getattr(score.events, "end_repeat", []) or [],
-            getattr(score.events, "double_bar", []) or [],
+            getattr(events, "start_repeat", []) or [],
+            getattr(events, "end_repeat", []) or [],
+            getattr(events, "double_bar", []) or [],
         ]:
             for ev in ev_list:
                 all_times.append(float(getattr(ev, "time", 0.0) or 0.0))
@@ -165,6 +174,9 @@ class BarlineTool(BaseTool):
         if self._editor is None:
             return
         score = self._editor.current_score()
+        events = self._editor.current_events(score)
+        if events is None:
+            return
         t_click = float(self._editor.widget_px_to_time(x, y))
         t_bar = self._nearest_event_time(t_click)
         if t_bar is None:
@@ -184,9 +196,9 @@ class BarlineTool(BaseTool):
                 out.append(ev)
             return out
 
-        score.events.start_repeat = _filter_events(getattr(score.events, "start_repeat", []) or [])
-        score.events.end_repeat = _filter_events(getattr(score.events, "end_repeat", []) or [])
-        score.events.double_bar = _filter_events(getattr(score.events, "double_bar", []) or [])
+        events.start_repeat = _filter_events(getattr(events, "start_repeat", []) or [])
+        events.end_repeat = _filter_events(getattr(events, "end_repeat", []) or [])
+        events.double_bar = _filter_events(getattr(events, "double_bar", []) or [])
 
         if not removed:
             return

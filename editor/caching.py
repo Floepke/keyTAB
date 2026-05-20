@@ -298,6 +298,7 @@ class CachingMixin:
         score = self.current_score()
         if score is None:
             return
+        score_events = self.current_events(score)
 
         top_mm = self._view_y_mm_offset
         vp_h_mm = self._viewport_h_mm
@@ -310,7 +311,7 @@ class CachingMixin:
 
         op = Operator(SHORTEST_DURATION)
 
-        notes = score.events.note
+        notes = list(getattr(score_events, 'note', []) or [])
         patched_values = self._apply_single_note_timing_cache_update(notes)
         if patched_values is not None:
             notes_sorted, starts, ends, end_pairs, end_values = patched_values
@@ -364,7 +365,7 @@ class CachingMixin:
             h = "l" if str(getattr(m, "hand", "l") or "l") == "l" else "r"
             notes_by_hand[h].append(m)
 
-        beam_markers = list(getattr(score.events, "beam", []) or [])
+        beam_markers = list(getattr(score_events, "beam", []) or [])
         beam_by_hand: dict[str, list] = {"l": [], "r": []}
         for b in beam_markers:
             h = "l" if str(getattr(b, "hand", "l") or "l") == "l" else "r"
@@ -414,7 +415,7 @@ class CachingMixin:
             self._grid_time_cache_values = (grid_den_times, barline_times)
 
         arpeggio_y_overrides: dict[int, float] = {}
-        arps_all = list(getattr(score.events, "arpeggio", []) or [])
+        arps_all = list(getattr(score_events, "arpeggio", []) or [])
         if arps_all:
             op_arp = Operator(float(SHORTEST_DURATION))
             notes_by_pitch: dict[int, list[object]] = {}

@@ -14,4 +14,5 @@ class AppState:
     snap_base: int = 8
     snap_divide: int = 1
     selected_tool: str = "note"
+    selected_stave_index: int = 0
     style_dialog_tab_index: int = 0

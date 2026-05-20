@@ -169,7 +169,8 @@ class NoteDrawerMixin:
             self._cached_barline_positions = cache.get('barline_positions') or []
         else:
             # Fallback: minimal local candidate selection (start-only)
-            notes_sorted = sorted(score.events.note or [], key=lambda n: (n.time, n.pitch))
+            score_events = self.current_events(score)
+            notes_sorted = sorted(getattr(score_events, 'note', []) or [], key=lambda n: (n.time, n.pitch))
             starts = [float(n.time) for n in notes_sorted]
             lo = bisect.bisect_left(starts, time_begin)
             hi = bisect.bisect_right(starts, time_end)
@@ -638,7 +639,8 @@ class NoteDrawerMixin:
         notes_sorted = cache.get('notes_sorted') or (self._cached_notes_sorted or [])
         if not starts or not notes_sorted:
             score: SCORE = self.current_score()
-            notes_sorted = sorted(getattr(score.events, 'note', []) or [], key=lambda nn: (float(nn.time), int(nn.pitch)))
+            score_events = self.current_events(score)
+            notes_sorted = sorted(getattr(score_events, 'note', []) or [], key=lambda nn: (float(nn.time), int(nn.pitch)))
             starts = [float(nn.time) for nn in notes_sorted]
         idx = bisect.bisect_left(starts, float(end - thr)) if starts else 0
         min_delta = None

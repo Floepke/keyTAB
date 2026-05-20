@@ -14,7 +14,8 @@ class LineBreakDrawerMixin:
         score = self.current_score()
         if score is None:
             return
-        line_breaks = list(getattr(score.events, 'line_break', []) or [])
+        score_events = self.current_events(score)
+        line_breaks = list(getattr(score_events, 'line_break', []) or [])
 
         # Viewport culling
         top_mm = float(getattr(self, '_view_y_mm_offset', 0.0) or 0.0)

@@ -81,7 +81,10 @@ class GraceNoteTool(BaseTool):
         return bool(grace_pitch == cursor_pitch and self._time_op.eq(grace_time, cursor_time))
 
     def _find_grace_at_cursor(self, score: SCORE, x: float, y: float):
-        for g in (getattr(score.events, 'grace_note', []) or []):
+        events = self._editor.current_events(score)
+        if events is None:
+            return None
+        for g in (getattr(events, 'grace_note', []) or []):
             if self._grace_matches_cursor(g, x, y):
                 return g
         return None
@@ -93,13 +96,16 @@ class GraceNoteTool(BaseTool):
         target = self._find_grace_at_cursor(score, x, y)
         if target is None:
             return
-        lst = getattr(score.events, 'grace_note', None)
+        events = self._editor.current_events(score)
+        if events is None:
+            return
+        lst = getattr(events, 'grace_note', None)
         if isinstance(lst, list):
             try:
                 lst.remove(target)
             except ValueError:
                 tid = int(getattr(target, '_id', -2) or -2)
-                score.events.grace_note = [m for m in lst if int(getattr(m, '_id', -2) or -2) != tid]
+                events.grace_note = [m for m in lst if int(getattr(m, '_id', -2) or -2) != tid]
         self._editor.update_score_length()
 
     def on_left_press(self, x: float, y: float) -> None:
@@ -193,8 +199,11 @@ class GraceNoteTool(BaseTool):
         score = self._score()
         if score is None:
             return
+        events = self._editor.current_events(score)
+        if events is None:
+            return
         target = None
-        for g in getattr(score.events, 'grace_note', []) or []:
+        for g in getattr(events, 'grace_note', []) or []:
             if int(getattr(g, '_id', -1) or -1) == int(gid):
                 target = g
                 break

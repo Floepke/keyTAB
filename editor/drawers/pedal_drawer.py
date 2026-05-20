@@ -16,8 +16,9 @@ class PedalDrawerMixin:
         score = getattr(self, 'current_score', lambda: None)()
         if score is None:
             return
+        score_events = self.current_events(score)
 
-        events = list(getattr(score.events, 'pedal', []) or [])
+        events = list(getattr(score_events, 'pedal', []) or [])
         if not events:
             return
 

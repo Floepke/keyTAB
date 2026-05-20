@@ -178,9 +178,12 @@ class DynamicTool(BaseTool):
         score = self._score()
         if score is None:
             return
+        events = self._editor.current_events(score)
+        if events is None:
+            return
         ev_id = int(getattr(ev, '_id', -1) or -1)
-        score.events.dynamic_symbol = [
-            d for d in (score.events.dynamic_symbol or [])
+        events.dynamic_symbol = [
+            d for d in (events.dynamic_symbol or [])
             if int(getattr(d, '_id', -2) or -2) != ev_id
         ]
 
@@ -188,7 +191,10 @@ class DynamicTool(BaseTool):
         score = self._score()
         if score is None:
             return []
-        return list(getattr(score.events, 'crescendo', []) or []) + list(getattr(score.events, 'decrescendo', []) or [])
+        events = self._editor.current_events(score)
+        if events is None:
+            return []
+        return list(getattr(events, 'crescendo', []) or []) + list(getattr(events, 'decrescendo', []) or [])
 
     def _create_hairpin(self, x: float, y: float):
         score = self._score()
@@ -213,9 +219,12 @@ class DynamicTool(BaseTool):
         score = self._score()
         if score is None:
             return None
+        events = self._editor.current_events(score)
+        if events is None:
+            return None
         endpoint_time = self._hairpin_endpoint_time(hp, handle)
         endpoint_rpitch = int(getattr(hp, 'x_rpitch', 0) or 0)
-        for symbol in (getattr(score.events, 'dynamic_symbol', []) or []):
+        for symbol in (getattr(events, 'dynamic_symbol', []) or []):
             symbol_time = float(getattr(symbol, 'time', 0.0) or 0.0)
             symbol_rpitch = int(getattr(symbol, 'x_rpitch', 0) or 0)
             if self._time_op.eq(symbol_time, endpoint_time) and symbol_rpitch == endpoint_rpitch:
@@ -226,8 +235,11 @@ class DynamicTool(BaseTool):
         score = self._score()
         if score is None:
             return []
+        events = self._editor.current_events(score)
+        if events is None:
+            return []
         out: list[object] = []
-        for symbol in (getattr(score.events, 'dynamic_symbol', []) or []):
+        for symbol in (getattr(events, 'dynamic_symbol', []) or []):
             symbol_time = float(getattr(symbol, 'time', 0.0) or 0.0)
             symbol_rpitch = int(getattr(symbol, 'x_rpitch', 0) or 0)
             if self._time_op.eq(symbol_time, float(point_time)) and symbol_rpitch == int(point_rpitch):
@@ -556,15 +568,18 @@ class DynamicTool(BaseTool):
         score = self._score()
         if score is None:
             return
+        events = self._editor.current_events(score)
+        if events is None:
+            return
         hp_id = int(getattr(hp, '_id', -1) or -1)
         if hp_type == 'crescendo':
-            score.events.crescendo = [
-                e for e in (score.events.crescendo or [])
+            events.crescendo = [
+                e for e in (events.crescendo or [])
                 if int(getattr(e, '_id', -2) or -2) != hp_id
             ]
         else:
-            score.events.decrescendo = [
-                e for e in (score.events.decrescendo or [])
+            events.decrescendo = [
+                e for e in (events.decrescendo or [])
                 if int(getattr(e, '_id', -2) or -2) != hp_id
             ]
         self._commit('dynamic_hairpin_delete')

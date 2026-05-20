@@ -117,7 +117,8 @@ class NoteTool(BaseTool):
         hit_id = int(hit_rect.get('_id', -1) or -1)
         cache = getattr(self._editor, '_draw_cache', None) or {}
         notes_view = cache.get('notes_view') or None
-        note_list = notes_view if notes_view is not None else (getattr(score.events, 'note', []) or [])
+        events = self._editor.current_events(score)
+        note_list = notes_view if notes_view is not None else (getattr(events, 'note', []) or []) if events is not None else []
         for n in note_list:
             if int(getattr(n, '_id', -1) or -1) == hit_id:
                 return n, hit_rect, y_mm
@@ -131,7 +132,8 @@ class NoteTool(BaseTool):
         if hasattr(self._editor, 'get_selected_note_ids_cached'):
             selected_ids = set(self._editor.get_selected_note_ids_cached(score) or set())
         if primary_id > 0 and primary_id in selected_ids:
-            out = [n for n in (getattr(score.events, 'note', []) or []) if int(getattr(n, '_id', 0) or 0) in selected_ids]
+            events = self._editor.current_events(score)
+            out = [n for n in (getattr(events, 'note', []) or []) if int(getattr(n, '_id', 0) or 0) in selected_ids] if events is not None else []
             if out:
                 return out
         return [primary]
@@ -199,7 +201,8 @@ class NoteTool(BaseTool):
         hand = str(getattr(note, 'hand', 'l') or 'l')
         cache = getattr(self._editor, '_draw_cache', None) or {}
         notes_view = cache.get('notes_view') or None
-        note_list = notes_view if notes_view is not None else (getattr(score.events, 'note', []) or [])
+        events = self._editor.current_events(score)
+        note_list = notes_view if notes_view is not None else (getattr(events, 'note', []) or []) if events is not None else []
         for other in note_list:
             other_id = int(getattr(other, '_id', -2) or -2)
             if other_id == note_id:
@@ -228,7 +231,8 @@ class NoteTool(BaseTool):
         hand = str(getattr(note, 'hand', 'l') or 'l')
         cache = getattr(self._editor, '_draw_cache', None) or {}
         notes_view = cache.get('notes_view') or None
-        note_list = notes_view if notes_view is not None else (getattr(score.events, 'note', []) or [])
+        events = self._editor.current_events(score)
+        note_list = notes_view if notes_view is not None else (getattr(events, 'note', []) or []) if events is not None else []
         for other in note_list:
             other_id = int(getattr(other, '_id', -2) or -2)
             if other_id == note_id:
@@ -410,7 +414,8 @@ class NoteTool(BaseTool):
         found = None
         cache = getattr(self._editor, '_draw_cache', None) or {}
         notes_view = cache.get('notes_view') or None
-        note_list = notes_view if notes_view is not None else (getattr(score.events, 'note', []) or [])
+        events = self._editor.current_events(score)
+        note_list = notes_view if notes_view is not None else (getattr(events, 'note', []) or []) if events is not None else []
         for n in note_list:
             if int(getattr(n, '_id', -1) or -1) == int(note_id):
                 found = n
@@ -683,7 +688,8 @@ class NoteTool(BaseTool):
             cache = getattr(self._editor, '_draw_cache', None) or {}
             notes_view = cache.get('notes_view') or None
             cached_notes_list = notes_view if notes_view is not None else None
-            notes_list = getattr(score.events, 'note', []) or []
+            events = self._editor.current_events(score)
+            notes_list = (getattr(events, 'note', []) or []) if events is not None else []
 
             # Fast path: remove the exact detected note object by identity and use cache.
             if cached_notes_list is not None:
@@ -717,7 +723,8 @@ class NoteTool(BaseTool):
         start_t, end_t = self._last_measure_window_ticks(score)
         if start_t is None or end_t is None:
             return False
-        notes = list(getattr(score.events, 'note', []) or [])
+        events = self._editor.current_events(score)
+        notes = list(getattr(events, 'note', []) or []) if events is not None else []
         op = Operator(float(SHORTEST_DURATION))
         for n in notes:
             t = float(getattr(n, 'time', 0.0) or 0.0)

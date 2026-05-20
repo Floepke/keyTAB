@@ -91,6 +91,7 @@ class Editor(QtCore.QObject,
     """
 
     DRAG_THRESHOLD: int = 1
+    MAX_EDITOR_STAVES: int = 4
 
     score_changed = QtCore.Signal()
 
@@ -382,7 +383,8 @@ class Editor(QtCore.QObject,
         score: SCORE | None = self.current_score()
         if score is None:
             return None
-        for n in getattr(score.events, 'note', []) or []:
+        events = self.current_events(score)
+        for n in getattr(events, 'note', []) or []:
             if int(getattr(n, '_id', -1) or -1) == note_id:
                 return n
         return None
@@ -429,7 +431,66 @@ class Editor(QtCore.QObject,
     def set_score(self, score):
         # Set an explicit score model when not using FileManager
         self._score = score
+        self._bind_events_to_selected_stave(score)
         self._invalidate_score_length_cache()
+
+    def _bind_events_to_selected_stave(self, score: SCORE | None) -> None:
+        """Route score.events to the currently selected stave events for editor tools."""
+        if score is None:
+            return
+        count = self.available_stave_count(score)
+        if count <= 0:
+            return
+        idx = self.selected_stave_index(score)
+        staves = list(getattr(score, 'staves', []) or [])
+        target = staves[int(idx % count)]
+        events = getattr(target, 'events', None)
+        if events is None:
+            return
+        score.events = events
+
+    def available_stave_count(self, score: SCORE | None = None) -> int:
+        sc = score if score is not None else self.current_score()
+        if sc is None:
+            return 0
+        staves = list(getattr(sc, 'staves', []) or [])
+        if not staves:
+            return 0
+        return int(max(1, min(len(staves), self.MAX_EDITOR_STAVES)))
+
+    def selected_stave_index(self, score: SCORE | None = None) -> int:
+        """Return the normalized selected stave index from SCORE.app_state."""
+        sc = score if score is not None else self.current_score()
+        if sc is None:
+            return 0
+        count = self.available_stave_count(sc)
+        if count <= 0:
+            return 0
+        try:
+            app_state = getattr(sc, 'app_state', None)
+            raw = int(getattr(app_state, 'selected_stave_index', 0) or 0)
+        except Exception:
+            raw = 0
+        return int(raw % count)
+
+    def set_selected_stave_index(self, stave_index: int) -> int:
+        """Persist selected stave index in app state and rebind editor events."""
+        score: SCORE | None = self.current_score()
+        if score is None:
+            return 0
+        count = self.available_stave_count(score)
+        if count <= 0:
+            return 0
+        normalized = int(int(stave_index) % count)
+        app_state = getattr(score, 'app_state', None)
+        if app_state is not None:
+            try:
+                app_state.selected_stave_index = int(normalized)
+            except Exception:
+                pass
+        self._bind_events_to_selected_stave(score)
+        self._invalidate_score_length_cache()
+        return normalized
 
     # Model provider for undo snapshots
     def set_file_manager(self, fm) -> None:
@@ -443,8 +504,24 @@ class Editor(QtCore.QObject,
     def current_score(self) -> SCORE:
         """Return the current SCORE: prefer FileManager; fall back to explicit _score."""
         if self._file_manager is not None:
-            return self._file_manager.current()
-        return getattr(self, "_score", None)
+            sc = self._file_manager.current()
+        else:
+            sc = getattr(self, "_score", None)
+        self._bind_events_to_selected_stave(sc)
+        return sc
+
+    def current_events(self, score: SCORE | None = None):
+        """Return the active stave events container for the editor selection."""
+        sc = score if score is not None else self.current_score()
+        if sc is None:
+            return None
+        staves = list(getattr(sc, 'staves', []) or [])
+        if not staves:
+            return None
+        idx = self.selected_stave_index(sc)
+        target = staves[int(idx % max(1, len(staves)))]
+        ev = getattr(target, 'events', None)
+        return ev
 
     def _invalidate_score_length_cache(self) -> None:
         self._cached_furthest_music_end = 0.0
@@ -479,13 +556,14 @@ class Editor(QtCore.QObject,
         if score is None:
             return False
 
-        arps = list(getattr(score.events, 'arpeggio', []) or [])
+        events = self.current_events(score)
+        arps = list(getattr(events, 'arpeggio', []) or [])
         if not arps:
             return False
 
         changed = False
         op = Operator(float(SHORTEST_DURATION))
-        notes = list(getattr(score.events, 'note', []) or [])
+        notes = list(getattr(events, 'note', []) or [])
         notes_by_hand: dict[str, list[object]] = {}
         for note in notes:
             hand = str(getattr(note, 'hand', 'l') or 'l')
@@ -569,7 +647,7 @@ class Editor(QtCore.QObject,
             new_arps.append(arp)
 
         if len(new_arps) != len(arps):
-            score.events.arpeggio = new_arps
+            events.arpeggio = new_arps
             changed = True
 
         return changed
@@ -960,17 +1038,32 @@ class Editor(QtCore.QObject,
                 self._score_length_cache_valid = True
                 return
 
-        # Furthest musical time (notes: end time; grace: start time only)
+        # Furthest musical time across all enabled staves
+        # (notes: end time; grace: start time only).
         furthest_end = 0.0
         grace_times: list[float] = []
-        for n in getattr(score.events, 'note', []) or []:
-            t = float(getattr(n, 'time', 0.0) or 0.0)
-            dur = float(getattr(n, 'duration', 0.0) or 0.0)
-            furthest_end = max(furthest_end, t + dur)
-        for g in getattr(score.events, 'grace_note', []) or []:
-            t = float(getattr(g, 'time', 0.0) or 0.0)
-            furthest_end = max(furthest_end, t)
-            grace_times.append(t)
+
+        staves = list(getattr(score, 'staves', []) or [])
+        if staves:
+            event_sources = [
+                getattr(st, 'events', None)
+                for st in staves
+                if getattr(st, 'events', None) is not None and getattr(st, 'enabled', False) is not False
+            ]
+        else:
+            # Safety fallback for malformed in-memory data.
+            active_events = self.current_events(score)
+            event_sources = [active_events] if active_events is not None else []
+
+        for events in event_sources:
+            for n in getattr(events, 'note', []) or []:
+                t = float(getattr(n, 'time', 0.0) or 0.0)
+                dur = float(getattr(n, 'duration', 0.0) or 0.0)
+                furthest_end = max(furthest_end, t + dur)
+            for g in getattr(events, 'grace_note', []) or []:
+                t = float(getattr(g, 'time', 0.0) or 0.0)
+                furthest_end = max(furthest_end, t)
+                grace_times.append(t)
 
         fitted_end = _fit_last_segment_to_end(furthest_end, grace_times)
         self._cached_furthest_music_end = float(furthest_end)
@@ -1411,7 +1504,8 @@ class Editor(QtCore.QObject,
                 cache = getattr(self, '_draw_cache', None) or {}
                 candidate_notes = list(cache.get('notes_view') or []) if isinstance(cache, dict) else []
                 if not candidate_notes:
-                    candidate_notes = list(getattr(score.events, 'note', []) or [])
+                    events = self.current_events(score)
+                    candidate_notes = list(getattr(events, 'note', []) or [])
                 for n in candidate_notes:
                     y_mm = float(self.time_to_mm(float(getattr(n, 'time', 0.0) or 0.0)))
                     hand = str(getattr(n, 'hand', 'l') or 'l')

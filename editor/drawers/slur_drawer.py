@@ -19,8 +19,9 @@ class SlurDrawerMixin:
         score = getattr(self, 'current_score', lambda: None)()
         if score is None:
             return
+        score_events = self.current_events(score)
 
-        slurs = getattr(score.events, 'slur', []) or []
+        slurs = getattr(score_events, 'slur', []) or []
         if not slurs:
             return
 

@@ -17,12 +17,13 @@ class RepeatDrawerMixin:
         score = self.current_score()
         if score is None:
             return
+        score_events = self.current_events(score)
         layout = getattr(score, 'layout', None)
         if layout is None:
             return
 
         event_attr = 'start_repeat' if kind == 'start' else 'end_repeat'
-        events = list(getattr(score.events, event_attr, []) or [])
+        events = list(getattr(score_events, event_attr, []) or [])
         if not events:
             return
 

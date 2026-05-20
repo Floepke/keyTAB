@@ -51,13 +51,16 @@ class ArpeggioTool(BaseTool):
         score = self._editor.current_score()
         if score is None:
             return (None, "")
+        events = self._editor.current_events(score)
+        if events is None:
+            return (None, "")
         x_mm, y_mm = self._cursor_mm(x_px, y_px)
         hit = self._editor.hit_test_hit_rect(x_mm, y_mm, "arpeggio")
         if hit is None:
             return (None, "")
         arp_id = int(hit.get("_id", -1) or -1)
         handle = str(hit.get("handle", "") or "")
-        for arp in getattr(score.events, "arpeggio", []) or []:
+        for arp in getattr(events, "arpeggio", []) or []:
             if int(getattr(arp, "_id", -1) or -1) == arp_id:
                 return (arp, handle)
         if handle in ("low", "high"):
@@ -86,9 +89,11 @@ class ArpeggioTool(BaseTool):
         notes_view = list(cache.get("notes_view") or [])
         note_sources = [notes_view]
         if not notes_view:
-            note_sources = [list(getattr(score.events, "note", []) or [])]
+            events = self._editor.current_events(score)
+            note_sources = [list(getattr(events, "note", []) or [])] if events is not None else [[]]
         else:
-            note_sources.append(list(getattr(score.events, "note", []) or []))
+            events = self._editor.current_events(score)
+            note_sources.append(list(getattr(events, "note", []) or []) if events is not None else [])
 
         for source_notes in note_sources:
             pitches.clear()
@@ -108,7 +113,10 @@ class ArpeggioTool(BaseTool):
     def _find_matching_arpeggio(self, score: SCORE, pitches: list[int], base_time: float) -> Arpeggio | None:
         key = tuple(sorted(int(p) for p in pitches if int(p) > 0))
         op = Operator(float(SHORTEST_DURATION))
-        for arp in getattr(score.events, "arpeggio", []) or []:
+        events = self._editor.current_events(score)
+        if events is None:
+            return None
+        for arp in getattr(events, "arpeggio", []) or []:
             arp_p = tuple(sorted(int(p) for p in (getattr(arp, "note_pitches", []) or []) if int(p) > 0))
             if arp_p != key:
                 continue
@@ -192,8 +200,10 @@ class ArpeggioTool(BaseTool):
             if rtime1 == 0.0 and rtime2 == 0.0:
                 score = self._editor.current_score()
                 if score is not None:
-                    arps = list(getattr(score.events, "arpeggio", []) or [])
-                    score.events.arpeggio = [arp for arp in arps if arp is not self._drag_target]
+                    events = self._editor.current_events(score)
+                    if events is not None:
+                        arps = list(getattr(events, "arpeggio", []) or [])
+                        events.arpeggio = [arp for arp in arps if arp is not self._drag_target]
             
             if hasattr(self._editor, "_snapshot_if_changed"):
                 self._editor._snapshot_if_changed(coalesce=True, label="arpeggio_drag")
@@ -217,15 +227,19 @@ class ArpeggioTool(BaseTool):
             hit_note = self._hit_note(score, x, y)
             if hit_note is not None:
                 note_pitches = set(self._chord_pitches(score, hit_note))
-                for arp in getattr(score.events, "arpeggio", []) or []:
+                events = self._editor.current_events(score)
+                for arp in (getattr(events, "arpeggio", []) or []) if events is not None else []:
                     arp_p = set(int(p) for p in (getattr(arp, "note_pitches", []) or []) if int(p) > 0)
                     if note_pitches and arp_p == note_pitches:
                         target = arp
                         break
         if target is None:
             return False
-        arps = list(getattr(score.events, "arpeggio", []) or [])
-        score.events.arpeggio = [arp for arp in arps if arp is not target]
+        events = self._editor.current_events(score)
+        if events is None:
+            return False
+        arps = list(getattr(events, "arpeggio", []) or [])
+        events.arpeggio = [arp for arp in arps if arp is not target]
         self._editor.update_score_length()
         self._request_refresh()
         return True

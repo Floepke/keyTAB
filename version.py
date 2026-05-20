@@ -92,9 +92,10 @@ change_log = '''
   * the reason: to have more space for tool buttons on smaller screens.
   * the middle vertical toolbar holds button functions that are always available.
   * the contextual toolbar holds tool-specific functions that belong to the active tool.
-- added: Keyboard Shortcut Card under menu 'Help > Keyboard Shortcut Card'.
-- added: Escape exit confirmation dialog to prevent accidental exits.
-- added: dynamic symbol custom rotation option, allowing symbols to be rotated by a custom angle.
+- [✓] added: Keyboard Shortcut Card under menu 'Help > Keyboard Shortcut Card'.
+- [✓] added: Escape exit confirmation dialog to prevent accidental exits.
+- [✓] added: dynamic symbol custom rotation option, allowing symbols to be rotated by a custom angle.
+- [] added: multiple staves per system support in the engraver, with proper horizontal spacing and alignment.
 - editor performance refactor: introduced centralized render caching (`editor/caching.py`) and wired drawers to reuse precomputed data.
 - optimized drawing hotspots in `grid`, `arpeggio`, `beam`, `slur`, `tempo`, `crescendo`, `decrescendo`, and `snap` drawers with viewport/time-window culling.
 - improved note/beam rendering pipeline by sharing note stem metrics and reducing repeated geometry work.

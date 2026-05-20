@@ -77,7 +77,8 @@ class LineBreakTool(BaseTool):
         if self._editor is None:
             return None
         score = self._editor.current_score()
-        events = list(getattr(score.events, 'line_break', []) or [])
+        active_events = self._editor.current_events(score)
+        events = list(getattr(active_events, 'line_break', []) or []) if active_events is not None else []
         if not events:
             return None
         tol_ticks = self._time_tol_ticks()
@@ -154,8 +155,13 @@ class LineBreakTool(BaseTool):
         if self._editor is None:
             return
         score = self._editor.current_score()
+        events = self._editor.current_events(score)
+        if events is None:
+            return
         try:
-            score.events.line_break.sort(key=lambda lb: float(getattr(lb, 'time', 0.0) or 0.0))
+            events.line_break.sort(key=lambda lb: float(getattr(lb, 'time', 0.0) or 0.0))
+            if hasattr(score, 'sync_linked_line_breaks'):
+                score.sync_linked_line_breaks()
         except Exception:
             pass
 
@@ -183,6 +189,8 @@ class LineBreakTool(BaseTool):
         if hit is not None:
             try:
                 hit.page_break = not bool(getattr(hit, 'page_break', False))
+                if hasattr(score, 'sync_linked_line_breaks'):
+                    score.sync_linked_line_breaks()
                 if hasattr(self._editor, '_snapshot_if_changed'):
                     self._editor._snapshot_if_changed(coalesce=False, label='line_break_toggle')
             except Exception:
@@ -211,6 +219,8 @@ class LineBreakTool(BaseTool):
         try:
             score.new_line_break(time=click_time, margin_mm=margin_mm, stave_range=stave_range, page_break=False)
             self._sort_line_breaks()
+            if hasattr(score, 'sync_linked_line_breaks'):
+                score.sync_linked_line_breaks()
             self._editor._snapshot_if_changed(coalesce=False, label='line_break_insert')
             if hasattr(self._editor, 'force_redraw_from_model'):
                 self._editor.force_redraw_from_model()
@@ -226,41 +236,40 @@ class LineBreakTool(BaseTool):
             return
         self._dialog_open = True
         from ui.dialogs.line_break_dialog import LineBreakDialog
-        from ui.preview_service import PreviewSession
         parent_w = QtWidgets.QApplication.activeWindow() if hasattr(QtWidgets, 'QApplication') else None
         score = self._editor.current_score()
-        file_manager = getattr(self._editor, '_file_manager', None)
-        preview = None
-        if file_manager is not None:
-            preview = PreviewSession(file_manager, self._editor, parent=parent_w, debounce_ms=150)
 
         def _apply_dialog_values() -> None:
+            try:
+                if hasattr(self._editor, '_file_manager') and self._editor._file_manager is not None:
+                    self._editor._file_manager.on_model_changed()
+            except Exception:
+                pass
             if hasattr(self._editor, 'force_redraw_from_model'):
                 self._editor.force_redraw_from_model()
             else:
                 self._editor.draw_frame()
-            try:
-                self._editor.score_changed.emit()
-            except Exception:
-                pass
 
         dlg = LineBreakDialog(
             parent=parent_w,
             score=score,
             selected_line_break=lb,
             measure_resolver=(lambda t: self._editor.get_measure_index_for_time(t)) if hasattr(self._editor, 'get_measure_index_for_time') else None,
-            on_change=preview.schedule_refresh if preview is not None else _apply_dialog_values,
+            on_change=_apply_dialog_values,
         )
 
+        try:
+            dlg.set_selected_stave_index(int(getattr(score.app_state, 'selected_stave_index', 0) or 0))
+        except Exception:
+            pass
+
         def _on_accept() -> None:
-            if preview is not None:
-                preview.commit(label='line_break_edit', restore_first=False)
-            else:
-                self._editor._snapshot_if_changed(coalesce=False, label='line_break_edit')
+            if hasattr(score, 'sync_linked_line_breaks'):
+                score.sync_linked_line_breaks()
+            self._editor._snapshot_if_changed(coalesce=False, label='line_break_edit')
 
         def _on_reject() -> None:
-            if preview is not None:
-                preview.restore_original()
+            pass
 
         def _on_finished(_result: int) -> None:
             self._dialog_open = False
@@ -286,12 +295,15 @@ class LineBreakTool(BaseTool):
         if self._editor is None or self._drag_target is None:
             return
         score = self._editor.current_score()
+        events = self._editor.current_events(score)
+        if events is None:
+            return
         new_time = self._cursor_time(y)
         if self._is_time_zero(new_time):
             return
         tol_ticks = self._time_tol_ticks()
         try:
-            for lb in list(getattr(score.events, 'line_break', []) or []):
+            for lb in list(getattr(events, 'line_break', []) or []):
                 if lb is self._drag_target:
                     continue
                 t0 = float(getattr(lb, 'time', 0.0) or 0.0)
@@ -323,13 +335,18 @@ class LineBreakTool(BaseTool):
         if self._editor is None:
             return
         score = self._editor.current_score()
+        events = self._editor.current_events(score)
+        if events is None:
+            return
         hit = self._hit_test_line_break(x, y)
         if hit is None:
             return
         if self._is_time_zero(float(getattr(hit, 'time', 0.0) or 0.0)):
             return
         try:
-            score.events.line_break = [lb for lb in list(getattr(score.events, 'line_break', []) or []) if lb is not hit]
+            events.line_break = [lb for lb in list(getattr(events, 'line_break', []) or []) if lb is not hit]
+            if hasattr(score, 'sync_linked_line_breaks'):
+                score.sync_linked_line_breaks()
             self._editor._snapshot_if_changed(coalesce=False, label='line_break_delete')
             if hasattr(self._editor, 'force_redraw_from_model'):
                 self._editor.force_redraw_from_model()

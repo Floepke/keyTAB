@@ -17,6 +17,7 @@ class GraceNoteDrawerMixin:
         score = self.current_score()
         if score is None:
             return
+        score_events = self.current_events(score)
         layout = getattr(score, 'layout', None)
         if layout is None:
             return
@@ -38,7 +39,7 @@ class GraceNoteDrawerMixin:
         time_begin = float(self.mm_to_time(top_mm - bleed_mm))
         time_end = float(self.mm_to_time(bottom_mm + bleed_mm))
 
-        notes = list(getattr(score.events, 'grace_note', []) or [])
+        notes = list(getattr(score_events, 'grace_note', []) or [])
         if not notes:
             return
 

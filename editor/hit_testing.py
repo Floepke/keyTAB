@@ -105,7 +105,8 @@ class HitTestingMixin:
         score = self.current_score()
         if score is None:
             return (None, None, None)
-        for ev in (getattr(score.events, hp_type, []) or []):
+        score_events = self.current_events(score)
+        for ev in (getattr(score_events, hp_type, []) or []):
             if int(getattr(ev, "_id", -1) or -1) == hp_id:
                 return (ev, hp_type, handle)
         return (None, None, None)
@@ -118,7 +119,8 @@ class HitTestingMixin:
         score = self.current_score()
         if score is None:
             return (None, None, None)
-        for ev in (getattr(score.events, "dynamic_symbol", []) or []):
+        score_events = self.current_events(score)
+        for ev in (getattr(score_events, "dynamic_symbol", []) or []):
             if int(getattr(ev, "_id", -1) or -1) == symbol_id:
                 return (ev, "dynamic_symbol", "")
         return (None, None, None)
@@ -132,7 +134,8 @@ class HitTestingMixin:
         score = self.current_score()
         if score is None:
             return (None, None)
-        for ev in (getattr(score.events, "count_line", []) or []):
+        score_events = self.current_events(score)
+        for ev in (getattr(score_events, "count_line", []) or []):
             if int(getattr(ev, "_id", -1) or -1) == count_line_id:
                 return (ev, part)
         return (None, None)

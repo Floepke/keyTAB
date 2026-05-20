@@ -108,10 +108,13 @@ class BeamTool(BaseTool):
         score = self._score()
         if score is None:
             return
+        events = self._editor.current_events(score)
+        if events is None:
+            return
         self._hand = self._hand_for_xy(x, y)
         t_raw = float(self._editor.widget_px_to_time(x, y))
         t_snap = float(self._editor.snap_time(t_raw))
-        markers = list(getattr(score.events, 'beam', []) or [])
+        markers = list(getattr(events, 'beam', []) or [])
         hit = self._find_hit(self._hand, t_raw, markers)
         self._press_hit = hit
         if hit is not None:
@@ -180,16 +183,19 @@ class BeamTool(BaseTool):
         score = self._score()
         if score is None:
             return
+        events = self._editor.current_events(score)
+        if events is None:
+            return
         hand = self._hand_for_xy(x, y)
-        markers = list(getattr(score.events, 'beam', []) or [])
+        markers = list(getattr(events, 'beam', []) or [])
         t_raw = float(self._editor.widget_px_to_time(x, y))
         target = self._find_hit(hand, t_raw, markers)
         if target is not None:
             try:
-                score.events.beam.remove(target)
+                events.beam.remove(target)
             except ValueError:
                 tid = int(getattr(target, '_id', -1) or -1)
-                score.events.beam = [m for m in markers if int(getattr(m, '_id', -2) or -2) != tid]
+                events.beam = [m for m in markers if int(getattr(m, '_id', -2) or -2) != tid]
             try:
                 self._editor._snapshot_if_changed(coalesce=True, label='beam_delete')
             except Exception:

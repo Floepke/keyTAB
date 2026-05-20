@@ -46,6 +46,9 @@ class PedalTool(BaseTool):
     def _find_matching_opposite(self, score, active_ev, rpitch: int, time_val: float):
         if score is None or active_ev is None:
             return None
+        events = self._editor.current_events(score)
+        if events is None:
+            return None
         active_symbol = self._ev_symbol(active_ev)
         opposite = self._opposite_symbol(active_symbol)
         if not opposite:
@@ -53,7 +56,7 @@ class PedalTool(BaseTool):
         op = Operator(float(SHORTEST_DURATION))
 
         active_id = self._ev_id(active_ev)
-        for ev in list(getattr(score.events, 'pedal', []) or []):
+        for ev in list(getattr(events, 'pedal', []) or []):
             if self._ev_id(ev) == active_id:
                 continue
             if self._ev_symbol(ev) != opposite:
@@ -184,6 +187,9 @@ class PedalTool(BaseTool):
         score = self._editor.current_score()
         if score is None:
             return
+        events = self._editor.current_events(score)
+        if events is None:
+            return
         hit = self._hit_pedal(x, y)
         if hit is None:
             self._active_pedal = None
@@ -192,7 +198,7 @@ class PedalTool(BaseTool):
         hit_id = int(hit.get('_id', 0) or 0)
         self._active_pedal = None
         self._active_bound_partner = None
-        for ev in list(getattr(score.events, 'pedal', []) or []):
+        for ev in list(getattr(events, 'pedal', []) or []):
             if int(getattr(ev, '_id', 0) or 0) == hit_id:
                 self._active_pedal = ev
                 # Start locked immediately when an opposite symbol already shares position.
@@ -206,6 +212,9 @@ class PedalTool(BaseTool):
             return
         score = self._editor.current_score()
         if score is None:
+            return
+        events = self._editor.current_events(score)
+        if events is None:
             return
 
         x_mm, _y_mm = self._cursor_mm(x, y)
@@ -270,7 +279,7 @@ class PedalTool(BaseTool):
         hit_id = int(hit.get('_id', 0) or 0)
         removed = False
         out = []
-        for ev in list(getattr(score.events, 'pedal', []) or []):
+        for ev in list(getattr(events, 'pedal', []) or []):
             if int(getattr(ev, '_id', 0) or 0) == hit_id:
                 removed = True
                 continue
@@ -278,7 +287,7 @@ class PedalTool(BaseTool):
         if not removed:
             return
 
-        score.events.pedal = out
+        events.pedal = out
         self._editor._snapshot_if_changed(coalesce=False, label='pedal_symbol_delete')
         if hasattr(self._editor, 'force_redraw_from_model'):
             self._editor.force_redraw_from_model()
@@ -292,6 +301,9 @@ class PedalTool(BaseTool):
         score = self._editor.current_score()
         if score is None:
             return
+        events = self._editor.current_events(score)
+        if events is None:
+            return
 
         hit = self._hit_pedal(x, y)
         if hit is None:
@@ -299,7 +311,7 @@ class PedalTool(BaseTool):
 
         hit_id = int(hit.get('_id', 0) or 0)
         target = None
-        for ev in list(getattr(score.events, 'pedal', []) or []):
+        for ev in list(getattr(events, 'pedal', []) or []):
             if int(getattr(ev, '_id', 0) or 0) == hit_id:
                 target = ev
                 break

@@ -47,8 +47,11 @@ class TempoTool(BaseTool):
         if self._editor is None:
             return None
         score = self._editor.current_score()
+        events = self._editor.current_events(score)
+        if events is None:
+            return None
         op = Operator(float(SHORTEST_DURATION))
-        for ev in list(getattr(score.events, 'tempo', []) or []):
+        for ev in list(getattr(events, 'tempo', []) or []):
             if op.equal(float(getattr(ev, 'time', 0.0) or 0.0), float(t)):
                 return ev
         return None
@@ -57,7 +60,10 @@ class TempoTool(BaseTool):
         if self._editor is None:
             return None
         score = self._editor.current_score()
-        for ev in list(getattr(score.events, 'tempo', []) or []):
+        events = self._editor.current_events(score)
+        if events is None:
+            return None
+        for ev in list(getattr(events, 'tempo', []) or []):
             if int(getattr(ev, '_id', -1) or -1) == int(tempo_id):
                 return ev
         return None
@@ -145,6 +151,9 @@ class TempoTool(BaseTool):
         if self._editor is None or self._active_tempo_id is None or self._active_time is None:
             return
         score = self._editor.current_score()
+        events = self._editor.current_events(score)
+        if events is None:
+            return
         anchor_time = self._drag_anchor_time
         if anchor_time is None:
             anchor_time = float(self._editor.widget_px_to_time(x, y))
@@ -159,7 +168,7 @@ class TempoTool(BaseTool):
         new_du = max(self._min_duration, float(snapped_end - float(self._active_time)))
         if new_du <= 0.0:
             new_du = self._min_duration
-        for ev in list(getattr(score.events, 'tempo', []) or []):
+        for ev in list(getattr(events, 'tempo', []) or []):
             if int(getattr(ev, '_id', -1) or -1) == int(self._active_tempo_id):
                 try:
                     ev.duration = float(new_du)
@@ -204,10 +213,13 @@ class TempoTool(BaseTool):
         if self._editor is None:
             return
         score = self._editor.current_score()
+        events = self._editor.current_events(score)
+        if events is None:
+            return
         tempo_id = self._editor.hit_test_tempo(x, y) if hasattr(self._editor, 'hit_test_tempo') else None
         t = self._editor.snap_time(self._editor.widget_px_to_time(x, y))
         op = Operator(float(SHORTEST_DURATION))
-        lst = list(getattr(score.events, 'tempo', []) or [])
+        lst = list(getattr(events, 'tempo', []) or [])
         if not lst:
             return
         # Do not delete the first tempo marker (earliest time)
@@ -223,7 +235,7 @@ class TempoTool(BaseTool):
                     return
                 try:
                     del lst[i]
-                    score.events.tempo = lst
+                    events.tempo = lst
                 except Exception:
                     pass
                 self._editor._snapshot_if_changed(coalesce=True, label='tempo_delete')

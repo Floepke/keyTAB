@@ -493,7 +493,8 @@ class GridDrawerMixin:
                 )
 
         if barline_visible and layout is not None:
-            double_events = list(getattr(score.events, 'double_bar', []) or [])
+            score_events = self.current_events(score)
+            double_events = list(getattr(score_events, 'double_bar', []) or [])
             if double_events:
                 top_mm = float(getattr(self, '_view_y_mm_offset', 0.0) or 0.0)
                 vp_h_mm = float(getattr(self, '_viewport_h_mm', 0.0) or 0.0)

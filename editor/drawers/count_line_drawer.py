@@ -14,7 +14,8 @@ class CountLineDrawerMixin:
         score = self.current_score()
         if score is None:
             return
-        events = list(getattr(score.events, 'count_line', []) or [])
+        score_events = self.current_events(score)
+        events = list(getattr(score_events, 'count_line', []) or [])
         if not events:
             return
 

@@ -1,9 +1,10 @@
-# my json structure design for *.piano files.
+# my json structure design for *.keytab files.
 from __future__ import annotations
 from dataclasses import dataclass, field, fields, MISSING, is_dataclass
 from typing import Callable, List, Optional, get_args, get_origin, get_type_hints, Literal
 import json
 from datetime import datetime
+from pathlib import Path
 
 from file_model.events.note import Note
 from file_model.events.grace_note import GraceNote
@@ -34,6 +35,9 @@ from file_model.old_file_conversion import convert_legacy_piano_data
 from utils.operator import Operator
 
 
+DEFAULT_STAVE_COUNT: int = 4
+
+
 def _timestamp_now() -> str:
 	"""Return current timestamp formatted from preferences with a safe fallback."""
 	default_fmt = "%d-%m-%Y_%H:%M:%S"
@@ -50,8 +54,8 @@ def _timestamp_now() -> str:
 
 @dataclass
 class MetaData:
-	description: str = 'This is a .piano score file created with keyTAB.'
-	extension: str = '.piano'
+	description: str = 'This is a .keytab score file created with keyTAB.'
+	extension: str = '.keytab'
 	format: str = 'json'
 	creation_timestamp: str = ''
 	modification_timestamp: str = ''
@@ -76,6 +80,14 @@ class Events:
 	crescendo: List[Crescendo] = field(default_factory=list)
 	decrescendo: List[Decrescendo] = field(default_factory=list)
 	dynamic_symbol: List[DynamicSymbol] = field(default_factory=list)
+
+
+@dataclass
+class Stave:
+	name: str = 'Stave 1'
+	scale: float = 1.0
+	enabled: bool = True
+	events: Events = field(default_factory=Events)
 
 
 def _defaults_for(dc_type):
@@ -174,6 +186,7 @@ class SCORE:
 	layout: Layout = field(default_factory=Layout)
 	app_state: AppState = field(default_factory=AppState)
 	events: Events = field(default_factory=Events)
+	staves: List[Stave] = field(default_factory=lambda: [Stave(name=f'Stave {i + 1}', enabled=True) for i in range(DEFAULT_STAVE_COUNT)])
 	_next_id: int = 1
 	_app_state_from_file: bool = False
 	_last_load_checks_report: dict = field(default_factory=dict)
@@ -362,6 +375,202 @@ class SCORE:
 			return obj
 		return to_dict(self)
 
+	def _load_events_container(self, ev_data: object, context_prefix: str) -> Events:
+		"""Parse an events dict into an Events dataclass with fresh sequential ids."""
+		ev = ev_data if isinstance(ev_data, dict) else {}
+		out = Events()
+		# Resolve postponed annotations (from __future__ import annotations)
+		try:
+			_ev_hints = get_type_hints(Events, globals(), locals())
+		except Exception:
+			_ev_hints = {}
+		for f_ev in fields(Events):
+			ann = _ev_hints.get(f_ev.name, f_ev.type)
+			origin = get_origin(ann)
+			args = get_args(ann)
+			elem_type = args[0] if origin is list or origin is List else None
+			if elem_type is None:
+				continue
+			name = f_ev.name
+			items = ev.get(name, []) or []
+			if not isinstance(items, list):
+				continue
+			lst = getattr(out, name)
+			for idx, item in enumerate(items):
+				incoming = item if isinstance(item, dict) else {}
+				obj = elem_type(**_merge_with_defaults(elem_type, incoming, f'{context_prefix}.{name}[{idx}]'))
+				try:
+					setattr(obj, '_id', self._gen_id())
+				except Exception:
+					pass
+				lst.append(obj)
+		return out
+
+	def _load_staves(self, staves_data: object, fallback_events: Events) -> List[Stave]:
+		"""Load staves from dict data and always provide DEFAULT_STAVE_COUNT staves."""
+		staves: List[Stave] = []
+		if isinstance(staves_data, list) and staves_data:
+			for i, raw in enumerate(staves_data):
+				incoming = raw if isinstance(raw, dict) else {}
+				name = str(incoming.get('name', f'Stave {i + 1}') or f'Stave {i + 1}')
+				try:
+					scale = float(incoming.get('scale', 1.0) or 1.0)
+				except Exception:
+					scale = 1.0
+				enabled = bool(incoming.get('enabled', True))
+				ev_raw = incoming.get('events', None)
+				if isinstance(ev_raw, dict):
+					ev_obj = self._load_events_container(ev_raw, f'staves[{i}].events')
+				elif i == 0:
+					ev_obj = deepcopy(fallback_events)
+				else:
+					ev_obj = Events()
+				staves.append(Stave(name=name, scale=scale, enabled=enabled, events=ev_obj))
+		if not staves:
+			staves = [Stave(name='Stave 1', enabled=True, events=deepcopy(fallback_events))]
+		# Always expose 4 editable staves in the model for editor/UI consistency.
+		staves = list(staves[:DEFAULT_STAVE_COUNT])
+		for i in range(len(staves), DEFAULT_STAVE_COUNT):
+			staves.append(Stave(name=f'Stave {i + 1}', enabled=True, events=Events()))
+		for i, st in enumerate(staves):
+			if not str(getattr(st, 'name', '') or '').strip():
+				st.name = f'Stave {i + 1}'
+		return staves
+
+	def _sync_events_staves_legacy_bridge(self) -> None:
+		"""Sync current events into selected stave and keep a safe legacy fallback."""
+		if not isinstance(getattr(self, 'staves', None), list) or not self.staves:
+			self.staves = [Stave(name=f'Stave {i + 1}', enabled=True) for i in range(DEFAULT_STAVE_COUNT)]
+		for i, st in enumerate(list(self.staves)):
+			if not isinstance(st, Stave):
+				self.staves[i] = Stave(name=f'Stave {i + 1}', enabled=True)
+		idx = 0
+		try:
+			app_state = getattr(self, 'app_state', None)
+			raw_idx = int(getattr(app_state, 'selected_stave_index', 0) or 0)
+			idx = int(raw_idx % max(1, len(self.staves)))
+		except Exception:
+			idx = 0
+		self.staves[idx].events = deepcopy(self.events)
+		# Keep a non-empty legacy fallback stave at index 0.
+		if len(self.staves) > 1 and not isinstance(getattr(self.staves[0], 'events', None), Events):
+			self.staves[0].events = Events()
+
+	def selected_stave_index(self) -> int:
+		"""Return the normalized selected stave index from app_state."""
+		staves = list(getattr(self, 'staves', []) or [])
+		if not staves:
+			return 0
+		try:
+			raw_idx = int(getattr(getattr(self, 'app_state', None), 'selected_stave_index', 0) or 0)
+		except Exception:
+			raw_idx = 0
+		return int(raw_idx % len(staves))
+
+	def stave_at(self, stave_index: int | None = None) -> Stave | None:
+		staves = list(getattr(self, 'staves', []) or [])
+		if not staves:
+			return None
+		idx = self.selected_stave_index() if stave_index is None else int(stave_index)
+		return staves[int(idx % len(staves))]
+
+	def stave_events_at(self, stave_index: int | None = None) -> Events | None:
+		stave = self.stave_at(stave_index)
+		if stave is None:
+			return None
+		return getattr(stave, 'events', None)
+
+	def line_breaks_at(self, stave_index: int | None = None) -> list[LineBreak]:
+		events = self.stave_events_at(stave_index)
+		if events is None:
+			return []
+		return list(getattr(events, 'line_break', []) or [])
+
+	def sync_linked_line_breaks(self, source_stave_index: int | None = None) -> None:
+		"""Propagate line-break time/page_break across all staves while keeping per-stave margins/ranges."""
+		def _clone_range_value(value):
+			if value == 'auto' or value is None:
+				return 'auto'
+			try:
+				return list(value)
+			except Exception:
+				return 'auto'
+
+		staves = list(getattr(self, 'staves', []) or [])
+		if not staves:
+			return
+		source_idx = self.selected_stave_index() if source_stave_index is None else int(source_stave_index) % len(staves)
+		source_events = self.stave_events_at(source_idx)
+		if source_events is None:
+			return
+		source_breaks = list(getattr(source_events, 'line_break', []) or [])
+		source_breaks.sort(key=lambda lb: float(getattr(lb, 'time', 0.0) or 0.0))
+		if not source_breaks:
+			source_breaks = [LineBreak(time=0.0)]
+			setattr(source_events, 'line_break', source_breaks)
+		for stave in staves:
+			events = getattr(stave, 'events', None)
+			if events is None:
+				continue
+			current = list(getattr(events, 'line_break', []) or [])
+			current.sort(key=lambda lb: float(getattr(lb, 'time', 0.0) or 0.0))
+			while len(current) < len(source_breaks):
+				idx = len(current)
+				src = source_breaks[idx]
+				current.append(LineBreak(
+					time=float(getattr(src, 'time', 0.0) or 0.0),
+					margin_mm=list(getattr(src, 'margin_mm', [5.0, 5.0]) or [5.0, 5.0]),
+					stave_range=_clone_range_value(getattr(src, 'stave_range', 'auto')),
+					page_break=bool(getattr(src, 'page_break', False)),
+				))
+			if len(current) > len(source_breaks):
+				current = current[:len(source_breaks)]
+			for idx, src in enumerate(source_breaks):
+				tgt = current[idx]
+				tgt.time = float(getattr(src, 'time', 0.0) or 0.0)
+				tgt.page_break = bool(getattr(src, 'page_break', False))
+			if current and not any(self._time_eq_lb(lb, 0.0) for lb in current):
+				current.insert(0, LineBreak(time=0.0))
+			events.line_break = current
+
+	def _time_eq_lb(self, lb: LineBreak, t: float) -> bool:
+		try:
+			return Operator(float(SHORTEST_DURATION)).eq(float(getattr(lb, 'time', 0.0) or 0.0), float(t))
+		except Exception:
+			return float(getattr(lb, 'time', 0.0) or 0.0) == float(t)
+
+	def _convert_imported_piano_to_keytab(self) -> None:
+		"""Normalize imported legacy .piano data into keyTAB stave-first schema."""
+		staves = list(getattr(self, 'staves', []) or [])
+		if not staves:
+			staves = [Stave(name='Piano', scale=1.0, enabled=True, events=deepcopy(self.events))]
+		staves = list(staves[:DEFAULT_STAVE_COUNT])
+		for i in range(len(staves), DEFAULT_STAVE_COUNT):
+			staves.append(Stave(name=f'Stave {i + 1}', scale=1.0, enabled=False, events=Events()))
+
+		first = staves[0]
+		first.name = 'Piano'
+		first.scale = 1.0
+		first.enabled = True
+		if not isinstance(getattr(first, 'events', None), Events):
+			first.events = deepcopy(self.events)
+
+		for i in range(1, len(staves)):
+			st = staves[i]
+			st.scale = 1.0
+			st.enabled = False
+			if not isinstance(getattr(st, 'events', None), Events):
+				st.events = Events()
+
+		self.staves = staves
+		self.events = deepcopy(first.events)
+		self.meta_data.extension = '.keytab'
+		self.meta_data.description = 'This is a .keytab score file created with keyTAB.'
+		try:
+			self.app_state.selected_stave_index = 0
+		except Exception:
+			pass
+
 	# ---- Persistence ----
 	def save(self, path: str) -> None:
 		try:
@@ -371,27 +580,24 @@ class SCORE:
 			pass
 		# Update modification timestamp before writing
 		self.meta_data.modification_timestamp = _timestamp_now()
+		self.meta_data.extension = '.keytab'
+		self._sync_events_staves_legacy_bridge()
 		payload = self.get_dict()
 		if isinstance(payload, dict):
 			payload.pop('editor', None)
-			events = payload.get('events', None)
-			if isinstance(events, dict):
-				notes = events.get('note', None)
-				if isinstance(notes, list):
-					events['note'] = sorted(
-						notes,
-						key=lambda n: (
-							float((n or {}).get('time', 0.0) or 0.0),
-							int((n or {}).get('pitch', 0) or 0),
-						),
-					)
-		with open(path, 'w', encoding='utf-8') as f:
+			# New schema: only per-stave event containers are persisted.
+			payload.pop('events', None)
+		target_path = str(Path(path).with_suffix('.keytab')) if str(path or '').lower().endswith('.piano') else str(path)
+		if str(Path(target_path).suffix or '').lower() != '.keytab':
+			target_path = str(Path(target_path).with_suffix('.keytab'))
+		with open(target_path, 'w', encoding='utf-8') as f:
 			# Store non-ASCII symbols (e.g., dynamic glyphs) as \uXXXX escapes for stable/plain-text readability.
 			json.dump(payload, f, indent=4, ensure_ascii=True, separators=(',', ':'))
 
 	def load(self, path: str) -> "SCORE":
 		with open(path, 'r', encoding='utf-8') as f:
 			data = json.load(f)
+		is_piano_import = str(path or '').lower().endswith('.piano')
 
 		# Migrate legacy file conventions (fail-open).
 		data = _apply_legacy_conversion(data)
@@ -425,38 +631,13 @@ class SCORE:
 			self.app_state = AppState()
 			self._app_state_from_file = False
 
-		# Events lists: generic loader based on Events dataclass field types
+		# Events lists
 		ev = data.get('events', {}) or {}
-		self.events = Events()
 		self._next_id = 1
-		# Resolve postponed annotations (from __future__ import annotations)
-		_ev_hints = {}
-		try:
-			_ev_hints = get_type_hints(Events, globals(), locals())
-		except Exception:
-			_ev_hints = {}
-		for f_ev in fields(Events):
-			# Expect typing like List[Note]; resolve element type from hints
-			ann = _ev_hints.get(f_ev.name, f_ev.type)
-			origin = get_origin(ann)
-			args = get_args(ann)
-			elem_type = args[0] if origin is list or origin is List else None
-			if elem_type is None:
-				continue
-			name = f_ev.name
-			items = ev.get(name, []) or []
-			if not isinstance(items, list):
-				continue
-			lst = getattr(self.events, name)
-			for idx, item in enumerate(items):
-				incoming = item if isinstance(item, dict) else {}
-				obj = elem_type(**_merge_with_defaults(elem_type, incoming, f'events.{name}[{idx}]'))
-				# Assign sequential _id regardless of incoming value
-				try:
-					setattr(obj, '_id', self._gen_id())
-				except Exception:
-					pass
-				lst.append(obj)
+		self.events = self._load_events_container(ev, 'events')
+		self.staves = self._load_staves(data.get('staves', None), self.events)
+		if not isinstance(data.get('events', None), dict):
+			self.events = deepcopy(self.staves[0].events)
 
 		# Normalize hand values and convert short notes to grace notes.
 		try:
@@ -484,6 +665,9 @@ class SCORE:
 
 		# Ensure a line break exists at time 0
 		self._ensure_line_break_zero()
+		if is_piano_import:
+			self._convert_imported_piano_to_keytab()
+		self._sync_events_staves_legacy_bridge()
 		return self
 
 	@classmethod
@@ -527,33 +711,11 @@ class SCORE:
 
 		# Events
 		ev = (data or {}).get('events', {}) or {}
-		self.events = Events()
 		self._next_id = 1
-		# Resolve postponed annotations
-		try:
-			_ev_hints = get_type_hints(Events, globals(), locals())
-		except Exception:
-			_ev_hints = {}
-		for f_ev in fields(Events):
-			ann = _ev_hints.get(f_ev.name, f_ev.type)
-			origin = get_origin(ann)
-			args = get_args(ann)
-			elem_type = args[0] if origin is list or origin is List else None
-			if elem_type is None:
-				continue
-			name = f_ev.name
-			items = ev.get(name, []) or []
-			if not isinstance(items, list):
-				continue
-			lst = getattr(self.events, name)
-			for idx, item in enumerate(items):
-				incoming = item if isinstance(item, dict) else {}
-				obj = elem_type(**_merge_with_defaults(elem_type, incoming, f'events.{name}[{idx}]'))
-				try:
-					setattr(obj, '_id', self._gen_id())
-				except Exception:
-					pass
-				lst.append(obj)
+		self.events = self._load_events_container(ev, 'events')
+		self.staves = self._load_staves((data or {}).get('staves', None), self.events)
+		if not isinstance((data or {}).get('events', None), dict):
+			self.events = deepcopy(self.staves[0].events)
 
 		# Normalize hand values and convert short notes to grace notes.
 		try:
@@ -567,6 +729,8 @@ class SCORE:
 		except Exception:
 			pass
 
+		self._sync_events_staves_legacy_bridge()
+
 		return self
 
 	# ---- New minimal template ----
@@ -579,6 +743,8 @@ class SCORE:
 		self.info.copyright = f"© keyTAB {datetime.now().year}"
 		self.base_grid = [BaseGrid()]
 		self.events = Events()
+		self.staves = [Stave(name=f'Stave {i + 1}', enabled=True, events=Events()) for i in range(DEFAULT_STAVE_COUNT)]
+		self.staves[0].events = deepcopy(self.events)
 		self.layout = Layout()
 		self.app_state = AppState()
 		self._next_id = 1
@@ -591,18 +757,24 @@ class SCORE:
 		measure_len = float(numer) * (4.0 / float(denom)) * float(QUARTER_NOTE_UNIT)
 		beat_len = measure_len / max(1, int(numer))
 		self.new_tempo(time=0.0, duration=float(beat_len))
+		self._sync_events_staves_legacy_bridge()
 		return self
 
 	def _ensure_line_break_zero(self) -> None:
 		"""Ensure there is always a line break at time 0."""
-		lb_list = list(getattr(self.events, 'line_break', []) or [])
+		stave = self.stave_at()
+		if stave is None or getattr(stave, 'events', None) is None:
+			return
+		lb_list = list(getattr(stave.events, 'line_break', []) or [])
 		if not lb_list:
-			self.new_line_break(time=0.0)
+			stave.events.line_break = [LineBreak(time=0.0)]
+			self.sync_linked_line_breaks()
 			return
 		op_load = Operator(float(SHORTEST_DURATION))
 		if not any(op_load.eq(float(getattr(lb, 'time', 0.0) or 0.0), 0.0) for lb in lb_list):
-			self.new_line_break(time=0.0)
-		self.events.line_break.sort(key=lambda lb: float(getattr(lb, 'time', 0.0) or 0.0))
+			stave.events.line_break.insert(0, LineBreak(time=0.0))
+		stave.events.line_break.sort(key=lambda lb: float(getattr(lb, 'time', 0.0) or 0.0))
+		self.sync_linked_line_breaks()
 
 	def _normalize_events_after_load(self) -> None:
 		"""Normalize event fields after parsing and convert short notes to grace notes."""
@@ -821,5 +993,6 @@ class SCORE:
 				break
 			index += group_len
 		self.events.line_break.sort(key=lambda lb: float(getattr(lb, 'time', 0.0) or 0.0))
+		self.sync_linked_line_breaks()
 		return True
 

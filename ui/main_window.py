@@ -19,6 +19,7 @@ from ui.widgets.draw_util import DrawUtil
 from ui.widgets.draw_view import DrawUtilView
 from ui.about_dialog import AboutDialog
 from ui.dialogs.keyboard_shortcuts_dialog import KeyboardShortcutsDialog
+from ui.dialogs.stave_dialog import StaveDialog
 from ui.error_dialog import show_error_dialog
 from ui.style import Style
 from ui.dialogs.fluidsynth_reverb_config_dialog import FluidSynthReverbConfigDialog
@@ -358,8 +359,10 @@ class MainWindow(QtWidgets.QMainWindow):
         self.splitter.lineBreakRequested.connect(self._open_line_break_dialog)
         self.splitter.selectionLeftRequested.connect(lambda: self._map_selected_notes_hand('l'))
         self.splitter.selectionRightRequested.connect(lambda: self._map_selected_notes_hand('r'))
+        self.splitter.staveSelectionRequested.connect(self._on_stave_selector_requested)
         # Any manual splitter movement should return print-view Ctrl/Cmd zoom to idle.
         self.splitter.splitterMoved.connect(self._on_splitter_moved)
+        QtCore.QTimer.singleShot(0, self._sync_stave_selector_from_score)
         
         # Splitter toolbar defaults are active here (fit/page nav/edit/playback/dialog shortcuts).
         # Fit state tracking
@@ -682,6 +685,10 @@ class MainWindow(QtWidgets.QMainWindow):
         style_act.setToolTip(tr("Open appearance settings for the score."))
         style_act.setShortcut(QtGui.QKeySequence("S"))
         style_act.triggered.connect(self._open_style_dialog)
+        stave_act = QtGui.QAction(tr("Staves..."), self)
+        stave_act.setToolTip(tr("Open stave configuration for names, scale, and visibility."))
+        stave_act.setShortcut(QtGui.QKeySequence("Shift+S"))
+        stave_act.triggered.connect(self._open_stave_dialog)
         info_act = QtGui.QAction(tr("Info..."), self)
         info_act.setToolTip(tr("Open title and metadata settings."))
         info_act.setShortcut(QtGui.QKeySequence("I"))
@@ -692,6 +699,7 @@ class MainWindow(QtWidgets.QMainWindow):
         line_break_act.triggered.connect(self._open_line_break_dialog)
 
         document_menu.addAction(style_act)
+        document_menu.addAction(stave_act)
         document_menu.addAction(info_act)
         document_menu.addAction(line_break_act)
         document_menu.addSeparator()
@@ -1360,6 +1368,39 @@ class MainWindow(QtWidgets.QMainWindow):
                         app_state.selected_tool = selected
         except Exception:
             pass
+        try:
+            if hasattr(self, 'editor_controller') and self.editor_controller is not None:
+                app_state.selected_stave_index = int(self.editor_controller.selected_stave_index())
+        except Exception:
+            pass
+
+    def _sync_stave_selector_from_score(self) -> None:
+        """Sync splitter stave selector with current score/app-state."""
+        try:
+            if not hasattr(self, 'editor_controller') or self.editor_controller is None:
+                return
+            count = int(self.editor_controller.available_stave_count())
+            selected = int(self.editor_controller.selected_stave_index())
+            if hasattr(self, 'splitter') and self.splitter is not None:
+                self.splitter.set_stave_selector_state(selected_index=selected, stave_count=count)
+        except Exception:
+            pass
+
+    def _on_stave_selector_requested(self, selected_index: int) -> None:
+        try:
+            if not hasattr(self, 'editor_controller') or self.editor_controller is None:
+                return
+            self.editor_controller.set_selected_stave_index(int(selected_index))
+        except Exception:
+            return
+        self._sync_stave_selector_from_score()
+        try:
+            if hasattr(self.editor_controller, 'force_redraw_from_model'):
+                self.editor_controller.force_redraw_from_model()
+            else:
+                self.editor_controller.draw_frame()
+        except Exception:
+            pass
 
     def _resolve_app_state_defaults(self) -> AppState:
         """Return app state from the currently loaded SCORE only."""
@@ -1378,6 +1419,12 @@ class MainWindow(QtWidgets.QMainWindow):
             app_state = None
         if app_state is None:
             app_state = AppState()
+        try:
+            if hasattr(self, 'editor_controller') and self.editor_controller is not None:
+                self.editor_controller.set_selected_stave_index(int(getattr(app_state, 'selected_stave_index', 0) or 0))
+        except Exception:
+            pass
+        self._sync_stave_selector_from_score()
         # Tool selection
         try:
             self.tool_dock.selector.set_selected_tool(str(app_state.selected_tool or "note"), emit=True)
@@ -2228,6 +2275,7 @@ class MainWindow(QtWidgets.QMainWindow):
                 self.print_view.request_render()
         # Also refresh the editor view
         self.editor_canvas.update()
+        self._sync_stave_selector_from_score()
 
     def _on_score_changed(self) -> None:
         if hasattr(self, '_score_change_engrave_timer') and self._score_change_engrave_timer is not None:
@@ -2371,6 +2419,35 @@ class MainWindow(QtWidgets.QMainWindow):
         dlg.accepted.connect(lambda: self.file_manager.save() if self.file_manager.path() is not None else None)
         dlg.show()
 
+    def _open_stave_dialog(self) -> None:
+        score = self.file_manager.current()
+        if score is None:
+            return
+
+        def _apply_dialog_values() -> None:
+            try:
+                dlg.apply_to_score()
+            except Exception:
+                pass
+            try:
+                self.file_manager.on_model_changed()
+                self._refresh_views_from_score()
+            except Exception:
+                pass
+
+        dlg = StaveDialog(parent=self, score=score, on_change=_apply_dialog_values)
+
+        def _on_accept() -> None:
+            try:
+                dlg.apply_to_score()
+            except Exception:
+                pass
+            self.file_manager.on_model_changed()
+            self._refresh_views_from_score()
+
+        dlg.accepted.connect(_on_accept)
+        dlg.show()
+
     def _open_info_dialog(self) -> None:
         from ui.dialogs.info_dialog import InfoDialog
         sc = self.file_manager.current()
@@ -2381,27 +2458,47 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def _open_line_break_dialog(self) -> None:
         from ui.dialogs.line_break_dialog import LineBreakDialog
-        from ui.preview_service import PreviewSession
 
         score = self.file_manager.current()
         if score is None:
             return
 
-        preview = PreviewSession(self.file_manager, self.editor_controller, parent=self, debounce_ms=150)
+        def _apply_dialog_values() -> None:
+            try:
+                self.file_manager.on_model_changed()
+            except Exception:
+                pass
+            try:
+                if hasattr(self.editor_controller, 'force_redraw_from_model'):
+                    self.editor_controller.force_redraw_from_model()
+                else:
+                    self.editor_controller.draw_frame()
+            except Exception:
+                pass
 
         dlg = LineBreakDialog(
             parent=self,
             score=score,
             selected_line_break=None,
             measure_resolver=(lambda t: self.editor_controller.get_measure_index_for_time(t)) if hasattr(self.editor_controller, 'get_measure_index_for_time') else None,
-            on_change=preview.schedule_refresh,
+            on_change=_apply_dialog_values,
         )
 
+        try:
+            dlg.set_selected_stave_index(int(getattr(score.app_state, 'selected_stave_index', 0) or 0))
+        except Exception:
+            pass
+
         def _on_accept() -> None:
-            preview.commit(label='line_break_edit', restore_first=False)
+            try:
+                if hasattr(score, 'sync_linked_line_breaks'):
+                    score.sync_linked_line_breaks()
+            except Exception:
+                pass
+            self.file_manager.on_model_changed()
 
         def _on_reject() -> None:
-            preview.restore_original()
+            pass
 
         def _on_finished(_result: int) -> None:
             if int(_result) == int(QtWidgets.QDialog.DialogCode.Accepted):

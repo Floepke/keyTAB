@@ -17,8 +17,9 @@ class DynamicDrawerMixin:
         score: SCORE = getattr(self, 'current_score', lambda: None)()
         if score is None:
             return
+        score_events = self.current_events(score)
 
-        events = list(getattr(score.events, 'dynamic_symbol', []) or [])
+        events = list(getattr(score_events, 'dynamic_symbol', []) or [])
         if not events:
             return
 
