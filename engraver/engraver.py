@@ -70,7 +70,6 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
     layout: dict = dict(score.get('layout', {}) or {})
     base_grid: list = list(score.get('base_grid', []) or [])
     staves_raw: list = list(score.get('staves', []) or [])
-    root_events: dict = dict(score.get('events', {}) or {})
 
     scale = float(layout.get('scale', 1.0) or 1.0)
     black_key_set = set(BLACK_KEYS)
@@ -83,6 +82,15 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
         if isinstance(item, dict):
             return item.get(key, default)
         return getattr(item, key, default)
+
+    def _item_get_float(item, key: str, default: float) -> float:
+        val = _item_get(item, key, None)
+        if val is None:
+            return float(default)
+        try:
+            return float(val)
+        except Exception:
+            return float(default)
 
     def _scaled(value: float) -> float:
         return float(value) * float(scale)
@@ -113,7 +121,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
             st_scale = float(st.get('scale', 1.0) or 1.0)
             enabled.append({'index': int(idx), 'events': st_events, 'stave_scale': st_scale})
         if not enabled:
-            enabled.append({'index': 0, 'events': root_events, 'stave_scale': 1.0})
+            enabled.append({'index': 0, 'events': staves_raw[0].get('events', {}) if staves_raw else {}, 'stave_scale': staves_raw[0].get('scale', 1.0) if staves_raw else 1.0})
         return enabled
 
     def _total_ticks(enabled_staves: list[dict]) -> float:
@@ -130,8 +138,8 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
         for st in enabled_staves:
             notes = list((st.get('events', {}) or {}).get('note', []) or [])
             for n in notes:
-                t0 = float(_item_get(n, 'time', 0.0) or 0.0)
-                dur = float(_item_get(n, 'duration', 0.0) or 0.0)
+                t0 = _item_get_float(n, 'time', 0.0)
+                dur = _item_get_float(n, 'duration', 0.0)
                 max_end = max(max_end, t0 + dur)
         return max(float(QUARTER_NOTE_UNIT), max_end)
 
@@ -287,16 +295,18 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
             lines = [{'start': 0.0, 'end': float(total_ticks), 'page_break': False}]
         return lines
 
-    def _event_in_line(event_type: str, ev, t0: float, t1: float) -> bool:
-        ev_t = float(_item_get(ev, 'time', 0.0) or 0.0)
-        ev_dur = float(_item_get(ev, 'duration', 0.0) or 0.0)
+    def _event_in_line(event_type: str, ev, t0: float, t1: float, include_negative_prefix: bool = False) -> bool:
+        ev_t = _item_get_float(ev, 'time', 0.0)
+        ev_dur = _item_get_float(ev, 'duration', 0.0)
+        if include_negative_prefix and ev_t < 0.0:
+            return True
         timed_spans = {'note', 'grace_note', 'slur', 'pedal', 'line'}
         if event_type in timed_spans and ev_dur > 0.0:
             ev_end = ev_t + ev_dur
             return not (ev_end <= t0 or ev_t >= t1)
         return t0 <= ev_t < t1
 
-    def _collect_events_for_line(st_events: dict, t0: float, t1: float) -> dict:
+    def _collect_events_for_line(st_events: dict, t0: float, t1: float, include_negative_prefix: bool = False) -> dict:
         event_types = [
             'note', 'arpeggio', 'count_line', 'dynamic', 'grace_note',
             'grid_band', 'grid', 'pedal', 'start_repeat', 'end_repeat',
@@ -305,7 +315,10 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
         out: dict = {}
         for ev_type in event_types:
             items = list(st_events.get(ev_type, []) or [])
-            out[ev_type] = [ev for ev in items if _event_in_line(ev_type, ev, t0, t1)]
+            out[ev_type] = [
+                ev for ev in items
+                if _event_in_line(ev_type, ev, t0, t1, include_negative_prefix=include_negative_prefix)
+            ]
         return out
 
     def _pre_calculate() -> dict:
@@ -324,9 +337,11 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
         y_end = float(page_h - page_bottom)
 
         measured_systems: list[dict] = []
+        first_line_start = float(lines_raw[0].get('start', 0.0) or 0.0) if lines_raw else 0.0
         for si, line in enumerate(lines_raw):
             t0 = float(line.get('start', 0.0) or 0.0)
             t1 = float(line.get('end', t0) or t0)
+            include_negative_prefix = bool(si == 0 and first_line_start >= 0.0 and t0 >= 0.0)
             staves_system: list[dict] = []
             system_reserved_width_mm = 0.0
 
@@ -345,8 +360,8 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                 notes = list(st_events.get('note', []) or [])
                 pitches: list[int] = []
                 for n in notes:
-                    nt = float(_item_get(n, 'time', 0.0) or 0.0)
-                    nd = float(_item_get(n, 'duration', 0.0) or 0.0)
+                    nt = _item_get_float(n, 'time', 0.0)
+                    nd = _item_get_float(n, 'duration', 0.0)
                     ne = nt + nd
                     if ne <= t0 or nt >= t1:
                         continue
@@ -382,8 +397,18 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                     # Keep exact existing auto behavior.
                     span_low, span_high, _span_groups = _expand_to_group_bounds(min(note_low, stave_low), max(note_high, stave_high))
                 else:
-                    # In manual mode, drawing span follows forced stave range.
-                    span_low, span_high = int(stave_low), int(stave_high)
+                    # In manual mode, stave drawing stays forced, but content span
+                    # still reserves ledger-line horizontal space equivalent to
+                    # what auto mode would reserve for this line.
+                    auto_base_low = min(note_low, clef_low_key)
+                    auto_base_high = max(note_high, clef_high_key)
+                    auto_stave_low, auto_stave_high, _auto_groups = _expand_to_group_bounds(auto_base_low, auto_base_high)
+                    auto_span_low, auto_span_high, _auto_span_groups = _expand_to_group_bounds(
+                        min(note_low, auto_stave_low),
+                        max(note_high, auto_stave_high),
+                    )
+                    span_low = int(min(stave_low, auto_span_low))
+                    span_high = int(max(stave_high, auto_span_high))
 
                 stave_width = _span_width_mm(stave_low, stave_high, key_offsets_stave, semitone_mm_stave)
                 stave_content_span_width = _span_width_mm(span_low, span_high, key_offsets_stave, semitone_mm_stave)
@@ -414,7 +439,12 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                         'composite_scale': composite_scale,
                         'semitone_mm': semitone_mm_stave,
                         'key_offsets': key_offsets_stave,
-                        'events_in_line': _collect_events_for_line(st_events, t0, t1),
+                        'events_in_line': _collect_events_for_line(
+                            st_events,
+                            t0,
+                            t1,
+                            include_negative_prefix=include_negative_prefix,
+                        ),
                     }
                 )
 
@@ -518,7 +548,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                     note_rule = str(layout.get('black_note_rule', 'above_stem') or 'above_stem')
                     note_refs: list[dict] = []
                     for ni, nraw in enumerate(notes_src):
-                        nt = float(_item_get(nraw, 'time', t0) or t0)
+                        nt = _item_get_float(nraw, 'time', t0)
                         pitch = int(_item_get(nraw, 'pitch', 41) or 41)
                         hand = _normalize_hand(_item_get(nraw, 'hand', 'l'))
                         note_refs.append({'idx': int(ni), 'time': nt, 'pitch': pitch, 'hand': hand, 'raw': nraw})
@@ -534,16 +564,18 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                     for nref in note_refs:
                         nraw = nref.get('raw', {})
                         pitch = int(nref.get('pitch', 41) or 41)
-                        nt = float(nref.get('time', t0) or t0)
+                        nt = _item_get_float(nref, 'time', t0)
                         hand = _normalize_hand(nref.get('hand', 'l'))
                         x_note = _key_to_x(pitch)
                         y_note = _time_to_y_sys(nt)
                         default_black_above = bool(_black_note_above_stem(nref, note_rule, note_refs))
                         note_draw_items.append(
                             {
+                                'id': int(_item_get(nraw, '_id', 0) or 0),
                                 'x_mm': float(x_note),
                                 'y_mm': float(y_note),
                                 'time': float(nt),
+                                'duration': _item_get_float(nraw, 'duration', 0.0),
                                 'pitch': int(pitch),
                                 'hand': hand,
                                 'is_up': bool(default_black_above),
@@ -675,8 +707,8 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                 }
                 stave_drawer(du, drawer_payload)
                 note_drawer(du, drawer_payload)
-                # grid_band_drawer(du, drawer_payload)
                 grid_drawer(du, drawer_payload)
+                # grid_band_drawer(du, drawer_payload)
                 # count_line_drawer(du, drawer_payload)
                 # time_signature_drawer(du, drawer_payload)
                 # tempo_drawer(du, drawer_payload)

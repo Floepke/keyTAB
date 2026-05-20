@@ -55,8 +55,19 @@ def grid_drawer(du, pre_calc: dict) -> None:
     t0 = float(system.get('time_start', 0.0) or 0.0)
     t1 = float(system.get('time_end', t0) or t0)
 
-    x_left = float(pre_calc.get('system_content_left_mm', 0.0) or 0.0)
-    x_right = float(x_left + float(pre_calc.get('system_content_width_mm', 0.0) or 0.0))
+    # Grid and barlines should follow the actual stave width, not the wider
+    # content span (which may include ledger-line reservation overhang).
+    x_left = float(system.get('system_stave_left_mm', pre_calc.get('system_content_left_mm', 0.0)) or 0.0)
+    x_right = float(
+        x_left
+        + float(
+            system.get(
+                'system_stave_width_mm',
+                pre_calc.get('system_content_width_mm', 0.0),
+            )
+            or 0.0
+        )
+    )
 
     op = Operator(SHORTEST_DURATION)
 
@@ -83,7 +94,7 @@ def grid_drawer(du, pre_calc: dict) -> None:
             y,
             x_right,
             y,
-            color=(notation_color[0], notation_color[1], notation_color[2], 0.35),
+            color=notation_color,
             width_mm=float(grid_w),
             dash_pattern=[0.8, 0.8],
             tags=['grid_line'],
@@ -100,7 +111,7 @@ def grid_drawer(du, pre_calc: dict) -> None:
             y,
             x_right,
             y,
-            color=(notation_color[0], notation_color[1], notation_color[2], 0.85),
+            color=notation_color,
             width_mm=(float(barline_w) * 2.0) if is_last else float(barline_w),
             tags=['end_barline' if is_last else 'barline'],
         )
@@ -108,6 +119,10 @@ def grid_drawer(du, pre_calc: dict) -> None:
     # Measure numbering at right side of the system for visible starts.
     for t in barline_times[:-1]:
         if not _in_system(float(t)):
+            continue
+        # Avoid duplicate labels on shared boundaries: the next system will
+        # render the label at its start (same time value).
+        if op.eq(float(t), float(t1)):
             continue
         key = round(float(t), 6)
         if key not in measure_numbers:

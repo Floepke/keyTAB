@@ -1,4 +1,5 @@
 from __future__ import annotations
+import bisect
 
 from symbol_design.noteheads import (
     normalize_notehead_literal,
@@ -6,6 +7,8 @@ from symbol_design.noteheads import (
     sheared_notehead_outline_points,
 )
 from ui.widgets.draw_util import DrawUtil
+from utils.CONSTANT import BLACK_KEYS, QUARTER_NOTE_UNIT, SHORTEST_DURATION
+from utils.operator import Operator
 
 
 def _event_get(item, key: str, default=None):
@@ -14,11 +17,37 @@ def _event_get(item, key: str, default=None):
     return getattr(item, key, default)
 
 
+def _event_get_float(item, key: str, default: float) -> float:
+    val = _event_get(item, key, None)
+    if val is None:
+        return float(default)
+    try:
+        return float(val)
+    except Exception:
+        return float(default)
+
+
 def _time_to_y(t: float, t0: float, t1: float, y0: float, y1: float) -> float:
     if t1 <= t0:
         return y0
-    u = max(0.0, min(1.0, (float(t) - float(t0)) / (float(t1) - float(t0))))
+    # Keep timeline anchored at t0, but allow negative times to extrapolate
+    # slightly before the start (used for pre-roll grace notes).
+    u = min(1.0, (float(t) - float(t0)) / (float(t1) - float(t0)))
     return float(y0 + (u * (y1 - y0)))
+
+
+def _barline_positions(base_grid: list) -> list[float]:
+    pos: list[float] = []
+    cur = 0.0
+    for bg in list(base_grid or []):
+        numer = int(_event_get(bg, 'numerator', 4) or 4)
+        denom = int(_event_get(bg, 'denominator', 4) or 4)
+        measures = int(_event_get(bg, 'measure_amount', 1) or 1)
+        measure_len = float(numer) * (4.0 / float(max(1, denom))) * float(QUARTER_NOTE_UNIT)
+        for _ in range(int(max(0, measures))):
+            pos.append(float(cur))
+            cur += measure_len
+    return pos
 
 
 def _pitch_to_x(pitch: int, stv: dict) -> float:
@@ -86,6 +115,8 @@ def note_drawer(du: DrawUtil, pre_calc: dict) -> None:
     t0 = float(system.get('time_start', 0.0) or 0.0)
     t1 = float(system.get('time_end', t0 + 1.0) or (t0 + 1.0))
     notation_color = tuple(pre_calc.get('notation_color', (0.0, 0.0, 0.0, 1.0)) or (0.0, 0.0, 0.0, 1.0))
+    op = Operator(SHORTEST_DURATION)
+    barline_times = _barline_positions(list(pre_calc.get('base_grid', []) or []))
 
     width_scale = float(layout.get('note_width_scaling', 1.0) or 1.0)
     height_scale = float(layout.get('notehead_height_scaling', 1.0) or 1.0)
@@ -105,12 +136,14 @@ def note_drawer(du: DrawUtil, pre_calc: dict) -> None:
             # Fallback path for older pre-calc payloads.
             for n in notes:
                 pitch = int(_event_get(n, 'pitch', 41) or 41)
-                nt = float(_event_get(n, 'time', t0) or t0)
+                nt = _event_get_float(n, 'time', t0)
                 draw_items.append(
                     {
+                        'id': int(_event_get(n, '_id', 0) or 0),
                         'x_mm': _pitch_to_x(pitch, stv),
                         'y_mm': _time_to_y(nt, t0, t1, y0, y1),
                         'time': nt,
+                        'duration': float(_event_get(n, 'duration', 0.0) or 0.0),
                         'pitch': pitch,
                         'hand': str(_event_get(n, 'hand', 'l') or 'l'),
                         'is_up': bool(_event_get(n, 'is_up', True)),
@@ -121,6 +154,74 @@ def note_drawer(du: DrawUtil, pre_calc: dict) -> None:
                     }
                 )
 
+        for idx, n in enumerate(draw_items):
+            if isinstance(n, dict):
+                n.setdefault('_idx', int(idx))
+
+        starts_all = sorted(
+            [n for n in draw_items if isinstance(n, dict)],
+            key=lambda n: _event_get_float(n, 'time', 0.0),
+        )
+        starts_all_times = [_event_get_float(n, 'time', 0.0) for n in starts_all]
+
+        starts_by_hand: dict[str, list[dict]] = {'l': [], 'r': []}
+        for n in starts_all:
+            hk = 'l' if str(_event_get(n, 'hand', 'l') or 'l') == 'l' else 'r'
+            starts_by_hand[hk].append(n)
+        start_times_by_hand = {
+            hk: [_event_get_float(n, 'time', 0.0) for n in arr]
+            for hk, arr in starts_by_hand.items()
+        }
+
+        ends_by_hand: dict[str, list[dict]] = {'l': [], 'r': []}
+        end_times_by_hand: dict[str, list[float]] = {'l': [], 'r': []}
+        for hk in ('l', 'r'):
+            pairs = []
+            for n in starts_by_hand.get(hk, []):
+                st = _event_get_float(n, 'time', 0.0)
+                en = st + _event_get_float(n, 'duration', 0.0)
+                pairs.append((float(en), n))
+            pairs.sort(key=lambda p: p[0])
+            end_times_by_hand[hk] = [float(p[0]) for p in pairs]
+            ends_by_hand[hk] = [p[1] for p in pairs]
+
+        def _starts_at_time(ticks: float) -> list[dict]:
+            thr = float(op.threshold)
+            lo = bisect.bisect_left(starts_all_times, float(ticks) - thr)
+            hi = bisect.bisect_right(starts_all_times, float(ticks) + thr)
+            out: list[dict] = []
+            for i in range(lo, hi):
+                n = starts_all[i]
+                if op.eq(_event_get_float(n, 'time', 0.0), float(ticks)):
+                    out.append(n)
+            return out
+
+        def _events_in_open_interval(hand: str, a: float, b: float, by_end: bool = False) -> list[dict]:
+            if not op.lt(float(a), float(b)):
+                return []
+            hk = 'l' if str(hand or 'l') == 'l' else 'r'
+            if by_end:
+                times = end_times_by_hand.get(hk, [])
+                arr = ends_by_hand.get(hk, [])
+            else:
+                times = start_times_by_hand.get(hk, [])
+                arr = starts_by_hand.get(hk, [])
+            thr = float(op.threshold)
+            lo = bisect.bisect_left(times, float(a) - thr)
+            hi = bisect.bisect_right(times, float(b) + thr)
+            out: list[dict] = []
+            for i in range(lo, hi):
+                tv = float(times[i])
+                if op.gt(tv, float(a)) and op.lt(tv, float(b)):
+                    out.append(arr[i])
+            return out
+
+        def _note_key(n: dict) -> tuple[str, int]:
+            raw_id = int(_event_get(n, 'id', _event_get(n, '_id', 0)) or 0)
+            if raw_id != 0:
+                return ('id', raw_id)
+            return ('idx', int(_event_get(n, '_idx', -1) or -1))
+
         note_positions: list[tuple[float, float, dict]] = []
         for n in draw_items:
             pitch = int(_event_get(n, 'pitch', 41) or 41)
@@ -129,6 +230,7 @@ def note_drawer(du: DrawUtil, pre_calc: dict) -> None:
             notehead_literal = str(_event_get(n, 'notehead', 'normal') or 'normal')
             x = float(_event_get(n, 'x_mm', 0.0) or 0.0)
             nt = float(_event_get(n, 'time', t0) or t0)
+            nt = _event_get_float(n, 'time', t0)
             # Keep vertical placement tied to timeline mapping, which is stable
             # across payload schema changes.
             y = _time_to_y(nt, t0, t1, y0, y1)
@@ -149,17 +251,59 @@ def note_drawer(du: DrawUtil, pre_calc: dict) -> None:
                 notation_color,
             )
 
-            if bool(_event_get(n, 'continuation_dot', False)):
-                dot = max(0.25, semitone_mm * 0.32)
-                du.add_oval(
-                    x + (semitone_mm * 0.9) - (dot * 0.5),
-                    y - (dot * 0.5),
-                    dot,
-                    dot,
-                    stroke_color=(notation_color[0], notation_color[1], notation_color[2], 0.0),
-                    fill_color=notation_color,
-                    tags=['continuation_dot'],
-                )
+            if bool(layout.get('note_continuation_dot_visible', True)):
+                n_key = _note_key(n)
+                hand = str(_event_get(n, 'hand', 'l') or 'l')
+                start = _event_get_float(n, 'time', t0)
+                end = float(start + _event_get_float(n, 'duration', 0.0))
+                dot_pitch = int(_event_get(n, 'pitch', 0) or 0)
+                dot_times: list[float] = []
+
+                for other in _events_in_open_interval(hand, start, end, by_end=False):
+                    if _note_key(other) != n_key:
+                        dot_times.append(_event_get_float(other, 'time', 0.0))
+                for other in _events_in_open_interval(hand, start, end, by_end=True):
+                    if _note_key(other) != n_key:
+                        ot = _event_get_float(other, 'time', 0.0)
+                        od = _event_get_float(other, 'duration', 0.0)
+                        dot_times.append(float(ot + od))
+
+                for bt in barline_times:
+                    if op.gt(float(bt), start) and op.lt(float(bt), end):
+                        dot_times.append(float(bt))
+
+                if dot_times:
+                    dot_size = max(0.05, float(layout.get('note_continuation_dot_size_mm', 2.5) or 2.5) * composite_scale)
+                    notehead_center_offset_y = float(semitone_mm) * float(height_scale)
+                    min_collision_gap = max(0.0, float(semitone_mm) * 2.0 - 1e-6)
+                    for dt in sorted(set(dot_times)):
+                        y_center = float(_time_to_y(float(dt), t0, t1, y0, y1)) + float(notehead_center_offset_y)
+                        has_adjacent_start = False
+                        for other in _starts_at_time(float(dt)):
+                            if _note_key(other) == n_key:
+                                continue
+                            mp = int(_event_get(other, 'pitch', 0) or 0)
+                            if abs(mp - dot_pitch) != 1:
+                                continue
+                            if mp in BLACK_KEYS and bool(_event_get(other, 'is_up', False)):
+                                continue
+                            other_x = float(_event_get(other, 'x_mm', x) or x)
+                            if abs(other_x - float(x)) >= min_collision_gap:
+                                continue
+                            has_adjacent_start = True
+                            break
+                        if has_adjacent_start:
+                            y_center += float(semitone_mm) * height_scale + semitone_mm
+
+                        du.add_oval(
+                            float(x) - (dot_size * 0.5),
+                            float(y_center) - (dot_size * 0.5),
+                            float(x) + (dot_size * 0.5),
+                            float(y_center) + (dot_size * 0.5),
+                            stroke_color=None,
+                            fill_color=notation_color,
+                            tags=['continuation_dot'],
+                        )
 
             if bool(_event_get(n, 'stop_symbol', False)):
                 r = max(0.25, semitone_mm * 0.45)

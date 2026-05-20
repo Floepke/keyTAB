@@ -169,6 +169,8 @@ stave
 
 - `note_span_low_key`, `note_span_high_key`
   Content span key range used for horizontal reservation.
+  In manual mode this can extend beyond `stave_low_key` / `stave_high_key`
+  to reserve ledger-line space equivalent to auto-mode content spacing.
 
 - `stave_width_mm`
   Width of stave line geometry span.

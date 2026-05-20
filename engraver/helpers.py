@@ -397,7 +397,9 @@ def time_to_y(line: dict, ticks: float) -> float:
     y0 = float(line.get('y_top', 0.0) or 0.0)
     y1 = float(line.get('y_bottom', y0) or y0)
     denom = max(1e-6, t1 - t0)
-    rel = max(0.0, min(1.0, (float(ticks) - t0) / denom))
+    # Keep line time_start as the anchor, but allow negative ticks to
+    # extrapolate before the start (for small pre-roll grace notes).
+    rel = min(1.0, (float(ticks) - t0) / denom)
     return y0 + ((y1 - y0) * rel)
 
 

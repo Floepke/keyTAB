@@ -17,8 +17,8 @@ def grace_note_drawer(du, pre_calc: dict) -> None:
             du.add_oval(
                 x - 0.4,
                 y - 0.25,
-                0.8,
-                0.5,
+                x + 0.4,
+                y + 0.25,
                 stroke_color=notation_color,
                 fill_color=notation_color,
                 tags=['grace_note_black'],
