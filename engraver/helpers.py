@@ -399,3 +399,60 @@ def time_to_y(line: dict, ticks: float) -> float:
     denom = max(1e-6, t1 - t0)
     rel = max(0.0, min(1.0, (float(ticks) - t0) / denom))
     return y0 + ((y1 - y0) * rel)
+
+
+def normalize_hand(value: object) -> str:
+    hand = str(value or 'l').strip().lower()
+    return 'r' if hand == 'r' else 'l'
+
+
+def group_notes_into_chords(note_items: list[dict]) -> list[dict]:
+    """Group note items into per-hand chord clusters using thresholded time equality."""
+    op = Operator(SHORTEST_DURATION)
+    items = sorted(
+        [dict(n or {}) for n in (note_items or [])],
+        key=lambda n: (normalize_hand(n.get('hand', 'l')), float(n.get('time', 0.0) or 0.0), int(n.get('pitch', 0) or 0)),
+    )
+    out: list[dict] = []
+    i = 0
+    while i < len(items):
+        hand = normalize_hand(items[i].get('hand', 'l'))
+        t0 = float(items[i].get('time', 0.0) or 0.0)
+        group = [items[i]]
+        i += 1
+        while i < len(items):
+            hand_i = normalize_hand(items[i].get('hand', 'l'))
+            ti = float(items[i].get('time', 0.0) or 0.0)
+            if hand_i != hand or not op.eq(ti, t0):
+                break
+            group.append(items[i])
+            i += 1
+        out.append({'hand': hand, 'time': t0, 'notes': group})
+    return out
+
+
+def build_stem_segments_for_chords(note_items: list[dict], stem_length_mm: float) -> list[dict]:
+    """Build one horizontal stem segment per chord cluster.
+
+    Right hand: segment extends to the right by stem_length_mm.
+    Left hand: segment extends to the left by stem_length_mm.
+    """
+    segs: list[dict] = []
+    for chord in group_notes_into_chords(note_items):
+        notes = list(chord.get('notes', []) or [])
+        if not notes:
+            continue
+        xs = [float(n.get('x_mm', 0.0) or 0.0) for n in notes]
+        ys = [float(n.get('y_mm', 0.0) or 0.0) for n in notes]
+        hand = normalize_hand(chord.get('hand', 'l'))
+        y = float(ys[0])
+        x_low = float(min(xs))
+        x_high = float(max(xs))
+        if hand == 'r':
+            x1 = float(x_low)
+            x2 = float(x_high + float(stem_length_mm))
+        else:
+            x1 = float(x_low - float(stem_length_mm))
+            x2 = float(x_high)
+        segs.append({'x1_mm': x1, 'y1_mm': y, 'x2_mm': x2, 'y2_mm': y, 'hand': hand, 'time': float(chord.get('time', y))})
+    return segs

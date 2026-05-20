@@ -2,7 +2,8 @@ from __future__ import annotations
 
 
 def time_signature_drawer(du, pre_calc: dict) -> None:
-    line = dict(pre_calc.get('line', {}) or {})
+    line = dict(pre_calc.get('line', {}) or pre_calc.get('system', {}) or {})
+    notation_color = tuple(pre_calc.get('notation_color', (0.0, 0.0, 0.0, 1.0)) or (0.0, 0.0, 0.0, 1.0))
     y0 = float(pre_calc.get('y0', 0.0) or 0.0)
     y1 = float(pre_calc.get('y1', 0.0) or 0.0)
     cy = (y0 + y1) * 0.5
@@ -16,5 +17,5 @@ def time_signature_drawer(du, pre_calc: dict) -> None:
                 numer = getattr(ev, 'numerator', 4)
                 denom = getattr(ev, 'denominator', 4)
             x = float(stv.get('stave_left_x_mm', 0.0) or 0.0)
-            du.add_text(x, cy - 0.8, str(numer), family='Edwin', size_pt=9.0, anchor='center', tags=['time-signature'])
-            du.add_text(x, cy + 0.8, str(denom), family='Edwin', size_pt=9.0, anchor='center', tags=['time-signature'])
+            du.add_text(x, cy - 0.8, str(numer), family='Edwin', size_pt=9.0, color=notation_color, anchor='center', tags=['ts_klavarskribo'])
+            du.add_text(x, cy + 0.8, str(denom), family='Edwin', size_pt=9.0, color=notation_color, anchor='center', tags=['ts_klavarskribo'])

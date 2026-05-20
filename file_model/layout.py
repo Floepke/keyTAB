@@ -6,7 +6,7 @@ from file_model.font import Font
 
 @dataclass
 class Layout:
-    scale: float = 0.35
+    scale: float = 0.33
     page_orientation: Literal['landscape', 'portrait'] = 'portrait'
     read_direction: Literal['horizontal', 'vertical'] = 'vertical'
     page_width_mm: float = 210.0

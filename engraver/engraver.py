@@ -26,9 +26,11 @@ from file_model.events.note import Note
 from engraver.helpers import (
     allow_font_registry as _allow_font_registry,
     black_note_above_stem as _black_note_above_stem,
+    build_stem_segments_for_chords as _build_stem_segments_for_chords,
     build_grid_band_dark_intervals as _build_grid_band_dark_intervals,
     group_by_beam_markers as _group_by_beam_markers,
     is_light_paper as _is_light_paper,
+    normalize_hand as _normalize_hand,
     normalize_hex_color as _normalize_hex_color,
     resolve_font_family_name as _resolve_font_family,
     scaled_dash_pattern_with_default as _scaled_dash_pattern_with_default,
@@ -72,7 +74,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
 
     scale = float(layout.get('scale', 1.0) or 1.0)
     black_key_set = set(BLACK_KEYS)
-    fga_keys = set(key_class_filter('FGA'))
+    fga_keys = set(key_class_filter('FGA')) # all f# g# a# keys from key 1..88
     be_keys = set(BE_KEYS)
     clef_low_key = 41
     clef_high_key = 43
@@ -510,6 +512,53 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                     stv['stave_left_mm'] = _key_to_x(stave_low)
                     stv['black_lines'] = black_lines
 
+                    # Prepare note drawing payload now, so note drawer becomes a thin renderer.
+                    events_in_line = dict(stv.get('events_in_line', {}) or {})
+                    notes_src = list(events_in_line.get('note', []) or [])
+                    note_rule = str(layout.get('black_note_rule', 'above_stem') or 'above_stem')
+                    note_refs: list[dict] = []
+                    for ni, nraw in enumerate(notes_src):
+                        nt = float(_item_get(nraw, 'time', t0) or t0)
+                        pitch = int(_item_get(nraw, 'pitch', 41) or 41)
+                        hand = _normalize_hand(_item_get(nraw, 'hand', 'l'))
+                        note_refs.append({'idx': int(ni), 'time': nt, 'pitch': pitch, 'hand': hand, 'raw': nraw})
+
+                    def _time_to_y_sys(ticks: float) -> float:
+                        y_start = float(sys.get('y_start_mm', 0.0) or 0.0)
+                        y_end = float(sys.get('y_end_mm', y_start) or y_start)
+                        denom = max(1e-6, float(t1 - t0))
+                        rel = max(0.0, min(1.0, (float(ticks) - float(t0)) / denom))
+                        return float(y_start + ((y_end - y_start) * rel))
+
+                    note_draw_items: list[dict] = []
+                    for nref in note_refs:
+                        nraw = nref.get('raw', {})
+                        pitch = int(nref.get('pitch', 41) or 41)
+                        nt = float(nref.get('time', t0) or t0)
+                        hand = _normalize_hand(nref.get('hand', 'l'))
+                        x_note = _key_to_x(pitch)
+                        y_note = _time_to_y_sys(nt)
+                        default_black_above = bool(_black_note_above_stem(nref, note_rule, note_refs))
+                        note_draw_items.append(
+                            {
+                                'x_mm': float(x_note),
+                                'y_mm': float(y_note),
+                                'time': float(nt),
+                                'pitch': int(pitch),
+                                'hand': hand,
+                                'is_up': bool(default_black_above),
+                                'notehead': str(_item_get(nraw, 'notehead', 'auto') or 'auto'),
+                                'beam': bool(_item_get(nraw, 'beam', False)),
+                                'continuation_dot': bool(_item_get(nraw, 'continuation_dot', False)),
+                                'stop_symbol': bool(_item_get(nraw, 'stop_symbol', False)),
+                            }
+                        )
+
+                    stem_len_mm = float(layout.get('note_stem_length_semitone', 7.0) or 7.0) * float(semitone_mm_stave)
+                    stv['note_draw_items'] = note_draw_items
+                    stv['stem_segments'] = _build_stem_segments_for_chords(note_draw_items, stem_len_mm)
+                    stv['note_stem_width_mm'] = float(layout.get('note_stem_thickness_mm', 0.8) or 0.8) * float(composite_scale)
+
                     local_x = float(span_right + mr)
 
                 system_outer_width_mm = float(local_x - system_outer_left_mm)
@@ -557,6 +606,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
             'page_top_margin_mm': float(page_top),
             'page_bottom_margin_mm': float(page_bottom),
             'layout': dict(layout),
+            'base_grid': list(base_grid),
             'pages': pages,
         }
 
@@ -565,12 +615,40 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
         page_h = float(precalc.get('page_height_mm', 297.0) or 297.0)
         pages = list(precalc.get('pages', []) or [])
         layout_ctx = dict(precalc.get('layout', {}) or {})
+        base_grid_ctx = list(precalc.get('base_grid', []) or [])
+
+        notation_rgb = Style.get_notation_color()
+        notation_color = (
+            float(notation_rgb[0]) / 255.0,
+            float(notation_rgb[1]) / 255.0,
+            float(notation_rgb[2]) / 255.0,
+            1.0,
+        )
+        paper_rgb = Style.get_paper_color()
+        paper_color = (
+            float(paper_rgb[0]) / 255.0,
+            float(paper_rgb[1]) / 255.0,
+            float(paper_rgb[2]) / 255.0,
+            1.0,
+        )
+        if pdf_export:
+            notation_color = (0.0, 0.0, 0.0, 1.0)
+            paper_color = (1.0, 1.0, 1.0, 1.0)
 
         du._pages = []
         du._current_index = -1
 
         for page in pages:
             du.new_page(page_w, page_h)
+            du.add_rectangle(
+                0.0,
+                0.0,
+                float(page_w),
+                float(page_h),
+                stroke_color=None,
+                fill_color=paper_color,
+                tags=['paper'],
+            )
             for system in list(page.get('systems', []) or []):
                 y0 = float(system.get('y_start_mm', 0.0) or 0.0)
                 y1 = float(system.get('y_end_mm', 0.0) or 0.0)
@@ -581,34 +659,11 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                 cw0 = float(system.get('system_content_width_mm', w0) or w0)
                 cx1 = float(cx0 + cw0)
 
-                # Red: full outer system footprint (including margins + rest-slot edges).
-                du.add_rectangle(
-                    x0,
-                    y0,
-                    x1,
-                    y1,
-                    stroke_color=(0.75, 0.25, 0.25, 0.75),
-                    stroke_width_mm=0.3,
-                    fill_color=None,
-                    dash_pattern=[1.5, 1.0],
-                    tags=['system-debug-rect'],
-                )
-                # # Green: inner content bounds where stave symbols are drawn.
-                # du.add_rectangle(
-                #     cx0,
-                #     y0,
-                #     cx1,
-                #     y1,
-                #     stroke_color=(0.15, 0.65, 0.25, 0.85),
-                #     stroke_width_mm=1,
-                #     fill_color=None,
-                #     dash_pattern=None,
-                #     tags=['system-debug-content-rect'],
-                # )
-
                 # Each drawer reads only pre-calculated data and DrawUtil.
                 drawer_payload = {
                     'layout': layout_ctx,
+                    'base_grid': base_grid_ctx,
+                    'notation_color': notation_color,
                     'page': page,
                     'system': system,
                     'y0': y0,
@@ -619,8 +674,9 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                     'system_content_width_mm': cw0,
                 }
                 stave_drawer(du, drawer_payload)
+                note_drawer(du, drawer_payload)
                 # grid_band_drawer(du, drawer_payload)
-                # grid_drawer(du, drawer_payload)
+                grid_drawer(du, drawer_payload)
                 # count_line_drawer(du, drawer_payload)
                 # time_signature_drawer(du, drawer_payload)
                 # tempo_drawer(du, drawer_payload)
@@ -631,7 +687,6 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                 # arpeggio_drawer(du, drawer_payload)
                 # slur_drawer(du, drawer_payload)
                 # grace_note_drawer(du, drawer_payload)
-                # note_drawer(du, drawer_payload)
 
         if du.page_count() > 0:
             try:
