@@ -89,7 +89,7 @@ EDITOR_LAYERING = [
 
 ENGRAVER_LAYERING = [
     # layers from background to foreground
-    'paper',
+    'page_background',
     'grid_band',
     'grid_band_marker',
     'midi_note',
