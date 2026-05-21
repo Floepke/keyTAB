@@ -24,7 +24,7 @@ class Line:
     # VISUAL
     width_mm: float = 0.5
     dash_pattern_mm: list[float] = field(default_factory=lambda: [3.0])
-    dash_phase_mm: float = 0.0 # 0..1. The phase is applied as an offset to the dash pattern, where 1.0 means a full cycle of the dash pattern.
+    dash_offset_mm: float = 0.0 # Offset in mm applied to the dash pattern cycle.
     # color: 'auto' means the color uses the default notation color.
     # otherwise it tries to resolve hex color, falls back to notation color if invalid.
     color: Literal['auto'] | str = "auto"

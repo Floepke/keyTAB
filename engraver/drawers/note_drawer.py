@@ -326,21 +326,4 @@ def note_drawer(du: DrawUtil, pre_calc: dict) -> None:
                 tags=['stem'],
             )
 
-        # Lightweight beam template: connect adjacent notes marked with beam.
-        stem_len = max(1.2, semitone_mm * 2.4)
-        for i in range(len(note_positions) - 1):
-            x1, y1n, n1 = note_positions[i]
-            x2, y2n, n2 = note_positions[i + 1]
-            if not bool(_event_get(n1, 'beam', False)) and not bool(_event_get(n2, 'beam', False)):
-                continue
-            beam_y1 = y1n - stem_len if bool(_event_get(n1, 'is_up', True)) else y1n + stem_len
-            beam_y2 = y2n - stem_len if bool(_event_get(n2, 'is_up', True)) else y2n + stem_len
-            du.add_line(
-                x1 + (semitone_mm * 0.55),
-                beam_y1,
-                x2 + (semitone_mm * 0.55),
-                beam_y2,
-                color=notation_color,
-                width_mm=max(0.2, semitone_mm * 0.35),
-                tags=['beam'],
-            )
+        # Beam rendering is centralized in beam_drawer using prepared beam_groups.

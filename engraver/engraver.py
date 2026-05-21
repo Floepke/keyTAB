@@ -38,6 +38,7 @@ from engraver.helpers import (
 )
 from engraver.drawers.stave_drawer import stave_drawer
 from engraver.drawers.note_drawer import note_drawer
+from engraver.drawers.beam_drawer import beam_drawer, prepare_beam_groups_for_stave
 from engraver.drawers.arpeggio_drawer import arpeggio_drawer
 from engraver.drawers.count_line_drawer import count_line_drawer
 from engraver.drawers.dynamic_drawer import dynamic_drawer
@@ -625,6 +626,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                     stv['note_left_chord_list'] = left_chords
                     stv['note_right_chord_list'] = right_chords
                     stv['note_stem_width_mm'] = float(layout.get('note_stem_thickness_mm', 0.8) or 0.8) * float(composite_scale)
+                    prepare_beam_groups_for_stave(stv, sys, base_grid, layout)
 
                     local_x = float(span_right + mr)
 
@@ -742,6 +744,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                 }
                 stave_drawer(du, drawer_payload)
                 note_drawer(du, drawer_payload)
+                beam_drawer(du, drawer_payload)
                 grid_drawer(du, drawer_payload)
                 # grid_band_drawer(du, drawer_payload)
                 # count_line_drawer(du, drawer_payload)

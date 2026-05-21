@@ -224,6 +224,142 @@ class DrawUtil:
             off = 0.0
         return (cleaned, off)
 
+    @staticmethod
+    def _dash_line_stats(line_len: float, pattern_mm: Sequence[float], dash_offset_mm: float) -> Tuple[float, float, int]:
+        """Return (last_on_end_clipped, last_on_end_unclipped, in_line_space_count)."""
+        cycle = float(sum(float(v) for v in pattern_mm if float(v) > 0.0))
+        if cycle <= 1e-9 or line_len <= 1e-9:
+            return (0.0, 0.0, 0)
+
+        offset = float(dash_offset_mm) % cycle
+        pos = -offset
+        idx = 0
+        painted = True
+        n = len(pattern_mm)
+        guard = 0
+        last_on_end_clipped = 0.0
+        last_on_end_unclipped = 0.0
+        in_line_spaces = 0
+
+        while pos < float(line_len) and guard < 100000:
+            seg_len = float(pattern_mm[idx % n])
+            if seg_len <= 0.0:
+                idx += 1
+                painted = not painted
+                guard += 1
+                continue
+            nxt = pos + seg_len
+            overlap_start = max(0.0, pos)
+            overlap_end = min(float(line_len), nxt)
+            if overlap_end > overlap_start:
+                if painted:
+                    last_on_end_clipped = float(overlap_end)
+                    last_on_end_unclipped = float(nxt)
+                else:
+                    in_line_spaces += 1
+            pos = nxt
+            idx += 1
+            painted = not painted
+            guard += 1
+
+        return (float(last_on_end_clipped), float(last_on_end_unclipped), int(in_line_spaces))
+
+    @staticmethod
+    def _pattern_with_adjusted_spaces(pattern_mm: Sequence[float], delta_each_mm: float) -> List[float]:
+        out: List[float] = []
+        delta_each = float(delta_each_mm)
+        for i, seg in enumerate(pattern_mm):
+            v = float(seg)
+            if i % 2 == 1:
+                # Keep a minimal positive gap so dash arrays remain valid.
+                v = max(0.01, v + delta_each)
+            out.append(v)
+        return out
+
+    def _auto_dash_divide_adjustment(
+        self,
+        x1_mm: float,
+        y1_mm: float,
+        x2_mm: float,
+        y2_mm: float,
+        pattern_mm: Sequence[float],
+        base_dash_offset_mm: float,
+    ) -> Tuple[List[float], float]:
+        """Auto adjust dash behavior based on end-of-line active segment cases.
+
+                Case A: overshoot (last active segment extends past end)
+                    -> narrow each in-line space equally.
+                Case B: undershoot (last active segment ends before end)
+                    -> widen each in-line space equally.
+        """
+        cycle = float(sum(float(v) for v in pattern_mm if float(v) > 0.0))
+        if cycle <= 1e-9:
+            return (list(pattern_mm), float(base_dash_offset_mm))
+
+        dx = float(x2_mm) - float(x1_mm)
+        dy = float(y2_mm) - float(y1_mm)
+        line_len = math.hypot(dx, dy)
+        if line_len <= 1e-9:
+            return (list(pattern_mm), float(base_dash_offset_mm))
+
+        base_offset = float(base_dash_offset_mm)
+        _last_clip, last_unclipped, in_line_spaces = self._dash_line_stats(float(line_len), pattern_mm, base_offset)
+
+        # Exact end alignment with current settings -> keep as-is.
+        if abs(float(last_unclipped) - float(line_len)) <= 1e-6:
+            return (list(pattern_mm), float(base_offset))
+
+        # Distribute end mismatch equally over all in-line spaces.
+        # undershoot => positive delta (widen spaces)
+        # overshoot  => negative delta (narrow spaces)
+        mismatch = float(line_len) - float(last_unclipped)
+        if in_line_spaces <= 0:
+            return (list(pattern_mm), 0.0)
+        delta_each_space = float(mismatch) / float(in_line_spaces)
+        adjusted_pattern = self._pattern_with_adjusted_spaces(pattern_mm, delta_each_space)
+        return (adjusted_pattern, 0.0)
+
+    def _auto_dash_divide_closed_outline(
+        self,
+        perimeter_mm: float,
+        pattern_mm: Sequence[float],
+        base_dash_offset_mm: float,
+    ) -> Tuple[List[float], float]:
+        """Auto-adjust dashed closed outlines for clean seam aesthetics.
+
+        Goals:
+        - Start on an active segment.
+        - Seam (end of open traversal) lands in a space segment.
+        - Reuse the same space-adjustment trick as open lines.
+        """
+        if perimeter_mm <= 1e-9:
+            return (list(pattern_mm), float(base_dash_offset_mm))
+
+        # Keep start on active by using zero offset as base reference.
+        adjusted_pattern, adjusted_offset = self._auto_dash_divide_adjustment(
+            0.0,
+            0.0,
+            float(perimeter_mm),
+            0.0,
+            pattern_mm,
+            0.0,
+        )
+
+        # For closed outlines, prefer the seam to land in a space segment.
+        # If seam still lands on active, nudge offset slightly positive while
+        # keeping the start point inside the first active segment.
+        _clip, last_unclipped, _spaces = self._dash_line_stats(
+            float(perimeter_mm),
+            adjusted_pattern,
+            adjusted_offset,
+        )
+        if abs(float(last_unclipped) - float(perimeter_mm)) <= 1e-6 and adjusted_pattern:
+            first_on = max(0.01, float(adjusted_pattern[0]))
+            eps = min(0.05, first_on * 0.25)
+            adjusted_offset = min(float(eps), max(0.0, first_on - 1e-6))
+
+        return (list(adjusted_pattern), float(adjusted_offset))
+
     def new_page(self, width_mm: float, height_mm: float) -> None:
         self._pages.append(Page(width_mm, height_mm))
         self._current_index = len(self._pages) - 1
@@ -317,10 +453,22 @@ class DrawUtil:
                  dash_offset_mm: float = 0.0,
                  line_cap: str = "round",
                  id: int = 0, tags: Optional[List[str]] = None,
-                 hit_rect_mm: Optional[Tuple[float, float, float, float]] = None) -> None:
+                 hit_rect_mm: Optional[Tuple[float, float, float, float]] = None,
+                 auto_dash_divide: bool = True) -> None:
         self._ensure_page()
+        safe_dash, safe_offset = self._safe_dash(dash_pattern, dash_offset_mm)
+        if auto_dash_divide and safe_dash:
+            safe_dash, safe_offset = self._auto_dash_divide_adjustment(
+                x1_mm,
+                y1_mm,
+                x2_mm,
+                y2_mm,
+                safe_dash,
+                safe_offset,
+            )
+            safe_dash, safe_offset = self._safe_dash(safe_dash, safe_offset)
         stroke = Stroke(color=color, width_mm=width_mm,
-                   dash_pattern_mm=dash_pattern, dash_offset_mm=dash_offset_mm, line_cap=line_cap)
+                   dash_pattern_mm=safe_dash, dash_offset_mm=safe_offset, line_cap=line_cap)
         if tags is None:
             tags = []
         # Compute a default hit rect for picking if not provided.
@@ -342,6 +490,7 @@ class DrawUtil:
                       fill_color: Optional[Color] = None,
                       dash_pattern: Optional[Sequence[float]] = None,
                       dash_offset_mm: float = 0.0,
+                      auto_dash_divide: bool = False,
                       corner_radius: Optional[float] = None,
                       id: int = 0,
                       tags: Optional[List[str]] = None,
@@ -350,12 +499,7 @@ class DrawUtil:
         self._ensure_page()
         stroke = None
         fill = None
-        if stroke_color is not None:
-            stroke = Stroke(stroke_color, stroke_width_mm, dash_pattern, dash_offset_mm)
-        if fill_color is not None:
-            fill = Fill(fill_color)
-        if tags is None:
-            tags = []
+        safe_dash, safe_offset = self._safe_dash(dash_pattern, dash_offset_mm)
         # Interpret inputs as two opposite corners
         x_a = float(x1_mm)
         y_a = float(y1_mm)
@@ -365,6 +509,22 @@ class DrawUtil:
         ry = min(y_a, y_b)
         rw = abs(x_b - x_a)
         rh = abs(y_b - y_a)
+
+        if auto_dash_divide and safe_dash and (rw > 0.0 or rh > 0.0):
+            rect_perimeter = max(0.0, 2.0 * (float(rw) + float(rh)))
+            safe_dash, safe_offset = self._auto_dash_divide_closed_outline(
+                rect_perimeter,
+                safe_dash,
+                safe_offset,
+            )
+            safe_dash, safe_offset = self._safe_dash(safe_dash, safe_offset)
+
+        if stroke_color is not None:
+            stroke = Stroke(stroke_color, stroke_width_mm, safe_dash, safe_offset)
+        if fill_color is not None:
+            fill = Fill(fill_color)
+        if tags is None:
+            tags = []
 
         if hit_rect_mm is None:
             hit_rect_mm = (rx, ry, rw, rh)
@@ -434,6 +594,7 @@ class DrawUtil:
                  fill_color: Optional[Color] = None,
                  dash_pattern: Optional[Sequence[float]] = None,
                  dash_offset_mm: float = 0.0,
+                 auto_dash_divide: bool = False,
                  id: int = 0,
                  tags: Optional[List[str]] = None,
                  hit_rect_mm: Optional[Tuple[float, float, float, float]] = None) -> None:
@@ -444,12 +605,7 @@ class DrawUtil:
         self._ensure_page()
         stroke = None
         fill = None
-        if stroke_color is not None:
-            stroke = Stroke(stroke_color, stroke_width_mm, dash_pattern, dash_offset_mm)
-        if fill_color is not None:
-            fill = Fill(fill_color)
-        if tags is None:
-            tags = []
+        safe_dash, safe_offset = self._safe_dash(dash_pattern, dash_offset_mm)
         # Normalize to rectangle origin + size
         xa = float(x1_mm)
         ya = float(y1_mm)
@@ -459,6 +615,26 @@ class DrawUtil:
         ry = min(ya, yb)
         rw = abs(xb - xa)
         rh = abs(yb - ya)
+
+        if auto_dash_divide and safe_dash and (rw > 0.0 or rh > 0.0):
+            # Ramanujan approximation for ellipse perimeter.
+            a = float(rw) * 0.5
+            b = float(rh) * 0.5
+            h = ((a - b) ** 2) / ((a + b) ** 2) if (a + b) > 1e-9 else 0.0
+            ellipse_perimeter = math.pi * (a + b) * (1.0 + (3.0 * h) / (10.0 + math.sqrt(max(1e-12, 4.0 - 3.0 * h))))
+            safe_dash, safe_offset = self._auto_dash_divide_closed_outline(
+                float(ellipse_perimeter),
+                safe_dash,
+                safe_offset,
+            )
+            safe_dash, safe_offset = self._safe_dash(safe_dash, safe_offset)
+
+        if stroke_color is not None:
+            stroke = Stroke(stroke_color, stroke_width_mm, safe_dash, safe_offset)
+        if fill_color is not None:
+            fill = Fill(fill_color)
+        if tags is None:
+            tags = []
         
         if hit_rect_mm is None:
             hit_rect_mm = (rx, ry, rw, rh)
@@ -470,13 +646,29 @@ class DrawUtil:
                     fill_color: Optional[Color] = None,
                     dash_pattern: Optional[Sequence[float]] = None,
                     dash_offset_mm: float = 0.0,
+                    auto_dash_divide: bool = False,
                     id: int = 0, tags: Optional[List[str]] = None,
                     hit_rect_mm: Optional[Tuple[float, float, float, float]] = None) -> None:
         self._ensure_page()
         stroke = None
         fill = None
+        safe_dash, safe_offset = self._safe_dash(dash_pattern, dash_offset_mm)
+        if auto_dash_divide and safe_dash:
+            pts = list(points_mm)
+            if len(pts) >= 2:
+                peri = 0.0
+                for i in range(len(pts)):
+                    x1, y1 = pts[i]
+                    x2, y2 = pts[(i + 1) % len(pts)]
+                    peri += math.hypot(float(x2) - float(x1), float(y2) - float(y1))
+                safe_dash, safe_offset = self._auto_dash_divide_closed_outline(
+                    float(peri),
+                    safe_dash,
+                    safe_offset,
+                )
+                safe_dash, safe_offset = self._safe_dash(safe_dash, safe_offset)
         if stroke_color is not None:
-            stroke = Stroke(stroke_color, stroke_width_mm, dash_pattern, dash_offset_mm)
+            stroke = Stroke(stroke_color, stroke_width_mm, safe_dash, safe_offset)
         if fill_color is not None:
             fill = Fill(fill_color)
         if tags is None:
