@@ -68,14 +68,23 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
         if not bool(st.get('enabled', True)):
             continue
         ev = st.get('events', None)
+        try:
+            st_scale = float(st.get('scale', 1.0) or 1.0)
+        except Exception:
+            st_scale = 1.0
+        st_scale = max(0.01, st_scale)
         if isinstance(ev, dict):
-            enabled_staves.append({'index': int(idx), 'events': ev})
+            enabled_staves.append({'index': int(idx), 'events': ev, 'scale': float(st_scale)})
 
     if not enabled_staves and isinstance(events, dict):
-        enabled_staves = [{'index': 0, 'events': events}]
+        enabled_staves = [{'index': 0, 'events': events, 'scale': 1.0}]
     enabled_stave_indices: list[int] = [int(st.get('index', 0) or 0) for st in enabled_staves]
     first_enabled_stave_i = int(enabled_stave_indices[0]) if enabled_stave_indices else 0
     last_enabled_stave_i = int(enabled_stave_indices[-1]) if enabled_stave_indices else first_enabled_stave_i
+    enabled_stave_scale_by_index: dict[int, float] = {
+        int(st.get('index', 0) or 0): max(0.01, float(st.get('scale', 1.0) or 1.0))
+        for st in enabled_staves
+    }
 
     def _tagged_events(source_events: dict, key: str, stave_index: int) -> list[dict]:
         out: list[dict] = []
@@ -993,6 +1002,10 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
     key_positions = _build_key_positions(1, PIANO_KEY_AMOUNT, semitone_mm)
     for line in lines:
         line_stave_i = int(line.get('stave_i', 0) or 0)
+        stave_scale = max(0.01, float(enabled_stave_scale_by_index.get(line_stave_i, 1.0) or 1.0))
+        composite_scale = float(scale) * float(stave_scale)
+        semitone_mm_line = 2.0 * composite_scale
+        key_positions_line = _build_key_positions(1, PIANO_KEY_AMOUNT, semitone_mm_line)
         active_norm_notes = [it for it in norm_notes if int(it.get('stave_i', 0) or 0) == line_stave_i]
         if line['stave_range'] == 'auto':
             groups, keys, bound_left, bound_right, _, pattern = _auto_line_keys_and_bounds(
@@ -1080,16 +1093,19 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
         # ledger_left_overhang = how far ledger stubs extend to the LEFT of the natural stave start.
         # In the drawing pass line_x_start is shifted right by this amount so ledger stubs
         # land inside the allocated column width rather than spilling to the right.
-        min_pos = key_positions.get(bound_left, 0.0)
-        max_pos = key_positions.get(bound_right, min_pos)
+        min_pos = key_positions_line.get(bound_left, 0.0)
+        max_pos = key_positions_line.get(bound_right, min_pos)
         stave_width = max(0.0, max_pos - min_pos)
-        ledger_min_pos = key_positions.get(ledger_bound_left, min_pos)
-        ledger_max_pos = key_positions.get(ledger_bound_right, max_pos)
+        ledger_min_pos = key_positions_line.get(ledger_bound_left, min_pos)
+        ledger_max_pos = key_positions_line.get(ledger_bound_right, max_pos)
         ledger_left_overhang = max(0.0, float(min_pos) - float(ledger_min_pos))
         stave_plus_ledger_width = max(stave_width, ledger_max_pos - ledger_min_pos)
         line['stave_width'] = float(stave_width)
         line['stave_plus_ledger_width'] = float(stave_plus_ledger_width)
         line['ledger_left_overhang'] = float(ledger_left_overhang)
+        line['stave_scale'] = float(stave_scale)
+        line['composite_scale'] = float(composite_scale)
+        line['semitone_mm'] = float(semitone_mm_line)
         base_margin_left = float(line.get('margin_left', 0.0) or 0.0)
         ts_lane_width = 0.0
         ts_lane_right_offset = 0.0
@@ -1120,11 +1136,11 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                             min_pitch = p if min_pitch is None else min(min_pitch, p)
             if min_pitch is not None:
                 stem_len_units = float(layout.get('note_stem_length_semitone', 3) or 3)
-                stem_len_mm = stem_len_units * semitone_mm
-                origin = float(key_positions.get(bound_left, 0.0))
-                note_offset = float(key_positions.get(min_pitch, origin)) - origin
+                stem_len_mm = stem_len_units * semitone_mm_line
+                origin = float(key_positions_line.get(bound_left, 0.0))
+                note_offset = float(key_positions_line.get(min_pitch, origin)) - origin
                 offset_left = note_offset - stem_len_mm
-                ts_lane_gap_mm = semitone_mm  # Minimum gap between indicator lane and notes/beam stems
+                ts_lane_gap_mm = semitone_mm_line  # Minimum gap between indicator lane and notes/beam stems
                 ts_lane_right_offset = min(0.0, float(offset_left - ts_lane_gap_mm))
         # Keep user-defined margins: do not expand margin_left for the indicator lane.
         line['margin_left'] = base_margin_left
@@ -1344,14 +1360,67 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
         line_axis_left_reserve, line_axis_right_reserve = _line_axis_reserves_for_page(page_index)
         available_width = _available_width_for_page(page_index)
         page_lines = list(reversed(page)) if horizontal_read_direction else page
-        used_width = sum(float(l['total_width']) for l in page_lines)
+        page_system_chunks: list[dict] = []
+        for _line in page_lines:
+            _sys_i = int(_line.get('system_index', -1) or -1)
+            if (not page_system_chunks) or int(page_system_chunks[-1].get('index', -2)) != _sys_i:
+                page_system_chunks.append({'index': _sys_i, 'lines': [_line], 'width': float(_line.get('total_width', 0.0) or 0.0)})
+            else:
+                page_system_chunks[-1]['lines'].append(_line)
+                page_system_chunks[-1]['width'] = float(page_system_chunks[-1].get('width', 0.0) or 0.0) + float(_line.get('total_width', 0.0) or 0.0)
+        used_width = sum(float(ch.get('width', 0.0) or 0.0) for ch in page_system_chunks)
         leftover = max(0.0, available_width - used_width)
-        gap = leftover / float(len(page_lines) + 1)
+        gap = leftover / float(len(page_system_chunks) + 1) if page_system_chunks else 0.0
         x_cursor = page_left + line_axis_left_reserve + gap
+
+        line_x_cursor_by_obj: dict[int, float] = {}
+        _x_probe = float(x_cursor)
+        for _chunk in page_system_chunks:
+            for _line in list(_chunk.get('lines', []) or []):
+                line_x_cursor_by_obj[id(_line)] = float(_x_probe)
+                _x_probe += float(_line.get('total_width', 0.0) or 0.0)
+            _x_probe += float(gap)
+
+        # Precompute per-system barline span from geometric outer edges so
+        # page-line ordering (including reversed order) cannot invert spans.
+        page_system_span_by_index: dict[int, dict[str, float]] = {}
+        for _line in page_lines:
+            _line_stave_i = int(_line.get('stave_i', 0) or 0)
+            _line_stave_scale = max(0.01, float(_line.get('stave_scale', enabled_stave_scale_by_index.get(_line_stave_i, 1.0)) or 1.0))
+            _line_scale = float(scale) * float(_line_stave_scale)
+            _semitone_mm = 2.0 * _line_scale
+            _key_positions = _build_key_positions(1, PIANO_KEY_AMOUNT, _semitone_mm)
+            _ledger_left_overhang = float(_line.get('ledger_left_overhang', 0.0) or 0.0)
+            _line_cursor = float(line_x_cursor_by_obj.get(id(_line), x_cursor))
+            _line_x_start = _line_cursor + float(_line.get('margin_left', 0.0) or 0.0) + _ledger_left_overhang
+            _bound_left = int(_line.get('bound_left', 1) or 1)
+            _natural_bound_left = int(_line.get('natural_bound_left', _bound_left) or _bound_left)
+            _natural_bound_right = int(_line.get('natural_bound_right', int(_line.get('bound_right', _bound_left)) or _bound_left) or _bound_left)
+            _origin = float(_key_positions.get(_bound_left, 0.0))
+
+            def _pre_key_to_x(_key: int) -> float:
+                return float(_line_x_start + (float(_key_positions.get(_key, 0.0)) - _origin))
+
+            _grid_left = _pre_key_to_x(_natural_bound_left)
+            _grid_right = _pre_key_to_x(_natural_bound_right)
+            _sys_idx = int(_line.get('system_index', -1) or -1)
+            _span = page_system_span_by_index.setdefault(_sys_idx, {})
+            _span['left'] = float(min(float(_span.get('left', _grid_left)), float(_grid_left)))
+            _span['right'] = float(max(float(_span.get('right', _grid_right)), float(_grid_right)))
+
+        page_system_barline_cuts_by_tick: dict[tuple[int, float], list[tuple[float, float]]] = {}
+        page_system_barline_width_by_tick: dict[tuple[int, float], float] = {}
+        page_system_endline_cuts_by_index: dict[int, list[tuple[float, float]]] = {}
+        page_system_endline_width_by_index: dict[int, float] = {}
+
         for line_index, line in enumerate(page_lines):
             line_stave_i = int(line.get('stave_i', 0) or 0)
             is_first_enabled_stave = int(line_stave_i) == int(first_enabled_stave_i)
             is_last_enabled_stave = int(line_stave_i) == int(last_enabled_stave_i)
+            line_stave_scale = max(0.01, float(line.get('stave_scale', enabled_stave_scale_by_index.get(line_stave_i, 1.0)) or 1.0))
+            line_scale = float(scale) * float(line_stave_scale)
+            semitone_mm = 2.0 * line_scale
+            key_positions = _build_key_positions(1, PIANO_KEY_AMOUNT, semitone_mm)
             norm_notes = [it for it in all_norm_notes if int(it.get('stave_i', 0) or 0) == line_stave_i]
             norm_grace = [it for it in all_norm_grace if int(it.get('stave_i', 0) or 0) == line_stave_i]
             norm_slurs = [it for it in all_norm_slurs if int(it.get('stave_i', 0) or 0) == line_stave_i]
@@ -1392,7 +1461,8 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
             # Shift line_x_start right by the left ledger overhang so left-side
             # ledger stubs land inside the allocated column width.
             _ledger_left_overhang = float(line.get('ledger_left_overhang', 0.0) or 0.0)
-            line_x_start = x_cursor + float(line['margin_left']) + _ledger_left_overhang
+            line_cursor = float(line_x_cursor_by_obj.get(id(line), x_cursor))
+            line_x_start = line_cursor + float(line['margin_left']) + _ledger_left_overhang
             line_x_end = line_x_start + float(line['stave_width'])
             if horizontal_read_direction:
                 y1 = page_top
@@ -1591,13 +1661,13 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                 'Edwin',
                 25.0,
             )
-            guide_thickness = float(layout.get('time_signature_indicator_guide_thickness_mm', 0.5) or 0.5) * scale
-            divider_thickness = float(layout.get('time_signature_indicator_divide_guide_thickness_mm', 1.0) or 1.0) * scale
-            classic_size_pt = classic_size * scale
-            klav_size_pt = klav_size * scale
+            guide_thickness = float(layout.get('time_signature_indicator_guide_thickness_mm', 0.5) or 0.5) * line_scale
+            divider_thickness = float(layout.get('time_signature_indicator_divide_guide_thickness_mm', 1.0) or 1.0) * line_scale
+            classic_size_pt = classic_size * line_scale
+            klav_size_pt = klav_size * line_scale
             # Shared half-span for classical divider width and klavarskribo guides,
             # also used as vertical offset around the classical divider center.
-            ts_indicator_half_span = 3.0 * scale
+            ts_indicator_half_span = 3.0 * line_scale
 
             def _ts_color(enabled: bool) -> tuple[float, float, float, float]:
                 if enabled:
@@ -1814,6 +1884,11 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
             # Ledger stubs extend beyond this but are drawn per-note.
             grid_left = _key_to_x(natural_bound_left)
             grid_right = _key_to_x(natural_bound_right)
+            _sys_span = page_system_span_by_index.get(int(line.get('system_index', -1) or -1), {})
+            system_barline_left = float(_sys_span.get('left', grid_left))
+            system_barline_right = float(_sys_span.get('right', grid_right))
+            if system_barline_right < system_barline_left:
+                system_barline_left, system_barline_right = system_barline_right, system_barline_left
 
             line_avg_split_pitch = 43.0
             line_pitches: list[int] = []
@@ -1840,7 +1915,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                 frac = float(line_avg_split_pitch - float(split_lo))
                 grid_band_split_x = float(x_lo + (x_hi - x_lo) * frac)
             grid_band_split_x = max(float(grid_left), min(float(grid_right), float(grid_band_split_x)))
-            ts_right_margin = max(0.0, 1.5 * scale)
+            ts_right_margin = max(0.0, 1.5 * line_scale)
             ts_lane_padding_mm = float(line.get('ts_lane_padding_mm', 0.0) or 0.0)
             ts_lane_width = ts_lane_width_mm
             if ts_lane_width > 0.0:
@@ -1858,8 +1933,8 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
             ts_x_mid = ts_left_edge + (ts_col_w * 1.5)
             ts_x_right = ts_left_edge + (ts_col_w * 2.5)
             grid_color = notation_color
-            bar_width_mm = float(layout.get('grid_barline_thickness_mm', 0.25) or 0.25) * scale
-            grid_width_mm = float(layout.get('grid_gridline_thickness_mm', 0.15) or 0.15) * scale
+            bar_width_mm = float(layout.get('grid_barline_thickness_mm', 0.25) or 0.25) * line_scale
+            grid_width_mm = float(layout.get('grid_gridline_thickness_mm', 0.15) or 0.15) * line_scale
             barline_visible = bool(layout.get('barline_visible', True))
             grid_line_visible = bool(layout.get('grid_line_visible', True))
             dash_pattern = _scaled_dash_pattern_with_default(
@@ -1881,6 +1956,18 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                 if p < 1 or p > PIANO_KEY_AMOUNT:
                     continue
                 line_notes_for_barlines.append(item)
+
+            # Notes that start exactly on barlines must contribute stem cutouts,
+            # including line-end boundary starts that are excluded from overlap lists.
+            line_note_starts_for_barlines: list[dict] = []
+            for item in norm_notes:
+                n_t = float(item.get('time', 0.0) or 0.0)
+                p = int(item.get('pitch', 0) or 0)
+                if op_time.lt(n_t, line_start_ticks_local) or op_time.gt(n_t, line_end_ticks_local):
+                    continue
+                if p < 1 or p > PIANO_KEY_AMOUNT:
+                    continue
+                line_note_starts_for_barlines.append(item)
 
             stem_len_units_for_barlines = float(layout.get('note_stem_length_semitone', 3) or 3)
             stem_len_mm_for_barlines = stem_len_units_for_barlines * semitone_mm
@@ -1991,9 +2078,9 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                     )
 
             note_head_half_w = semitone_mm * float(layout.get('note_width_scaling', 0.75) or 0.75)
-            stem_collision_pad = max(0.15, float(layout.get('note_stem_thickness_mm', 0.5) or 0.5) * scale)
+            stem_collision_pad = max(0.15, float(layout.get('note_stem_thickness_mm', 0.5) or 0.5) * line_scale)
             head_collision_pad = max(0.15, semitone_mm * 0.15)
-            beam_collision_pad = max(0.2, float(layout.get('beam_thickness_mm', 1.0) or 1.0) * scale * 0.7)
+            beam_collision_pad = max(0.2, float(layout.get('beam_thickness_mm', 1.0) or 1.0) * line_scale * 0.7)
             barline_symbol_gap_mm = max(0.0, semitone_mm)
 
             beam_segments_for_barlines: list[dict[str, float]] = []
@@ -2094,6 +2181,13 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
 
             def _barline_cut_intervals(ticks: float) -> list[tuple[float, float]]:
                 intervals: list[tuple[float, float]] = []
+                notes_at_tick = [
+                    it for it in line_notes_for_barlines
+                    if op_time.eq(float(it.get('time', 0.0) or 0.0), float(ticks))
+                ]
+                outer_right_pitch = None
+                if notes_at_tick:
+                    outer_right_pitch = max(int(it.get('pitch', 0) or 0) for it in notes_at_tick)
                 for item in line_notes_for_barlines:
                     n_t = float(item.get('time', 0.0) or 0.0)
                     if not op_time.eq(n_t, float(ticks)):
@@ -2104,6 +2198,13 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                         x_note - note_head_half_w - head_collision_pad - barline_symbol_gap_mm,
                         x_note + note_head_half_w + head_collision_pad + barline_symbol_gap_mm,
                     ))
+                    if outer_right_pitch is not None and int(p) == int(outer_right_pitch):
+                        # Keep only outer-right stem/beam reach clear from notehead x.
+                        right_reach_x = x_note + stem_len_mm_for_barlines + semitone_mm
+                        intervals.append((
+                            x_note - stem_collision_pad - barline_symbol_gap_mm,
+                            right_reach_x + stem_collision_pad + barline_symbol_gap_mm,
+                        ))
                     if bool(layout.get('note_stem_visible', True)):
                         hand_key = str(item.get('hand', 'l') or 'l')
                         x_stem_tip = x_note - stem_len_mm_for_barlines if hand_key == 'l' else x_note + stem_len_mm_for_barlines
@@ -2187,9 +2288,39 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                         c_x1 + beam_collision_pad + barline_symbol_gap_mm,
                     ))
 
+                # Ensure stem cutouts for any note that starts exactly on this barline tick.
+                if bool(layout.get('note_stem_visible', True)):
+                    start_notes_at_tick = [
+                        it for it in line_note_starts_for_barlines
+                        if op_time.eq(float(it.get('time', 0.0) or 0.0), float(ticks))
+                    ]
+                    outer_right_start_pitch = None
+                    if start_notes_at_tick:
+                        outer_right_start_pitch = max(int(it.get('pitch', 0) or 0) for it in start_notes_at_tick)
+                    for item in line_note_starts_for_barlines:
+                        n_t = float(item.get('time', 0.0) or 0.0)
+                        if not op_time.eq(n_t, float(ticks)):
+                            continue
+                        p = int(item.get('pitch', 0) or 0)
+                        x_note = _key_to_x(p)
+                        if outer_right_start_pitch is not None and int(p) == int(outer_right_start_pitch):
+                            right_reach_x = x_note + stem_len_mm_for_barlines + semitone_mm
+                            intervals.append((
+                                x_note - stem_collision_pad - barline_symbol_gap_mm,
+                                right_reach_x + stem_collision_pad + barline_symbol_gap_mm,
+                            ))
+                        hand_key = str(item.get('hand', 'l') or 'l')
+                        x_stem_tip = x_note - stem_len_mm_for_barlines if hand_key == 'l' else x_note + stem_len_mm_for_barlines
+                        intervals.append((
+                            min(x_note, x_stem_tip) - stem_collision_pad - barline_symbol_gap_mm,
+                            max(x_note, x_stem_tip) + stem_collision_pad + barline_symbol_gap_mm,
+                        ))
+
                 return _merge_intervals(intervals)
 
             def _draw_barline_segments(
+                x_left: float,
+                x_right: float,
                 yb: float,
                 cuts: list[tuple[float, float]],
                 width_mm: float,
@@ -2197,44 +2328,68 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                 item_id: int = 0,
                 dash_pattern: list[float] | None = None,
             ) -> None:
-                if not cuts:
+                x0 = float(x_left)
+                x1 = float(x_right)
+                if x1 < x0:
+                    x0, x1 = x1, x0
+
+                clipped: list[tuple[float, float]] = []
+                for a, b in cuts:
+                    c0 = max(x0, min(x1, float(min(a, b))))
+                    c1 = max(x0, min(x1, float(max(a, b))))
+                    if c1 > c0:
+                        clipped.append((c0, c1))
+
+                if clipped:
+                    clipped.sort(key=lambda it: it[0])
+                    merged: list[tuple[float, float]] = [clipped[0]]
+                    for a, b in clipped[1:]:
+                        la, lb = merged[-1]
+                        if a <= lb:
+                            merged[-1] = (la, max(lb, b))
+                        else:
+                            merged.append((a, b))
+                else:
+                    merged = []
+
+                if not merged:
                     du.add_line(
-                        grid_left,
-                        yb,
-                        grid_right,
-                        yb,
+                        x0,
+                        float(yb),
+                        x1,
+                        float(yb),
                         color=grid_color,
-                        width_mm=width_mm,
-                        id=item_id,
+                        width_mm=float(width_mm),
+                        id=int(item_id),
                         tags=tags,
                         dash_pattern=dash_pattern,
                     )
                     return
-                x_cursor_seg = float(grid_left)
-                min_seg = max(0.05, width_mm * 0.5)
-                for c0, c1 in cuts:
+                x_cursor_seg = x0
+                min_seg = max(0.05, float(width_mm) * 0.5)
+                for c0, c1 in merged:
                     if c0 - x_cursor_seg > min_seg:
                         du.add_line(
                             x_cursor_seg,
-                            yb,
-                            c0,
-                            yb,
+                            float(yb),
+                            float(c0),
+                            float(yb),
                             color=grid_color,
-                            width_mm=width_mm,
-                            id=item_id,
+                            width_mm=float(width_mm),
+                            id=int(item_id),
                             tags=tags,
                             dash_pattern=dash_pattern,
                         )
-                    x_cursor_seg = max(x_cursor_seg, c1)
-                if float(grid_right) - x_cursor_seg > min_seg:
+                    x_cursor_seg = max(x_cursor_seg, float(c1))
+                if x1 - x_cursor_seg > min_seg:
                     du.add_line(
                         x_cursor_seg,
-                        yb,
-                        grid_right,
-                        yb,
+                        float(yb),
+                        x1,
+                        float(yb),
                         color=grid_color,
-                        width_mm=width_mm,
-                        id=item_id,
+                        width_mm=float(width_mm),
+                        id=int(item_id),
                         tags=tags,
                         dash_pattern=dash_pattern,
                     )
@@ -2242,19 +2397,35 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
             def _draw_barline_constructive(ticks: float, width_mm: float, tag: str = 'barline') -> None:
                 yb = _time_to_y(float(ticks))
                 cuts = _barline_cut_intervals(float(ticks))
-                _draw_barline_segments(float(yb), cuts, float(width_mm), [tag], 0)
+                _draw_barline_segments(float(grid_left), float(grid_right), float(yb), cuts, float(width_mm), [tag], 0)
+
+            def _draw_system_barline(ticks: float, width_mm: float, tag: str = 'barline') -> None:
+                yb = _time_to_y(float(ticks))
+                du.add_line(
+                    float(system_barline_left),
+                    float(yb),
+                    float(system_barline_right),
+                    float(yb),
+                    color=grid_color,
+                    width_mm=float(width_mm),
+                    id=0,
+                    tags=[tag],
+                    dash_pattern=None,
+                )
 
             def _draw_double_bar_constructive(ticks: float, width_mm: float, gap_mm: float, ev_id: int = 0) -> None:
                 yb = _time_to_y(float(ticks))
                 cuts = _barline_cut_intervals(float(ticks))
                 gap = max(0.1, float(gap_mm))
                 tags = ['barline', 'double_barline']
-                _draw_barline_segments(float(yb + gap), cuts, float(width_mm), tags, int(ev_id))
+                _draw_barline_segments(float(grid_left), float(grid_right), float(yb + gap), cuts, float(width_mm), tags, int(ev_id))
 
             def _draw_gridline_constructive(ticks: float, width_mm: float, dash: list[float] | None) -> None:
                 yb = _time_to_y(float(ticks))
                 cuts = _barline_cut_intervals(float(ticks))
                 _draw_barline_segments(
+                    float(grid_left),
+                    float(grid_right),
                     float(yb),
                     cuts,
                     float(width_mm),
@@ -2266,6 +2437,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
             '''Draw barlines and grid lines from the base grid, using constructive geometry to cut out collisions with notes and beams.'''
             time_cursor = 0.0
             has_any_barlines = False
+            system_index = int(line.get('system_index', -1) or -1)
             for bg in base_grid:
                 numerator = int(bg.get('numerator', 4) or 4)
                 denominator = int(bg.get('denominator', 4) or 4)
@@ -2336,7 +2508,14 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                             continue
                         if not barline_visible:
                             continue
-                        _draw_barline_constructive(t, bar_width_mm, tag='barline')
+                        _tick_key = (int(system_index), round(float(t), 6))
+                        _cuts = _barline_cut_intervals(float(t))
+                        if _cuts:
+                            page_system_barline_cuts_by_tick.setdefault(_tick_key, []).extend(_cuts)
+                        page_system_barline_width_by_tick[_tick_key] = max(
+                            float(page_system_barline_width_by_tick.get(_tick_key, 0.0) or 0.0),
+                            float(bar_width_mm),
+                        )
                     for off in grid_offsets:
                         t = float(time_cursor + float(off))
                         if op_time.lt(t, float(line['time_start'])) or op_time.gt(t, float(line['time_end'])):
@@ -2347,23 +2526,61 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                     time_cursor += measure_len
                 if op_time.gt(time_cursor, float(line['time_end'])):
                     break
+
+            if barline_visible and has_any_barlines and is_last_enabled_stave:
+                system_dash_pattern = layout.get('grid_gridline_dash_pattern_mm', [3.0, 4.0])
+                system_dash_pattern = _scaled_dash_pattern_with_default(system_dash_pattern, grid_dash_mm, line_scale)
+                _tick_keys_for_system = sorted(
+                    [
+                        key
+                        for key in page_system_barline_width_by_tick.keys()
+                        if int(key[0]) == int(system_index)
+                    ],
+                    key=lambda k: float(k[1]),
+                )
+                for _sys_key in _tick_keys_for_system:
+                    _t = float(_sys_key[1])
+                    if op_time.lt(_t, float(line['time_start'])) or op_time.gt(_t, float(line['time_end'])):
+                        continue
+                    _w = float(page_system_barline_width_by_tick.get(_sys_key, bar_width_mm) or bar_width_mm)
+                    _cuts = list(page_system_barline_cuts_by_tick.get(_sys_key, []) or [])
+                    _draw_barline_segments(
+                        float(system_barline_left),
+                        float(system_barline_right),
+                        _time_to_y(_t),
+                        _cuts,
+                        _w,
+                        ['barline'],
+                        0,
+                        dash_pattern=system_dash_pattern,
+                    )
             
             '''End-barline drawing'''
             if barline_visible and has_any_barlines and op_time.ge(total_ticks, float(line['time_start'])) and op_time.le(total_ticks, float(line['time_end'])):
                 # Single final barline (Klavarskribo convention).
                 end_thick_w = bar_width_mm * 1.5
-                y_end = _time_to_y(float(total_ticks))
-                du.add_line(
-                    grid_left, 
-                    y_end, 
-                    grid_right, 
-                    y_end, 
-                    color=grid_color, 
-                    width_mm=end_thick_w * 1.5, 
-                    id=0, 
-                    tags=['end_barline'],
-                    dash_pattern=None
+                _end_cuts = _barline_cut_intervals(float(total_ticks))
+                page_system_endline_cuts_by_index.setdefault(int(system_index), []).extend(_end_cuts)
+                page_system_endline_width_by_index[int(system_index)] = max(
+                    float(page_system_endline_width_by_index.get(int(system_index), 0.0) or 0.0),
+                    float(end_thick_w * 1.5),
                 )
+                if is_last_enabled_stave:
+                    y_end = _time_to_y(float(total_ticks))
+                    _w_end = float(page_system_endline_width_by_index.get(int(system_index), end_thick_w * 1.5) or (end_thick_w * 1.5))
+                    _cuts_end = list(page_system_endline_cuts_by_index.get(int(system_index), []) or [])
+                    system_dash_pattern = layout.get('grid_gridline_dash_pattern_mm', [3.0, 4.0])
+                    system_dash_pattern = _scaled_dash_pattern_with_default(system_dash_pattern, grid_dash_mm, line_scale)
+                    _draw_barline_segments(
+                        float(system_barline_left),
+                        float(system_barline_right),
+                        y_end,
+                        _cuts_end,
+                        _w_end,
+                        ['end_barline'],
+                        0,
+                        dash_pattern=system_dash_pattern,
+                    )
 
             '''Double barlines from events, drawn with the same constructive geometry as regular barlines to avoid collisions.'''
             if barline_visible and bool(layout.get('double_barline_visible', True)) and norm_double_bars:
@@ -2384,7 +2601,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
 
             # Problem solved: draw pedal symbols using draw_pedal_symbol for keyboard-aware positioning
             if pedals:
-                pedal_thickness_mm = float(layout.get('pedal_symbol_thickness_mm', 0.3) or 0.3) * scale
+                pedal_thickness_mm = float(layout.get('pedal_symbol_thickness_mm', 0.3) or 0.3) * line_scale
 
                 def _read_pedal_field(pedal_ev, name: str, default):
                     if isinstance(pedal_ev, dict):
@@ -2447,7 +2664,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                     default_countline_dash_mm,
                     scale,
                 )
-                countline_w = float(layout.get('countline_thickness_mm', 0.5) or 0.5) * scale
+                countline_w = float(layout.get('countline_thickness_mm', 0.5) or 0.5) * line_scale
                 base_x_c4 = _key_to_x(40)
                 for ev in count_lines:
                     t0 = float(ev.get('time', 0.0) or 0.0)
@@ -2778,7 +2995,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                     )
 
             # Pre-compute beam line bounds so measure numbers can test real beam spans.
-            beam_thickness_mm = float(layout.get('beam_thickness_mm', 1.0) or 1.0) * scale
+            beam_thickness_mm = float(layout.get('beam_thickness_mm', 1.0) or 1.0) * line_scale
             beam_line_bounds: list[dict[str, float]] = []
 
             def _record_beam_line_bounds() -> None:
@@ -2835,7 +3052,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
 
             # Problem solved: measure numbers must avoid colliding with notes/beams.
             mn_family, mn_size, mn_bold, mn_italic, _mn_ul = _layout_font('measure_numbering_font', 'Edwin', 10.0)
-            size_pt = mn_size * scale
+            size_pt = mn_size * line_scale
             mm_per_pt = 25.4 / 72.0
             text_h_mm = size_pt * mm_per_pt
             measure_pad = 1.5
@@ -2844,7 +3061,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
             measure_symbol_default_right_x = float(grid_right + measure_pad * 2.0)
             measure_guide_width_mm = max(
                 0.05,
-                float(layout.get('measure_numbering_guide_thickness_mm', 1.0) or 1.0) * scale,
+                float(layout.get('measure_numbering_guide_thickness_mm', 1.0) or 1.0) * line_scale,
             )
             # Allow an explicit measure-numbering guide dash style, with
             # fallback to the global grid line pattern for backward compatibility.
@@ -3168,11 +3385,11 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                 except Exception:
                     tempo_font_family = 'Edwin'
 
-                tempo_font_size_pt = 32.0 * scale
+                tempo_font_size_pt = 32.0 * line_scale
                 tempo_dash = [0.5, 1.0]
                 tempo_stroke = 0.25
                 right_outer_stave_x = float(grid_right)
-                tempo_right_pad = max(0.6, 4.0 * scale)
+                tempo_right_pad = max(0.6, 4.0 * line_scale)
 
                 def _tempo_left_x(tp_time: float) -> float:
                     key = round(float(tp_time), 6)
@@ -3230,7 +3447,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
 
                     # Keep the left edge of tempo text aligned with the right edge
                     # of the measure-number text; variable text width grows to the right.
-                    tempo_text_left = _tempo_left_x(t0) + (tempo_x_offset * scale)
+                    tempo_text_left = _tempo_left_x(t0) + (tempo_x_offset * line_scale)
                     tempo_x_left = float(tempo_text_left)
                     tempo_text_center_x = float(tempo_x_left + (tempo_text_span_x * 0.5))
                     tempo_x_right = float(tempo_x_left + tempo_text_span_x + tempo_right_pad)
@@ -3291,7 +3508,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
             symbol_width = max(3.0, semitone_mm * 4.0)
             symbol_gap = max(0.6, semitone_mm * 0.35)
             symbol_thick_w = max(0.1, bar_width_mm)
-            symbol_dot_d = max(1.0, semitone_mm * scale)
+            symbol_dot_d = max(1.0, semitone_mm * line_scale)
             # Minimum clear gap between the outer edge of the horizontal line
             # and the nearest edge of a dot. Increase to space dots further out.
             dot_line_gap = semitone_mm
@@ -3478,7 +3695,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                 kb_x1 = float(_key_to_x(int(natural_bound_left))) - float(semitone_mm)
                 kb_x2 = float(_key_to_x(int(natural_bound_right))) + float(semitone_mm)
                 if kb_x2 > kb_x1:
-                    bar_width_mm = max(0.01, float(1.125 * scale))
+                    bar_width_mm = max(0.01, float(1.125 * line_scale))
                     key_len_mm = float(semitone_mm) * 4.0
                     black_key_width_mm = semitone_mm
                     black_key_set = set(BLACK_KEYS)
@@ -3563,7 +3780,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                                 family='Edwin',
                                 color=notation_color,
                                 anchor='center',
-                                size_pt=16.0 * scale,
+                                size_pt=16.0 * line_scale,
                                 angle_deg=90.0 if read_direction == 'horizontal' else 0.0,
                                 id=0,
                                 tags=['piano_octave_number'],
@@ -3576,7 +3793,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                         kb_y2,
                         stroke_color=notation_color,
                         stroke_width_mm=bar_width_mm,
-                        corner_radius=0.75 * scale,
+                        corner_radius=0.75 * line_scale,
                         fill_color=None,
                         id=0,
                         tags=['piano_outline'],
@@ -3592,14 +3809,14 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
 
                 stem_len_units = float(layout.get('note_stem_length_semitone', 3) or 3)
                 layout_stem_len = stem_len_units * semitone_mm
-                beam_w = float(layout.get('beam_thickness_mm', 1.0) or 1.0) * scale
-                stem_w = float(layout.get('note_stem_thickness_mm', 0.5) or 0.5) * scale
+                beam_w = float(layout.get('beam_thickness_mm', 1.0) or 1.0) * line_scale
+                stem_w = float(layout.get('note_stem_thickness_mm', 0.5) or 0.5) * line_scale
                 line_start = float(line_time_start_render)
                 line_end = float(line.get('time_end', 0.0) or 0.0)
 
                 beam_half = max(0.1, float(beam_w) * 0.5)
                 stem_half = max(0.05, float(stem_w) * 0.5)
-                beam_corner_r = max(0.0, float(layout.get('beam_corner_radius_mm', 0.2) or 0.2) * scale)
+                beam_corner_r = max(0.0, float(layout.get('beam_corner_radius_mm', 0.2) or 0.2) * line_scale)
 
                 def _rounded_polygon(points: list[tuple[float, float]], radius: float, steps: int = 12) -> list[tuple[float, float]]:
                     if len(points) < 3 or radius <= 1e-6:
@@ -3830,7 +4047,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                 # grace_note_scale is a relative factor; semitone_mm already includes layout scale.
                 g_scale = float(layout.get('grace_note_scale', 0.75) or 0.75)
                 # grace_note_outline_width_mm is a mm value; apply global layout scale to stroke width.
-                g_outline = float(layout.get('grace_note_outline_width_mm', layout.get('grace_note_outline_width', 0.3)) or 0.3) * scale
+                g_outline = float(layout.get('grace_note_outline_width_mm', layout.get('grace_note_outline_width', 0.3)) or 0.3) * line_scale
                 for item in line_grace:
                     g_t = float(item.get('time', 0.0) or 0.0)
                     p = int(item.get('pitch', 0) or 0)
@@ -3932,7 +4149,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                     if note_idx not in arpeggio_chord_note_ids_line:
                         stem_len_units = float(layout.get('note_stem_length_semitone', 3) or 3)
                         stem_len = stem_len_units * semitone_mm
-                        stem_w = float(layout.get('note_stem_thickness_mm', 0.5) or 0.5) * scale
+                        stem_w = float(layout.get('note_stem_thickness_mm', 0.5) or 0.5) * line_scale
                         x2 = x - stem_len if hand_key == 'l' else x + stem_len
                         du.add_line(
                             x,
@@ -3954,7 +4171,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                     is_above_stem = bool(getattr(spec, 'is_up', False))
                     y_anchor = float(y_start - note_h) if is_above_stem else float(y_start + note_h)
                     y_target = float(y_anchor - semitone_mm) if is_above_stem else float(y_anchor + semitone_mm)
-                    acc_line_w = max(0.1, float(layout.get('note_stem_thickness_mm', 0.5) or 0.5) * scale * 0.9)
+                    acc_line_w = max(0.1, float(layout.get('note_stem_thickness_mm', 0.5) or 0.5) * line_scale * 0.9)
                     du.add_line(
                         float(x),
                         float(y_anchor),
@@ -4156,7 +4373,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                             x2,
                             y_start,
                             color=notation_color,
-                            width_mm=float(layout.get('note_stem_thickness_mm', 0.5) or 0.5) * scale,
+                            width_mm=float(layout.get('note_stem_thickness_mm', 0.5) or 0.5) * line_scale,
                             id=0,
                             tags=['chord_connect'],
                         )
@@ -4179,13 +4396,13 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                     du.add_polyline(
                         points,
                         stroke_color=notation_color,
-                        stroke_width_mm=float(layout.get('note_stopsign_thickness_mm', 0.4) or 0.4) * scale,
+                        stroke_width_mm=float(layout.get('note_stopsign_thickness_mm', 0.4) or 0.4) * line_scale,
                         id=0,
                         tags=['stop_sign'],
                     )
 
             if bool(layout.get('chord_connect_visible', True)) and line_arpeggio_stems:
-                stem_w = float(layout.get('note_stem_thickness_mm', 0.5) or 0.5) * scale
+                stem_w = float(layout.get('note_stem_thickness_mm', 0.5) or 0.5) * line_scale
                 for arp_stem in line_arpeggio_stems:
                     stem_points = list(arp_stem.get('points', []) or [])
                     if len(stem_points) < 2:
@@ -4209,11 +4426,11 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                 return clamp_x(base_x_c4 + float(rp) * semitone_mm)
 
             if bool(layout.get('hairpin_visible', True)) and (line_crescendos or line_decrescendos):
-                hairpin_w = float(layout.get('hairpin_line_width_mm', 0.5) or 0.5) * scale
-                hairpin_spread = float(layout.get('hairpin_width_mm', 5.0) or 5.0) * scale
-                hairpin_gap = float(0.0) * scale
-                dynamic_symbol_font_size_pt = float(layout.get('dynamic_symbol_font_size_pt', 12.0) or 12.0) * scale
-                dynamic_bg_pad = float(layout.get('dynamic_symbol_background_padding_mm', 0.5) or 0.5) * scale
+                hairpin_w = float(layout.get('hairpin_line_width_mm', 0.5) or 0.5) * line_scale
+                hairpin_spread = float(layout.get('hairpin_width_mm', 5.0) or 5.0) * line_scale
+                hairpin_gap = float(0.0) * line_scale
+                dynamic_symbol_font_size_pt = float(layout.get('dynamic_symbol_font_size_pt', 12.0) or 12.0) * line_scale
+                dynamic_bg_pad = float(layout.get('dynamic_symbol_background_padding_mm', 0.5) or 0.5) * line_scale
                 layout_dynamic_rotation = float(layout.get('dynamic_rotation', 0.0) or 0.0)
 
                 def _get_dynamic_symbol_at_position(t: float, x_rpitch: int) -> dict | None:
@@ -4363,13 +4580,13 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                     _draw_hairpin(hp, False)
 
             if bool(layout.get('dynamic_symbol_visible', True)) and line_dynamic_symbols:
-                text_size_pt = float(layout.get('dynamic_symbol_font_size_pt', 12.0) or 12.0) * scale
+                text_size_pt = float(layout.get('dynamic_symbol_font_size_pt', 12.0) or 12.0) * line_scale
                 dynamic_bg_pad = float(
                     layout.get(
                         'dynamic_symbol_background_padding_mm',
                         layout.get('dynamic_symbol_background_padding', layout.get('dynamic_background_padding', layout.get('text_background_padding_mm', 0.5))),
                     ) or 0.0
-                ) * scale
+                ) * line_scale
                 text_family = 'LelandText'
                 text_color = notation_color
                 layout_dynamic_rotation = float(layout.get('dynamic_rotation', 0.0) or 0.0)
@@ -4445,7 +4662,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
             '''Text drawing.'''
             if bool(layout.get('text_visible', True)) and line_texts:
                 default_font = layout.get('font_text', {}) or {}
-                pad_mm = float(layout.get('text_background_padding_mm', 0.0) or 0.0) * scale
+                pad_mm = float(layout.get('text_background_padding_mm', 0.0) or 0.0) * line_scale
 
                 def _resolve_font(tx: dict) -> tuple[str, float, bool, bool, bool]:
                     use_custom = bool(tx.get('use_custom_font', False))
@@ -4517,7 +4734,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                     txt_raw = str(tx.get('text', '') or '')
                     alignment = str(tx.get('alignment', 'left') or 'left').lower()
                     family, size_pt_raw, italic, bold, underline = _resolve_font(tx)
-                    size_pt = float(size_pt_raw) * ENGRAVER_FRACTIONAL_TEXT_SCALING_CORRECTION * (scale / 0.3333333333333333)
+                    size_pt = float(size_pt_raw) * ENGRAVER_FRACTIONAL_TEXT_SCALING_CORRECTION * (line_scale / 0.3333333333333333)
                     width_off_mm = float(tx.get('text_background_width_offset_mm', 0.0) or 0.0)
                     y_mm = _time_to_y(t_time) + y_off
                     x_mm = rpitch_to_x(x_rp) + x_off
@@ -4613,8 +4830,8 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
             if bool(layout.get('slur_visible', True)) and (
                     line_slurs or line_slur_continuations
                     or line_slur_end_indicators or line_slur_start_indicators):
-                side_w = float(layout.get('slur_width_sides_mm', 0.1) or 0.1) * scale
-                mid_w = float(layout.get('slur_width_middle_mm', 1.5) or 1.5) * scale
+                side_w = float(layout.get('slur_width_sides_mm', 0.1) or 0.1) * line_scale
+                mid_w = float(layout.get('slur_width_middle_mm', 1.5) or 1.5) * line_scale
                 n_seg = max(2, int(SLUR_SEGMENT_COUNT))
 
                 def tri_interp(t: float) -> float:
@@ -4828,6 +5045,14 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
     _ptm: list = []
     for _p_idx, _p_lines in enumerate(pages):
         _page_lines_ord = list(reversed(_p_lines)) if horizontal_read_direction else _p_lines
+        _page_system_chunks: list[dict] = []
+        for _line in _page_lines_ord:
+            _sys_i = int(_line.get('system_index', -1) or -1)
+            if (not _page_system_chunks) or int(_page_system_chunks[-1].get('index', -2)) != _sys_i:
+                _page_system_chunks.append({'index': _sys_i, 'lines': [_line], 'width': float(_line.get('total_width', 0.0) or 0.0)})
+            else:
+                _page_system_chunks[-1]['lines'].append(_line)
+                _page_system_chunks[-1]['width'] = float(_page_system_chunks[-1].get('width', 0.0) or 0.0) + float(_line.get('total_width', 0.0) or 0.0)
         # y range for this page
         if horizontal_read_direction:
             _y_top = float(page_top)
@@ -4839,24 +5064,26 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
         # x justification for this page
         _lr, _rr = _line_axis_reserves_for_page(_p_idx)
         _avail = max(1e-6, page_w - page_left - page_right - _lr - _rr)
-        _used = sum(float(_l['total_width']) for _l in _page_lines_ord)
+        _used = sum(float(_ch.get('width', 0.0) or 0.0) for _ch in _page_system_chunks)
         _leftover = max(0.0, _avail - _used)
-        _gap = _leftover / float(len(_page_lines_ord) + 1) if _page_lines_ord else 0.0
+        _gap = _leftover / float(len(_page_system_chunks) + 1) if _page_system_chunks else 0.0
         _xc = page_left + _lr + _gap
         _lines_map: list = []
-        for _line in _page_lines_ord:
-            _lo = float(_line.get('ledger_left_overhang', 0.0) or 0.0)
-            _lx_s = _xc + float(_line['margin_left']) + _lo
-            _lx_e = _lx_s + float(_line.get('stave_width', 0.0) or 0.0)
-            _lines_map.append({
-                'time_start': float(_line.get('time_start', 0.0)),
-                'time_end': float(_line.get('time_end', 0.0)),
-                'y_top': float(_line.get('y_top', _y_top)),
-                'y_bottom': float(_line.get('y_bottom', _y_bot)),
-                'x_start': float(_lx_s),
-                'x_end': float(_lx_e),
-            })
-            _xc += float(_line['total_width']) + _gap
+        for _chunk in _page_system_chunks:
+            for _line in list(_chunk.get('lines', []) or []):
+                _lo = float(_line.get('ledger_left_overhang', 0.0) or 0.0)
+                _lx_s = _xc + float(_line['margin_left']) + _lo
+                _lx_e = _lx_s + float(_line.get('stave_width', 0.0) or 0.0)
+                _lines_map.append({
+                    'time_start': float(_line.get('time_start', 0.0)),
+                    'time_end': float(_line.get('time_end', 0.0)),
+                    'y_top': float(_line.get('y_top', _y_top)),
+                    'y_bottom': float(_line.get('y_bottom', _y_bot)),
+                    'x_start': float(_lx_s),
+                    'x_end': float(_lx_e),
+                })
+                _xc += float(_line['total_width'])
+            _xc += _gap
         _ptm.append(_lines_map)
     du.print_time_map = _ptm
 
