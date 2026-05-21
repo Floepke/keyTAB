@@ -5,6 +5,7 @@ import multiprocessing as mp
 import traceback
 from ui.widgets.draw_util import DrawUtil
 from utils.CONSTANT import BE_KEYS, QUARTER_NOTE_UNIT, PIANO_KEY_AMOUNT, SHORTEST_DURATION, hex_to_rgba, BLACK_KEYS, ENGRAVER_FRACTIONAL_TEXT_SCALING_CORRECTION, SLUR_SEGMENT_COUNT
+from utils.multiprocessing_utils import get_context as get_mp_context
 from utils.tiny_tool import key_class_filter
 from utils.operator import Operator
 from file_model.SCORE import SCORE
@@ -35,7 +36,7 @@ from engraver.helpers import (
     should_tune_under_stem_black_width as _should_tune_under_stem_black_width,
 )
 
-_MP_CONTEXT = mp.get_context("spawn")
+_MP_CONTEXT = get_mp_context()
 
 def _grace_layout_no_tilt(layout: dict) -> dict:
     """Return layout dict copy with notehead_tilt set to 0 for grace notes visual contrast."""

@@ -50,6 +50,7 @@ from fonts import (
     register_font_from_bytes,
 )
 from utils.file_associations import extract_document_paths
+from utils.multiprocessing_utils import configure_start_method
 
 APP_NAME = "keyTAB"
 MIME_TYPE_KEYTAB = "application/x-keytab"
@@ -479,4 +480,5 @@ def main(argv: list[str] | None = None):
 
 if __name__ == "__main__":
     mp.freeze_support()
+    configure_start_method()
     main()
