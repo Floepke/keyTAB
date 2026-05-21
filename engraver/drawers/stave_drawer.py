@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from symbol_design.noteheads import resolve_notehead_spec
 from ui.widgets.draw_util import DrawUtil
 from utils.CONSTANT import BLACK_KEYS
 from utils.tiny_tool import key_class_filter
@@ -74,6 +75,8 @@ def stave_drawer(du: DrawUtil, pre_calc: dict) -> None:
     """Draw stave black-key lines from pre-calculated geometry."""
     system = dict(pre_calc.get('system', {}) or {})
     layout = dict(pre_calc.get('layout', {}) or {})
+    if not bool(layout.get('stave_visible', True)):
+        return
     y0 = float(pre_calc.get('y0', 0.0) or 0.0)
     y1 = float(pre_calc.get('y1', 0.0) or 0.0)
     t0 = float(system.get('time_start', 0.0) or 0.0)
@@ -133,16 +136,41 @@ def stave_drawer(du: DrawUtil, pre_calc: dict) -> None:
                 chord_items = [n for n in list(chord or []) if isinstance(n, dict)]
                 if not chord_items:
                     continue
-                t_ch = _item_get_float(chord_items[0], 'time', t0)
-                y_anchor = _time_to_y(float(t_ch), t0, t1, y0, y1)
-                y_top = float(y_anchor) - y_pad
-                y_bottom = float(y_anchor) + notehead_h + y_pad
+                ledger_notes = [
+                    n
+                    for n in chord_items
+                    if int(_item_get(n, 'pitch', 0) or 0) < stave_low_key
+                    or int(_item_get(n, 'pitch', 0) or 0) > stave_high_key
+                ]
+                if not ledger_notes:
+                    continue
+
+                note_tops: list[float] = []
+                note_bottoms: list[float] = []
+                for n in ledger_notes:
+                    n_time = _item_get_float(n, 'time', t0)
+                    y_anchor = _time_to_y(float(n_time), t0, t1, y0, y1)
+                    # Use the rendered notehead direction, not the raw payload flag.
+                    # White auto noteheads are always down; black auto noteheads follow
+                    # default_black_above from pre-calc.
+                    spec = resolve_notehead_spec(n, default_black_above=bool(_item_get(n, 'is_up', False)))
+                    if bool(spec.is_up):
+                        note_tops.append(float(y_anchor) - float(notehead_h))
+                        note_bottoms.append(float(y_anchor))
+                    else:
+                        note_tops.append(float(y_anchor))
+                        note_bottoms.append(float(y_anchor) + float(notehead_h))
+
+                chord_outer_top = float(min(note_tops))
+                chord_outer_bottom = float(max(note_bottoms))
+                y_top = float(chord_outer_top - y_pad)
+                y_bottom = float(chord_outer_bottom + y_pad)
 
                 keys_to_draw: set[int] = set()
                 low_edge_i = _nearest_group_index_for_pitch(groups, stave_low_key)
                 high_edge_i = _nearest_group_index_for_pitch(groups, stave_high_key)
 
-                for n in chord_items:
+                for n in ledger_notes:
                     p = int(_item_get(n, 'pitch', 0) or 0)
                     if stave_low_key <= p <= stave_high_key:
                         continue

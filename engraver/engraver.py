@@ -2,6 +2,7 @@ from PySide6 import QtCore
 from datetime import datetime
 import bisect, math
 import multiprocessing as mp
+import time
 import traceback
 from ui.widgets.draw_util import DrawUtil
 from utils.CONSTANT import BE_KEYS, QUARTER_NOTE_UNIT, PIANO_KEY_AMOUNT, SHORTEST_DURATION, hex_to_rgba, BLACK_KEYS, ENGRAVER_FRACTIONAL_TEXT_SCALING_CORRECTION, SLUR_SEGMENT_COUNT
@@ -67,10 +68,15 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
     It converts the score model into page/line geometry without any Qt
     rendering calls, then records only DrawUtil primitives.
     """
+    engrave_t0 = time.perf_counter()
     score = score or {}
     layout: dict = dict(score.get('layout', {}) or {})
     base_grid: list = list(score.get('base_grid', []) or [])
     staves_raw: list = list(score.get('staves', []) or [])
+    page_time_ranges_hint: list[tuple[float, float]] = [
+        tuple(r) if isinstance(r, (list, tuple)) and len(r) >= 2 else (0.0, 0.0)
+        for r in list(score.get('_page_time_ranges', []) or [])
+    ]
 
     scale = float(layout.get('scale', 1.0) or 1.0)
     black_key_set = set(BLACK_KEYS)
@@ -281,14 +287,15 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
         starts = sorted(list(dict.fromkeys(starts)))
         if not starts:
             starts = [0.0]
-        if starts[0] > 0.0:
+        op = Operator()
+        if op.greater(starts[0], 0.0):
             starts.insert(0, 0.0)
         first_idx = int(enabled_staves[0].get('index', 0) or 0)
         first_lbs = lb_by_stave.get(first_idx, [])
         lines: list[dict] = []
         for i, t0 in enumerate(starts):
             t1 = starts[i + 1] if i + 1 < len(starts) else float(total_ticks)
-            if t1 <= t0:
+            if Operator().less_or_equal(t1, t0):
                 continue
             src = _line_break_for_time(first_lbs, t0)
             lines.append({'start': float(t0), 'end': float(t1), 'page_break': bool(src.get('page_break', False))})
@@ -299,13 +306,14 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
     def _event_in_line(event_type: str, ev, t0: float, t1: float, include_negative_prefix: bool = False) -> bool:
         ev_t = _item_get_float(ev, 'time', 0.0)
         ev_dur = _item_get_float(ev, 'duration', 0.0)
-        if include_negative_prefix and ev_t < 0.0:
+        op = Operator()
+        if include_negative_prefix and op.less(ev_t, 0.0):
             return True
         timed_spans = {'note', 'grace_note', 'slur', 'pedal', 'line'}
-        if event_type in timed_spans and ev_dur > 0.0:
+        if event_type in timed_spans and op.greater(ev_dur, 0.0):
             ev_end = ev_t + ev_dur
-            return not (ev_end <= t0 or ev_t >= t1)
-        return t0 <= ev_t < t1
+            return not (op.less_or_equal(ev_end, t0) or op.greater_or_equal(ev_t, t1))
+        return op.greater_or_equal(ev_t, t0) and op.less(ev_t, t1)
 
     def _collect_events_for_line(st_events: dict, t0: float, t1: float, include_negative_prefix: bool = False) -> dict:
         event_types = [
@@ -334,6 +342,26 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
 
         lines_raw = _build_lines(enabled_staves, total_ticks, lb_by_stave)
 
+        page_range_mode = False
+        target_page_index = max(0, int(pageno))
+        page_time_start = 0.0
+        page_time_end = 0.0
+        op = Operator()
+        if not pdf_export and op.greater_or_equal(target_page_index, 0) and op.less(target_page_index, len(page_time_ranges_hint)):
+            page_time_start, page_time_end = page_time_ranges_hint[target_page_index]
+            page_range_mode = op.greater(page_time_end, page_time_start)
+
+        def _line_overlaps_page_range(line: dict) -> bool:
+            if not page_range_mode:
+                return True
+            line_start = float(line.get('start', 0.0) or 0.0)
+            line_end = float(line.get('end', line_start) or line_start)
+            op = Operator()
+            return bool(op.greater(line_end, page_time_start) and op.less(line_start, page_time_end))
+
+        if page_range_mode:
+            lines_raw = [line for line in lines_raw if _line_overlaps_page_range(line)]
+
         y_start = float(page_top)
         y_end = float(page_h - page_bottom)
 
@@ -342,7 +370,8 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
         for si, line in enumerate(lines_raw):
             t0 = float(line.get('start', 0.0) or 0.0)
             t1 = float(line.get('end', t0) or t0)
-            include_negative_prefix = bool(si == 0 and first_line_start >= 0.0 and t0 >= 0.0)
+            op = Operator()
+            include_negative_prefix = bool(si == 0 and op.greater_or_equal(first_line_start, 0.0) and op.greater_or_equal(t0, 0.0))
             staves_system: list[dict] = []
             system_reserved_width_mm = 0.0
 
@@ -364,10 +393,11 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                     nt = _item_get_float(n, 'time', 0.0)
                     nd = _item_get_float(n, 'duration', 0.0)
                     ne = nt + nd
-                    if ne <= t0 or nt >= t1:
+                    op = Operator()
+                    if op.less_or_equal(ne, t0) or op.greater_or_equal(nt, t1):
                         continue
                     p = int(_item_get(n, 'pitch', 0) or 0)
-                    if 1 <= p <= PIANO_KEY_AMOUNT:
+                    if Operator().greater_or_equal(p, 1) and Operator().less_or_equal(p, PIANO_KEY_AMOUNT):
                         pitches.append(p)
 
                 note_low = int(min(pitches)) if pitches else clef_low_key
@@ -463,23 +493,33 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
             )
 
         available_w = float(page_w - page_left - page_right)
-        pages: list[dict] = []
-        current = {'page_index': 0, 'systems': [], 'used_width_mm': 0.0}
+        if page_range_mode:
+            total_page_count = max(len(page_time_ranges_hint), int(target_page_index) + 1)
+            pages: list[dict] = [
+                {'page_index': int(i), 'systems': [], 'used_width_mm': 0.0}
+                for i in range(total_page_count)
+            ]
+            current = pages[int(target_page_index)]
+            current['systems'] = list(measured_systems)
+            current['used_width_mm'] = float(sum(float(sys.get('system_reserved_width_mm', 0.0) or 0.0) for sys in measured_systems))
+        else:
+            pages = []
+            current = {'page_index': 0, 'systems': [], 'used_width_mm': 0.0}
 
-        for system in measured_systems:
-            if bool(system.get('page_break', False)):
-                pages.append(current)
-                current = {'page_index': len(pages), 'systems': [], 'used_width_mm': 0.0}
+            for system in measured_systems:
+                if bool(system.get('page_break', False)):
+                    pages.append(current)
+                    current = {'page_index': len(pages), 'systems': [], 'used_width_mm': 0.0}
 
-            system_w = float(system.get('system_reserved_width_mm', 0.0) or 0.0)
-            if current['systems'] and (float(current['used_width_mm']) + system_w > available_w):
-                pages.append(current)
-                current = {'page_index': len(pages), 'systems': [], 'used_width_mm': 0.0}
+                system_w = float(system.get('system_reserved_width_mm', 0.0) or 0.0)
+                if current['systems'] and (float(current['used_width_mm']) + system_w > available_w):
+                    pages.append(current)
+                    current = {'page_index': len(pages), 'systems': [], 'used_width_mm': 0.0}
 
-            current['systems'].append(system)
-            current['used_width_mm'] = float(current['used_width_mm']) + system_w
+                current['systems'].append(system)
+                current['used_width_mm'] = float(current['used_width_mm']) + system_w
 
-        pages.append(current)
+            pages.append(current)
 
         for page in pages:
             used = float(page.get('used_width_mm', 0.0) or 0.0)
@@ -494,6 +534,8 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
             rest_per_slot = (rest / float(system_count + 1)) if system_count > 0 else 0.0
 
             x_cursor = float(page_left + rest_per_slot)
+            if page_range_mode and int(page.get('page_index', 0) or 0) != int(target_page_index):
+                continue
             for sys in systems_on_page:
                 staves_sys = list(sys.get('staves', []) or [])
                 system_outer_left_mm = float(x_cursor)
@@ -547,12 +589,9 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                     events_in_line = dict(stv.get('events_in_line', {}) or {})
                     notes_src = list(events_in_line.get('note', []) or [])
                     note_rule = str(layout.get('black_note_rule', 'above_stem') or 'above_stem')
-                    note_refs: list[dict] = []
-                    for ni, nraw in enumerate(notes_src):
-                        nt = _item_get_float(nraw, 'time', t0)
-                        pitch = int(_item_get(nraw, 'pitch', 41) or 41)
-                        hand = _normalize_hand(_item_get(nraw, 'hand', 'l'))
-                        note_refs.append({'idx': int(ni), 'time': nt, 'pitch': pitch, 'hand': hand, 'raw': nraw})
+                    rule_norm = str(note_rule or 'above_stem')
+                    if rule_norm == 'above_stem_if_chord_and_white_note':
+                        rule_norm = 'above_stem_if_chord_and_white_note_same_hand'
 
                     def _time_to_y_sys(ticks: float) -> float:
                         y_start = float(sys.get('y_start_mm', 0.0) or 0.0)
@@ -561,31 +600,65 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                         rel = max(0.0, min(1.0, (float(ticks) - float(t0)) / denom))
                         return float(y_start + ((y_end - y_start) * rel))
 
+                    pitches_by_time: dict[float, set[int]] = {}
+                    white_pitches_by_time_hand: dict[tuple[float, str], set[int]] = {}
                     note_draw_items: list[dict] = []
-                    for nref in note_refs:
-                        nraw = nref.get('raw', {})
-                        pitch = int(nref.get('pitch', 41) or 41)
-                        nt = _item_get_float(nref, 'time', t0)
-                        hand = _normalize_hand(nref.get('hand', 'l'))
+                    for nraw in notes_src:
+                        nt = _item_get_float(nraw, 'time', t0)
+                        tk = round(float(nt), 6)
+                        pitch = int(_item_get(nraw, 'pitch', 41) or 41)
+                        hand = _normalize_hand(_item_get(nraw, 'hand', 'l'))
                         x_note = _key_to_x(pitch)
                         y_note = _time_to_y_sys(nt)
-                        default_black_above = bool(_black_note_above_stem(nref, note_rule, note_refs))
+
+                        pitches_by_time.setdefault(float(tk), set()).add(int(pitch))
+                        if int(pitch) not in black_key_set:
+                            white_pitches_by_time_hand.setdefault((float(tk), hand), set()).add(int(pitch))
+
+                        # Default/common mode can resolve direction in this single pass.
+                        is_up = True if rule_norm == 'above_stem' else False
                         note_draw_items.append(
                             {
                                 'id': int(_item_get(nraw, '_id', 0) or 0),
                                 'x_mm': float(x_note),
                                 'y_mm': float(y_note),
                                 'time': float(nt),
+                                'time_key': float(tk),
                                 'duration': _item_get_float(nraw, 'duration', 0.0),
                                 'pitch': int(pitch),
                                 'hand': hand,
-                                'is_up': bool(default_black_above),
+                                'is_up': bool(is_up),
                                 'notehead': str(_item_get(nraw, 'notehead', 'auto') or 'auto'),
                                 'beam': bool(_item_get(nraw, 'beam', False)),
                                 'continuation_dot': bool(_item_get(nraw, 'continuation_dot', False)),
                                 'stop_symbol': bool(_item_get(nraw, 'stop_symbol', False)),
                             }
                         )
+
+                    def _default_black_above_fast(item: dict) -> bool:
+                        if rule_norm == 'above_stem':
+                            return True
+                        tk = float(item.get('time_key', round(float(item.get('time', 0.0) or 0.0), 6)))
+                        p0 = int(item.get('pitch', 0) or 0)
+                        if rule_norm == 'above_stem_if_collision':
+                            tp = pitches_by_time.get(tk, set())
+                            return (int(p0 - 1) in tp) or (int(p0 + 1) in tp)
+                        if rule_norm != 'above_stem_if_chord_and_white_note_same_hand':
+                            return False
+                        h0 = _normalize_hand(item.get('hand', 'l'))
+                        whites = white_pitches_by_time_hand.get((tk, h0), set())
+                        if not whites:
+                            return False
+                        if len(whites) > 1:
+                            return True
+                        return next(iter(whites)) != p0
+
+                    if rule_norm != 'above_stem':
+                        for it in note_draw_items:
+                            it['is_up'] = bool(_default_black_above_fast(it))
+
+                    for it in note_draw_items:
+                        it.pop('time_key', None)
 
                     # Group notes per hand by time-equality (thresholded) so
                     # downstream drawers can treat simultaneous notes as chords.
@@ -667,6 +740,18 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
             page['over_space_mm'] = over
             page['rest_space_per_slot_mm'] = rest_per_slot
 
+        page_time_ranges: list[tuple[float, float]] = []
+        for page in pages:
+            starts: list[float] = []
+            ends: list[float] = []
+            for system in list(page.get('systems', []) or []):
+                starts.append(float(system.get('time_start', 0.0) or 0.0))
+                ends.append(float(system.get('time_end', 0.0) or 0.0))
+            if starts and ends:
+                page_time_ranges.append((float(min(starts)), float(max(ends))))
+            else:
+                page_time_ranges.append((0.0, 0.0))
+
         return {
             'page_width_mm': float(page_w),
             'page_height_mm': float(page_h),
@@ -677,14 +762,27 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
             'layout': dict(layout),
             'base_grid': list(base_grid),
             'pages': pages,
+            'page_time_ranges': page_time_ranges,
+            'page_range_mode': bool(page_range_mode),
+            'target_page_index': int(target_page_index),
         }
 
-    def _draw(precalc: dict) -> None:
+    def _draw(precalc: dict) -> dict[str, float]:
         page_w = float(precalc.get('page_width_mm', 210.0) or 210.0)
         page_h = float(precalc.get('page_height_mm', 297.0) or 297.0)
         pages = list(precalc.get('pages', []) or [])
         layout_ctx = dict(precalc.get('layout', {}) or {})
         base_grid_ctx = list(precalc.get('base_grid', []) or [])
+        page_time_ranges = list(precalc.get('page_time_ranges', []) or [])
+        render_target_only = bool(precalc.get('page_range_mode', False))
+        target_page_index = max(0, int(precalc.get('target_page_index', 0) or 0))
+
+        drawer_times: dict[str, float] = {
+            'stave_drawer': 0.0,
+            'note_drawer': 0.0,
+            'beam_drawer': 0.0,
+            'grid_drawer': 0.0,
+        }
 
         notation_rgb = Style.get_notation_color()
         notation_color = (
@@ -706,9 +804,16 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
 
         du._pages = []
         du._current_index = -1
+        total_page_count = max(1, len(pages))
+
+        for _ in range(total_page_count):
+            du.new_page(page_w, page_h)
+        current_target = max(0, min(int(target_page_index), total_page_count - 1))
+        du.set_current_page(current_target)
 
         for page in pages:
-            du.new_page(page_w, page_h)
+            page_index = int(page.get('page_index', 0) or 0)
+            du.set_current_page(page_index)
             du.add_rectangle(
                 0.0,
                 0.0,
@@ -733,6 +838,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                     'layout': layout_ctx,
                     'base_grid': base_grid_ctx,
                     'notation_color': notation_color,
+                    'paper_color': paper_color,
                     'page': page,
                     'system': system,
                     'y0': y0,
@@ -742,10 +848,24 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                     'system_content_left_mm': cx0,
                     'system_content_width_mm': cw0,
                 }
+                if render_target_only and page_index != int(current_target):
+                    continue
+
+                t_drawer = time.perf_counter()
                 stave_drawer(du, drawer_payload)
+                drawer_times['stave_drawer'] += float(time.perf_counter() - t_drawer)
+
+                t_drawer = time.perf_counter()
                 note_drawer(du, drawer_payload)
+                drawer_times['note_drawer'] += float(time.perf_counter() - t_drawer)
+
+                t_drawer = time.perf_counter()
                 beam_drawer(du, drawer_payload)
+                drawer_times['beam_drawer'] += float(time.perf_counter() - t_drawer)
+
+                t_drawer = time.perf_counter()
                 grid_drawer(du, drawer_payload)
+                drawer_times['grid_drawer'] += float(time.perf_counter() - t_drawer)
                 # grid_band_drawer(du, drawer_payload)
                 # count_line_drawer(du, drawer_payload)
                 # time_signature_drawer(du, drawer_payload)
@@ -759,13 +879,31 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                 # grace_note_drawer(du, drawer_payload)
 
         if du.page_count() > 0:
-            try:
-                du.set_current_page(max(0, min(int(pageno), du.page_count() - 1)))
-            except Exception:
-                pass
+            du.set_current_page(max(0, min(int(pageno), du.page_count() - 1)))
 
+        du.page_time_ranges = list(page_time_ranges)
+
+        return drawer_times
+
+    t_pre = time.perf_counter()
     pre_calculated = _pre_calculate()
-    _draw(pre_calculated)
+    pre_calculate_s = float(time.perf_counter() - t_pre)
+
+    t_draw = time.perf_counter()
+    drawer_times = _draw(pre_calculated)
+    draw_total_s = float(time.perf_counter() - t_draw)
+
+    engrave_total_s = float(time.perf_counter() - engrave_t0)
+    print(
+        "[engraver timing] "
+        f"pre_calculate={pre_calculate_s:.4f}s "
+        f"draw_total={draw_total_s:.4f}s "
+        f"stave={drawer_times.get('stave_drawer', 0.0):.4f}s "
+        f"note={drawer_times.get('note_drawer', 0.0):.4f}s "
+        f"beam={drawer_times.get('beam_drawer', 0.0):.4f}s "
+        f"grid={drawer_times.get('grid_drawer', 0.0):.4f}s "
+        f"total={engrave_total_s:.4f}s"
+    )
 
 
 def _engrave_worker(score: dict, request_id: int, pageno: int, out_conn) -> None:
@@ -823,6 +961,10 @@ class Engraver(QtCore.QObject):
         self._delay_timer.setSingleShot(True)
         self._delay_timer.timeout.connect(self._maybe_start_pending)
         self.analysis: Analysis | None = None
+        self._request_enqueued_at: dict[int, float] = {}
+        self._request_started_at: dict[int, float] = {}
+        self._request_recv_cost_s: dict[int, float] = {}
+        self._page_time_ranges: list[tuple[float, float]] = []
 
     def _close_result_pipe(self) -> None:
         if self._result_send is not None:
@@ -844,6 +986,7 @@ class Engraver(QtCore.QObject):
                 pageno = 0
         self._latest_request_id += 1
         req_id = int(self._latest_request_id)
+        self._request_enqueued_at[req_id] = float(time.perf_counter())
         # If currently running, just replace the pending request
         if self._running:
             self._pending_score = dict(score or {})
@@ -888,15 +1031,22 @@ class Engraver(QtCore.QObject):
     def _start_task(self, score: dict, pageno: int, request_id: int) -> None:
         """Start a new process to engrave the given score.
 
-        Problem solved: terminate stale workers before launching a new one.
+        Problem solved: keep engraving requests serialized so page windows can
+        be built from prior results without preempting the active worker.
         """
-        self._running = True
-        self._last_start_ms = int(self._elapsed.elapsed())
+        if self._proc is not None and self._proc.is_alive():
+            # Never preempt the active worker in the page-windowed plan.
+            # The request remains pending and will start after completion.
+            self._pending_score = dict(score or {})
+            self._pending_pageno = int(pageno)
+            self._pending_request_id = int(request_id)
+            return
         if self._proc is not None:
-            if self._proc.is_alive():
-                self._proc.terminate()
             self._proc.join(timeout=0.1)
             self._proc = None
+        self._running = True
+        self._last_start_ms = int(self._elapsed.elapsed())
+        self._request_started_at[int(request_id)] = float(time.perf_counter())
         self._close_result_pipe()
         self._result_recv, self._result_send = self._mp_ctx.Pipe(duplex=False)
         self._proc = self._mp_ctx.Process(
@@ -928,7 +1078,9 @@ class Engraver(QtCore.QObject):
                 has_result = False
             if has_result:
                 try:
+                    recv_t0 = time.perf_counter()
                     payload = self._result_recv.recv()
+                    recv_s = float(time.perf_counter() - recv_t0)
                 except (EOFError, OSError):
                     pass
                 else:
@@ -937,9 +1089,11 @@ class Engraver(QtCore.QObject):
                     kind = str(payload[0]) if isinstance(payload, tuple) and payload else 'ok'
                     if kind == 'ok':
                         _kind, req_id, result_du = payload
+                        self._request_recv_cost_s[int(req_id)] = float(recv_s)
                         self._on_finished(req_id, result_du)
                     else:
                         _kind, req_id, error_text, error_details = payload
+                        self._request_recv_cost_s[int(req_id)] = float(recv_s)
                         self._on_failed(req_id, str(error_text), str(error_details))
 
         if self._proc is not None and not self._proc.is_alive():
@@ -980,6 +1134,22 @@ class Engraver(QtCore.QObject):
 
     @QtCore.Slot(int, object)
     def _on_finished(self, request_id: int, result_du: DrawUtil) -> None:
+        rid = int(request_id)
+        now = float(time.perf_counter())
+        enqueued_at = self._request_enqueued_at.pop(rid, None)
+        started_at = self._request_started_at.pop(rid, None)
+        recv_cost_s = float(self._request_recv_cost_s.pop(rid, 0.0) or 0.0)
+        queue_s = max(0.0, (started_at - enqueued_at)) if (enqueued_at is not None and started_at is not None) else 0.0
+        run_and_transfer_s = max(0.0, now - started_at) if started_at is not None else 0.0
+        end_to_end_s = max(0.0, now - enqueued_at) if enqueued_at is not None else 0.0
+        print(
+            "[engraver e2e] "
+            f"request={rid} "
+            f"queue={queue_s:.4f}s "
+            f"run_and_transfer={run_and_transfer_s:.4f}s "
+            f"ipc_recv={recv_cost_s:.4f}s "
+            f"end_to_end={end_to_end_s:.4f}s"
+        )
         # Called on worker completion; schedule next or emit signal
         self._running = False
         if self._pending_score is not None:
@@ -993,10 +1163,15 @@ class Engraver(QtCore.QObject):
             self.analysis = getattr(result_du, 'analysis', None)
             self._du.analysis = self.analysis
             self._du.print_time_map = getattr(result_du, 'print_time_map', [])
+            self._page_time_ranges = list(getattr(result_du, 'page_time_ranges', []) or [])
             self.engraved.emit()
 
     @QtCore.Slot(int, str, str)
     def _on_failed(self, request_id: int, error_text: str, error_details: str) -> None:
+        rid = int(request_id)
+        self._request_enqueued_at.pop(rid, None)
+        self._request_started_at.pop(rid, None)
+        self._request_recv_cost_s.pop(rid, None)
         self._running = False
         if self._pending_score is not None:
             self._maybe_start_pending()

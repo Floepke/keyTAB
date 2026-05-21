@@ -80,8 +80,15 @@ def grid_drawer(du: DrawUtil, pre_calc: dict) -> None:
     system_composite_scale = max([float(st.get('composite_scale', 1.0) or 1.0) for st in staves] or [1.0])
     system_semitone_mm = max([float(st.get('semitone_mm', 1.0) or 1.0) for st in staves] or [1.0])
     beam_visible = bool(layout.get('beam_visible', True))
+    barline_visible = bool(layout.get('barline_visible', True))
+    grid_line_visible = bool(layout.get('grid_line_visible', True))
+    measure_numbers_visible = bool(layout.get('measure_numbers_visible', True))
     barline_w = max(0.01, float(layout.get('grid_barline_thickness_mm', 0.1) or 0.1) * system_composite_scale)
     grid_w = max(0.01, float(layout.get('grid_gridline_thickness_mm', 0.15) or 0.15) * system_composite_scale)
+    grid_dash = [
+        max(0.01, float(d) * system_composite_scale)
+        for d in list(layout.get('grid_gridline_dash_pattern_mm', [0.8, 0.8]) or [0.8, 0.8])
+    ]
 
     # Collision geometry parameters (ported from editor logic, adapted to pre-calc notes).
     note_head_half_w = float(system_semitone_mm) * float(layout.get('note_width_scaling', 0.75) or 0.75)
@@ -102,27 +109,65 @@ def grid_drawer(du: DrawUtil, pre_calc: dict) -> None:
 
     barline_times, grid_times, measure_numbers = _build_grid_times(base_grid)
     barline_keys = {round(float(t), 6) for t in barline_times}
+    query_tick_values = sorted(
+        list(
+            dict.fromkeys(
+                [round(float(t), 6) for t in list(grid_times or [])]
+                + [round(float(t), 6) for t in list(barline_times or [])]
+            )
+        )
+    )
+    query_tick_set = set(query_tick_values)
 
     def _norm_hand(v: str) -> str:
         return 'l' if str(v or 'l') == 'l' else 'r'
 
-    notes_view: list[dict] = []
+    notes_at_tick: dict[float, list[dict]] = {}
+    chord_span_at_tick_hand: dict[tuple[float, str], tuple[float, float]] = {}
     beam_groups_view: list[dict] = []
     stem_segments_view: list[dict] = []
     for stv in staves:
-        items = [dict(n or {}) for n in list(stv.get('note_draw_items', []) or []) if isinstance(n, dict)]
+        items = [n for n in list(stv.get('note_draw_items', []) or []) if isinstance(n, dict)]
         if not items:
-            print("No note items for stave, skipping grid collision checks.")
-            return
+            continue
         for n in items:
-            n['hand'] = _norm_hand(str(_item_get(n, 'hand', 'l') or 'l'))
-            notes_view.append(n)
+            nt = round(float(_item_get(n, 'time', 0.0) or 0.0), 6)
+            notes_at_tick.setdefault(nt, []).append(n)
+            hand = _norm_hand(str(_item_get(n, 'hand', 'l') or 'l'))
+            x_note = float(_item_get(n, 'x_mm', x_left) or x_left)
+            chord_key = (nt, hand)
+            span = chord_span_at_tick_hand.get(chord_key)
+            if span is None:
+                chord_span_at_tick_hand[chord_key] = (x_note, x_note)
+            else:
+                chord_span_at_tick_hand[chord_key] = (min(span[0], x_note), max(span[1], x_note))
         for seg in list(stv.get('stem_segments', []) or []):
             if isinstance(seg, dict):
                 stem_segments_view.append(seg)
         for grp in list(stv.get('beam_groups', []) or []):
             if isinstance(grp, dict):
                 beam_groups_view.append(grp)
+
+    beam_segments_by_tick: dict[float, list[dict]] = {}
+    beam_connect_segments_by_tick: dict[float, list[dict]] = {}
+    if query_tick_values and beam_groups_view:
+        eps = float(barline_time_eps)
+        for seg in beam_groups_view:
+            bs0 = float(_item_get(seg, 't_start', 0.0) or 0.0)
+            bs1 = float(_item_get(seg, 't_end', 0.0) or 0.0)
+            lo_t = float(min(bs0, bs1) - eps)
+            hi_t = float(max(bs0, bs1) + eps)
+            lo_i = bisect.bisect_left(query_tick_values, lo_t)
+            hi_i = bisect.bisect_right(query_tick_values, hi_t)
+            for i_tick in range(lo_i, hi_i):
+                tk = float(query_tick_values[i_tick])
+                beam_segments_by_tick.setdefault(tk, []).append(seg)
+            for conn in list(_item_get(seg, 'connect_segments', []) or []):
+                if not isinstance(conn, dict):
+                    continue
+                c_tk = round(float(_item_get(conn, 'time', 0.0) or 0.0), 6)
+                if c_tk in query_tick_set:
+                    beam_connect_segments_by_tick.setdefault(float(c_tk), []).append(conn)
 
     def _merge_intervals(intervals: list[tuple[float, float]]) -> list[tuple[float, float]]:
         if not intervals:
@@ -146,19 +191,16 @@ def grid_drawer(du: DrawUtil, pre_calc: dict) -> None:
                 merged.append((a, b))
         return merged
 
-    notes_at_tick: dict[float, list[dict]] = {}
-    for n in notes_view:
-        nt = round(float(_item_get(n, 'time', 0.0) or 0.0), 6)
-        notes_at_tick.setdefault(nt, []).append(n)
-
-    chord_span_at_tick_hand: dict[tuple[float, str], tuple[float, float]] = {}
+    # Keep chord spans only for actual chords (>= 2 notes in same hand/tick).
+    chord_counts: dict[tuple[float, str], int] = {}
     for tick_key, tick_notes in notes_at_tick.items():
-        for chord_hand_key in ('l', 'r'):
-            chord_notes = [n for n in tick_notes if _norm_hand(str(_item_get(n, 'hand', 'l') or 'l')) == chord_hand_key]
-            if len(chord_notes) < 2:
-                continue
-            xs = [float(_item_get(n, 'x_mm', x_left) or x_left) for n in chord_notes]
-            chord_span_at_tick_hand[(tick_key, chord_hand_key)] = (float(min(xs)), float(max(xs)))
+        for n in tick_notes:
+            hand = _norm_hand(str(_item_get(n, 'hand', 'l') or 'l'))
+            key = (tick_key, hand)
+            chord_counts[key] = int(chord_counts.get(key, 0)) + 1
+    chord_span_at_tick_hand = {
+        k: v for k, v in chord_span_at_tick_hand.items() if int(chord_counts.get(k, 0)) >= 2
+    }
 
     barline_cut_cache: dict[float, list[tuple[float, float]]] = {}
 
@@ -177,8 +219,10 @@ def grid_drawer(du: DrawUtil, pre_calc: dict) -> None:
                 )
             )
 
+        tick_notes = notes_at_tick.get(tick_key, [])
+
         if beam_visible:
-            for n in notes_at_tick.get(tick_key, []):
+            for n in tick_notes:
                 x_note = float(_item_get(n, 'x_mm', x_left) or x_left)
                 hand_key = _norm_hand(str(_item_get(n, 'hand', 'l') or 'l'))
                 x_tip = x_note - stem_len_mm if hand_key == 'l' else x_note + stem_len_mm
@@ -218,62 +262,39 @@ def grid_drawer(du: DrawUtil, pre_calc: dict) -> None:
                     )
                 )
 
-        # Two beam-cut modes:
-        # - beam hidden: no beam cuts (only notehead + real stem-segment cuts above).
-        # - beam visible: cut around actual beam/stem extents used for drawing.
-        beam_collision_pad = max(0.2, float(layout.get('beam_thickness_mm', 1.0) or 1.0) * system_composite_scale * 0.7)
-        beam_line_half_visible = max(0.05, float(layout.get('beam_thickness_mm', 1.0) or 1.0) * system_composite_scale * 0.5)
-        beam_stem_half_visible = max(0.05, float(layout.get('note_stem_thickness_mm', 0.5) or 0.5) * system_composite_scale * 0.5)
-        visible_extra_pad = max(0.0, float(system_semitone_mm) * 0.1)
-        for seg in beam_groups_view:
-            bs0 = float(_item_get(seg, 't_start', 0.0) or 0.0)
-            bs1 = float(_item_get(seg, 't_end', 0.0) or 0.0)
-            if not _barline_time_in_range(float(ticks), bs0, bs1):
-                continue
-            dt = float(bs1 - bs0)
-            if abs(dt) <= 1e-9:
-                continue
-            ratio = (float(ticks) - bs0) / dt
-            seg_x1 = float(_item_get(seg, 'x1_mm', 0.0) or 0.0)
-            seg_x2 = float(_item_get(seg, 'x2_mm', 0.0) or 0.0)
-            x_on_beam = float(seg_x1) + ratio * (float(seg_x2) - float(seg_x1))
-            if beam_visible:
+        # Beam cuts are only needed while beams are visible.
+        if beam_visible:
+            beam_line_half_visible = max(0.05, float(layout.get('beam_thickness_mm', 1.0) or 1.0) * system_composite_scale * 0.5)
+            beam_stem_half_visible = max(0.05, float(layout.get('note_stem_thickness_mm', 0.5) or 0.5) * system_composite_scale * 0.5)
+            visible_extra_pad = max(0.0, float(system_semitone_mm) * 0.1)
+            for seg in beam_segments_by_tick.get(tick_key, []):
+                bs0 = float(_item_get(seg, 't_start', 0.0) or 0.0)
+                bs1 = float(_item_get(seg, 't_end', 0.0) or 0.0)
+                if not _barline_time_in_range(float(ticks), bs0, bs1):
+                    continue
+                dt = float(bs1 - bs0)
+                if abs(dt) <= 1e-9:
+                    continue
+                ratio = (float(ticks) - bs0) / dt
+                seg_x1 = float(_item_get(seg, 'x1_mm', 0.0) or 0.0)
+                seg_x2 = float(_item_get(seg, 'x2_mm', 0.0) or 0.0)
+                x_on_beam = float(seg_x1) + ratio * (float(seg_x2) - float(seg_x1))
                 seg_hand = _norm_hand(str(_item_get(seg, 'hand', 'l') or 'l'))
                 if seg_hand == 'r':
                     x_on_beam += float(system_semitone_mm)
                 else:
                     x_on_beam -= float(system_semitone_mm)
                 beam_pad = float(beam_line_half_visible + visible_extra_pad)
-                beam_gap = 0.0
-            else:
-                beam_pad = float(beam_collision_pad)
-                beam_gap = float(barline_symbol_gap_mm)
-            intervals.append(
-                (
-                    x_on_beam - beam_pad - beam_gap,
-                    x_on_beam + beam_pad + beam_gap,
-                )
-            )
-            for conn in list(_item_get(seg, 'connect_segments', []) or []):
-                if not isinstance(conn, dict):
-                    continue
+                intervals.append((x_on_beam - beam_pad, x_on_beam + beam_pad))
+
+            for conn in beam_connect_segments_by_tick.get(tick_key, []):
                 c_t = float(_item_get(conn, 'time', 0.0) or 0.0)
                 if not _barline_time_eq(float(c_t), float(ticks)):
                     continue
                 c_x0 = float(_item_get(conn, 'x0_mm', 0.0) or 0.0)
                 c_x1 = float(_item_get(conn, 'x1_mm', 0.0) or 0.0)
-                if beam_visible:
-                    conn_pad = float(beam_stem_half_visible + visible_extra_pad)
-                    conn_gap = 0.0
-                else:
-                    conn_pad = float(beam_collision_pad)
-                    conn_gap = float(barline_symbol_gap_mm)
-                intervals.append(
-                    (
-                        c_x0 - conn_pad - conn_gap,
-                        c_x1 + conn_pad + conn_gap,
-                    )
-                )
+                conn_pad = float(beam_stem_half_visible + visible_extra_pad)
+                intervals.append((c_x0 - conn_pad, c_x1 + conn_pad))
 
         merged = _merge_intervals(intervals)
         barline_cut_cache[tick_key] = merged
@@ -320,48 +341,51 @@ def grid_drawer(du: DrawUtil, pre_calc: dict) -> None:
             )
 
     # Sub-grid lines, excluding primary barline layer times.
-    for t in grid_times:
-        if round(float(t), 6) in barline_keys:
-            continue
-        if not _in_system(float(t)):
-            continue
-        y = _time_to_y(float(t), t0, t1, y0, y1)
-        cuts = _barline_cut_intervals(float(t))
-        _draw_line_around_chords(float(y), cuts, float(grid_w), ['grid_line'], dash_pattern=[0.8, 0.8])
+    if grid_line_visible:
+        for t in grid_times:
+            if round(float(t), 6) in barline_keys:
+                continue
+            if not _in_system(float(t)):
+                continue
+            y = _time_to_y(float(t), t0, t1, y0, y1)
+            cuts = _barline_cut_intervals(float(t))
+            _draw_line_around_chords(float(y), cuts, float(grid_w), ['grid_line'], dash_pattern=grid_dash)
 
     # Barlines connect the full green content rectangle width.
-    for i, t in enumerate(barline_times):
-        if not _in_system(float(t)):
-            continue
-        y = _time_to_y(float(t), t0, t1, y0, y1)
-        is_last = i == (len(barline_times) - 1)
-        cuts = _barline_cut_intervals(float(t))
-        _draw_line_around_chords(
-            float(y),
-            cuts,
-            (float(barline_w) * 2.0) if is_last else float(barline_w),
-            ['end_barline' if is_last else 'barline'],
-        )
+    if barline_visible:
+        for i, t in enumerate(barline_times):
+            if not _in_system(float(t)):
+                continue
+            y = _time_to_y(float(t), t0, t1, y0, y1)
+            is_last = i == (len(barline_times) - 1)
+            cuts = _barline_cut_intervals(float(t))
+            _draw_line_around_chords(
+                float(y),
+                cuts,
+                (float(barline_w) * 2.0) if is_last else float(barline_w),
+                ['end_barline' if is_last else 'barline'],
+            )
 
     # Measure numbering at right side of the system for visible starts.
-    for t in barline_times[:-1]:
-        if not _in_system(float(t)):
-            continue
-        # Avoid duplicate labels on shared boundaries: the next system will
-        # render the label at its start (same time value).
-        if op.eq(float(t), float(t1)):
-            continue
-        key = round(float(t), 6)
-        if key not in measure_numbers:
-            continue
-        y = _time_to_y(float(t), t0, t1, y0, y1)
-        du.add_text(
-            x_right + 0.8,
-            y + 0.1,
-            str(int(measure_numbers[key])),
-            family='Edwin',
-            size_pt=8.5,
-            color=notation_color,
-            anchor='w',
-            tags=['measure_number'],
-        )
+    if measure_numbers_visible:
+        for t in barline_times[:-1]:
+            if not _in_system(float(t)):
+                continue
+            # Avoid duplicate labels on shared boundaries: the next system will
+            # render the label at its start (same time value).
+            if op.eq(float(t), float(t1)):
+                continue
+            key = round(float(t), 6)
+            if key not in measure_numbers:
+                continue
+            y = _time_to_y(float(t), t0, t1, y0, y1)
+            du.add_text(
+                x_right + 0.8,
+                y + 0.1,
+                str(int(measure_numbers[key])),
+                family='Edwin',
+                size_pt=8.5,
+                color=notation_color,
+                anchor='w',
+                tags=['measure_number'],
+            )

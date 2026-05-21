@@ -1,11 +1,8 @@
 from __future__ import annotations
+
 import bisect
 
-from symbol_design.noteheads import (
-    normalize_notehead_literal,
-    resolve_notehead_spec,
-    sheared_notehead_outline_points,
-)
+from symbol_design.noteheads import Notehead
 from ui.widgets.draw_util import DrawUtil
 from utils.CONSTANT import BLACK_KEYS, QUARTER_NOTE_UNIT, SHORTEST_DURATION
 from utils.operator import Operator
@@ -62,52 +59,58 @@ def _pitch_to_x(pitch: int, stv: dict) -> float:
 
 def _draw_notehead(
     du: DrawUtil,
+    layout: dict,
     x: float,
     y: float,
     semitone_mm: float,
+    note_id: int,
     hand: str,
     is_up: bool,
     literal: str,
     pitch: int,
-    width_scale: float,
-    height_scale: float,
-    base_tilt: float,
     outline_width_mm: float,
     notation_color: tuple[float, float, float, float],
+    paper_color: tuple[float, float, float, float],
+    notehead_cache: dict | None = None,
 ) -> None:
-    normalized = normalize_notehead_literal(literal)
-    spec = resolve_notehead_spec(
-        {'notehead': normalized, 'pitch': int(pitch), 'hand': str(hand)},
-        default_black_above=bool(is_up),
+    note_payload = {
+        'notehead': str(literal or 'auto'),
+        'pitch': int(pitch),
+        'hand': str(hand),
+    }
+    cache_key = (
+        str(note_payload['notehead']),
+        int(note_payload['pitch']),
+        str(note_payload['hand']),
+        bool(is_up),
+        round(float(max(0.2, float(semitone_mm))), 6),
+        round(float(max(0.05, float(outline_width_mm))), 6),
+        int(id(layout)),
     )
-    if str(spec.form) == 'x':
-        r = max(0.2, float(semitone_mm) * 0.55)
-        du.add_line(x - r, y - r, x + r, y + r, color=notation_color, width_mm=max(0.05, float(outline_width_mm)), tags=['notehead_black'])
-        du.add_line(x - r, y + r, x + r, y - r, color=notation_color, width_mm=max(0.05, float(outline_width_mm)), tags=['notehead_black'])
-        return
-
-    points = sheared_notehead_outline_points(
-        hand=hand,
-        is_up=bool(spec.is_up),
-        semitone_space_mm=max(0.2, float(semitone_mm)),
-        width_scale=max(0.05, float(width_scale)),
-        height_scale=max(0.1, float(height_scale)),
-        base_tilt=max(-1.0, min(1.0, float(base_tilt))),
-        sample_count=48,
-    )
-    abs_points = [(float(x + px), float(y + py)) for px, py in points]
-    filled = bool(spec.filled)
-    du.add_polygon(
-        abs_points,
-        stroke_color=notation_color,
-        stroke_width_mm=max(0.05, float(outline_width_mm)),
-        fill_color=notation_color if filled else None,
-        tags=['notehead_black' if filled else 'notehead_white'],
-    )
+    notehead = None
+    if isinstance(notehead_cache, dict):
+        notehead = notehead_cache.get(cache_key)
+    if notehead is None:
+        notehead = Notehead.from_note(
+            x_mm=0.0,
+            y_mm=0.0,
+            note=note_payload,
+            layout=layout,
+            semitone_space_mm=float(max(0.2, float(semitone_mm))),
+            notation_color=notation_color,
+            paper_color=paper_color,
+            default_black_above=bool(is_up),
+            outline_width_mm_override=max(0.05, float(outline_width_mm)),
+        )
+        if isinstance(notehead_cache, dict):
+            notehead_cache[cache_key] = notehead
+    notehead.x_mm = float(x)
+    notehead.y_mm = float(y)
+    tag = 'notehead_black' if bool(getattr(notehead, 'filled', False)) else 'notehead_white'
+    notehead.draw_notehead(du, item_id=int(note_id), tags=[tag], use_custom_color=False)
 
 
 def note_drawer(du: DrawUtil, pre_calc: dict) -> None:
-    """Draw notehead + stem + beam + continuation dot + stop symbol from precalculated payload."""
     system = dict(pre_calc.get('system', {}) or {})
     layout = dict(pre_calc.get('layout', {}) or {})
     y0 = float(pre_calc.get('y0', 0.0) or 0.0)
@@ -115,13 +118,18 @@ def note_drawer(du: DrawUtil, pre_calc: dict) -> None:
     t0 = float(system.get('time_start', 0.0) or 0.0)
     t1 = float(system.get('time_end', t0 + 1.0) or (t0 + 1.0))
     notation_color = tuple(pre_calc.get('notation_color', (0.0, 0.0, 0.0, 1.0)) or (0.0, 0.0, 0.0, 1.0))
+    paper_color = tuple(pre_calc.get('paper_color', (1.0, 1.0, 1.0, 1.0)) or (1.0, 1.0, 1.0, 1.0))
     op = Operator(SHORTEST_DURATION)
     barline_times = _barline_positions(list(pre_calc.get('base_grid', []) or []))
 
-    width_scale = float(layout.get('note_width_scaling', 1.0) or 1.0)
+    note_head_visible = bool(layout.get('note_head_visible', True))
+    note_stem_visible = bool(layout.get('note_stem_visible', True))
+    note_stop_visible = bool(layout.get('note_stop_visible', True))
+    dot_visible = bool(layout.get('note_continuation_dot_visible', True))
+
     height_scale = float(layout.get('notehead_height_scaling', 1.0) or 1.0)
-    # geometry.py mirrors sign by hand; using positive base makes L=+tilt, R=-tilt.
-    base_tilt = float(layout.get('notehead_tilt', 0.0) or 0.0)
+
+    notehead_cache: dict = {}
 
     for stv in list(system.get('staves', []) or []):
         events = dict(stv.get('events_in_line', {}) or {})
@@ -133,7 +141,6 @@ def note_drawer(du: DrawUtil, pre_calc: dict) -> None:
 
         draw_items = list(stv.get('note_draw_items', []) or [])
         if not draw_items:
-            # Fallback path for older pre-calc payloads.
             for n in notes:
                 pitch = int(_event_get(n, 'pitch', 41) or 41)
                 nt = _event_get_float(n, 'time', t0)
@@ -141,58 +148,72 @@ def note_drawer(du: DrawUtil, pre_calc: dict) -> None:
                     {
                         'id': int(_event_get(n, '_id', 0) or 0),
                         'x_mm': _pitch_to_x(pitch, stv),
-                        'y_mm': _time_to_y(nt, t0, t1, y0, y1),
                         'time': nt,
                         'duration': float(_event_get(n, 'duration', 0.0) or 0.0),
                         'pitch': pitch,
                         'hand': str(_event_get(n, 'hand', 'l') or 'l'),
                         'is_up': bool(_event_get(n, 'is_up', True)),
                         'notehead': str(_event_get(n, 'notehead', 'normal') or 'normal'),
-                        'beam': bool(_event_get(n, 'beam', False)),
-                        'continuation_dot': bool(_event_get(n, 'continuation_dot', False)),
-                        'stop_symbol': bool(_event_get(n, 'stop_symbol', False)),
                     }
                 )
 
+        draw_items = [n for n in draw_items if isinstance(n, dict)]
         for idx, n in enumerate(draw_items):
-            if isinstance(n, dict):
-                n.setdefault('_idx', int(idx))
+            n.setdefault('_idx', int(idx))
+            n_time = _event_get_float(n, 'time', t0)
+            n_duration = _event_get_float(n, 'duration', 0.0)
+            n_end = float(n_time + n_duration)
+            n_id = int(_event_get(n, 'id', _event_get(n, '_id', 0)) or 0)
+            n_idx = int(_event_get(n, '_idx', -1) or -1)
+            n['_time'] = float(n_time)
+            n['_duration'] = float(n_duration)
+            n['_end'] = float(n_end)
+            n['_pitch_i'] = int(_event_get(n, 'pitch', 41) or 41)
+            n['_hand_norm'] = 'l' if str(_event_get(n, 'hand', 'l') or 'l') == 'l' else 'r'
+            n['_is_up_b'] = bool(_event_get(n, 'is_up', True))
+            n['_notehead_lit'] = str(_event_get(n, 'notehead', 'normal') or 'normal')
+            n['_dot_b'] = bool(_event_get(n, 'continuation_dot', True))
+            n['_stop_b'] = bool(_event_get(n, 'stop_symbol', False))
+            n['_x'] = float(_event_get(n, 'x_mm', 0.0) or 0.0)
+            n['_id_i'] = int(n_id)
+            n['_nkey'] = ('id', n_id) if n_id != 0 else ('idx', n_idx)
 
-        starts_all = sorted(
-            [n for n in draw_items if isinstance(n, dict)],
-            key=lambda n: _event_get_float(n, 'time', 0.0),
-        )
-        starts_all_times = [_event_get_float(n, 'time', 0.0) for n in starts_all]
-
+        starts_all = sorted(draw_items, key=lambda n: float(n.get('_time', 0.0) or 0.0))
+        starts_all_times = [float(n.get('_time', 0.0) or 0.0) for n in starts_all]
+        starts_exact: dict[float, list[dict]] = {}
         starts_by_hand: dict[str, list[dict]] = {'l': [], 'r': []}
         for n in starts_all:
-            hk = 'l' if str(_event_get(n, 'hand', 'l') or 'l') == 'l' else 'r'
+            tv = float(n.get('_time', 0.0) or 0.0)
+            starts_exact.setdefault(tv, []).append(n)
+            hk = str(n.get('_hand_norm', 'l') or 'l')
             starts_by_hand[hk].append(n)
         start_times_by_hand = {
-            hk: [_event_get_float(n, 'time', 0.0) for n in arr]
+            hk: [float(n.get('_time', 0.0) or 0.0) for n in arr]
             for hk, arr in starts_by_hand.items()
         }
 
         ends_by_hand: dict[str, list[dict]] = {'l': [], 'r': []}
         end_times_by_hand: dict[str, list[float]] = {'l': [], 'r': []}
-        for hk in ('l', 'r'):
-            pairs = []
-            for n in starts_by_hand.get(hk, []):
-                st = _event_get_float(n, 'time', 0.0)
-                en = st + _event_get_float(n, 'duration', 0.0)
-                pairs.append((float(en), n))
-            pairs.sort(key=lambda p: p[0])
-            end_times_by_hand[hk] = [float(p[0]) for p in pairs]
-            ends_by_hand[hk] = [p[1] for p in pairs]
+        if dot_visible:
+            for hk in ('l', 'r'):
+                pairs: list[tuple[float, dict]] = []
+                for n in starts_by_hand.get(hk, []):
+                    pairs.append((float(n.get('_end', 0.0) or 0.0), n))
+                pairs.sort(key=lambda p: p[0])
+                end_times_by_hand[hk] = [float(p[0]) for p in pairs]
+                ends_by_hand[hk] = [p[1] for p in pairs]
 
         def _starts_at_time(ticks: float) -> list[dict]:
+            exact = starts_exact.get(float(ticks), None)
+            if exact is not None:
+                return exact
             thr = float(op.threshold)
             lo = bisect.bisect_left(starts_all_times, float(ticks) - thr)
             hi = bisect.bisect_right(starts_all_times, float(ticks) + thr)
             out: list[dict] = []
             for i in range(lo, hi):
                 n = starts_all[i]
-                if op.eq(_event_get_float(n, 'time', 0.0), float(ticks)):
+                if op.eq(float(n.get('_time', 0.0) or 0.0), float(ticks)):
                     out.append(n)
             return out
 
@@ -216,61 +237,77 @@ def note_drawer(du: DrawUtil, pre_calc: dict) -> None:
                     out.append(arr[i])
             return out
 
-        def _note_key(n: dict) -> tuple[str, int]:
-            raw_id = int(_event_get(n, 'id', _event_get(n, '_id', 0)) or 0)
-            if raw_id != 0:
-                return ('id', raw_id)
-            return ('idx', int(_event_get(n, '_idx', -1) or -1))
+        def _is_followed_by_rest_item(n: dict) -> bool:
+            hk = str(n.get('_hand_norm', 'l') or 'l')
+            end = float(n.get('_end', 0.0) or 0.0)
+            times = start_times_by_hand.get(hk, [])
+            arr = starts_by_hand.get(hk, [])
+            if not times or not arr:
+                return True
+            thr = float(op.threshold)
+            idx = bisect.bisect_left(times, float(end - thr))
+            n_key = n.get('_nkey', ('idx', -1))
+            min_delta = None
+            for j in range(idx, len(arr)):
+                m = arr[j]
+                if m.get('_nkey', ('idx', -2)) == n_key:
+                    continue
+                delta = float(float(m.get('_time', 0.0) or 0.0) - end)
+                if delta >= -thr:
+                    min_delta = delta
+                    break
+            if min_delta is None:
+                return True
+            return op.gt(float(min_delta), 0.0)
 
-        note_positions: list[tuple[float, float, dict]] = []
         for n in draw_items:
-            pitch = int(_event_get(n, 'pitch', 41) or 41)
-            hand = str(_event_get(n, 'hand', 'l') or 'l')
-            is_up = bool(_event_get(n, 'is_up', True))
-            notehead_literal = str(_event_get(n, 'notehead', 'normal') or 'normal')
-            x = float(_event_get(n, 'x_mm', 0.0) or 0.0)
-            nt = float(_event_get(n, 'time', t0) or t0)
-            nt = _event_get_float(n, 'time', t0)
-            # Keep vertical placement tied to timeline mapping, which is stable
-            # across payload schema changes.
+            pitch = int(n.get('_pitch_i', 41) or 41)
+            hand = str(n.get('_hand_norm', 'l') or 'l')
+            is_up = bool(n.get('_is_up_b', True))
+            notehead_literal = str(n.get('_notehead_lit', 'normal') or 'normal')
+            x = float(n.get('_x', 0.0) or 0.0)
+            nt = float(n.get('_time', t0) or t0)
             y = _time_to_y(nt, t0, t1, y0, y1)
+            note_end = float(n.get('_end', nt) or nt)
 
-            _draw_notehead(
-                du,
-                x,
-                y,
-                semitone_mm,
-                hand,
-                is_up,
-                notehead_literal,
-                pitch,
-                width_scale,
-                height_scale,
-                base_tilt,
-                outline_width_mm,
-                notation_color,
-            )
+            if note_head_visible:
+                _draw_notehead(
+                    du,
+                    layout,
+                    x,
+                    y,
+                    semitone_mm,
+                    int(n.get('_id_i', 0) or 0),
+                    hand,
+                    is_up,
+                    notehead_literal,
+                    pitch,
+                    outline_width_mm,
+                    notation_color,
+                    paper_color,
+                    notehead_cache,
+                )
 
-            if bool(layout.get('note_continuation_dot_visible', True)):
-                n_key = _note_key(n)
-                hand = str(_event_get(n, 'hand', 'l') or 'l')
-                start = _event_get_float(n, 'time', t0)
-                end = float(start + _event_get_float(n, 'duration', 0.0))
-                dot_pitch = int(_event_get(n, 'pitch', 0) or 0)
+            if dot_visible and bool(n.get('_dot_b', True)):
+                n_key = n.get('_nkey', ('idx', -1))
+                start = float(n.get('_time', t0) or t0)
+                end = float(note_end)
+                dot_pitch = int(n.get('_pitch_i', 0) or 0)
                 dot_times: list[float] = []
 
                 for other in _events_in_open_interval(hand, start, end, by_end=False):
-                    if _note_key(other) != n_key:
-                        dot_times.append(_event_get_float(other, 'time', 0.0))
+                    if other.get('_nkey', ('idx', -2)) != n_key:
+                        dot_times.append(float(other.get('_time', 0.0) or 0.0))
                 for other in _events_in_open_interval(hand, start, end, by_end=True):
-                    if _note_key(other) != n_key:
-                        ot = _event_get_float(other, 'time', 0.0)
-                        od = _event_get_float(other, 'duration', 0.0)
+                    if other.get('_nkey', ('idx', -2)) != n_key:
+                        ot = float(other.get('_time', 0.0) or 0.0)
+                        od = float(other.get('_duration', 0.0) or 0.0)
                         dot_times.append(float(ot + od))
 
-                for bt in barline_times:
-                    if op.gt(float(bt), start) and op.lt(float(bt), end):
-                        dot_times.append(float(bt))
+                bt_lo = bisect.bisect_right(barline_times, float(start))
+                bt_hi = bisect.bisect_left(barline_times, float(end))
+                if bt_hi > bt_lo:
+                    dot_times.extend(float(bt) for bt in barline_times[bt_lo:bt_hi])
 
                 if dot_times:
                     dot_size = max(0.05, float(layout.get('note_continuation_dot_size_mm', 2.5) or 2.5) * composite_scale)
@@ -280,14 +317,14 @@ def note_drawer(du: DrawUtil, pre_calc: dict) -> None:
                         y_center = float(_time_to_y(float(dt), t0, t1, y0, y1)) + float(notehead_center_offset_y)
                         has_adjacent_start = False
                         for other in _starts_at_time(float(dt)):
-                            if _note_key(other) == n_key:
+                            if other.get('_nkey', ('idx', -2)) == n_key:
                                 continue
-                            mp = int(_event_get(other, 'pitch', 0) or 0)
+                            mp = int(other.get('_pitch_i', 0) or 0)
                             if abs(mp - dot_pitch) != 1:
                                 continue
-                            if mp in BLACK_KEYS and bool(_event_get(other, 'is_up', False)):
+                            if mp in BLACK_KEYS and bool(other.get('_is_up_b', False)):
                                 continue
-                            other_x = float(_event_get(other, 'x_mm', x) or x)
+                            other_x = float(other.get('_x', x) or x)
                             if abs(other_x - float(x)) >= min_collision_gap:
                                 continue
                             has_adjacent_start = True
@@ -305,25 +342,38 @@ def note_drawer(du: DrawUtil, pre_calc: dict) -> None:
                             tags=['continuation_dot'],
                         )
 
-            if bool(_event_get(n, 'stop_symbol', False)):
-                r = max(0.25, semitone_mm * 0.45)
-                stop_w = max(0.05, 0.15 * composite_scale)
-                du.add_line(x - r, y - r, x + r, y + r, color=notation_color, width_mm=stop_w, tags=['stop_sign'])
-                du.add_line(x - r, y + r, x + r, y - r, color=notation_color, width_mm=stop_w, tags=['stop_sign'])
+            if note_stop_visible and bool(n.get('_stop_b', False)) and _is_followed_by_rest_item(n):
+                stop_y = float(_time_to_y(note_end, t0, t1, y0, y1))
+                stop_w = float(semitone_mm) * 1.8
+                stop_stroke_w = max(
+                    0.05,
+                    float(layout.get('note_stopsign_thickness_mm', 1.0) or 1.0) * float(composite_scale),
+                )
+                stop_points = [
+                    (float(x) - (stop_w * 0.5), float(stop_y) - float(stop_w)),
+                    (float(x), float(stop_y)),
+                    (float(x) + (stop_w * 0.5), float(stop_y) - float(stop_w)),
+                ]
+                du.add_polyline(
+                    stop_points,
+                    stroke_color=notation_color,
+                    stroke_width_mm=stop_stroke_w,
+                    id=0,
+                    tags=['stop_sign'],
+                )
 
-            note_positions.append((x, y, n))
-
-        for seg in list(stv.get('stem_segments', []) or []):
-            seg_time = float(_event_get(seg, 'time', t0) or t0)
-            seg_y = _time_to_y(seg_time, t0, t1, y0, y1)
-            du.add_line(
-                float(seg.get('x1_mm', 0.0) or 0.0),
-                float(seg_y),
-                float(seg.get('x2_mm', 0.0) or 0.0),
-                float(seg_y),
-                color=notation_color,
-                width_mm=max(0.05, float(stem_width_mm)),
-                tags=['stem'],
-            )
+        if note_stem_visible:
+            for seg in list(stv.get('stem_segments', []) or []):
+                seg_time = float(_event_get(seg, 'time', t0) or t0)
+                seg_y = _time_to_y(seg_time, t0, t1, y0, y1)
+                du.add_line(
+                    float(seg.get('x1_mm', 0.0) or 0.0),
+                    float(seg_y),
+                    float(seg.get('x2_mm', 0.0) or 0.0),
+                    float(seg_y),
+                    color=notation_color,
+                    width_mm=max(0.05, float(stem_width_mm)),
+                    tags=['stem'],
+                )
 
         # Beam rendering is centralized in beam_drawer using prepared beam_groups.
