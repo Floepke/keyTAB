@@ -2,6 +2,7 @@ from __future__ import annotations
 from typing import Callable, Optional, Tuple
 from PySide6 import QtCore, QtGui, QtWidgets
 from ui.dialogs import DialogGeometryMixin
+from ui.dialogs.style_dialog import FloatSliderEdit
 
 from utils.CONSTANT import BE_KEYS, CF_KEYS, QUARTER_NOTE_UNIT
 
@@ -159,12 +160,70 @@ class LineBreakDialog(DialogGeometryMixin, QtWidgets.QDialog):
         self._measure_grouping_text = str(getattr(self._layout, 'measure_grouping', "") or "") if self._layout is not None else ""
         self._measure_starts_mm: list[float] = self._build_measure_starts()
         self._suppress_measure_change: bool = False
+        self._suppress_stave_meta_change: bool = False
 
-        self.stave_label = QtWidgets.QLabel(self.tr("Editing stave 1 / 1"), self)
-        lay.addWidget(self.stave_label)
+        self._suppress_tab_change: bool = False
+        self.stave_tabs = QtWidgets.QTabWidget(self)
+        self._tab_pages: list[QtWidgets.QWidget] = []
+        lay.addWidget(self.stave_tabs)
 
-        list_label = QtWidgets.QLabel(self.tr("Line/Page break markers:"), self)
-        self.break_table = QtWidgets.QTableWidget(self)
+        base_color = self.palette().color(QtGui.QPalette.ColorRole.Window).name()
+        accent_color = self.palette().color(QtGui.QPalette.ColorRole.Link).name()
+        self.stave_tabs.setStyleSheet(
+            "QTabWidget::pane {"
+            f" background-color: {base_color};"
+            " border: 0px solid palette(mid);"
+            "}"
+            "QTabBar::tab {"
+            f" background-color: {base_color};"
+            "}"
+            "QTabBar::tab:selected {"
+            f" background-color: {accent_color};"
+            "}"
+        )
+
+        self._tab_content_host = QtWidgets.QWidget(self)
+        content_lay = QtWidgets.QVBoxLayout(self._tab_content_host)
+        content_lay.setContentsMargins(8, 8, 8, 8)
+        content_lay.setSpacing(8)
+        self._tab_content_host.setAutoFillBackground(True)
+        content_palette = self._tab_content_host.palette()
+        content_palette.setColor(QtGui.QPalette.ColorRole.Window, QtGui.QColor(base_color))
+        self._tab_content_host.setPalette(content_palette)
+
+        self.staves_group = QtWidgets.QGroupBox(self.tr("Staves"), self._tab_content_host)
+        staves_group_lay = QtWidgets.QVBoxLayout(self.staves_group)
+        staves_group_lay.setContentsMargins(6, 6, 6, 6)
+        staves_group_lay.setSpacing(6)
+        stave_row = QtWidgets.QHBoxLayout()
+        stave_row.setContentsMargins(0, 0, 0, 0)
+        stave_row.setSpacing(6)
+        self.stave_enabled_label = QtWidgets.QLabel(self.tr("Enabled:"), self.staves_group)
+        self.stave_enabled_cb = QtWidgets.QCheckBox(self.staves_group)
+        self.stave_name_label = QtWidgets.QLabel(self.tr("Name:"), self.staves_group)
+        self.stave_name_edit = QtWidgets.QLineEdit(self.staves_group)
+        self.stave_scale_label = QtWidgets.QLabel(self.tr("Scale:"), self.staves_group)
+        self.stave_scale_slider = FloatSliderEdit(1.0, 0.25, 3.0, 0.05, self.staves_group)
+        self.stave_scale_slider.setMinimumWidth(240)
+        self.stave_name_edit.setSizePolicy(QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Fixed)
+        self.stave_scale_slider.setSizePolicy(QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Fixed)
+        self.stave_enabled_cb.setToolTip(self.tr("Enable or disable this stave in score rendering."))
+        self.stave_name_edit.setToolTip(self.tr("Set the display name of this stave."))
+        self.stave_scale_slider.setToolTip(self.tr("Set stave scale. 1.00 means original size."))
+        stave_row.addWidget(self.stave_enabled_label)
+        stave_row.addWidget(self.stave_enabled_cb)
+        stave_row.addWidget(self.stave_name_label)
+        stave_row.addWidget(self.stave_name_edit, 1)
+        stave_row.addWidget(self.stave_scale_label)
+        stave_row.addWidget(self.stave_scale_slider, 2)
+        staves_group_lay.addLayout(stave_row)
+        content_lay.addWidget(self.staves_group)
+
+        self.break_markers_group = QtWidgets.QGroupBox(self.tr("Line/Page break markers"), self._tab_content_host)
+        break_group_lay = QtWidgets.QVBoxLayout(self.break_markers_group)
+        break_group_lay.setContentsMargins(6, 6, 6, 6)
+        break_group_lay.setSpacing(6)
+        self.break_table = QtWidgets.QTableWidget(self.break_markers_group)
         self.break_table.setColumnCount(6)
         left_label, right_label = self._margin_side_labels()
         self.break_table.setHorizontalHeaderLabels([
@@ -186,17 +245,22 @@ class LineBreakDialog(DialogGeometryMixin, QtWidgets.QDialog):
         self.break_table.horizontalHeader().setSectionResizeMode(3, QtWidgets.QHeaderView.ResizeMode.ResizeToContents)
         self.break_table.horizontalHeader().setSectionResizeMode(4, QtWidgets.QHeaderView.ResizeMode.ResizeToContents)
         self.break_table.horizontalHeader().setSectionResizeMode(5, QtWidgets.QHeaderView.ResizeMode.Stretch)
-        lay.addWidget(list_label)
-        lay.addWidget(self.break_table)
+        break_group_lay.addWidget(self.break_table)
+        content_lay.addWidget(self.break_markers_group)
+
+        self.layout_group = QtWidgets.QGroupBox(self.tr("Layout"), self)
+        layout_group_lay = QtWidgets.QVBoxLayout(self.layout_group)
+        layout_group_lay.setContentsMargins(6, 6, 6, 6)
+        layout_group_lay.setSpacing(8)
 
         quick_row = QtWidgets.QHBoxLayout()
         quick_row.setContentsMargins(0, 0, 0, 0)
         quick_row.setSpacing(6)
-        self.measure_grouping_label = QtWidgets.QLabel(self.tr("Measure Grouping:"), self)
-        self.measure_grouping_edit = QtWidgets.QLineEdit(self)
+        self.measure_grouping_label = QtWidgets.QLabel(self.tr("Measure Grouping:"), self.layout_group)
+        self.measure_grouping_edit = QtWidgets.QLineEdit(self.layout_group)
         self.measure_grouping_edit.setPlaceholderText(self.tr("e.g. 4 6 4"))
         self.measure_grouping_edit.setText(self._measure_grouping_text)
-        self.apply_grouping_btn = QtWidgets.QPushButton(self.tr("Apply Measure Grouping"), self)
+        self.apply_grouping_btn = QtWidgets.QPushButton(self.tr("Apply Measure Grouping"), self.layout_group)
         self.apply_grouping_btn.clicked.connect(self._on_apply_grouping_clicked)
 
         grouping_tip = self.tr(
@@ -214,14 +278,14 @@ class LineBreakDialog(DialogGeometryMixin, QtWidgets.QDialog):
         quick_row.addWidget(self.measure_grouping_label)
         quick_row.addWidget(self.measure_grouping_edit, 1)
         quick_row.addWidget(self.apply_grouping_btn)
-        lay.addLayout(quick_row)
+        layout_group_lay.addLayout(quick_row)
 
         bulk_row = QtWidgets.QHBoxLayout()
         bulk_row.setContentsMargins(0, 0, 0, 0)
-        bulk_row.setSpacing(6)
-        self.edit_all_left_btn = QtWidgets.QPushButton(self._edit_all_margins_button_text("left"), self)
-        self.edit_all_right_btn = QtWidgets.QPushButton(self._edit_all_margins_button_text("right"), self)
-        self.set_all_key_ranges_btn = QtWidgets.QPushButton(self.tr("Set All Key Ranges"), self)
+        bulk_row.setSpacing(8)
+        self.edit_all_left_btn = QtWidgets.QPushButton(self._edit_all_margins_button_text("left"), self.layout_group)
+        self.edit_all_right_btn = QtWidgets.QPushButton(self._edit_all_margins_button_text("right"), self.layout_group)
+        self.set_all_key_ranges_btn = QtWidgets.QPushButton(self.tr("Set All Key Ranges"), self.layout_group)
         self.edit_all_left_btn.clicked.connect(lambda: self._edit_all_margins(side="left"))
         self.edit_all_right_btn.clicked.connect(lambda: self._edit_all_margins(side="right"))
         self.set_all_key_ranges_btn.clicked.connect(self._set_all_key_ranges)
@@ -232,20 +296,30 @@ class LineBreakDialog(DialogGeometryMixin, QtWidgets.QDialog):
         bulk_row.addWidget(self.edit_all_right_btn)
         bulk_row.addWidget(self.set_all_key_ranges_btn)
         bulk_row.addStretch(1)
-        lay.addLayout(bulk_row)
+        layout_group_lay.addLayout(bulk_row)
 
         # Validation message
-        self.msg_label = QtWidgets.QLabel("", self)
+        self.msg_label = QtWidgets.QLabel("...", self.layout_group)
         pal = self.msg_label.palette()
         pal.setColor(self.msg_label.foregroundRole(), QtCore.Qt.GlobalColor.red)
         self.msg_label.setPalette(pal)
-        lay.addWidget(self.msg_label)
+        layout_group_lay.addWidget(self.msg_label)
+
+        self._init_stave_tabs()
+        layout_group_row = QtWidgets.QHBoxLayout()
+        layout_group_row.setContentsMargins(16, 0, 16, 0)
+        layout_group_row.setSpacing(0)
+        layout_group_row.addWidget(self.layout_group)
+        lay.addLayout(layout_group_row)
 
         # Buttons
         self.btns = QtWidgets.QDialogButtonBox(
             QtWidgets.QDialogButtonBox.Ok | QtWidgets.QDialogButtonBox.Cancel,
             parent=self,
         )
+        self.help_btn = QtWidgets.QPushButton(self.tr("Help"), self)
+        self.help_btn.setIcon(self.style().standardIcon(QtWidgets.QStyle.StandardPixmap.SP_DialogHelpButton))
+        self.help_btn.clicked.connect(self._show_help)
         self.btns.accepted.connect(self._on_accept_clicked)
         self.btns.rejected.connect(self.reject)
 
@@ -255,10 +329,20 @@ class LineBreakDialog(DialogGeometryMixin, QtWidgets.QDialog):
         cancel_btn = self.btns.button(QtWidgets.QDialogButtonBox.Cancel)
         if cancel_btn is not None:
             cancel_btn.setToolTip(self.tr("Discard previewed edits and close this dialog."))
-        lay.addWidget(self.btns)
+        buttons_row = QtWidgets.QHBoxLayout()
+        buttons_row.setContentsMargins(8, 8, 8, 8)
+        buttons_row.setSpacing(8)
+        buttons_row.addWidget(self.help_btn, 0)
+        buttons_row.addStretch(1)
+        buttons_row.addWidget(self.btns, 0)
+        lay.addLayout(buttons_row)
 
         self.valuesChanged.connect(self._validate_form)
         self.valuesChanged.connect(self._on_values_changed)
+
+        self.stave_enabled_cb.stateChanged.connect(self._on_stave_enabled_changed)
+        self.stave_name_edit.textChanged.connect(self._on_stave_name_changed)
+        self.stave_scale_slider.valueChanged.connect(self._on_stave_scale_changed)
 
         # Initialize
         self._reload_line_breaks(keep_row=False)
@@ -275,6 +359,56 @@ class LineBreakDialog(DialogGeometryMixin, QtWidgets.QDialog):
                 splitter.staveSelectionRequested.connect(self.set_selected_stave_index)
         except Exception:
             pass
+
+    def _stave_tab_title(self, stave_index: int) -> str:
+        default_name = self.tr("Stave {idx}").format(idx=int(stave_index) + 1)
+        stave_name = default_name
+        staves = list(getattr(self._score, 'staves', []) or []) if self._score is not None else []
+        if 0 <= int(stave_index) < len(staves):
+            candidate = str(getattr(staves[int(stave_index)], 'name', '') or '').strip()
+            if candidate:
+                stave_name = candidate
+        return self.tr("Stave {idx}: {name}").format(idx=int(stave_index) + 1, name=stave_name)
+
+    def _init_stave_tabs(self) -> None:
+        target_count = 4
+        self._tab_pages = []
+        self.stave_tabs.clear()
+        for idx in range(target_count):
+            page = QtWidgets.QWidget(self.stave_tabs)
+            page_lay = QtWidgets.QVBoxLayout(page)
+            page_lay.setContentsMargins(8, 8, 8, 8)
+            page_lay.setSpacing(0)
+            page.setAutoFillBackground(True)
+            page_palette = page.palette()
+            page_palette.setColor(QtGui.QPalette.ColorRole.Window, self.palette().color(QtGui.QPalette.ColorRole.Window))
+            page.setPalette(page_palette)
+            self._tab_pages.append(page)
+            self.stave_tabs.addTab(page, self._stave_tab_title(idx))
+        self.stave_tabs.currentChanged.connect(self._on_tab_changed)
+        current_index = max(0, min(int(self._active_stave_index), max(0, target_count - 1)))
+        self._suppress_tab_change = True
+        self.stave_tabs.setCurrentIndex(current_index)
+        self._suppress_tab_change = False
+        self._move_content_into_active_tab()
+
+    def _move_content_into_active_tab(self) -> None:
+        if not self._tab_pages:
+            return
+        idx = max(0, min(int(self._active_stave_index), len(self._tab_pages) - 1))
+        old_parent = self._tab_content_host.parentWidget()
+        if old_parent is not None and old_parent.layout() is not None:
+            old_parent.layout().removeWidget(self._tab_content_host)
+        target = self._tab_pages[idx]
+        target_lay = target.layout()
+        if target_lay is not None:
+            target_lay.addWidget(self._tab_content_host)
+
+    def _on_tab_changed(self, tab_index: int) -> None:
+        if self._suppress_tab_change:
+            return
+        self.set_selected_stave_index(int(tab_index))
+
     def _resolve_active_stave_index(self) -> int:
         if self._score is None:
             return 0
@@ -292,34 +426,129 @@ class LineBreakDialog(DialogGeometryMixin, QtWidgets.QDialog):
             return None
         staves = list(getattr(self._score, 'staves', []) or [])
         if not staves:
-            return getattr(self._score, 'events', None)
+            return None
         idx = max(0, min(self._active_stave_index, len(staves) - 1))
         stave = staves[idx]
-        return getattr(stave, 'events', None) or getattr(self._score, 'events', None)
+        return getattr(stave, 'events', None)
+
+    def _current_stave(self):
+        if self._score is None:
+            return None
+        staves = list(getattr(self._score, 'staves', []) or [])
+        if not staves:
+            return None
+        idx = max(0, min(self._active_stave_index, len(staves) - 1))
+        return staves[idx]
 
     def _current_stave_line_breaks(self) -> list[LineBreak]:
         events = self._current_stave_events()
-        return list(getattr(events, 'line_break', []) or []) if events is not None else []
+        if events is None:
+            return []
+        lst = getattr(events, 'line_break', None)
+        if isinstance(lst, list):
+            return lst
+        return []
 
-    def _update_stave_label(self) -> None:
-        total = len(getattr(self._score, 'staves', []) or []) if self._score is not None else 0
-        stave_name = self.tr("Stave {idx}").format(idx=self._active_stave_index + 1)
-        if self._score is not None:
-            staves = list(getattr(self._score, 'staves', []) or [])
-            if 0 <= self._active_stave_index < len(staves):
-                candidate = str(getattr(staves[self._active_stave_index], 'name', '') or '').strip()
-                if candidate:
-                    stave_name = candidate
-        if total <= 0:
-            self.stave_label.setText(self.tr("Editing stave: {name}").format(name=stave_name))
+    def _update_stave_tabs(self) -> None:
+        if not self._tab_pages:
             return
-        self.stave_label.setText(
-            self.tr("Editing stave {idx} / {total}: {name}").format(
-                idx=self._active_stave_index + 1,
-                total=total,
-                name=stave_name,
-            )
+        for idx in range(len(self._tab_pages)):
+            self.stave_tabs.setTabText(idx, self._stave_tab_title(idx))
+        current_index = max(0, min(int(self._active_stave_index), len(self._tab_pages) - 1))
+        if self.stave_tabs.currentIndex() != current_index:
+            self._suppress_tab_change = True
+            self.stave_tabs.setCurrentIndex(current_index)
+            self._suppress_tab_change = False
+        self._move_content_into_active_tab()
+        self._sync_stave_meta_controls()
+
+    def _sync_stave_meta_controls(self) -> None:
+        stave = self._current_stave()
+        self._suppress_stave_meta_change = True
+        try:
+            if stave is None:
+                self.stave_enabled_cb.setEnabled(False)
+                self.stave_name_edit.setEnabled(False)
+                self.stave_scale_slider.setEnabled(False)
+                self.stave_enabled_cb.setChecked(False)
+                self.stave_name_edit.setText("")
+                self.stave_scale_slider.set_value(1.0)
+                return
+            self.stave_enabled_cb.setEnabled(True)
+            self.stave_name_edit.setEnabled(True)
+            self.stave_scale_slider.setEnabled(True)
+            self.stave_enabled_cb.setChecked(bool(getattr(stave, 'enabled', True)))
+            self.stave_name_edit.setText(str(getattr(stave, 'name', '') or ''))
+            try:
+                self.stave_scale_slider.set_value(float(getattr(stave, 'scale', 1.0) or 1.0))
+            except Exception:
+                self.stave_scale_slider.set_value(1.0)
+        finally:
+            self._suppress_stave_meta_change = False
+
+    def _on_stave_enabled_changed(self, _state: int) -> None:
+        if self._suppress_stave_meta_change:
+            return
+        stave = self._current_stave()
+        if stave is None:
+            return
+        try:
+            stave.enabled = bool(self.stave_enabled_cb.isChecked())
+        except Exception:
+            return
+        self.valuesChanged.emit()
+
+    def _on_stave_name_changed(self, text: str) -> None:
+        if self._suppress_stave_meta_change:
+            return
+        stave = self._current_stave()
+        if stave is None:
+            return
+        try:
+            stave.name = str(text or "")
+        except Exception:
+            return
+        self._update_stave_tabs()
+        self.valuesChanged.emit()
+
+    def _on_stave_scale_changed(self, value: float) -> None:
+        if self._suppress_stave_meta_change:
+            return
+        stave = self._current_stave()
+        if stave is None:
+            return
+        try:
+            stave.scale = float(value)
+        except Exception:
+            return
+        self.valuesChanged.emit()
+
+    def _show_help(self) -> None:
+        title = self.tr("Line/Page Break Help")
+        text = self.tr(
+            "Use this dialog to configure both stave properties and line/page breaks.\n\n"
+            "Stave settings (top row in each tab):\n"
+            "- Enabled: include/exclude this stave in rendering.\n"
+            "- Name: rename the stave.\n"
+            "- Scale: change this stave's drawing scale (0.25 to 3.00).\n\n"
+            "Line/Page break markers:\n"
+            "- Start Measure: choose where a marker starts.\n"
+            "- Type: L for line break, P for page break.\n"
+            "- Margins: set left/right (or bottom/top in horizontal read direction) per stave.\n"
+            "- Key range: set automatic or manual key range for each marker.\n"
+            "- Delete: remove a marker (the first marker at measure 1 cannot be deleted).\n\n"
+            "Shared fields across staves:\n"
+            "- Marker time and marker type are linked across staves. Editing them in one tab updates all tabs.\n"
+            "- Margins and key ranges stay per stave.\n\n"
+            "Measure Grouping:\n"
+            "- Enter positive integers (for example: 4 6 4) to generate repeating line-break distribution by measures.\n"
+            "- Existing marker styling is reused in order.\n\n"
+            "Bulk tools:\n"
+            "- Edit all left/right margins for current stave markers.\n"
+            "- Set one key range for all current stave markers.\n\n"
+            "OK accepts changes. Cancel discards dialog changes when used with preview restore."
         )
+        QtWidgets.QMessageBox.information(self, title, text)
 
     def set_selected_stave_index(self, stave_index: int) -> None:
         if self._score is None:
@@ -329,6 +558,7 @@ class LineBreakDialog(DialogGeometryMixin, QtWidgets.QDialog):
             return
         normalized = int(int(stave_index) % len(staves))
         if normalized == self._active_stave_index and self._line_breaks:
+            self._update_stave_tabs()
             return
         self._active_stave_index = normalized
         try:
@@ -337,13 +567,14 @@ class LineBreakDialog(DialogGeometryMixin, QtWidgets.QDialog):
                 app_state.selected_stave_index = int(normalized)
         except Exception:
             pass
+        self._update_stave_tabs()
         self._reload_line_breaks(keep_row=True)
 
     def _reload_line_breaks(self, keep_row: bool = True) -> None:
         current_row = self.break_table.currentRow() if keep_row else -1
         self._line_breaks = self._current_stave_line_breaks()
         self._measure_starts_mm = self._build_measure_starts()
-        self._update_stave_label()
+        self._update_stave_tabs()
         self._populate_break_list()
         if self._line_breaks:
             if keep_row and current_row >= 0:
@@ -759,6 +990,7 @@ class LineBreakDialog(DialogGeometryMixin, QtWidgets.QDialog):
             if hasattr(self._score, 'sync_linked_line_breaks'):
                 self._score.sync_linked_line_breaks(self._active_stave_index)
             self._reload_line_breaks()
+            self.valuesChanged.emit()
         else:
             self.msg_label.setText(self.tr("Could not apply measure grouping."))
 
@@ -844,6 +1076,9 @@ class LineBreakDialog(DialogGeometryMixin, QtWidgets.QDialog):
         low_key, high_key = dlg.get_range()
         for lb in self._line_breaks:
             lb.stave_range = [int(low_key), int(high_key)]
+
+        if hasattr(self._score, 'sync_linked_line_breaks'):
+            self._score.sync_linked_line_breaks(self._active_stave_index)
         
         self._populate_break_list()
         self.valuesChanged.emit()
@@ -874,11 +1109,30 @@ class LineBreakDialog(DialogGeometryMixin, QtWidgets.QDialog):
         return not bool(msg)
 
     def _on_values_changed(self) -> None:
+        callback_ok = False
         if callable(self._on_change_cb):
             try:
                 self._on_change_cb()
+                callback_ok = True
             except Exception:
                 pass
+        if callback_ok:
+            return
+
+        # Fallback: refresh directly through the parent window when callback
+        # wiring is unavailable or fails, so live preview still updates.
+        parent = self.parent()
+
+        file_manager = getattr(parent, 'file_manager', None)
+        if file_manager is not None and hasattr(file_manager, 'on_model_changed'):
+            file_manager.on_model_changed()
+
+        editor_controller = getattr(parent, 'editor_controller', None)
+        if editor_controller is not None:
+            if hasattr(editor_controller, 'force_redraw_from_model'):
+                editor_controller.force_redraw_from_model()
+            elif hasattr(editor_controller, 'draw_frame'):
+                editor_controller.draw_frame()
 
     def _persist_measure_grouping(self) -> None:
         if self._layout is None:

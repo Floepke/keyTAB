@@ -319,7 +319,13 @@ class SCORE:
 		}
 		base.update(kwargs)
 		obj = LineBreak(**base, _id=self._gen_id())
-		self.events.line_break.append(obj)
+		events = self.stave_events_at()
+		if events is None:
+			if not isinstance(getattr(self, 'staves', None), list) or not self.staves:
+				self.staves = [Stave(name=f'Stave {i + 1}', enabled=True, events=Events()) for i in range(DEFAULT_STAVE_COUNT)]
+			events = self.stave_events_at(0)
+		if events is not None:
+			events.line_break.append(obj)
 		return obj
 
 	def new_tempo(self, **kwargs) -> Tempo:
@@ -794,7 +800,7 @@ class SCORE:
 		self.tempo = []
 		self.events = Events()
 		self.events.tempo = []
-		self.staves = [Stave(name=f'Stave {i + 1}', enabled=True, events=Events()) for i in range(DEFAULT_STAVE_COUNT)]
+		self.staves = [Stave(name=f'Stave {i + 1}', enabled=True if i == 0 else False, events=Events()) for i in range(DEFAULT_STAVE_COUNT)]
 		self.staves[0].events = deepcopy(self.events)
 		self.layout = Layout()
 		self.app_state = AppState()
@@ -1020,8 +1026,12 @@ class SCORE:
 		if len(starts) < 2:
 			return False
 
-		# Preserve styling from existing line breaks in order; reuse last when exhausted
-		existing = sorted(list(getattr(self.events, 'line_break', []) or []), key=lambda lb: float(getattr(lb, 'time', 0.0) or 0.0))
+		events = self.stave_events_at()
+		if events is None:
+			return False
+
+		# Preserve styling from active-stave line breaks in order; reuse last when exhausted
+		existing = sorted(list(getattr(events, 'line_break', []) or []), key=lambda lb: float(getattr(lb, 'time', 0.0) or 0.0))
 		defaults = LineBreak()
 
 		def _template_for(idx: int) -> tuple[list[float], list[int] | Literal['auto'] | bool, bool]:
@@ -1036,8 +1046,8 @@ class SCORE:
 			page_break = bool(getattr(tmpl, 'page_break', False)) if tmpl else False
 			return (margin_mm, stave_range, page_break)
 
-		# Clear and rebuild line breaks following the requested grouping
-		self.events.line_break = []
+		# Clear and rebuild active-stave line breaks following the requested grouping
+		events.line_break = []
 		total_measures = len(starts) - 1
 		index = 0
 		group_idx = 0
@@ -1059,7 +1069,7 @@ class SCORE:
 			if group_len <= 0:
 				break
 			index += group_len
-		self.events.line_break.sort(key=lambda lb: float(getattr(lb, 'time', 0.0) or 0.0))
+		events.line_break.sort(key=lambda lb: float(getattr(lb, 'time', 0.0) or 0.0))
 		self.sync_linked_line_breaks()
 		return True
 

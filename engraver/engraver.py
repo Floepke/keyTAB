@@ -1473,21 +1473,21 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                 y1 = page_top + header_offset
                 y2 = float(page_h - page_bottom - footer_height)
 
-            # In horizontal read direction page_lines is reversed, so the visual first
-            # system (leftmost column) is the last element; in vertical it is the first.
-            visual_first_line = (line_index == len(page_lines) - 1) if horizontal_read_direction else (line_index == 0)
-            mini_piano_enabled = bool(layout.get('mini_piano_visible', True)) and page_index == 0 and visual_first_line
-            mini_piano_height_mm = (7.0 * float(semitone_mm)) if mini_piano_enabled else 0.0
-            y2_draw = max(y1 + 1.0, y2 - mini_piano_height_mm) if mini_piano_enabled else y2
+            mini_piano_enabled = False
+            mini_piano_height_mm = 0.0
+            y2_draw = y2
             if y2 <= y1:
                 y2 = y1 + 1.0
-            if y2_draw <= y1:
-                y2_draw = y1 + 1.0
             line_time_start = float(line.get('time_start', 0.0) or 0.0)
             line_time_end = float(line.get('time_end', 0.0) or 0.0)
+            is_first_system_line = bool(page_index == 0 and op_time.eq(line_time_start, first_system_start))
+            mini_piano_enabled = bool(layout.get('mini_piano_visible', True)) and is_first_system_line
+            mini_piano_height_mm = (7.0 * float(semitone_mm)) if mini_piano_enabled else 0.0
+            y2_draw = max(y1 + 1.0, y2 - mini_piano_height_mm) if mini_piano_enabled else y2
+            if y2_draw <= y1:
+                y2_draw = y1 + 1.0
             line_span_ticks = max(1e-6, float(line_time_end - line_time_start))
             line_span_mm = max(1e-6, float(y2_draw - y1))
-            is_first_system_line = op_time.eq(line_time_start, first_system_start)
             pre_roll_ticks = 0.0
             if is_first_system_line:
                 pre_roll_ticks = max(0.0, line_span_ticks * max(0.0, float(y1)) / line_span_mm)
@@ -2590,8 +2590,6 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                     y_end = _time_to_y(float(total_ticks))
                     _w_end = float(page_system_endline_width_by_index.get(int(system_index), end_thick_w * 1.5) or (end_thick_w * 1.5))
                     _cuts_end = list(page_system_endline_cuts_by_index.get(int(system_index), []) or [])
-                    system_dash_pattern = layout.get('grid_gridline_dash_pattern_mm', [3.0, 4.0])
-                    system_dash_pattern = _scaled_dash_pattern_with_default(system_dash_pattern, grid_dash_mm, line_scale)
                     _draw_line_with_cuts(
                         float(system_barline_left),
                         float(system_barline_right),
@@ -2600,7 +2598,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                         _w_end,
                         ['end_barline'],
                         0,
-                        dash_pattern=system_dash_pattern,
+                        dash_pattern=None,
                     )
 
             '''Double barlines from events, drawn with the same constructive geometry as regular barlines to avoid collisions.'''

@@ -2383,10 +2383,15 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def _open_line_break_dialog(self) -> None:
         from ui.dialogs.line_break_dialog import LineBreakDialog
+        from ui.preview_service import PreviewSession
 
         score = self.file_manager.current()
         if score is None:
             return
+
+        # Keep a baseline snapshot so Cancel can fully restore pre-dialog state,
+        # including dirty flag semantics.
+        preview = PreviewSession(self.file_manager, self.editor_controller, parent=self, debounce_ms=0)
 
         def _apply_dialog_values() -> None:
             try:
@@ -2398,6 +2403,10 @@ class MainWindow(QtWidgets.QMainWindow):
                     self.editor_controller.force_redraw_from_model()
                 else:
                     self.editor_controller.draw_frame()
+            except Exception:
+                pass
+            try:
+                self._refresh_views_from_score()
             except Exception:
                 pass
 
@@ -2416,22 +2425,29 @@ class MainWindow(QtWidgets.QMainWindow):
 
         def _on_accept() -> None:
             try:
-                if hasattr(score, 'sync_linked_line_breaks'):
-                    score.sync_linked_line_breaks()
+                cur = self.file_manager.current()
+                if hasattr(cur, 'sync_linked_line_breaks'):
+                    cur.sync_linked_line_breaks()
             except Exception:
                 pass
-            self.file_manager.on_model_changed()
+            try:
+                # Accept final state and record one undo snapshot for the dialog edit.
+                preview.commit(label='line_break_dialog', restore_first=False)
+            except Exception:
+                pass
 
         def _on_reject() -> None:
-            pass
-
-        def _on_finished(_result: int) -> None:
-            if int(_result) == int(QtWidgets.QDialog.DialogCode.Accepted):
-                self.file_manager.on_model_changed()
+            try:
+                preview.restore_original()
+            except Exception:
+                pass
+            try:
+                self._refresh_views_from_score()
+            except Exception:
+                pass
 
         dlg.accepted.connect(_on_accept)
         dlg.rejected.connect(_on_reject)
-        dlg.finished.connect(_on_finished)
         dlg.show()
 
     def _ensure_tool_action_engine(self):
