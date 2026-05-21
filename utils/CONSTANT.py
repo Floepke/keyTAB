@@ -100,6 +100,7 @@ ENGRAVER_LAYERING = [
     'barline_symbol',
     'barline_symbol_dot',
     'stave',
+    'ledger_line',
     'piano_octave_band',
     'piano_outline',
     'piano_octave_number',

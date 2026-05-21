@@ -586,9 +586,44 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                             }
                         )
 
+                    # Group notes per hand by time-equality (thresholded) so
+                    # downstream drawers can treat simultaneous notes as chords.
+                    chord_op = Operator(SHORTEST_DURATION)
+                    sorted_items = sorted(
+                        [dict(it or {}) for it in note_draw_items],
+                        key=lambda it: (
+                            str(it.get('hand', 'l') or 'l'),
+                            _item_get_float(it, 'time', 0.0),
+                            int(it.get('pitch', 0) or 0),
+                        ),
+                    )
+                    left_chords: list[tuple[dict, ...]] = []
+                    right_chords: list[tuple[dict, ...]] = []
+                    i_ch = 0
+                    while i_ch < len(sorted_items):
+                        cur = sorted_items[i_ch]
+                        cur_hand = str(cur.get('hand', 'l') or 'l')
+                        cur_t = _item_get_float(cur, 'time', 0.0)
+                        bucket: list[dict] = [cur]
+                        i_ch += 1
+                        while i_ch < len(sorted_items):
+                            nxt = sorted_items[i_ch]
+                            nxt_hand = str(nxt.get('hand', 'l') or 'l')
+                            nxt_t = _item_get_float(nxt, 'time', 0.0)
+                            if nxt_hand != cur_hand or not chord_op.eq(float(nxt_t), float(cur_t)):
+                                break
+                            bucket.append(nxt)
+                            i_ch += 1
+                        if cur_hand == 'r':
+                            right_chords.append(tuple(bucket))
+                        else:
+                            left_chords.append(tuple(bucket))
+
                     stem_len_mm = float(layout.get('note_stem_length_semitone', 7.0) or 7.0) * float(semitone_mm_stave)
                     stv['note_draw_items'] = note_draw_items
                     stv['stem_segments'] = _build_stem_segments_for_chords(note_draw_items, stem_len_mm)
+                    stv['note_left_chord_list'] = left_chords
+                    stv['note_right_chord_list'] = right_chords
                     stv['note_stem_width_mm'] = float(layout.get('note_stem_thickness_mm', 0.8) or 0.8) * float(composite_scale)
 
                     local_x = float(span_right + mr)
