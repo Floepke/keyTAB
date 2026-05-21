@@ -235,7 +235,7 @@ class LineBreakTool(BaseTool):
         if self._dialog_open:
             return
         self._dialog_open = True
-        from ui.dialogs.line_break_dialog import LineBreakDialog
+        from ui.dialogs.stave_config_dialog import StaveConfigDialog
         parent_w = QtWidgets.QApplication.activeWindow() if hasattr(QtWidgets, 'QApplication') else None
         score = self._editor.current_score()
 
@@ -250,7 +250,7 @@ class LineBreakTool(BaseTool):
             else:
                 self._editor.draw_frame()
 
-        dlg = LineBreakDialog(
+        dlg = StaveConfigDialog(
             parent=parent_w,
             score=score,
             selected_line_break=lb,

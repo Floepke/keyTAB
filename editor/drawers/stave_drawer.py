@@ -70,6 +70,35 @@ class StaveDrawerMixin:
                     tags=[tag]
                 )
 
+        # Draw selected stave name centered in the current viewport, vertically
+        # centered in the top margin band.
+        staves = list(getattr(score, 'staves', []) or [])
+        if staves:
+            try:
+                selected_idx = int(getattr(getattr(score, 'app_state', None), 'selected_stave_index', 0) or 0)
+            except Exception:
+                selected_idx = 0
+            selected_idx = int(max(0, min(len(staves) - 1, selected_idx)))
+            selected_stave = staves[selected_idx]
+            selected_name = str(getattr(selected_stave, 'name', '') or '').strip()
+            if not selected_name:
+                selected_name = f"Stave {selected_idx + 1}"
+            else:
+                selected_name = f"Stave {selected_idx + 1}: {selected_name}"
+            cx_mm = float(self.margin or 0.0) + (float(self.stave_width or 0.0) / 2.0)
+            y_name = float(self.margin or 0.0) * 0.5
+            du.add_text(
+                float(cx_mm),
+                float(y_name),
+                selected_name,
+                family="Edwin",
+                color=self.notation_color,
+                anchor='center',
+                size_pt=24.0,
+                id=0,
+                tags=["stave_name"],
+            )
+
         '''Draw piano keyboard below stave'''
         bar_width_mm = max(0.01, float(getattr(self, 'editor_line_width_global', 0.1) or 0.1))
         end_t = float(self._calc_base_grid_list_total_length())

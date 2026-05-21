@@ -19,7 +19,6 @@ from ui.widgets.draw_util import DrawUtil
 from ui.widgets.draw_view import DrawUtilView
 from ui.about_dialog import AboutDialog
 from ui.dialogs.keyboard_shortcuts_dialog import KeyboardShortcutsDialog
-from ui.dialogs.stave_dialog import StaveDialog
 from ui.error_dialog import show_error_dialog
 from ui.style import Style
 from ui.dialogs.fluidsynth_reverb_config_dialog import FluidSynthReverbConfigDialog
@@ -683,10 +682,6 @@ class MainWindow(QtWidgets.QMainWindow):
         style_act.setToolTip(tr("Open appearance settings for the score."))
         style_act.setShortcut(QtGui.QKeySequence("S"))
         style_act.triggered.connect(self._open_style_dialog)
-        stave_act = QtGui.QAction(tr("Staves..."), self)
-        stave_act.setToolTip(tr("Open stave configuration for names, scale, and visibility."))
-        stave_act.setShortcut(QtGui.QKeySequence("Shift+S"))
-        stave_act.triggered.connect(self._open_stave_dialog)
         info_act = QtGui.QAction(tr("Info..."), self)
         info_act.setToolTip(tr("Open title and metadata settings."))
         info_act.setShortcut(QtGui.QKeySequence("I"))
@@ -697,7 +692,6 @@ class MainWindow(QtWidgets.QMainWindow):
         line_break_act.triggered.connect(self._open_line_break_dialog)
 
         document_menu.addAction(style_act)
-        document_menu.addAction(stave_act)
         document_menu.addAction(info_act)
         document_menu.addAction(line_break_act)
         document_menu.addSeparator()
@@ -2344,35 +2338,6 @@ class MainWindow(QtWidgets.QMainWindow):
         dlg.accepted.connect(lambda: self.file_manager.save() if self.file_manager.path() is not None else None)
         dlg.show()
 
-    def _open_stave_dialog(self) -> None:
-        score = self.file_manager.current()
-        if score is None:
-            return
-
-        def _apply_dialog_values() -> None:
-            try:
-                dlg.apply_to_score()
-            except Exception:
-                pass
-            try:
-                self.file_manager.on_model_changed()
-                self._refresh_views_from_score()
-            except Exception:
-                pass
-
-        dlg = StaveDialog(parent=self, score=score, on_change=_apply_dialog_values)
-
-        def _on_accept() -> None:
-            try:
-                dlg.apply_to_score()
-            except Exception:
-                pass
-            self.file_manager.on_model_changed()
-            self._refresh_views_from_score()
-
-        dlg.accepted.connect(_on_accept)
-        dlg.show()
-
     def _open_info_dialog(self) -> None:
         from ui.dialogs.info_dialog import InfoDialog
         sc = self.file_manager.current()
@@ -2382,7 +2347,7 @@ class MainWindow(QtWidgets.QMainWindow):
         dlg.show()
 
     def _open_line_break_dialog(self) -> None:
-        from ui.dialogs.line_break_dialog import LineBreakDialog
+        from ui.dialogs.stave_config_dialog import StaveConfigDialog
         from ui.preview_service import PreviewSession
 
         score = self.file_manager.current()
@@ -2410,7 +2375,7 @@ class MainWindow(QtWidgets.QMainWindow):
             except Exception:
                 pass
 
-        dlg = LineBreakDialog(
+        dlg = StaveConfigDialog(
             parent=self,
             score=score,
             selected_line_break=None,

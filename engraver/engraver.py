@@ -2564,6 +2564,23 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                     if op_time.lt(_t, float(line['time_start'])) or op_time.gt(_t, float(line['time_end'])):
                         continue
                     _w = float(page_system_barline_width_by_tick.get(_sys_key, bar_width_mm) or bar_width_mm)
+                    # At each system end tick, draw a solid (non-cut) regular
+                    # barline across enabled staves. For the global final tick,
+                    # let the dedicated end-barline pass handle it.
+                    if op_time.eq(_t, float(line['time_end'])):
+                        if op_time.eq(_t, float(total_ticks)):
+                            continue
+                        _draw_line_with_cuts(
+                            float(system_barline_left),
+                            float(system_barline_right),
+                            _time_to_y(_t),
+                            [],
+                            _w,
+                            ['barline'],
+                            0,
+                            dash_pattern=None,
+                        )
+                        continue
                     _cuts = list(page_system_barline_cuts_by_tick.get(_sys_key, []) or [])
                     _draw_line_with_cuts(
                         float(system_barline_left),
@@ -2578,24 +2595,17 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
             
             '''End-barline drawing'''
             if barline_visible and has_any_barlines and op_time.ge(total_ticks, float(line['time_start'])) and op_time.le(total_ticks, float(line['time_end'])):
-                # Single final barline (Klavarskribo convention).
+                # Single final barline (Klavarskribo convention), drawn without
+                # constructive cutouts so it remains a solid system-spanning line.
                 end_thick_w = bar_width_mm * 1.5
-                _end_cuts = _barline_cut_intervals(float(total_ticks))
-                page_system_endline_cuts_by_index.setdefault(int(system_index), []).extend(_end_cuts)
-                page_system_endline_width_by_index[int(system_index)] = max(
-                    float(page_system_endline_width_by_index.get(int(system_index), 0.0) or 0.0),
-                    float(end_thick_w * 1.5),
-                )
                 if is_last_enabled_stave:
                     y_end = _time_to_y(float(total_ticks))
-                    _w_end = float(page_system_endline_width_by_index.get(int(system_index), end_thick_w * 1.5) or (end_thick_w * 1.5))
-                    _cuts_end = list(page_system_endline_cuts_by_index.get(int(system_index), []) or [])
                     _draw_line_with_cuts(
                         float(system_barline_left),
                         float(system_barline_right),
                         y_end,
-                        _cuts_end,
-                        _w_end,
+                        [],
+                        float(end_thick_w * 1.5),
                         ['end_barline'],
                         0,
                         dash_pattern=None,
@@ -5060,7 +5070,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
     # Build a compact time-to-page map so the print-view playhead can locate any
     # source-time position without re-running the full engraver.
     # Structure: list[list[dict]] – one outer entry per page, each inner list
-    # contains one dict per stave line with time/y/x geometry.
+    # contains one dict per system with geometry spanning all enabled staves.
     _ptm: list = []
     for _p_idx, _p_lines in enumerate(pages):
         _page_lines_ord = list(reversed(_p_lines)) if horizontal_read_direction else _p_lines
@@ -5089,11 +5099,12 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
         _xc = page_left + _lr + _gap
         _lines_map: list = []
         for _chunk in _page_system_chunks:
+            _chunk_entries: list[dict] = []
             for _line in list(_chunk.get('lines', []) or []):
                 _lo = float(_line.get('ledger_left_overhang', 0.0) or 0.0)
                 _lx_s = _xc + float(_line['margin_left']) + _lo
                 _lx_e = _lx_s + float(_line.get('stave_width', 0.0) or 0.0)
-                _lines_map.append({
+                _chunk_entries.append({
                     'time_start': float(_line.get('time_start', 0.0)),
                     'time_end': float(_line.get('time_end', 0.0)),
                     'y_top': float(_line.get('y_top', _y_top)),
@@ -5102,6 +5113,15 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                     'x_end': float(_lx_e),
                 })
                 _xc += float(_line['total_width'])
+            if _chunk_entries:
+                _lines_map.append({
+                    'time_start': min(float(_it.get('time_start', 0.0) or 0.0) for _it in _chunk_entries),
+                    'time_end': max(float(_it.get('time_end', 0.0) or 0.0) for _it in _chunk_entries),
+                    'y_top': min(float(_it.get('y_top', _y_top) or _y_top) for _it in _chunk_entries),
+                    'y_bottom': max(float(_it.get('y_bottom', _y_bot) or _y_bot) for _it in _chunk_entries),
+                    'x_start': min(float(_it.get('x_start', 0.0) or 0.0) for _it in _chunk_entries),
+                    'x_end': max(float(_it.get('x_end', 0.0) or 0.0) for _it in _chunk_entries),
+                })
             _xc += _gap
         _ptm.append(_lines_map)
     du.print_time_map = _ptm

@@ -127,8 +127,8 @@ class FlexibleDoubleSpinBox(QtWidgets.QDoubleSpinBox):
         super().keyPressEvent(ev)
 
 
-class LineBreakDialog(DialogGeometryMixin, QtWidgets.QDialog):
-    DIALOG_KEY = "line_break"
+class StaveConfigDialog(DialogGeometryMixin, QtWidgets.QDialog):
+    DIALOG_KEY = "stave_config"
     valuesChanged = QtCore.Signal()
     def __init__(self,
                  parent=None,
@@ -139,7 +139,7 @@ class LineBreakDialog(DialogGeometryMixin, QtWidgets.QDialog):
         super().__init__(parent)
         self.setWindowFlag(QtCore.Qt.WindowType.WindowMinMaxButtonsHint, True)
         self.setSizeGripEnabled(True)
-        self.setWindowTitle(self.tr("Line/Page Break"))
+        self.setWindowTitle(self.tr("Stave Configuration / Document Layout"))
         self.setModal(False)
         self.setWindowModality(QtCore.Qt.NonModal)
         self.resize(900, 200)
@@ -219,7 +219,7 @@ class LineBreakDialog(DialogGeometryMixin, QtWidgets.QDialog):
         staves_group_lay.addLayout(stave_row)
         content_lay.addWidget(self.staves_group)
 
-        self.break_markers_group = QtWidgets.QGroupBox(self.tr("Line/Page break markers"), self._tab_content_host)
+        self.break_markers_group = QtWidgets.QGroupBox(self.tr("Line/Page break editor"), self._tab_content_host)
         break_group_lay = QtWidgets.QVBoxLayout(self.break_markers_group)
         break_group_lay.setContentsMargins(6, 6, 6, 6)
         break_group_lay.setSpacing(6)

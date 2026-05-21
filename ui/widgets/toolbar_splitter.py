@@ -128,7 +128,35 @@ class StaveSelector(QtWidgets.QWidget):
 
         self.minus_btn.clicked.connect(self._decrease)
         self.plus_btn.clicked.connect(self._increase)
+        # Ensure wheel scrolling over any child control switches staves.
+        self.installEventFilter(self)
+        self.plus_btn.installEventFilter(self)
+        self.minus_btn.installEventFilter(self)
+        self.label.installEventFilter(self)
         self._update_ui()
+
+    def eventFilter(self, obj: QtCore.QObject, ev: QtCore.QEvent) -> bool:
+        if obj in (self, self.plus_btn, self.minus_btn, self.label) and ev.type() == QtCore.QEvent.Type.Wheel:
+            wheel_ev = ev
+            if self._handle_wheel(wheel_ev):
+                return True
+        return super().eventFilter(obj, ev)
+
+    def wheelEvent(self, ev: QtGui.QWheelEvent) -> None:
+        if self._handle_wheel(ev):
+            return
+        super().wheelEvent(ev)
+
+    def _handle_wheel(self, ev: QtGui.QWheelEvent) -> bool:
+        delta = int(ev.angleDelta().y() or ev.angleDelta().x())
+        if delta == 0:
+            return False
+        if delta > 0:
+            self._increase()
+        else:
+            self._decrease()
+        ev.accept()
+        return True
 
     def set_stave_count(self, count: int) -> None:
         self._stave_count = max(1, min(self._max_staves, int(count or 1)))

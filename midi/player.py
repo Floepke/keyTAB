@@ -1139,7 +1139,7 @@ class Player:
         Arpeggiated chords replace base note starts with arpeggio-adjusted starts so playback
         follows rendered notehead offsets.
         """
-        notes = list(getattr(getattr(score, 'events', None), 'note', []) or [])
+        notes = self._collect_enabled_stave_events(score, 'note')
         arpeggio_starts = self._compute_arpeggio_note_starts(score, notes)
 
         note_spans: List[Tuple[float, float, int]] = []
@@ -1153,7 +1153,7 @@ class Player:
             note_spans.append((start_units, float(start_units + dur_units), pitch))
             yield start_units, dur_units, pitch, vel
 
-        for g in getattr(getattr(score, 'events', None), 'grace_note', []) or []:
+        for g in self._collect_enabled_stave_events(score, 'grace_note'):
             dur_units = float(self._grace_duration_units)
             start_units = float(getattr(g, 'time', 0.0) or 0.0)
             overlap_end: Optional[float] = None
@@ -1171,7 +1171,7 @@ class Player:
 
         Mirrors the editor/cache geometry so playback timing matches rendered arpeggios.
         """
-        arps = list(getattr(getattr(score, 'events', None), 'arpeggio', []) or [])
+        arps = self._collect_enabled_stave_events(score, 'arpeggio')
         if not arps or not notes:
             return {}
 
@@ -1391,7 +1391,7 @@ class Player:
 
     def _iter_playable_events(self, score):
         """Yield (event, duration_units) for normal and grace notes."""
-        notes = getattr(getattr(score, 'events', None), 'note', []) or []
+        notes = self._collect_enabled_stave_events(score, 'note')
         note_spans: List[Tuple[float, float, int]] = []
         # Normal notes carry their own duration; skip malformed entries.
         for n in notes:
@@ -1402,7 +1402,7 @@ class Player:
             yield n, dur_units
 
         # Grace notes have no stored duration; fall back to the default 32.0 units.
-        for g in getattr(getattr(score, 'events', None), 'grace_note', []) or []:
+        for g in self._collect_enabled_stave_events(score, 'grace_note'):
             # Default grace duration is fixed at 32 units unless overlapped with a sustaining note.
             dur_units = float(self._grace_duration_units)
             start_units = float(getattr(g, 'time', 0.0) or 0.0)
@@ -1415,6 +1415,20 @@ class Player:
             if overlap_end is not None:
                 dur_units = max(dur_units, float(overlap_end - start_units))
             yield g, dur_units
+
+    def _collect_enabled_stave_events(self, score, event_name: str) -> List[object]:
+        """Collect event objects from enabled staves only (no legacy fallback)."""
+        staves = list(getattr(score, 'staves', []) or [])
+        if not staves:
+            return []
+        enabled_staves = [st for st in staves if bool(getattr(st, 'enabled', True))]
+        out: List[object] = []
+        for stave in enabled_staves:
+            events_obj = getattr(stave, 'events', None)
+            if events_obj is None:
+                continue
+            out.extend(list(getattr(events_obj, event_name, []) or []))
+        return out
 
     def _collect_sustain_pedal_points(self, score) -> List[Tuple[float, int]]:
         """Collect sustain pedal CC64 points from pedal symbols.
