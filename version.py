@@ -7,7 +7,7 @@ Bump policy (Semantic Versioning):
   PATCH - bug fixes only
 """
 
-__version__ = "1.1.0beta"
+__version__ = "1.1.1"
 APP_NAME    = "keyTAB"
 
 change_log = '''
@@ -103,6 +103,5 @@ change_log = '''
 - general translation/string cleanup and internal drawing/refactor polish across related tools and dialogs.
 
 1.1.1 (2026-06-01)
-- changed under the hood: the editor's internal data structure supports multiple staves per system
-- rebuilded engraver from the ground up to support multiple staves per system
+- changed under the hood: the editor's internal data structure now supports multiple staves per system
 '''

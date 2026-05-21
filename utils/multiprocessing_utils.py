@@ -3,7 +3,9 @@ import sys
 
 
 def preferred_start_method() -> str | None:
-    if sys.platform.startswith("linux") or sys.platform == "darwin":
+    # On macOS, forcing fork in GUI apps (Qt/Cocoa) can crash the process.
+    # Keep the faster fork path only on Linux.
+    if sys.platform.startswith("linux"):
         if "fork" in mp.get_all_start_methods():
             return "fork"
     return None
