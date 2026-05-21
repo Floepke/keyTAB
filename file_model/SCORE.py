@@ -185,6 +185,7 @@ class SCORE:
 	base_grid: List[BaseGrid] = field(default_factory=list)
 	layout: Layout = field(default_factory=Layout)
 	app_state: AppState = field(default_factory=AppState)
+	tempo: List[Tempo] = field(default_factory=list)
 	events: Events = field(default_factory=Events)
 	staves: List[Stave] = field(default_factory=lambda: [Stave(name=f'Stave {i + 1}', enabled=True) for i in range(DEFAULT_STAVE_COUNT)])
 	_next_id: int = 1
@@ -325,7 +326,7 @@ class SCORE:
 		base = {'time': 0.0, 'duration': 0.0, 'tempo': Tempo().tempo}
 		base.update(kwargs)
 		obj = Tempo(**base, _id=self._gen_id())
-		self.events.tempo.append(obj)
+		self.tempo.append(obj)
 		return obj
 
 	def new_arpeggio(self, **kwargs) -> Arpeggio:
@@ -406,6 +407,20 @@ class SCORE:
 				lst.append(obj)
 		return out
 
+	def _load_top_level_tempo(self, tempo_data: object) -> List[Tempo]:
+		"""Parse top-level tempo list into Tempo dataclasses with fresh ids."""
+		out: List[Tempo] = []
+		items = tempo_data if isinstance(tempo_data, list) else []
+		for idx, item in enumerate(items):
+			incoming = item if isinstance(item, dict) else {}
+			obj = Tempo(**_merge_with_defaults(Tempo, incoming, f'tempo[{idx}]'))
+			try:
+				setattr(obj, '_id', self._gen_id())
+			except Exception:
+				pass
+			out.append(obj)
+		return out
+
 	def _load_staves(self, staves_data: object, fallback_events: Events) -> List[Stave]:
 		"""Load staves from dict data and always provide DEFAULT_STAVE_COUNT staves."""
 		staves: List[Stave] = []
@@ -459,6 +474,8 @@ class SCORE:
 		if commit_to_selected_stave:
 			# Save path: commit working legacy container into selected stave.
 			if isinstance(getattr(self, 'events', None), Events):
+				# Tempo is system/global and no longer persisted per-stave.
+				self.events.tempo = []
 				op_load = Operator(float(SHORTEST_DURATION))
 				lb_list = list(getattr(self.events, 'line_break', []) or [])
 				if not lb_list:
@@ -473,8 +490,11 @@ class SCORE:
 			st_events = getattr(self.staves[idx], 'events', None)
 			if isinstance(st_events, Events):
 				self.events = deepcopy(st_events)
+				self.events.tempo = []
 			elif not isinstance(getattr(self, 'events', None), Events):
 				self.events = Events()
+			else:
+				self.events.tempo = []
 		# Keep a non-empty legacy fallback stave at index 0.
 		if len(self.staves) > 1 and not isinstance(getattr(self.staves[0], 'events', None), Events):
 			self.staves[0].events = Events()
@@ -657,10 +677,13 @@ class SCORE:
 		# Events lists
 		ev = data.get('events', {}) or {}
 		self._next_id = 1
+		self.tempo = self._load_top_level_tempo(data.get('tempo', []))
 		self.events = self._load_events_container(ev, 'events')
+		self.events.tempo = []
 		self.staves = self._load_staves(data.get('staves', None), self.events)
 		if not isinstance(data.get('events', None), dict):
 			self.events = deepcopy(self.staves[0].events)
+			self.events.tempo = []
 
 		# Normalize hand values and convert short notes to grace notes.
 		try:
@@ -671,8 +694,8 @@ class SCORE:
 
 		# Ensure an initial tempo marker exists at time 0
 		try:
-			if not getattr(self.events, 'tempo', None):
-				self.events.tempo = []
+			if not getattr(self, 'tempo', None):
+				self.tempo = []
 			# Determine a reasonable default duration: one beat of the first base grid
 			numer = int(getattr(self.base_grid[0], 'numerator', 4) or 4) if self.base_grid else 4
 			denom = int(getattr(self.base_grid[0], 'denominator', 4) or 4) if self.base_grid else 4
@@ -680,7 +703,7 @@ class SCORE:
 			beat_len = measure_len / max(1, int(numer))
 			# Check if any tempo at time 0 exists
 			op_load = Operator(float(SHORTEST_DURATION))
-			at_zero = any(op_load.eq(float(getattr(tp, 'time', 0.0) or 0.0), 0.0) for tp in self.events.tempo)
+			at_zero = any(op_load.eq(float(getattr(tp, 'time', 0.0) or 0.0), 0.0) for tp in self.tempo)
 			if not at_zero:
 				self.new_tempo(time=0.0, duration=float(beat_len))
 		except Exception:
@@ -735,10 +758,13 @@ class SCORE:
 		# Events
 		ev = (data or {}).get('events', {}) or {}
 		self._next_id = 1
+		self.tempo = self._load_top_level_tempo((data or {}).get('tempo', []))
 		self.events = self._load_events_container(ev, 'events')
+		self.events.tempo = []
 		self.staves = self._load_staves((data or {}).get('staves', None), self.events)
 		if not isinstance((data or {}).get('events', None), dict):
 			self.events = deepcopy(self.staves[0].events)
+			self.events.tempo = []
 
 		# Normalize hand values and convert short notes to grace notes.
 		try:
@@ -765,7 +791,9 @@ class SCORE:
 		self.analysis = Analysis()
 		self.info.copyright = f"© keyTAB {datetime.now().year}"
 		self.base_grid = [BaseGrid()]
+		self.tempo = []
 		self.events = Events()
+		self.events.tempo = []
 		self.staves = [Stave(name=f'Stave {i + 1}', enabled=True, events=Events()) for i in range(DEFAULT_STAVE_COUNT)]
 		self.staves[0].events = deepcopy(self.events)
 		self.layout = Layout()

@@ -377,7 +377,7 @@ def midi_load(path: str, track_assignments: Dict[int, str] | None = None) -> SCO
 
     # ---- Build SCORE ----------------------------------------------
     score = SCORE().new()
-    score.events.tempo = []
+    score.tempo = []
     score.info.title = str(p.stem or score.info.title)
 
     # Tempo markers

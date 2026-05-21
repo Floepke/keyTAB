@@ -115,7 +115,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
     start_repeats: list = []
     end_repeats: list = []
     double_bars: list = []
-    tempos: list = []
+    tempos: list = list(score.get('tempo', []) or [])
     pedals: list = []
     arpeggios: list = []
     for st in enabled_staves:
@@ -133,7 +133,6 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
         start_repeats.extend(_tagged_events(st_events, 'start_repeat', st_idx))
         end_repeats.extend(_tagged_events(st_events, 'end_repeat', st_idx))
         double_bars.extend(_tagged_events(st_events, 'double_bar', st_idx))
-        tempos.extend(_tagged_events(st_events, 'tempo', st_idx))
         pedals.extend(_tagged_events(st_events, 'pedal', st_idx))
         arpeggios.extend(_tagged_events(st_events, 'arpeggio', st_idx))
 
@@ -410,7 +409,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
         tempo_val = int(ev.get('tempo', 60) or 60)
         norm_tempos.append({
             'time': t0,
-            'stave_i': int(ev.get('_stave_i', 0) or 0),
+            'stave_i': int(last_enabled_stave_i),
             'duration': dur,
             'end': t0 + dur,
             'tempo': tempo_val,
@@ -2185,28 +2184,46 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                     it for it in line_notes_for_barlines
                     if op_time.eq(float(it.get('time', 0.0) or 0.0), float(ticks))
                 ]
-                outer_right_pitch = None
-                if notes_at_tick:
-                    outer_right_pitch = max(int(it.get('pitch', 0) or 0) for it in notes_at_tick)
+                outer_right_pitch_r = None
+                outer_left_pitch_l = None
+                right_hand_notes_at_tick = [
+                    it for it in notes_at_tick
+                    if str(it.get('hand', 'l') or 'l') == 'r'
+                ]
+                left_hand_notes_at_tick = [
+                    it for it in notes_at_tick
+                    if str(it.get('hand', 'l') or 'l') == 'l'
+                ]
+                if right_hand_notes_at_tick:
+                    outer_right_pitch_r = max(int(it.get('pitch', 0) or 0) for it in right_hand_notes_at_tick)
+                if left_hand_notes_at_tick:
+                    outer_left_pitch_l = min(int(it.get('pitch', 0) or 0) for it in left_hand_notes_at_tick)
                 for item in line_notes_for_barlines:
                     n_t = float(item.get('time', 0.0) or 0.0)
                     if not op_time.eq(n_t, float(ticks)):
                         continue
                     p = int(item.get('pitch', 0) or 0)
                     x_note = _key_to_x(p)
+                    hand_key = str(item.get('hand', 'l') or 'l')
                     intervals.append((
                         x_note - note_head_half_w - head_collision_pad - barline_symbol_gap_mm,
                         x_note + note_head_half_w + head_collision_pad + barline_symbol_gap_mm,
                     ))
-                    if outer_right_pitch is not None and int(p) == int(outer_right_pitch):
-                        # Keep only outer-right stem/beam reach clear from notehead x.
+                    if hand_key == 'r' and outer_right_pitch_r is not None and int(p) == int(outer_right_pitch_r):
+                        # Keep the outer-right stem/beam reach clear from notehead x.
                         right_reach_x = x_note + stem_len_mm_for_barlines + semitone_mm
                         intervals.append((
                             x_note - stem_collision_pad - barline_symbol_gap_mm,
                             right_reach_x + stem_collision_pad + barline_symbol_gap_mm,
                         ))
+                    elif hand_key == 'l' and outer_left_pitch_l is not None and int(p) == int(outer_left_pitch_l):
+                        # Keep the outer-left stem/beam reach clear from notehead x.
+                        left_reach_x = x_note - stem_len_mm_for_barlines - semitone_mm
+                        intervals.append((
+                            left_reach_x - stem_collision_pad - barline_symbol_gap_mm,
+                            x_note + stem_collision_pad + barline_symbol_gap_mm,
+                        ))
                     if bool(layout.get('note_stem_visible', True)):
-                        hand_key = str(item.get('hand', 'l') or 'l')
                         x_stem_tip = x_note - stem_len_mm_for_barlines if hand_key == 'l' else x_note + stem_len_mm_for_barlines
                         intervals.append((
                             min(x_note, x_stem_tip) - stem_collision_pad - barline_symbol_gap_mm,
@@ -2294,22 +2311,39 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                         it for it in line_note_starts_for_barlines
                         if op_time.eq(float(it.get('time', 0.0) or 0.0), float(ticks))
                     ]
-                    outer_right_start_pitch = None
-                    if start_notes_at_tick:
-                        outer_right_start_pitch = max(int(it.get('pitch', 0) or 0) for it in start_notes_at_tick)
+                    outer_right_start_pitch_r = None
+                    outer_left_start_pitch_l = None
+                    start_right_hand_notes_at_tick = [
+                        it for it in start_notes_at_tick
+                        if str(it.get('hand', 'l') or 'l') == 'r'
+                    ]
+                    start_left_hand_notes_at_tick = [
+                        it for it in start_notes_at_tick
+                        if str(it.get('hand', 'l') or 'l') == 'l'
+                    ]
+                    if start_right_hand_notes_at_tick:
+                        outer_right_start_pitch_r = max(int(it.get('pitch', 0) or 0) for it in start_right_hand_notes_at_tick)
+                    if start_left_hand_notes_at_tick:
+                        outer_left_start_pitch_l = min(int(it.get('pitch', 0) or 0) for it in start_left_hand_notes_at_tick)
                     for item in line_note_starts_for_barlines:
                         n_t = float(item.get('time', 0.0) or 0.0)
                         if not op_time.eq(n_t, float(ticks)):
                             continue
                         p = int(item.get('pitch', 0) or 0)
                         x_note = _key_to_x(p)
-                        if outer_right_start_pitch is not None and int(p) == int(outer_right_start_pitch):
+                        hand_key = str(item.get('hand', 'l') or 'l')
+                        if hand_key == 'r' and outer_right_start_pitch_r is not None and int(p) == int(outer_right_start_pitch_r):
                             right_reach_x = x_note + stem_len_mm_for_barlines + semitone_mm
                             intervals.append((
                                 x_note - stem_collision_pad - barline_symbol_gap_mm,
                                 right_reach_x + stem_collision_pad + barline_symbol_gap_mm,
                             ))
-                        hand_key = str(item.get('hand', 'l') or 'l')
+                        elif hand_key == 'l' and outer_left_start_pitch_l is not None and int(p) == int(outer_left_start_pitch_l):
+                            left_reach_x = x_note - stem_len_mm_for_barlines - semitone_mm
+                            intervals.append((
+                                left_reach_x - stem_collision_pad - barline_symbol_gap_mm,
+                                x_note + stem_collision_pad + barline_symbol_gap_mm,
+                            ))
                         x_stem_tip = x_note - stem_len_mm_for_barlines if hand_key == 'l' else x_note + stem_len_mm_for_barlines
                         intervals.append((
                             min(x_note, x_stem_tip) - stem_collision_pad - barline_symbol_gap_mm,
@@ -2318,7 +2352,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
 
                 return _merge_intervals(intervals)
 
-            def _draw_barline_segments(
+            def _draw_line_with_cuts(
                 x_left: float,
                 x_right: float,
                 yb: float,
@@ -2328,6 +2362,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                 item_id: int = 0,
                 dash_pattern: list[float] | None = None,
             ) -> None:
+                '''Draw a barline or grid line at y=yb from x_left to x_right, cutting out segments in cuts, which are assumed to be merged and sorted. Cuts outside the x range are ignored, and cuts that touch or nearly touch are merged.'''
                 x0 = float(x_left)
                 x1 = float(x_right)
                 if x1 < x0:
@@ -2397,33 +2432,19 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
             def _draw_barline_constructive(ticks: float, width_mm: float, tag: str = 'barline') -> None:
                 yb = _time_to_y(float(ticks))
                 cuts = _barline_cut_intervals(float(ticks))
-                _draw_barline_segments(float(grid_left), float(grid_right), float(yb), cuts, float(width_mm), [tag], 0)
-
-            def _draw_system_barline(ticks: float, width_mm: float, tag: str = 'barline') -> None:
-                yb = _time_to_y(float(ticks))
-                du.add_line(
-                    float(system_barline_left),
-                    float(yb),
-                    float(system_barline_right),
-                    float(yb),
-                    color=grid_color,
-                    width_mm=float(width_mm),
-                    id=0,
-                    tags=[tag],
-                    dash_pattern=None,
-                )
+                _draw_line_with_cuts(float(grid_left), float(grid_right), float(yb), cuts, float(width_mm), [tag], 0)
 
             def _draw_double_bar_constructive(ticks: float, width_mm: float, gap_mm: float, ev_id: int = 0) -> None:
                 yb = _time_to_y(float(ticks))
                 cuts = _barline_cut_intervals(float(ticks))
                 gap = max(0.1, float(gap_mm))
                 tags = ['barline', 'double_barline']
-                _draw_barline_segments(float(grid_left), float(grid_right), float(yb + gap), cuts, float(width_mm), tags, int(ev_id))
+                _draw_line_with_cuts(float(grid_left), float(grid_right), float(yb + gap), cuts, float(width_mm), tags, int(ev_id))
 
             def _draw_gridline_constructive(ticks: float, width_mm: float, dash: list[float] | None) -> None:
                 yb = _time_to_y(float(ticks))
                 cuts = _barline_cut_intervals(float(ticks))
-                _draw_barline_segments(
+                _draw_line_with_cuts(
                     float(grid_left),
                     float(grid_right),
                     float(yb),
@@ -2544,7 +2565,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                         continue
                     _w = float(page_system_barline_width_by_tick.get(_sys_key, bar_width_mm) or bar_width_mm)
                     _cuts = list(page_system_barline_cuts_by_tick.get(_sys_key, []) or [])
-                    _draw_barline_segments(
+                    _draw_line_with_cuts(
                         float(system_barline_left),
                         float(system_barline_right),
                         _time_to_y(_t),
@@ -2552,7 +2573,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                         _w,
                         ['barline'],
                         0,
-                        dash_pattern=system_dash_pattern,
+                        dash_pattern=None,
                     )
             
             '''End-barline drawing'''
@@ -2571,7 +2592,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                     _cuts_end = list(page_system_endline_cuts_by_index.get(int(system_index), []) or [])
                     system_dash_pattern = layout.get('grid_gridline_dash_pattern_mm', [3.0, 4.0])
                     system_dash_pattern = _scaled_dash_pattern_with_default(system_dash_pattern, grid_dash_mm, line_scale)
-                    _draw_barline_segments(
+                    _draw_line_with_cuts(
                         float(system_barline_left),
                         float(system_barline_right),
                         y_end,

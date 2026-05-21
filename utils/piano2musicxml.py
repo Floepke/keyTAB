@@ -500,7 +500,7 @@ def _append_voice_material(
 def export_score_to_musicxml(score: SCORE, output_path: Path) -> dict[str, int]:
     notes = _extract_note_events(score)
     max_note_end = max((float(n.end_units) for n in notes), default=0.0)
-    max_tempo_time = max((float(getattr(t, "time", 0.0) or 0.0) for t in (getattr(score.events, "tempo", []) or [])), default=0.0)
+    max_tempo_time = max((float(getattr(t, "time", 0.0) or 0.0) for t in (getattr(score, "tempo", []) or [])), default=0.0)
     measures = _build_measures(score, max(max_note_end, max_tempo_time))
     chunks = _split_notes_into_measures(notes, measures)
 
@@ -520,7 +520,7 @@ def export_score_to_musicxml(score: SCORE, output_path: Path) -> dict[str, int]:
 
     part = ET.SubElement(root, "part", {"id": "P1"})
 
-    tempo_events = sorted((getattr(score.events, "tempo", []) or []), key=lambda t: float(getattr(t, "time", 0.0) or 0.0))
+    tempo_events = sorted((getattr(score, "tempo", []) or []), key=lambda t: float(getattr(t, "time", 0.0) or 0.0))
     prev_sig: tuple[int, int] | None = None
 
     chunks_by_measure: dict[int, list[NoteChunk]] = {}

@@ -1560,7 +1560,7 @@ class Player:
     def _get_tempo_segments(self, score) -> List[Tuple[float, float, float]]:
         segs: List[Tuple[float, float, float]] = []
         try:
-            lst = sorted(list(getattr(score.events, 'tempo', []) or []), key=lambda e: float(getattr(e, 'time', 0.0) or 0.0))
+            lst = sorted(list(getattr(score, 'tempo', []) or []), key=lambda e: float(getattr(e, 'time', 0.0) or 0.0))
         except Exception:
             lst = []
         if not lst:

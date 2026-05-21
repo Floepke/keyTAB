@@ -200,7 +200,7 @@ def parse_musicxml(path: Path) -> tuple[SCORE, dict[str, int]]:
     score = SCORE().new()
     score.events.note = []
     score.events.grace_note = []
-    score.events.tempo = []
+    score.tempo = []
 
     title_node = next((n for n in root.iter() if _local_name(n.tag) == "work-title"), None)
     if title_node is not None and title_node.text:
@@ -463,7 +463,7 @@ def parse_musicxml(path: Path) -> tuple[SCORE, dict[str, int]]:
         seen_tempo_times.add(key)
         tempo_unique.append(t)
 
-    score.events.tempo = []
+    score.tempo = []
     if tempo_unique:
         if float(tempo_unique[0].time_units) > 0.0:
             score.new_tempo(
@@ -522,7 +522,7 @@ def parse_musicxml(path: Path) -> tuple[SCORE, dict[str, int]]:
     return score, {
         "notes": len(score.events.note),
         "grace_notes": len(score.events.grace_note),
-        "tempo_events": len(score.events.tempo),
+        "tempo_events": len(score.tempo),
         "time_signature_segments": len(score.base_grid),
     }
 
