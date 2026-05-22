@@ -374,19 +374,19 @@ class NoteDrawerMixin:
         arp_y_overrides: dict[int, float] = getattr(self, '_arpeggio_y_overrides', {}) or {}
 
         for hand_key in ('l', 'r'):
-            hand_notes = list(cached_by_hand.get(hand_key, []) or [])
-            if hand_notes:
+            cached_notes = list(cached_by_hand.get(hand_key, []) or [])
+            if cached_notes:
                 # Cache notes are pre-sorted by (time, pitch) – skip redundant sort.
-                hand_notes_sorted = hand_notes
+                hand_notes_sorted = cached_notes
             else:
                 # Fallback when cache is unavailable/incomplete.
-                hand_notes = [
+                fallback_notes = [
                     n for n in notes_view
                     if ('l' if str(getattr(n, 'hand', 'l') or 'l') == 'l' else 'r') == hand_key
                 ]
-                if not hand_notes:
+                if not fallback_notes:
                     continue
-                hand_notes_sorted = sorted(hand_notes, key=lambda n: (float(getattr(n, 'time', 0.0) or 0.0), int(getattr(n, 'pitch', 0) or 0)))
+                hand_notes_sorted = sorted(fallback_notes, key=lambda n: (float(getattr(n, 'time', 0.0) or 0.0), int(getattr(n, 'pitch', 0) or 0)))
 
             i = 0
             while i < len(hand_notes_sorted):
@@ -504,6 +504,9 @@ class NoteDrawerMixin:
             y_center = float(self.time_to_mm(t)) + w
             # Shift dot down one semitone when it lands on a double barline
             # so the two vertical lines don't overlap the dot.
+            # Bisect finds the leftmost candidate >= tf-thr; if it is also <= tf+thr
+            # then it is within the same ±thr window as _time_op.eq, replicating the
+            # original any(_time_op.eq(t, dbt) for dbt in ...) in O(log D) time.
             tf = float(t)
             lo = bisect.bisect_left(double_bar_ticks_sorted, tf - thr)
             if lo < len(double_bar_ticks_sorted) and double_bar_ticks_sorted[lo] <= tf + thr:
