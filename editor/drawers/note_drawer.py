@@ -143,6 +143,9 @@ class NoteDrawerMixin:
         if score is None:
             return
 
+        # Hoist per-frame constants so sub-methods don't re-fetch them per note.
+        layout = score.layout
+
         # Layout metrics
         margin = float(self.margin or 0.0)
         zpq = float(getattr(score.app_state, 'zoom_mm_per_quarter', 25.0) or 25.0)
@@ -180,6 +183,12 @@ class NoteDrawerMixin:
 
         self._rebuild_note_lookup(self._cached_notes_view)
 
+        # Build double-barline tick positions once per frame (sorted for bisect lookups).
+        _double_bar_ticks_sorted: list[float] = sorted(
+            float(getattr(ev, 'time', 0.0) or 0.0)
+            for ev in (getattr(score.events, 'double_bar', []) or [])
+        )
+
         # Per-frame arpeggio Y overrides (set by _build_render_cache)
         arp_y_overrides: dict[int, float] = getattr(self, '_arpeggio_y_overrides', {}) or {}
 
@@ -198,20 +207,29 @@ class NoteDrawerMixin:
             nid = int(getattr(n, '_id', 0) or 0)
             y1 = arp_y_overrides[nid] if nid in arp_y_overrides else time_to_mm(n_start)
             y2 = time_to_mm(n_end)
-            self._draw_single_note(du, n, x, y1, y2, draw_mode=draw_mode)
+            self._draw_single_note(du, n, x, y1, y2, draw_mode=draw_mode,
+                                   layout=layout, double_bar_ticks_sorted=_double_bar_ticks_sorted)
 
         # Draw stems in one batched pass to avoid per-note duplicates.
         self._draw_stem(du, draw_mode=draw_mode)
 
         # Do not clear caches here; when using shared cache, Editor manages lifecycle
 
-    def _draw_single_note(self, du: DrawUtil, n, x: float, y1: float, y2: float, draw_mode: str = 'note') -> None:
+    def _draw_single_note(self, du: DrawUtil, n, x: float, y1: float, y2: float, draw_mode: str = 'note', *,
+                          layout=None, double_bar_ticks_sorted: list | None = None) -> None:
         self = cast("Editor", self)
+        # Resolve layout once; fall back only when called outside the normal draw path.
+        if layout is None:
+            score = self.current_score()
+            layout = score.layout if score else None
+        # Compute per-note booleans that are shared by multiple sub-methods.
+        is_black_above: bool = self._black_note_above_stem(n, layout)
+        is_narrow: bool = self._should_tune_under_stem_black_width(n, layout)
         # In tiny mode, render only noteheads and a simple hit rect
         if getattr(self, 'is_tiny_mode', None) and self.is_tiny_mode():
-            self._draw_notehead(du, n, x, y1, draw_mode)
-            self._draw_midinote(du, n, x, y1, y2, draw_mode)
-            self._draw_note_accidental(du, n, x, y1)
+            self._draw_notehead(du, n, x, y1, draw_mode, layout=layout, is_black_above=is_black_above, is_narrow=is_narrow)
+            self._draw_midinote(du, n, x, y1, y2, draw_mode, layout=layout, is_black_above=is_black_above)
+            self._draw_note_accidental(du, n, x, y1, layout=layout, is_black_above=is_black_above)
             # NOTE: not sure what this code block is good for... it seems unnecessary.
             # try:
             #     w = float(self.semitone_dist or 0.5)
@@ -227,11 +245,11 @@ class NoteDrawerMixin:
             return
 
         # Draw all parts of the note
-        self._draw_midinote(du, n, x, y1, y2, draw_mode)
-        self._draw_notehead(du, n, x, y1, draw_mode)
+        self._draw_midinote(du, n, x, y1, y2, draw_mode, layout=layout, is_black_above=is_black_above)
+        self._draw_notehead(du, n, x, y1, draw_mode, layout=layout, is_black_above=is_black_above, is_narrow=is_narrow)
         self._draw_notestop(du, n, x, y2, draw_mode)
-        self._draw_note_accidental(du, n, x, y1)
-        self._draw_note_continuation_dot(du, n, x, y1, y2, draw_mode)
+        self._draw_note_accidental(du, n, x, y1, layout=layout, is_black_above=is_black_above)
+        self._draw_note_continuation_dot(du, n, x, y1, y2, draw_mode, layout=layout, double_bar_ticks_sorted=double_bar_ticks_sorted)
 
     def _midinote_color(self, n, draw_mode: str) -> tuple[float, float, float, float]:
         if draw_mode in ('cursor', 'edit', 'selected'):
@@ -241,7 +259,8 @@ class NoteDrawerMixin:
         r, g, b = Style.get_named_rgb(key, (153, 179, 204))
         return (float(r) / 255.0, float(g) / 255.0, float(b) / 255.0, 1.0)
 
-    def _draw_midinote(self, du: DrawUtil, n, x: float, y1: float, y2: float, draw_mode: str) -> None:
+    def _draw_midinote(self, du: DrawUtil, n, x: float, y1: float, y2: float, draw_mode: str, *,
+                       layout=None, is_black_above: bool | None = None) -> None:
         '''Draw the MIDI note rectangle for visualizing note durations'''
         self = cast("Editor", self)
         fill = self._midinote_color(n, draw_mode)
@@ -267,19 +286,27 @@ class NoteDrawerMixin:
         x_left = x - max(w, head_half_w)
         x_right = x + max(w, head_half_w)
         y_top = y1           # top of notehead
-        score = self.current_score()
-        layout = score.layout if score else None
-        spec = resolve_notehead_spec(n, default_black_above=self._black_note_above_stem(n, layout))
+        if layout is None:
+            score = self.current_score()
+            layout = score.layout if score else None
+        if is_black_above is None:
+            is_black_above = self._black_note_above_stem(n, layout)
+        spec = resolve_notehead_spec(n, default_black_above=is_black_above)
         if bool(getattr(spec, 'is_up', False)):
             y_top -= w * 2.0
         y_bottom = y2        # actual end of note polygon
         rect_id = int(getattr(n, '_id', 0) or 0)
         self.register_hit_rect('note', rect_id, float(x_left), float(y_top), float(x_right), float(y_bottom))
 
-    def _draw_notehead(self, du: DrawUtil, n, x: float, y1: float, draw_mode: str) -> None:
+    def _draw_notehead(self, du: DrawUtil, n, x: float, y1: float, draw_mode: str, *,
+                       layout=None, is_black_above: bool | None = None, is_narrow: bool | None = None) -> None:
         self = cast("Editor", self)
-        layout = self.current_score().layout
-        is_narrow = self._should_tune_under_stem_black_width(n, layout)
+        if layout is None:
+            layout = self.current_score().layout
+        if is_narrow is None:
+            is_narrow = self._should_tune_under_stem_black_width(n, layout)
+        if is_black_above is None:
+            is_black_above = self._black_note_above_stem(n, layout)
         outline_w = layout.note_stem_thickness_mm * SCALE
         paper_r, paper_g, paper_b = Style.get_named_rgb('paper', (255, 255, 255))
         bg_fill = (paper_r / 255.0, paper_g / 255.0, paper_b / 255.0, 1.0)
@@ -291,7 +318,7 @@ class NoteDrawerMixin:
             semitone_space_mm=float(self.semitone_dist or 0.5),
             notation_color=self.notation_color,
             paper_color=bg_fill,
-            default_black_above=self._black_note_above_stem(n, layout),
+            default_black_above=is_black_above,
             outline_width_mm_override=outline_w,
             black_note_narrow=is_narrow,
         )
@@ -302,7 +329,6 @@ class NoteDrawerMixin:
         self = cast("Editor", self)
         if getattr(self, 'is_tiny_mode', None) and self.is_tiny_mode():
             return
-        layout = self.current_score().layout
         # Show stop triangle if followed by a rest in same hand
         if not self._is_followed_by_rest(n):
             return
@@ -348,16 +374,19 @@ class NoteDrawerMixin:
         arp_y_overrides: dict[int, float] = getattr(self, '_arpeggio_y_overrides', {}) or {}
 
         for hand_key in ('l', 'r'):
-            hand_notes = list(cached_by_hand.get(hand_key, []) or [])
-            if not hand_notes:
+            cached_notes = list(cached_by_hand.get(hand_key, []) or [])
+            if cached_notes:
+                # Cache notes are pre-sorted by (time, pitch) – skip redundant sort.
+                hand_notes_sorted = cached_notes
+            else:
                 # Fallback when cache is unavailable/incomplete.
-                hand_notes = [
+                fallback_notes = [
                     n for n in notes_view
                     if ('l' if str(getattr(n, 'hand', 'l') or 'l') == 'l' else 'r') == hand_key
                 ]
-            if not hand_notes:
-                continue
-            hand_notes_sorted = sorted(hand_notes, key=lambda n: (float(getattr(n, 'time', 0.0) or 0.0), int(getattr(n, 'pitch', 0) or 0)))
+                if not fallback_notes:
+                    continue
+                hand_notes_sorted = sorted(fallback_notes, key=lambda n: (float(getattr(n, 'time', 0.0) or 0.0), int(getattr(n, 'pitch', 0) or 0)))
 
             i = 0
             while i < len(hand_notes_sorted):
@@ -425,11 +454,13 @@ class NoteDrawerMixin:
         if isinstance(cache, dict):
             cache['note_stem_metrics_by_id'] = stem_metrics_by_id
 
-    def _draw_note_continuation_dot(self, du: DrawUtil, n: Note, x: float, y1: float, y2: float, draw_mode: str) -> None:
+    def _draw_note_continuation_dot(self, du: DrawUtil, n: Note, x: float, y1: float, y2: float, draw_mode: str, *,
+                                    layout=None, double_bar_ticks_sorted: list | None = None) -> None:
         self = cast("Editor", self)
         if getattr(self, 'is_tiny_mode', None) and self.is_tiny_mode():
             return
-        layout = self.current_score().layout
+        if layout is None:
+            layout = self.current_score().layout
         # Draw dots where other notes in same hand start or end within this note duration
         hand = getattr(n, 'hand', 'l')
         start = float(n.time)
@@ -458,20 +489,27 @@ class NoteDrawerMixin:
         # Draw dots using notehead center for consistent positioning
         dot_d = w * 0.8
         dot_pitch = int(getattr(n, 'pitch', 0) or 0)
-        layout = self.current_score().layout
-        
-        # Build a set of double-barline tick positions to avoid overlap.
-        _double_bar_ticks: set[float] = {
-            float(getattr(ev, 'time', 0.0) or 0.0)
-            for ev in (getattr(self.current_score().events, 'double_bar', []) or [])
-        }
+
+        # Build sorted double-barline tick list once per frame (passed in from _draw_notes).
+        # Fall back to building it here if called outside the normal draw path.
+        if double_bar_ticks_sorted is None:
+            double_bar_ticks_sorted = sorted(
+                float(getattr(ev, 'time', 0.0) or 0.0)
+                for ev in (getattr(self.current_score().events, 'double_bar', []) or [])
+            )
+        thr = float(self._time_op.threshold)
         dot_x = float(self.pitch_to_x(dot_pitch))
         min_collision_gap = max(0.0, float(self.semitone_dist or 0.5) * 2.0 - 1e-6)
         for t in sorted(set(dot_times)):
             y_center = float(self.time_to_mm(t)) + w
             # Shift dot down one semitone when it lands on a double barline
             # so the two vertical lines don't overlap the dot.
-            if any(self._time_op.eq(float(t), dbt) for dbt in _double_bar_ticks):
+            # Bisect finds the leftmost candidate >= tf-thr; if it is also <= tf+thr
+            # then it is within the same ±thr window as _time_op.eq, replicating the
+            # original any(_time_op.eq(t, dbt) for dbt in ...) in O(log D) time.
+            tf = float(t)
+            lo = bisect.bisect_left(double_bar_ticks_sorted, tf - thr)
+            if lo < len(double_bar_ticks_sorted) and double_bar_ticks_sorted[lo] <= tf + thr:
                 y_center += float(self.semitone_dist or 0.5)
 
             # If another note starts at this exact time on adjacent pitch,
