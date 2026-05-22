@@ -13,7 +13,8 @@ if TYPE_CHECKING:
 class AccidentalDrawerMixin:
     """Draw accidental guide lines for notes with a valid non-zero `acc` value."""
 
-    def _draw_note_accidental(self, du: "DrawUtil", note: Note, x: float, y_start: float) -> None:
+    def _draw_note_accidental(self, du: "DrawUtil", note: Note, x: float, y_start: float, *,
+                              layout=None, is_black_above: bool | None = None) -> None:
         self = cast("Editor", self)
         acc = int(getattr(note, 'acc', 0) or 0)
         
@@ -23,13 +24,14 @@ class AccidentalDrawerMixin:
         if not Note.is_valid_accidental(note):
             return
 
-        score = self.current_score()
-        if score is None:
-            return
-        layout = score.layout
-
-        default_black_above = self._black_note_above_stem(note, layout)
-        spec = resolve_notehead_spec(note, default_black_above=default_black_above)
+        if layout is None:
+            score = self.current_score()
+            if score is None:
+                return
+            layout = score.layout
+        if is_black_above is None:
+            is_black_above = self._black_note_above_stem(note, layout)
+        spec = resolve_notehead_spec(note, default_black_above=is_black_above)
         is_above_stem = bool(getattr(spec, 'is_up', False))
 
         semitone = float(getattr(self, 'semitone_dist', 0.5) or 0.5)
