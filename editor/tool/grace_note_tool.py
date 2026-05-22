@@ -84,9 +84,13 @@ class GraceNoteTool(BaseTool):
         events = self._editor.current_events(score)
         if events is None:
             return None
-        for g in (getattr(events, 'grace_note', []) or []):
-            if self._grace_matches_cursor(g, x, y):
-                return g
+        hit_gid = None
+        if hasattr(self._editor, 'hit_test_grace_note_id'):
+            hit_gid = self._editor.hit_test_grace_note_id(x, y)
+        if hit_gid is not None:
+            for g in (getattr(events, 'grace_note', []) or []):
+                if int(getattr(g, '_id', -1) or -1) == int(hit_gid):
+                    return g
         return None
 
     def _delete_grace_note(self, x: float, y: float) -> None:

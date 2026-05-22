@@ -149,7 +149,7 @@ class StaveConfigDialog(DialogGeometryMixin, QtWidgets.QDialog):
         lay.setSpacing(8)
 
         self._score = score
-        self._active_stave_index = self._resolve_active_stave_index()
+        self._active_stave_index = 0
         self._line_breaks: list[LineBreak] = []
         self._selected_line_break: Optional[LineBreak] = selected_line_break if selected_line_break in self._line_breaks else (self._line_breaks[0] if self._line_breaks else None)
         self._measure_resolver = measure_resolver
@@ -352,14 +352,6 @@ class StaveConfigDialog(DialogGeometryMixin, QtWidgets.QDialog):
 
         QtCore.QTimer.singleShot(0, self._focus_first)
 
-        try:
-            parent = self.parent()
-            splitter = getattr(parent, 'splitter', None)
-            if splitter is not None and hasattr(splitter, 'staveSelectionRequested'):
-                splitter.staveSelectionRequested.connect(self.set_selected_stave_index)
-        except Exception:
-            pass
-
     def _stave_tab_title(self, stave_index: int) -> str:
         default_name = self.tr("Stave {idx}").format(idx=int(stave_index) + 1)
         stave_name = default_name
@@ -408,18 +400,6 @@ class StaveConfigDialog(DialogGeometryMixin, QtWidgets.QDialog):
         if self._suppress_tab_change:
             return
         self.set_selected_stave_index(int(tab_index))
-
-    def _resolve_active_stave_index(self) -> int:
-        if self._score is None:
-            return 0
-        staves = list(getattr(self._score, 'staves', []) or [])
-        if not staves:
-            return 0
-        try:
-            raw = int(getattr(getattr(self._score, 'app_state', None), 'selected_stave_index', 0) or 0)
-        except Exception:
-            raw = 0
-        return int(raw % len(staves))
 
     def _current_stave_events(self):
         if self._score is None:
@@ -561,12 +541,6 @@ class StaveConfigDialog(DialogGeometryMixin, QtWidgets.QDialog):
             self._update_stave_tabs()
             return
         self._active_stave_index = normalized
-        try:
-            app_state = getattr(self._score, 'app_state', None)
-            if app_state is not None:
-                app_state.selected_stave_index = int(normalized)
-        except Exception:
-            pass
         self._update_stave_tabs()
         self._reload_line_breaks(keep_row=True)
 

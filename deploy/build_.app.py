@@ -70,10 +70,7 @@ SKIPPED_SCAN_DIRS = {
 
 def copy_qt_licenses(app_path: Path) -> None:
     """Bundle Qt/PySide6 license files into the .app for compliance."""
-    try:
-        import PySide6  # type: ignore
-    except Exception:
-        return
+    import PySide6  # type: ignore
 
     qt_root = Path(getattr(PySide6, "__file__", "")).resolve().parent
     search_roots = [qt_root, qt_root / "Qt", qt_root / "Qt" / "LICENSES"]
@@ -524,6 +521,7 @@ def main() -> None:
         shutil.move(str(result_path), final_app_path)
         print(f"Copied .app to: {final_app_path}")
 
+        # cleanup
         if dmg_path and dmg_path.exists():
             final_dmg_path = output_dir / dmg_path.name
             if final_dmg_path.exists():

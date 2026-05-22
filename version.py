@@ -95,7 +95,6 @@ change_log = '''
 - [✓] added: Keyboard Shortcut Card under menu 'Help > Keyboard Shortcut Card'.
 - [✓] added: Escape exit confirmation dialog to prevent accidental exits.
 - [✓] added: dynamic symbol custom rotation option, allowing symbols to be rotated by a custom angle.
-- [] added: multiple staves per system support in the engraver, with proper horizontal spacing and alignment.
 - editor performance refactor: introduced centralized render caching (`editor/caching.py`) and wired drawers to reuse precomputed data.
 - optimized drawing hotspots in `grid`, `arpeggio`, `beam`, `slur`, `tempo`, `crescendo`, `decrescendo`, and `snap` drawers with viewport/time-window culling.
 - improved note/beam rendering pipeline by sharing note stem metrics and reducing repeated geometry work.
@@ -103,5 +102,6 @@ change_log = '''
 - general translation/string cleanup and internal drawing/refactor polish across related tools and dialogs.
 
 1.1.1 (2026-06-01)
+- [✓] added: multiple (4) staves per system support in the engraver and editor (stave switcher), with proper horizontal spacing and alignment.
 - changed under the hood: the editor's internal data structure now supports multiple staves per system
 '''

@@ -80,6 +80,11 @@ class HitTestingMixin:
         r = self.hit_test_hit_rect(x_mm, y_mm, "tempo")
         return int(r["_id"]) if r is not None else None
 
+    def hit_test_grace_note_id(self, x_px: float, y_px: float) -> int | None:
+        x_mm, y_mm = self._px_to_mm(x_px, y_px)
+        r = self.hit_test_hit_rect(x_mm, y_mm, "grace_note")
+        return int(r["_id"]) if r is not None else None
+
     def hit_test_arpeggio_handle(self, x_px: float, y_px: float) -> int | None:
         x_mm, y_mm = self._px_to_mm(x_px, y_px)
         r = self.hit_test_hit_rect(x_mm, y_mm, "arpeggio")

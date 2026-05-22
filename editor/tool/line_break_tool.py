@@ -258,11 +258,6 @@ class LineBreakTool(BaseTool):
             on_change=_apply_dialog_values,
         )
 
-        try:
-            dlg.set_selected_stave_index(int(getattr(score.app_state, 'selected_stave_index', 0) or 0))
-        except Exception:
-            pass
-
         def _on_accept() -> None:
             if hasattr(score, 'sync_linked_line_breaks'):
                 score.sync_linked_line_breaks()
