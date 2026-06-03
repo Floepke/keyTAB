@@ -283,11 +283,11 @@ class Editor(QtCore.QObject,
         for fn in methods:
             if fn is None:
                 continue
-            drawer_start = time.perf_counter()
+            # drawer_start = time.perf_counter()
             fn(du)
-            timing_rows.append((fn.__name__, (time.perf_counter() - drawer_start) * 1000.0))
+        #     timing_rows.append((fn.__name__, (time.perf_counter() - drawer_start) * 1000.0))
 
-        total_ms = (time.perf_counter() - frame_start) * 1000.0
+        # total_ms = (time.perf_counter() - frame_start) * 1000.0
         # print("NEW FRAME:")
         # for name, elapsed_ms in timing_rows:
         #     print(f"{name}={elapsed_ms:.3f} ms")

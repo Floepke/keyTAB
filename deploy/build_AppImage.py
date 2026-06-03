@@ -112,11 +112,8 @@ def ensure_appimage_tools(tools_dir: Path) -> Path:
     if not linuxdeploy.exists():
         urlretrieve(LINUXDEPLOY_URL, linuxdeploy)
     for tool in (linuxdeploy,):
-        try:
-            mode = tool.stat().st_mode
-            tool.chmod(mode | 0o111)
-        except Exception:
-            pass
+        mode = tool.stat().st_mode
+        tool.chmod(mode | 0o111)
     return linuxdeploy
 
 
