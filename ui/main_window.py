@@ -30,6 +30,7 @@ from engraver.engraver import Engraver as LegacyEngraver
 from editor.tool_manager import ToolManager
 from editor.editor import Editor
 from scripting.engine import ScriptEngine
+from midi.midi_input import MidiInputManager
 
 
 class MainWindow(QtWidgets.QMainWindow):
@@ -40,6 +41,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.setAcceptDrops(True)
         # Ensure player attribute always exists
         self.player = None
+        self.midi_input = None
         self._fluidsynth_missing_warned = False
         self._player_config: tuple[str, str] | None = None
         self._left_panel_width_frozen = False
@@ -290,6 +292,8 @@ class MainWindow(QtWidgets.QMainWindow):
         self.tool_manager = ToolManager(self.contextual_toolbar)
         self.editor_controller = Editor(self.tool_manager)
         self.editor_canvas.set_editor(self.editor_controller)
+        self.midi_input = MidiInputManager(self)
+        self.editor_controller.set_midi_input(self.midi_input)
         # Provide widget reference to editor for explicit full redraws
         try:
             self.editor_controller.widget = self.editor_canvas
@@ -3832,6 +3836,11 @@ class MainWindow(QtWidgets.QMainWindow):
             self._clock_timer.stop()
         # Fully dispose audio/MIDI backend so CoreMIDI/AudioToolbox threads are released
         self._dispose_player()
+        if hasattr(self, 'midi_input') and self.midi_input is not None:
+            try:
+                self.midi_input.shutdown()
+            except Exception:
+                pass
         # Stop playhead timer and clear overlay
         self._clear_playhead_overlay()
         # Close FX dialog if open

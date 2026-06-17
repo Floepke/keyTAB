@@ -40,6 +40,16 @@ class NoteTool(BaseTool):
         self._suppress_note_edit_until_release: bool = False
         self._notehead_dialog_active: bool = False
         self._pending_notehead_dialog_note_id: int | None = None
+        self._midi_input_enabled: bool = False
+        self._midi_active_counts: dict[int, int] = {}
+        self._midi_active_velocities: dict[int, int] = {}
+        self._midi_session_active: bool = False
+        self._midi_session_notes_by_pitch: dict[int, Note] = {}
+        self._midi_session_start_time: float = 0.0
+        self._midi_last_mouse_x: float = 0.0
+        self._midi_last_mouse_y: float = 0.0
+        self._midi_default_duration_units: float = float(SHORTEST_DURATION)
+        self._midi_connected_input = None
 
     def _play_note_on_edit_enabled(self) -> bool:
         try:
@@ -83,6 +93,13 @@ class NoteTool(BaseTool):
                 'rotation': 270.0 if editor_orientation == 'horizontal' else 0.0,
             },
             {
+                'name': 'midi_input_toggle',
+                'icon': 'midi',
+                'text': 'MIDI',
+                'active': bool(self._midi_input_enabled),
+                'tooltip': (QtCore.QCoreApplication.translate('NoteTool', 'MIDI input editing is on. Press keys/chords on a connected MIDI controller and adjust duration with mouse movement.') if self._midi_input_enabled else QtCore.QCoreApplication.translate('NoteTool', 'MIDI input editing is off. Toggle to enter notes/chords from connected MIDI controllers at cursor time.')),
+            },
+            {
                 'name': 'velocity_toggle',
                 'icon': 'velocity',
                 'text': 'Vel',
@@ -90,6 +107,198 @@ class NoteTool(BaseTool):
                 'tooltip': (QtCore.QCoreApplication.translate('NoteTool', 'Velocity editing is on. Toggle on/off to edit the note velocities using the sliders on the sides of the editor.') if self._velocity_mode else QtCore.QCoreApplication.translate('NoteTool', 'Velocity editing is off. Toggle on/off to edit the note velocities using the sliders on the sides of the editor.')),
             },
         ]
+
+    def _midi_input_manager(self):
+        if self._editor is None:
+            return None
+        getter = getattr(self._editor, 'get_midi_input', None)
+        if callable(getter):
+            return getter()
+        return getattr(self._editor, 'midi_input', None)
+
+    def _connect_midi_input(self) -> None:
+        mi = self._midi_input_manager()
+        if mi is None:
+            self._midi_connected_input = None
+            return
+        if self._midi_connected_input is mi:
+            return
+        if self._midi_connected_input is not None:
+            try:
+                self._midi_connected_input.note_on_received.disconnect(self._on_midi_note_on)
+            except Exception:
+                pass
+            try:
+                self._midi_connected_input.note_off_received.disconnect(self._on_midi_note_off)
+            except Exception:
+                pass
+        self._midi_connected_input = mi
+        try:
+            mi.note_on_received.connect(self._on_midi_note_on)
+        except Exception:
+            pass
+        try:
+            mi.note_off_received.connect(self._on_midi_note_off)
+        except Exception:
+            pass
+
+    def _set_midi_input_enabled(self, enabled: bool) -> None:
+        self._midi_input_enabled = bool(enabled)
+        self._connect_midi_input()
+        mi = self._midi_input_manager()
+        if mi is not None:
+            try:
+                mi.set_enabled(bool(enabled))
+            except Exception:
+                pass
+        if not self._midi_input_enabled:
+            self._finish_midi_session()
+            self._midi_active_counts.clear()
+            self._midi_active_velocities.clear()
+
+    @staticmethod
+    def _midi_note_to_app_pitch(midi_note: int) -> int:
+        return int(midi_note) - 20
+
+    def _current_mouse_time_and_hand(self) -> tuple[float, str]:
+        if self._editor is None:
+            return (0.0, 'l')
+        t_cursor = getattr(self._editor, 'time_cursor', None)
+        if t_cursor is None:
+            try:
+                t_cursor = float(self._editor.widget_px_to_time(self._midi_last_mouse_x, self._midi_last_mouse_y))
+            except Exception:
+                t_cursor = 0.0
+        t = float(self._editor.snap_time(float(t_cursor)))
+        hand = str(getattr(self._editor, 'hand_cursor', self._hand) or self._hand)
+        return (t, hand)
+
+    def _begin_or_update_midi_session(self) -> None:
+        if self._editor is None:
+            return
+        score: SCORE = self._editor.current_score()
+        if score is None:
+            return
+
+        pressed_app_pitches = sorted(
+            int(p) for p, c in self._midi_active_counts.items() if int(c) > 0 and 1 <= int(p) <= int(PIANO_KEY_AMOUNT)
+        )
+        if not pressed_app_pitches:
+            return
+
+        if not self._midi_session_active:
+            start_t, hand = self._current_mouse_time_and_hand()
+            self._midi_session_active = True
+            self._midi_session_start_time = float(start_t)
+            self._midi_session_notes_by_pitch = {}
+            self._editor.guides_active = False
+            units = float(getattr(self._editor, 'snap_size_units', SHORTEST_DURATION) or SHORTEST_DURATION)
+            self._midi_default_duration_units = float(max(float(SHORTEST_DURATION), units))
+
+            for pitch in pressed_app_pitches:
+                vel = int(max(0, min(127, int(self._midi_active_velocities.get(int(pitch), 64)))))
+                acc_preview = int(self.preview_accidental_for_pitch(int(pitch)))
+                n = score.new_note(
+                    pitch=int(pitch),
+                    time=float(start_t),
+                    duration=float(self._midi_default_duration_units),
+                    velocity=int(vel),
+                    hand=str(hand),
+                    acc=int(acc_preview),
+                )
+                self._midi_session_notes_by_pitch[int(pitch)] = n
+            self.edit_note = next(iter(self._midi_session_notes_by_pitch.values()), None)
+            self._editing_existing = False
+            self._duration_edit_armed = True
+            self._move_pitch_time_mode = False
+            self._editor.update_score_length()
+        else:
+            start_t = float(self._midi_session_start_time)
+            hand = str(getattr(self._editor, 'hand_cursor', self._hand) or self._hand)
+            for pitch in pressed_app_pitches:
+                if int(pitch) in self._midi_session_notes_by_pitch:
+                    continue
+                vel = int(max(0, min(127, int(self._midi_active_velocities.get(int(pitch), 64)))))
+                acc_preview = int(self.preview_accidental_for_pitch(int(pitch)))
+                n = score.new_note(
+                    pitch=int(pitch),
+                    time=float(start_t),
+                    duration=float(self._midi_default_duration_units),
+                    velocity=int(vel),
+                    hand=str(hand),
+                    acc=int(acc_preview),
+                )
+                self._midi_session_notes_by_pitch[int(pitch)] = n
+
+        self._apply_midi_duration_from_mouse()
+        if hasattr(self._editor, 'force_redraw_from_model'):
+            self._editor.force_redraw_from_model()
+        else:
+            self._editor.draw_frame()
+
+    def _apply_midi_duration_from_mouse(self) -> None:
+        if self._editor is None or not self._midi_session_active:
+            return
+        if not self._midi_session_notes_by_pitch:
+            return
+        start_t = float(self._midi_session_start_time)
+        cur_t_raw = float(self._editor.widget_px_to_time(self._midi_last_mouse_x, self._midi_last_mouse_y))
+        cur_t_snap = float(self._editor.snap_time(cur_t_raw))
+        units = float(max(float(SHORTEST_DURATION), getattr(self._editor, 'snap_size_units', SHORTEST_DURATION) or SHORTEST_DURATION))
+        duration = float(max(units, cur_t_snap - start_t))
+        for n in list(self._midi_session_notes_by_pitch.values()):
+            if n is None:
+                continue
+            if self._can_apply_duration(n, duration):
+                n.duration = float(duration)
+        self._editor.update_score_length()
+
+    def _finish_midi_session(self) -> None:
+        if self._editor is None:
+            return
+        if not self._midi_session_active:
+            return
+        self._midi_session_active = False
+        self._midi_session_notes_by_pitch = {}
+        self.edit_note = None
+        self._editing_existing = False
+        self._duration_edit_armed = False
+        self._move_pitch_time_mode = False
+        self._editor.guides_active = True
+        if hasattr(self._editor, '_snapshot_if_changed'):
+            self._editor._snapshot_if_changed(coalesce=True, label='midi_input_note')
+        if hasattr(self._editor, 'force_redraw_from_model'):
+            self._editor.force_redraw_from_model()
+        else:
+            self._editor.draw_frame()
+
+    @QtCore.Slot(int, int, str)
+    def _on_midi_note_on(self, midi_note: int, velocity: int, _port_name: str) -> None:
+        if not self._midi_input_enabled:
+            return
+        app_pitch = int(self._midi_note_to_app_pitch(int(midi_note)))
+        if app_pitch < 1 or app_pitch > int(PIANO_KEY_AMOUNT):
+            return
+        self._midi_active_counts[app_pitch] = int(self._midi_active_counts.get(app_pitch, 0) + 1)
+        self._midi_active_velocities[app_pitch] = int(max(0, min(127, int(velocity))))
+        self._begin_or_update_midi_session()
+
+    @QtCore.Slot(int, int, str)
+    def _on_midi_note_off(self, midi_note: int, _velocity: int, _port_name: str) -> None:
+        if not self._midi_input_enabled:
+            return
+        app_pitch = int(self._midi_note_to_app_pitch(int(midi_note)))
+        if app_pitch < 1 or app_pitch > int(PIANO_KEY_AMOUNT):
+            return
+        cur = int(self._midi_active_counts.get(app_pitch, 0))
+        if cur <= 1:
+            self._midi_active_counts.pop(app_pitch, None)
+            self._midi_active_velocities.pop(app_pitch, None)
+        else:
+            self._midi_active_counts[app_pitch] = int(cur - 1)
+
+        if not self._midi_active_counts:
+            self._finish_midi_session()
 
     @property
     def velocity_mode(self) -> bool:
@@ -174,6 +383,7 @@ class NoteTool(BaseTool):
 
     def on_activate(self) -> None:
         super().on_activate()
+        self._connect_midi_input()
         self._acc_toggle = 0
         self._velocity_mode = False
         self._velocity_dragging = False
@@ -187,6 +397,11 @@ class NoteTool(BaseTool):
             w = getattr(self._editor, 'widget')
             if hasattr(w, 'request_overlay_refresh'):
                 w.request_overlay_refresh()
+
+    def on_deactivate(self) -> None:
+        self._finish_midi_session()
+        self._set_midi_input_enabled(False)
+        super().on_deactivate()
 
     def _can_apply_duration(self, note: Note, candidate_duration: float) -> bool:
         score: SCORE = self._editor.current_score()
@@ -768,6 +983,14 @@ class NoteTool(BaseTool):
 
     def on_mouse_move(self, x: float, y: float) -> None:
         super().on_mouse_move(x, y)
+        self._midi_last_mouse_x = float(x)
+        self._midi_last_mouse_y = float(y)
+        if self._midi_input_enabled and self._midi_session_active:
+            self._apply_midi_duration_from_mouse()
+            if hasattr(self._editor, 'force_redraw_from_model'):
+                self._editor.force_redraw_from_model()
+            else:
+                self._editor.draw_frame()
 
     def on_key_press(self, key: int, modifiers) -> bool:
         if self._editor is None:
@@ -788,6 +1011,8 @@ class NoteTool(BaseTool):
             self._editor.hand_cursor = 'l'
         elif name == 'hand_right':
             self._editor.hand_cursor = 'r'
+        elif name == 'midi_input_toggle':
+            self._set_midi_input_enabled(not self._midi_input_enabled)
         elif name == 'velocity_toggle':
             self._velocity_mode = not self._velocity_mode
             self._velocity_dragging = False

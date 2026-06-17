@@ -55,6 +55,7 @@ from utils.operator import Operator
 from editor.hit_testing import HitTestingMixin
 from ui.widgets.draw_util import DrawUtil
 from midi.player import Player
+from midi.midi_input import MidiInputManager
 
 if TYPE_CHECKING:
     from editor.tool.base_tool import BaseTool
@@ -228,6 +229,7 @@ class Editor(QtCore.QObject,
         self._right_selection_mode: bool = False
         # player for auditioning
         self.player: Player = None
+        self.midi_input: MidiInputManager | None = None
 
     # ---- Drawing via mixins ----
     def draw_background_gray(self, du) -> None:
@@ -427,6 +429,12 @@ class Editor(QtCore.QObject,
 
     def set_player(self, player) -> None:
         self.player = player
+
+    def set_midi_input(self, midi_input: MidiInputManager | None) -> None:
+        self.midi_input = midi_input
+
+    def get_midi_input(self) -> MidiInputManager | None:
+        return self.midi_input
 
     def set_score(self, score):
         # Set an explicit score model when not using FileManager
