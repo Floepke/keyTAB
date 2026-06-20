@@ -160,9 +160,9 @@ class NoteTool(BaseTool):
     def _midi_note_to_app_pitch(midi_note: int) -> int:
         return int(midi_note) - 20
 
-    def _current_mouse_time_and_hand(self) -> tuple[float, str]:
+    def _current_mouse_time_and_split_pitch(self) -> tuple[float, int]:
         if self._editor is None:
-            return (0.0, 'l')
+            return (0.0, 40)
         t_cursor = getattr(self._editor, 'time_cursor', None)
         if t_cursor is None:
             try:
@@ -170,8 +170,18 @@ class NoteTool(BaseTool):
             except Exception:
                 t_cursor = 0.0
         t = float(self._editor.snap_time(float(t_cursor)))
-        hand = str(getattr(self._editor, 'hand_cursor', self._hand) or self._hand)
-        return (t, hand)
+        split_pitch = getattr(self._editor, 'pitch_cursor', None)
+        if split_pitch is None:
+            try:
+                split_pitch = int(self._editor.widget_px_to_pitch(self._midi_last_mouse_x, self._midi_last_mouse_y))
+            except Exception:
+                split_pitch = 40
+        split_pitch = int(max(1, min(int(PIANO_KEY_AMOUNT), int(split_pitch))))
+        return (t, split_pitch)
+
+    @staticmethod
+    def _midi_hand_from_split(note_pitch: int, split_pitch: int) -> str:
+        return 'l' if int(note_pitch) <= int(split_pitch) else 'r'
 
     def _begin_or_update_midi_session(self) -> None:
         if self._editor is None:
@@ -187,7 +197,7 @@ class NoteTool(BaseTool):
             return
 
         if not self._midi_session_active:
-            start_t, hand = self._current_mouse_time_and_hand()
+            start_t, split_pitch = self._current_mouse_time_and_split_pitch()
             self._midi_session_active = True
             self._midi_session_start_time = float(start_t)
             self._midi_session_notes_by_pitch = {}
@@ -203,7 +213,7 @@ class NoteTool(BaseTool):
                     time=float(start_t),
                     duration=float(self._midi_default_duration_units),
                     velocity=int(vel),
-                    hand=str(hand),
+                    hand=str(self._midi_hand_from_split(int(pitch), int(split_pitch))),
                     acc=int(acc_preview),
                 )
                 self._midi_session_notes_by_pitch[int(pitch)] = n
@@ -214,7 +224,7 @@ class NoteTool(BaseTool):
             self._editor.update_score_length()
         else:
             start_t = float(self._midi_session_start_time)
-            hand = str(getattr(self._editor, 'hand_cursor', self._hand) or self._hand)
+            _cur_t, split_pitch = self._current_mouse_time_and_split_pitch()
             for pitch in pressed_app_pitches:
                 if int(pitch) in self._midi_session_notes_by_pitch:
                     continue
@@ -225,7 +235,7 @@ class NoteTool(BaseTool):
                     time=float(start_t),
                     duration=float(self._midi_default_duration_units),
                     velocity=int(vel),
-                    hand=str(hand),
+                    hand=str(self._midi_hand_from_split(int(pitch), int(split_pitch))),
                     acc=int(acc_preview),
                 )
                 self._midi_session_notes_by_pitch[int(pitch)] = n
