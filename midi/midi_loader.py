@@ -336,7 +336,11 @@ def midi_analyze_tracks(path: str) -> List[dict]:
 # Public entry point
 # ---------------------------------------------------------------------------
 
-def midi_load(path: str, track_assignments: Dict[int, str] | None = None) -> SCORE:
+def midi_load(
+    path: str,
+    track_assignments: Dict[int, object] | None = None,
+    target_stave_index: int | None = None,
+) -> SCORE:
     """Load a MIDI file and convert it to a SCORE model.
 
     Uses a pure-Python byte-level parser with no dependency on mido or
@@ -345,12 +349,13 @@ def midi_load(path: str, track_assignments: Dict[int, str] | None = None) -> SCO
 
     Args:
         path:             Path to the MIDI file.
-        track_assignments: Optional dict mapping 0-based track index to 'l'
-                           (left hand), 'r' (right hand), or 'skip'. When
-                           provided, the assigned hand overrides the default
-                           pitch-based heuristic; 'skip' excludes all notes
-                           from that track.  When None, the original
-                           pitch-based heuristic is used for every note.
+        track_assignments: Optional dict mapping 0-based track index to either:
+                   - 'l' | 'r' | 'skip' (legacy format), or
+                   - {'hand': 'l'|'r'|'skip', 'stave': int}
+                   When provided, hand overrides the default heuristic;
+                   'skip' excludes that track.
+        target_stave_index: Optional 0-based stave index where imported notes
+                           should be written. When None, stave 0 is used.
     """
     p = Path(path)
     if not p.exists():
@@ -380,6 +385,25 @@ def midi_load(path: str, track_assignments: Dict[int, str] | None = None) -> SCO
     score.tempo = []
     score.info.title = str(p.stem or score.info.title)
 
+    # Global/default destination stave fallback.
+    staves = list(getattr(score, 'staves', []) or [])
+    stave_count = max(1, len(staves))
+    if target_stave_index is None:
+        target_idx = 0
+    else:
+        target_idx = int(int(target_stave_index) % stave_count)
+    try:
+        score.app_state.selected_stave_index = int(target_idx)
+    except Exception:
+        pass
+    target_events = score.stave_events_at(target_idx)
+    if target_events is not None:
+        score.events = target_events
+    try:
+        score.staves[target_idx].enabled = True
+    except Exception:
+        pass
+
     # Tempo markers
     seen_tick: set[int] = set()
     for tick_pos, tempo_us in tempo_map:
@@ -397,15 +421,35 @@ def midi_load(path: str, track_assignments: Dict[int, str] | None = None) -> SCO
     # Drum channel (MIDI ch 9) is skipped.
     max_end_tick = 0
     for track_idx, track in enumerate(tracks):
-        # Determine hand override for this track (if assignments provided)
+        # Determine per-track hand/stave override.
+        track_hand: str | None = None
+        track_target_idx = int(target_idx)
         if track_assignments is not None:
-            track_hand = track_assignments.get(track_idx)
-            if track_hand == 'skip':
-                continue  # exclude this track entirely
-            if track_hand not in ('l', 'r'):
-                track_hand = None  # fall back to pitch heuristic
-        else:
-            track_hand = None  # always use pitch heuristic
+            track_spec = track_assignments.get(track_idx)
+            if isinstance(track_spec, dict):
+                hand_candidate = str(track_spec.get('hand', '') or '').strip()
+                if hand_candidate == 'skip':
+                    continue  # exclude this track entirely
+                if hand_candidate in ('l', 'r'):
+                    track_hand = hand_candidate
+                try:
+                    track_target_idx = int(int(track_spec.get('stave', target_idx) or target_idx) % stave_count)
+                except Exception:
+                    track_target_idx = int(target_idx)
+            else:
+                hand_candidate = str(track_spec or '').strip()
+                if hand_candidate == 'skip':
+                    continue  # exclude this track entirely
+                if hand_candidate in ('l', 'r'):
+                    track_hand = hand_candidate
+
+        track_events = score.stave_events_at(track_target_idx)
+        if track_events is not None:
+            score.events = track_events
+        try:
+            score.staves[track_target_idx].enabled = True
+        except Exception:
+            pass
 
         open_notes: Dict[Tuple[int, int], List[Tuple[int, int]]] = {}
         for ev in track:

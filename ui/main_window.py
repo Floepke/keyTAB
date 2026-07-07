@@ -2243,30 +2243,68 @@ class MainWindow(QtWidgets.QMainWindow):
         # Snapshot the current score so we can restore it on cancel.
         preview = PreviewSession(self.file_manager, self.editor_controller, parent=self, debounce_ms=80)
         latest_assignments: dict = {}
+        try:
+            default_stave_index = int(self.editor_controller.selected_stave_index())
+        except Exception:
+            default_stave_index = 0
 
         def _reload_with_assignments(assignments: dict) -> None:
-            """Reload MIDI with the given hand assignments and refresh the view."""
+            """Reload MIDI with the given import options and refresh the view."""
             sc = midi_load(path, track_assignments=assignments)
             if hasattr(sc, '_normalize_events_after_load'):
                 sc._normalize_events_after_load()
             self.file_manager.replace_current(sc)
 
-        def _schedule_live_preview(assignments: dict) -> None:
+        def _schedule_live_preview() -> None:
             nonlocal latest_assignments
-            latest_assignments = dict(assignments or {})
             preview.schedule_preview(
                 mutator=lambda: _reload_with_assignments(latest_assignments),
                 restore_first=False,
             )
 
+        def _on_assignments_changed(assignments: dict) -> None:
+            nonlocal latest_assignments
+            latest_assignments = dict(assignments or {})
+            _schedule_live_preview()
+
+        def _first_selected_stave(assignments: dict, fallback: int) -> int:
+            chosen = []
+            for item in (assignments or {}).values():
+                if not isinstance(item, dict):
+                    continue
+                if str(item.get('hand', 'r')) == 'skip':
+                    continue
+                try:
+                    chosen.append(int(item.get('stave', fallback)))
+                except Exception:
+                    continue
+            if not chosen:
+                return int(fallback)
+            try:
+                return int(chosen[0])
+            except Exception:
+                return int(fallback)
+
         # Initial load with default assignments so the editor shows a preview right away.
-        initial_assignments = {ti['index']: ti['default_hand'] for ti in track_infos}
+        initial_assignments = {
+            ti['index']: {
+                'hand': ti['default_hand'],
+                'stave': int(default_stave_index),
+            }
+            for ti in track_infos
+        }
+        latest_assignments = dict(initial_assignments)
         _reload_with_assignments(initial_assignments)
         preview.refresh()
 
         # Build and show the dialog.
-        dlg = MidiImportDialog(track_infos=track_infos, parent=self)
-        dlg.assignments_changed.connect(_schedule_live_preview)
+        dlg = MidiImportDialog(
+            track_infos=track_infos,
+            parent=self,
+            available_staves=4,
+            default_stave_index=default_stave_index,
+        )
+        dlg.assignments_changed.connect(_on_assignments_changed)
 
         result = dlg.exec()
 
@@ -2290,6 +2328,12 @@ class MainWindow(QtWidgets.QMainWindow):
             )
             # Extra safety: fully rebind and refresh views so the final imported
             # state is always visible immediately after pressing OK.
+            try:
+                self.editor_controller.set_selected_stave_index(
+                    _first_selected_stave(dlg.get_assignments(), fallback=default_stave_index)
+                )
+            except Exception:
+                pass
             try:
                 self.editor_controller.set_score(self.file_manager.current())
             except Exception:

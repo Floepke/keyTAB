@@ -255,6 +255,7 @@ def write_mime_package(appdir: Path, name: str) -> Path:
         "<mime-info xmlns=\"http://www.freedesktop.org/standards/shared-mime-info\">\n"
         f"  <mime-type type=\"{MIME_TYPE_KEYTAB}\">\n"
         "    <comment>keyTAB score</comment>\n"
+        "    <glob pattern=\"*.keytab\"/>\n"
         "    <glob pattern=\"*.piano\"/>\n"
         "  </mime-type>\n"
         "  <mime-type type=\"application/vnd.recordare.musicxml+xml\">\n"

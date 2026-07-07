@@ -8,7 +8,19 @@ import multiprocessing as mp
 
 
 def _install_fluidsynth_warning_filter() -> None:
-    """Globally filter 'fluidsynth: warning: ' lines from native stderr (fd 2)."""
+    """Filter known noisy native stderr lines while preserving real errors."""
+    ignored_prefixes = (
+        b"fluidsynth: warning: ",
+        b"(process:",
+    )
+    ignored_glib_fragments = (
+        b"GLib-GObject-CRITICAL",
+        b"g_param_spec_enum: assertion ",
+        b"validate_pspec_to_install: assertion ",
+        b"g_param_spec_ref_sink: assertion ",
+        b"g_param_spec_unref: assertion ",
+    )
+
     saved = os.dup(2)
     r_fd, w_fd = os.pipe()
     os.dup2(w_fd, 2)
@@ -26,6 +38,10 @@ def _install_fluidsynth_warning_filter() -> None:
             buf += chunk
             while b"\n" in buf:
                 line, buf = buf.split(b"\n", 1)
+                if line.startswith(ignored_prefixes) and any(
+                    fragment in line for fragment in ignored_glib_fragments
+                ):
+                    continue
                 if not line.startswith(b"fluidsynth: warning: "):
                     try:
                         os.write(saved, line + b"\n")
@@ -204,6 +220,7 @@ def _write_mime_package() -> None:
         "<mime-info xmlns=\"http://www.freedesktop.org/standards/shared-mime-info\">\n"
         f"  <mime-type type=\"{MIME_TYPE_KEYTAB}\">\n"
         "    <comment>keyTAB score</comment>\n"
+        "    <glob pattern=\"*.keytab\"/>\n"
         "    <glob pattern=\"*.piano\"/>\n"
         "  </mime-type>\n"
         "  <mime-type type=\"application/vnd.recordare.musicxml+xml\">\n"
@@ -285,7 +302,7 @@ def prompt_install_if_needed() -> None:
         QtCore.QCoreApplication.translate("keyTAB", "<b>Install keyTAB for desktop integration?</b><br><br>")
         + QtCore.QCoreApplication.translate("keyTAB", "This will:<ul>")
         + QtCore.QCoreApplication.translate("keyTAB", "<li>Add keyTAB to your application menu</li>")
-        + QtCore.QCoreApplication.translate("keyTAB", "<li>Associate .piano, .mid/.midi, and .musicxml/.mxl files with keyTAB</li>")
+        + QtCore.QCoreApplication.translate("keyTAB", "<li>Associate .keytab/.piano, .mid/.midi, and .musicxml/.mxl files with keyTAB</li>")
         + QtCore.QCoreApplication.translate("keyTAB", "<li>Copy this AppImage to a stable location in your home folder</li>")
         + QtCore.QCoreApplication.translate("keyTAB", "</ul>")
         + QtCore.QCoreApplication.translate("keyTAB", "You can remove the integration later by deleting the desktop entry in ")

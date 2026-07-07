@@ -6,19 +6,25 @@ from ui.dialogs import DialogGeometryMixin
 
 class MidiImportDialog(DialogGeometryMixin, QtWidgets.QDialog):
     DIALOG_KEY = "midi_import"
-    """Dialog for assigning MIDI tracks to left/right hand before import.
+    """Dialog for assigning MIDI tracks to hand and stave before import.
 
     Displays a table with one row per non-empty, non-drum track.
-    Each row shows track number, name, note count, pitch range, and a
-    combo box to assign the track to left hand / right hand / skip.
+    Each row shows track number, name, note count, pitch range, and
+    combo boxes to assign hand (left/right/skip) and destination stave.
 
     The ``assignments_changed`` signal is emitted whenever the user changes
     any assignment; callers can wire this to a live-preview refresh.
     """
 
-    assignments_changed = QtCore.Signal(dict)  # {track_index: 'l' | 'r' | 'skip'}
+    assignments_changed = QtCore.Signal(dict)  # {track_index: {'hand': str, 'stave': int}}
 
-    def __init__(self, track_infos: list[dict], parent=None) -> None:
+    def __init__(
+        self,
+        track_infos: list[dict],
+        parent=None,
+        available_staves: int = 4,
+        default_stave_index: int = 0,
+    ) -> None:
         super().__init__(parent)
         self.setWindowFlag(QtCore.Qt.WindowType.WindowMinMaxButtonsHint, True)
         self.setSizeGripEnabled(True)
@@ -26,7 +32,10 @@ class MidiImportDialog(DialogGeometryMixin, QtWidgets.QDialog):
         self.setModal(True)
 
         self._track_infos = track_infos
-        self._combos: dict[int, QtWidgets.QComboBox] = {}
+        self._hand_combos: dict[int, QtWidgets.QComboBox] = {}
+        self._stave_combos: dict[int, QtWidgets.QComboBox] = {}
+        self._available_staves = max(1, int(available_staves or 1))
+        self._default_stave_index = max(0, min(self._available_staves - 1, int(default_stave_index or 0)))
 
         self._build_ui()
 
@@ -42,8 +51,8 @@ class MidiImportDialog(DialogGeometryMixin, QtWidgets.QDialog):
         # Explanation
         info = QtWidgets.QLabel(
             self.tr(
-                "Assign each MIDI track to a hand. "
-                "Notes are placed in the assigned hand during import.\n"
+                "Assign each MIDI track to a hand and destination stave.\n"
+                "Notes are placed in the assigned hand on the selected stave during import.\n"
                 "Choose 'Skip' to exclude a track entirely."
             ),
             self,
@@ -53,13 +62,14 @@ class MidiImportDialog(DialogGeometryMixin, QtWidgets.QDialog):
 
         # Track table
         self.table = QtWidgets.QTableWidget(self)
-        self.table.setColumnCount(5)
+        self.table.setColumnCount(6)
         self.table.setHorizontalHeaderLabels([
             self.tr("Track"),
             self.tr("Name"),
             self.tr("Notes"),
             self.tr("Pitch range"),
             self.tr("Hand"),
+            self.tr("Stave"),
         ])
         self.table.setSelectionMode(QtWidgets.QAbstractItemView.SelectionMode.NoSelection)
         self.table.setEditTriggers(QtWidgets.QAbstractItemView.EditTrigger.NoEditTriggers)
@@ -69,6 +79,7 @@ class MidiImportDialog(DialogGeometryMixin, QtWidgets.QDialog):
         self.table.horizontalHeader().setSectionResizeMode(2, QtWidgets.QHeaderView.ResizeMode.ResizeToContents)
         self.table.horizontalHeader().setSectionResizeMode(3, QtWidgets.QHeaderView.ResizeMode.ResizeToContents)
         self.table.horizontalHeader().setSectionResizeMode(4, QtWidgets.QHeaderView.ResizeMode.ResizeToContents)
+        self.table.horizontalHeader().setSectionResizeMode(5, QtWidgets.QHeaderView.ResizeMode.ResizeToContents)
         self.table.setAlternatingRowColors(True)
 
         self.table.setRowCount(len(self._track_infos))
@@ -140,25 +151,57 @@ class MidiImportDialog(DialogGeometryMixin, QtWidgets.QDialog):
         combo.currentTextChanged.connect(self._on_assignment_changed)
         combo.activated.connect(lambda _idx: self._on_assignment_changed())
         self.table.setCellWidget(row, 4, combo)
-        self._combos[track_idx] = combo
+        self._hand_combos[track_idx] = combo
+
+        stave_combo = QtWidgets.QComboBox(self)
+        for sidx in range(self._available_staves):
+            stave_combo.addItem(self.tr("Stave {0}").format(sidx + 1), sidx)
+        default_stave_idx = int(ti.get('default_stave_index', self._default_stave_index) or self._default_stave_index)
+        default_stave_idx = max(0, min(self._available_staves - 1, default_stave_idx))
+        stave_data_idx = stave_combo.findData(default_stave_idx)
+        if stave_data_idx >= 0:
+            stave_combo.setCurrentIndex(stave_data_idx)
+        stave_combo.currentIndexChanged.connect(self._on_assignment_changed)
+        stave_combo.currentTextChanged.connect(self._on_assignment_changed)
+        stave_combo.activated.connect(lambda _idx: self._on_assignment_changed())
+        self.table.setCellWidget(row, 5, stave_combo)
+        self._stave_combos[track_idx] = stave_combo
+        self._sync_row_enabled_state(track_idx)
 
     # ------------------------------------------------------------------
     # Public API
     # ------------------------------------------------------------------
 
-    def get_assignments(self) -> dict[int, str]:
-        """Return current {track_index: 'l' | 'r' | 'skip'} mapping."""
-        return {idx: str(combo.currentData() or 'r') for idx, combo in self._combos.items()}
+    def get_assignments(self) -> dict[int, dict[str, int | str]]:
+        """Return current {track_index: {'hand': 'l'|'r'|'skip', 'stave': int}} mapping."""
+        out: dict[int, dict[str, int | str]] = {}
+        for idx, hand_combo in self._hand_combos.items():
+            hand = str(hand_combo.currentData() or 'r')
+            stave_combo = self._stave_combos.get(idx)
+            try:
+                stave_index = int(stave_combo.currentData() or 0) if stave_combo is not None else 0
+            except Exception:
+                stave_index = 0
+            out[idx] = {'hand': hand, 'stave': int(stave_index)}
+        return out
 
     # ------------------------------------------------------------------
     # Internal
     # ------------------------------------------------------------------
 
     def _has_any_imported_track(self) -> bool:
-        for combo in self._combos.values():
+        for combo in self._hand_combos.values():
             if str(combo.currentData() or 'r') != 'skip':
                 return True
         return False
+
+    def _sync_row_enabled_state(self, track_idx: int) -> None:
+        hand_combo = self._hand_combos.get(track_idx)
+        stave_combo = self._stave_combos.get(track_idx)
+        if hand_combo is None or stave_combo is None:
+            return
+        is_skip = str(hand_combo.currentData() or 'r') == 'skip'
+        stave_combo.setEnabled(not is_skip)
 
     def _update_validation_ui(self) -> None:
         ok_btn = self._btns.button(QtWidgets.QDialogButtonBox.StandardButton.Ok) if hasattr(self, '_btns') else None
@@ -173,5 +216,7 @@ class MidiImportDialog(DialogGeometryMixin, QtWidgets.QDialog):
                 ok_btn.setEnabled(False)
 
     def _on_assignment_changed(self) -> None:
+        for track_idx in self._hand_combos.keys():
+            self._sync_row_enabled_state(track_idx)
         self._update_validation_ui()
         self.assignments_changed.emit(self.get_assignments())
