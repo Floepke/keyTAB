@@ -25,6 +25,53 @@ class GridBandTool(BaseTool):
         self._drag_initial_durations: dict[str, float] = {}
         self._drag_hands: list[str] = []
 
+    def toolbar_spec(self) -> list[dict]:
+        return [
+            {
+                'name': 'clear_all_grid_bands',
+                'text': 'X',
+                'icon': '',
+                'tooltip': 'Clear all grid band markers.',
+            }
+        ]
+
+    def on_toolbar_button(self, name: str) -> None:
+        if name != 'clear_all_grid_bands':
+            return
+        score = self._score()
+        if score is None:
+            return
+        layout = getattr(score, 'layout', None)
+        if layout is None:
+            return
+
+        had_any = bool(list(getattr(layout, 'grid_band_track', []) or []))
+        if not had_any:
+            had_any = bool(list(getattr(layout, 'grid_band_left_track', []) or []))
+        if not had_any:
+            had_any = bool(list(getattr(layout, 'grid_band_right_track', []) or []))
+
+        setattr(layout, 'grid_band_track', [])
+        try:
+            setattr(layout, 'grid_band_left_track', [])
+            setattr(layout, 'grid_band_right_track', [])
+        except Exception:
+            pass
+
+        self._drag_marker = None
+        self._drag_markers = {}
+        self._drag_initial_durations = {}
+        self._drag_hands = []
+        self._press_hit = None
+
+        if self._editor is not None and had_any:
+            self._editor._snapshot_if_changed(coalesce=True, label='grid_band_clear_all')
+        elif self._editor is not None:
+            if hasattr(self._editor, 'force_redraw_from_model'):
+                self._editor.force_redraw_from_model()
+            else:
+                self._editor.draw_frame()
+
     # ---- Helpers ----
     def _score(self) -> Optional[SCORE]:
         try:
