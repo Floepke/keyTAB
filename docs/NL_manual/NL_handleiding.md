@@ -1,4 +1,4 @@
-# keyTAB Handleiding (NL)
+# keyTAB Handleiding (NL) v1.1.1
 
 ## 1. Doel van deze handleiding
 
@@ -14,7 +14,7 @@ keyTAB is opgebouwd uit drie hoofdgebieden die u tegelijk ziet:
 
 Tussen de Editor en de Print View staat een verticale toolbar met snelle acties.
 
-![Overzicht van de interface](./img/interface_annotated.png)
+![Overzicht van de interface](./img/interface.png)
 
 ## 3. Basisbediening met de muis
 
@@ -39,11 +39,13 @@ De Tool Selector bestaat uit twee onderdelen:
 
 Van boven naar beneden:
 
+![Verticale toolbar tussen Editor en Print View](./img/vertical_toolbar_annotated.png)
+
 1. Fit-knop (fit/splitter)
    Past de pagina in beeld in de Print View. Via deze knop/splitter kunt u ook de verhouding tussen Editor en Print View aanpassen.
 
 2. Stave selector (+, nummer, -)
-   Selecteert de actieve stave (balk). Met plus/min kiest u respectievelijk de volgende of vorige stave.
+   Selecteert de actieve stave (balk). Met plus/min kiest u respectievelijk de volgende of vorige balk. Er zijn in totaal 4 beschikbare notenbalken. U kunt de beschikbare notenbalken aan of uit zetten in de line break editor: ![](./img/line_break_editor_icon.png)
 
 3. Volgende pagina
    Ga naar de volgende afdrukpagina.
@@ -299,11 +301,3 @@ Gebruik dit venster voor:
 3. Verdeling van de muziek over de pagina's
 
 Tip: werk eerst muzikaal inhoudelijk, en verfijn daarna de pagina-indeling in een laatste opmaakronde.
-
-## 10. Snelle Start In 5 Stappen
-
-1. Kies links een tool (bijvoorbeeld Noot)
-2. Plaats en bewerk noten in de Editor
-3. Controleer resultaat in de Print View
-4. Gebruik Style en Info voor opmaak en documentgegevens
-5. Gebruik Line Breaks om de pagina-opbouw af te ronden

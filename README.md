@@ -70,6 +70,13 @@ Welcome to **keyTAB**, a passion project for creating, editing, and engraving Kl
 	- `bash utils/build_translations.sh`
 - Restart keyTAB to apply language changes.
 
+## Manual PDF build
+- The Dutch manual lives in `docs/NL_manual/NL_handleiding.md`.
+- Start the watcher with `bash utils/build_manual_pdf_watch.sh`.
+- It writes `docs/NL_manual/NL_handleiding.pdf` and rebuilds it when the markdown or images change.
+- The watcher uses the project venv plus `pypandoc-binary` and `weasyprint`.
+- If you change the venv, reinstall those packages and rerun the watcher.
+
 ## Project Status
 Active and evolving. Expect iterative improvements and occasional breaking changes while features solidify.
 
