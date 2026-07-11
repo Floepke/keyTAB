@@ -9,21 +9,53 @@ from pathlib import Path
 from typing import List, Optional, Tuple
 
 import mido
-import traceback
 from symbol_design.noteheads import resolve_notehead_spec, sheared_notehead_outline_points, sheared_notehead_support_v, support_point_from_outline_points
 
 fluidsynth = None
 _FLUIDSYNTH_AVAILABLE = True
 _FLUIDSYNTH_IMPORT_ERROR = ""
 _FLUIDSYNTH_GAIN_MAX = 4.0
+_MIDO_BACKEND_SELECTED = "mido-default"
+_MIDO_BACKEND_ERRORS: list[str] = []
+
+
+def _mido_backend_candidates() -> list[str]:
+    env_backend = str(os.environ.get("MIDO_BACKEND", "") or "").strip()
+    candidates: list[str] = []
+    if env_backend:
+        candidates.append(env_backend)
+    candidates.append("mido.backends.rtmidi")
+    if sys.platform.startswith("win"):
+        candidates.append("mido.backends.pygame")
+
+    unique: list[str] = []
+    seen: set[str] = set()
+    for name in candidates:
+        key = str(name).strip().lower()
+        if not key or key in seen:
+            continue
+        seen.add(key)
+        unique.append(str(name).strip())
+    return unique
 
 
 def _mido_io_backend():
     """Prefer explicit RtMidi backend; fall back to mido default backend."""
-    try:
-        return mido.Backend("mido.backends.rtmidi")
-    except Exception:
-        return mido
+    global _MIDO_BACKEND_SELECTED, _MIDO_BACKEND_ERRORS
+
+    errors: list[str] = []
+    for backend_name in _mido_backend_candidates():
+        try:
+            backend = mido.Backend(backend_name)
+            _MIDO_BACKEND_SELECTED = backend_name
+            _MIDO_BACKEND_ERRORS = errors
+            return backend
+        except Exception as exc:
+            errors.append(f"{backend_name}: {exc}")
+
+    _MIDO_BACKEND_SELECTED = str(getattr(mido, "backend", "mido-default") or "mido-default")
+    _MIDO_BACKEND_ERRORS = errors
+    return mido
 
 
 def _is_fluidsynth_port(name: str) -> bool:
@@ -43,9 +75,9 @@ def list_midi_output_ports() -> List[str]:
     try:
         backend = _mido_io_backend()
         names = list(backend.get_output_names() or [])
-    except Exception:
+    except Exception as exc:
         names = []
-        traceback.print_exc()
+        _MIDO_BACKEND_ERRORS.append(f"get_output_names: {exc}")
     filtered: list[str] = []
     for n in names:
         if not str(n).strip():
@@ -55,10 +87,12 @@ def list_midi_output_ports() -> List[str]:
         filtered.append(str(n))
     if not filtered:
         try:
+            errors = "; ".join(_MIDO_BACKEND_ERRORS[:3]) if _MIDO_BACKEND_ERRORS else "none"
             sys.stderr.write(
-                "[midi] No MIDI outputs discovered. backend=%s rtmidi=%s\n" % (
-                    getattr(mido, "backend", ""),
+                "[midi] No MIDI outputs discovered. backend=%s rtmidi=%s errors=%s\n" % (
+                    _MIDO_BACKEND_SELECTED,
                     getattr(sys.modules.get("rtmidi"), "__version__", "unknown"),
+                    errors,
                 )
             )
         except Exception:

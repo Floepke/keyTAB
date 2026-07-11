@@ -9,6 +9,10 @@ import multiprocessing as mp
 
 def _install_fluidsynth_warning_filter() -> None:
     """Filter known noisy native stderr lines while preserving real errors."""
+    # This low-level fd redirection is not reliable on Windows consoles.
+    if os.name == "nt":
+        return
+
     ignored_prefixes = (
         b"fluidsynth: warning: ",
         b"(process:",
@@ -21,10 +25,13 @@ def _install_fluidsynth_warning_filter() -> None:
         b"g_param_spec_unref: assertion ",
     )
 
-    saved = os.dup(2)
-    r_fd, w_fd = os.pipe()
-    os.dup2(w_fd, 2)
-    os.close(w_fd)
+    try:
+        saved = os.dup(2)
+        r_fd, w_fd = os.pipe()
+        os.dup2(w_fd, 2)
+        os.close(w_fd)
+    except OSError:
+        return
 
     def _relay() -> None:
         buf = b""
@@ -47,6 +54,12 @@ def _install_fluidsynth_warning_filter() -> None:
                         os.write(saved, line + b"\n")
                     except OSError:
                         pass
+
+        if buf and not buf.startswith(b"fluidsynth: warning: "):
+            try:
+                os.write(saved, buf)
+            except OSError:
+                pass
 
     threading.Thread(target=_relay, daemon=True).start()
 

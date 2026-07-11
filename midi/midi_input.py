@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import os
+import sys
 from typing import Any
 
 import mido
@@ -24,10 +26,25 @@ class MidiInputManager(QtCore.QObject):
         self._poll_timer.timeout.connect(self.refresh_ports)
 
     def _resolve_backend(self):
-        try:
-            return mido.Backend("mido.backends.rtmidi")
-        except Exception:
-            return mido
+        env_backend = str(os.environ.get("MIDO_BACKEND", "") or "").strip()
+        candidates: list[str] = []
+        if env_backend:
+            candidates.append(env_backend)
+        candidates.append("mido.backends.rtmidi")
+        if sys.platform.startswith("win"):
+            candidates.append("mido.backends.pygame")
+
+        seen: set[str] = set()
+        for backend_name in candidates:
+            key = str(backend_name).strip().lower()
+            if not key or key in seen:
+                continue
+            seen.add(key)
+            try:
+                return mido.Backend(str(backend_name).strip())
+            except Exception:
+                continue
+        return mido
 
     def is_enabled(self) -> bool:
         return bool(self._enabled)
