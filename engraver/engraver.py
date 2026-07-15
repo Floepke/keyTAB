@@ -744,6 +744,35 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
             return True
         return op_time.gt(float(min_delta), 0.0)
 
+    def _resolve_arpeggio_chord_notes(notes: list[dict], base_time: float, pitches: tuple[int, ...]) -> list[dict]:
+        """Resolve chord notes for an arpeggio at `base_time`.
+
+        Prefer notes that start exactly at the arpeggio time, but fall back to
+        notes that are already active there so line-break continuations engrave
+        the same way as chords that begin at time zero.
+        """
+        resolved: list[dict] = []
+        for pitch in pitches:
+            exact_match: dict | None = None
+            active_match: dict | None = None
+            active_start = float('-inf')
+            for note in notes:
+                if int(note.get('pitch', 0) or 0) != int(pitch):
+                    continue
+                note_time = float(note.get('time', 0.0) or 0.0)
+                note_end = float(note.get('end', 0.0) or 0.0)
+                if op_time.eq(note_time, base_time):
+                    exact_match = note
+                    break
+                if op_time.le(note_time, base_time) and op_time.gt(note_end, base_time):
+                    if active_match is None or op_time.gt(note_time, active_start):
+                        active_match = note
+                        active_start = note_time
+            chosen = exact_match or active_match
+            if chosen is not None:
+                resolved.append(chosen)
+        return resolved
+
     # Problem solved: reset DrawUtil pages so the engrave output is fresh.
     du._pages = []
     du._current_index = -1
@@ -1492,6 +1521,17 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
             pre_roll_ticks = 0.0
             if is_first_system_line:
                 pre_roll_ticks = max(0.0, line_span_ticks * max(0.0, float(y1)) / line_span_mm)
+            arpeggio_pre_roll_ticks = 0.0
+            for arp in norm_arpeggios:
+                arp_time = float(arp.get('time', 0.0) or 0.0)
+                if not op_time.eq(arp_time, line_time_start):
+                    continue
+                arp_rtime1 = float(arp.get('rtime1', 0.0) or 0.0)
+                arp_rtime2 = float(arp.get('rtime2', 0.0) or 0.0)
+                earliest_offset = min(arp_rtime1, arp_rtime2)
+                if earliest_offset < 0.0:
+                    arpeggio_pre_roll_ticks = max(arpeggio_pre_roll_ticks, -earliest_offset)
+            pre_roll_ticks = max(pre_roll_ticks, arpeggio_pre_roll_ticks)
             line_time_start_render = float(line_time_start - pre_roll_ticks)
             line['y_top'] = y1
             line['y_bottom'] = y2_draw
@@ -1519,7 +1559,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
             def _time_to_y(ticks: float) -> float:
                 # Problem solved: normalize time to line height for vertical layout.
                 rel = (float(ticks) - line_time_start) / line_span_ticks
-                if is_first_system_line:
+                if pre_roll_ticks > 0.0:
                     min_rel = -pre_roll_ticks / line_span_ticks if line_span_ticks > 1e-6 else 0.0
                     rel = max(float(min_rel), min(1.0, rel))
                 else:
@@ -1972,11 +2012,6 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
             stem_len_units_for_barlines = float(layout.get('note_stem_length_semitone', 3) or 3)
             stem_len_mm_for_barlines = stem_len_units_for_barlines * semitone_mm
 
-            line_notes_by_time_pitch_for_barlines: dict[tuple[int, int], dict] = {
-                (int(round(float(it.get('time', 0.0) or 0.0))), int(it.get('pitch', 0) or 0)): it
-                for it in line_notes_for_barlines
-            }
-
             active_arpeggio_chord_keys_for_barlines: set[tuple[int, str, tuple[int, ...]]] = set()
             arpeggio_segments_for_barlines: list[dict[str, object]] = []
             if norm_arpeggios:
@@ -1988,11 +2023,11 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                     pitches = tuple(int(p) for p in (arp.get('note_pitches', ()) or ()) if int(p) > 0)
                     if len(pitches) < 2:
                         continue
-                    chord_notes = [
-                        line_notes_by_time_pitch_for_barlines[(base_time_key, p)]
-                        for p in pitches
-                        if (base_time_key, p) in line_notes_by_time_pitch_for_barlines
-                    ]
+                    chord_notes = _resolve_arpeggio_chord_notes(
+                        line_notes_for_barlines,
+                        base_time,
+                        pitches,
+                    )
                     if len(chord_notes) < 2:
                         continue
                     chord_sorted = sorted(chord_notes, key=lambda n: int(n.get('pitch', 0) or 0))
@@ -2864,10 +2899,6 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
             active_arpeggio_chord_keys_line: set[tuple[int, str, tuple[int, ...]]] = set()
             line_arpeggio_stems: list[dict[str, object]] = []
             if norm_arpeggios and line_notes:
-                line_notes_by_time_pitch: dict[tuple[int, int], dict] = {
-                    (int(round(float(it.get('time', 0.0) or 0.0))), int(it.get('pitch', 0) or 0)): it
-                    for it in line_notes
-                }
                 width_scale_arp = max(0.05, float(layout.get('note_width_scaling', 1.0) or 1.0))
                 height_scale_arp = max(0.1, float(layout.get('notehead_height_scaling', 1.0) or 1.0))
                 base_tilt_arp = max(-1.0, min(1.0, float(layout.get('notehead_tilt', 0.0) or 0.0)))
@@ -2881,11 +2912,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                     pitches = tuple(int(p) for p in (arp.get('note_pitches', ()) or ()) if int(p) > 0)
                     if len(pitches) < 2:
                         continue
-                    chord_notes = [
-                        line_notes_by_time_pitch[(base_time_key, p)]
-                        for p in pitches
-                        if (base_time_key, p) in line_notes_by_time_pitch
-                    ]
+                    chord_notes = _resolve_arpeggio_chord_notes(line_notes, base_time, pitches)
                     if len(chord_notes) < 2:
                         continue
 
@@ -4392,9 +4419,10 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                         hand_key,
                         tuple(sorted(int(m.get('pitch', 0) or 0) for m in same_time)),
                     )
-                    if int(lowest.get('id', 0) or 0) == int(item.get('id', 0) or 0):
-                        if chord_key in active_arpeggio_chord_keys_line:
-                            continue
+                    if (
+                        int(lowest.get('id', 0) or 0) == int(item.get('id', 0) or 0)
+                        and chord_key not in active_arpeggio_chord_keys_line
+                    ):
                         x1 = _key_to_x(int(lowest.get('pitch', 0) or 0))
                         x2 = _key_to_x(int(highest.get('pitch', 0) or 0))
                         du.add_line(
