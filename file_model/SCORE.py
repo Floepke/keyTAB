@@ -885,8 +885,6 @@ class SCORE:
 				remaining_notes.append(n)
 
 		# Replace original notes with remaining valid notes and add converted grace notes.
-		# De-duplicate notes that start at effectively the same time (with a small load-time threshold),
-		# share the same pitch, and are in the same hand. Keep the shortest duration note among duplicates.
 		remaining_notes.sort(
 			key=lambda n: (
 				int(getattr(n, 'pitch', 0) or 0),
@@ -895,31 +893,14 @@ class SCORE:
 				float(getattr(n, 'duration', 0.0) or 0.0),
 			)
 		)
-		deduped_notes: List[Note] = []
-		for n in remaining_notes:
-			if not deduped_notes:
-				deduped_notes.append(n)
-				continue
-			prev = deduped_notes[-1]
-			prev_pitch = int(getattr(prev, 'pitch', 0) or 0)
-			prev_time = float(getattr(prev, 'time', 0.0) or 0.0)
-			prev_hand = str(getattr(prev, 'hand', 'l') or 'l')
-			cur_pitch = int(getattr(n, 'pitch', 0) or 0)
-			cur_time = float(getattr(n, 'time', 0.0) or 0.0)
-			cur_hand = str(getattr(n, 'hand', 'l') or 'l')
-			if cur_pitch == prev_pitch and op_load.eq(cur_time, prev_time) and cur_hand == prev_hand:
-				prev_dur = float(getattr(prev, 'duration', 0.0) or 0.0)
-				cur_dur = float(getattr(n, 'duration', 0.0) or 0.0)
-				if cur_dur < prev_dur:
-					deduped_notes[-1] = n
-				continue
-			deduped_notes.append(n)
-		deduped_removed = max(0, len(remaining_notes) - len(deduped_notes))
+		normalized_notes = remaining_notes
+		deduped_removed = 0
 
 		# Prevent overlapping same-pitch notes by shortening each note to the
 		# first later same-pitch note start that falls inside its duration window.
+		# Same-start duplicates are allowed and therefore ignored here.
 		by_pitch: dict[int, List[Note]] = {}
-		for n in deduped_notes:
+		for n in normalized_notes:
 			pitch = int(getattr(n, 'pitch', 0) or 0)
 			by_pitch.setdefault(pitch, []).append(n)
 		shortened_overlaps = 0
@@ -934,9 +915,9 @@ class SCORE:
 				overlap_start = None
 				for other in pitch_notes[i + 1:]:
 					other_start = float(getattr(other, 'time', 0.0) or 0.0)
-					if other_start <= start_t:
+					if op_load.le(other_start, start_t):
 						continue
-					if other_start >= end_t:
+					if op_load.ge(other_start, end_t):
 						break
 					overlap_start = other_start
 					break
@@ -946,7 +927,7 @@ class SCORE:
 						shortened_overlaps += 1
 					setattr(n, 'duration', new_duration)
 
-		self.events.note = deduped_notes
+		self.events.note = normalized_notes
 		for g in converted_grace:
 			self.new_grace_note(pitch=int(g.pitch), time=float(g.time), notehead=str(getattr(g, 'notehead', 'auto') or 'auto'))
 
