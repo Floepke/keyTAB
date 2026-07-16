@@ -7,7 +7,7 @@ Bump policy (Semantic Versioning):
   PATCH - bug fixes only
 """
 
-__version__ = "1.1.1"
+__version__ = "1.1.2"
 APP_NAME    = "keyTAB"
 
 change_log = '''
@@ -104,4 +104,7 @@ change_log = '''
 1.1.1 (2026-06-01)
 - [✓] added: multiple (4) staves per system support in the engraver and editor (stave switcher), with proper horizontal spacing and alignment.
 - changed under the hood: the editor's internal data structure now supports multiple staves per system
+
+1.1.2 (2026-07-16)
+- fixed: arpeggio rendering bug on new lines works properly now.
 '''
