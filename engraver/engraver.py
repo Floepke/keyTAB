@@ -1519,6 +1519,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
             line_span_ticks = max(1e-6, float(line_time_end - line_time_start))
             line_span_mm = max(1e-6, float(y2_draw - y1))
             pre_roll_ticks = 0.0
+            line_time_start_actual = float(line_time_start)
             if is_first_system_line:
                 pre_roll_ticks = max(0.0, line_span_ticks * max(0.0, float(y1)) / line_span_mm)
             arpeggio_pre_roll_ticks = 0.0
@@ -2760,7 +2761,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                 n_t = float(item.get('time', 0.0) or 0.0)
                 n_end = float(item.get('end', 0.0) or 0.0)
                 p = int(item.get('pitch', 0) or 0)
-                if op_time.ge(n_t, line_time_end) or op_time.le(n_end, line_time_start_render):
+                if op_time.ge(n_t, line_time_end) or op_time.le(n_end, line_time_start_actual):
                     continue
                 if p < 1 or p > PIANO_KEY_AMOUNT:
                     continue
@@ -2869,6 +2870,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
 
             beam_groups_by_hand: dict[str, tuple[list[list[dict]], list[tuple[float, float]]]] = {}
             line_start = float(line_time_start_render)
+            line_start_actual = float(line.get('time_start', 0.0) or 0.0)
             line_end = float(line.get('time_end', 0.0) or 0.0)
 
             def _is_line_continuation(note_dict: dict) -> bool:
@@ -2876,7 +2878,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                 # across a line break; only continuation dots should appear.
                 start_t = float(note_dict.get('time', 0.0) or 0.0)
                 end_t = float(note_dict.get('end', 0.0) or 0.0)
-                return op_time.gt(float(line_start), start_t) and op_time.gt(end_t, float(line_start))
+                return op_time.gt(float(line_start_actual), start_t) and op_time.gt(end_t, float(line_start_actual))
             
             for hand_norm in ('r', 'l'):
                 notes_for_hand = notes_by_hand_line.get(hand_norm, [])
@@ -3273,12 +3275,12 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                             dot_times.append(e)
                     for bt in barline_positions:
                         bt = float(bt)
-                        if op_time.eq(bt, float(line_start)) or op_time.eq(bt, float(line_end)):
+                        if op_time.eq(bt, float(line_start_actual)) or op_time.eq(bt, float(line_end)):
                             continue
                         if op_time.gt(bt, n_t) and op_time.lt(bt, n_end):
                             dot_times.append(bt)
                     if _is_line_continuation(item):
-                        dot_times.append(float(line_start))
+                        dot_times.append(float(line_start_actual))
 
                     if not dot_times:
                         continue
@@ -4045,6 +4047,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                             )
 
             line_start = float(line_time_start_render)
+            line_start_actual = float(line.get('time_start', 0.0) or 0.0)
             line_end = float(line.get('time_end', 0.0) or 0.0)
 
             def _clip_poly_y(poly: list[tuple[float, float]], y_min: float, y_max: float) -> list[tuple[float, float]]:
@@ -4331,12 +4334,12 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                         dot_times.append(e)
                 for bt in barline_positions:
                     bt = float(bt)
-                    if op_time.eq(bt, float(line_start)) or op_time.eq(bt, float(line_end)):
+                    if op_time.eq(bt, float(line_start_actual)) or op_time.eq(bt, float(line_end)):
                         continue
                     if op_time.gt(bt, n_t) and op_time.lt(bt, n_end):
                         dot_times.append(bt)
                 if continues_from_prev_line:
-                    dot_times.append(float(line_start))
+                    dot_times.append(float(line_start_actual))
                 # Problem solved: explicitly draw a dot at the stave bottom for any
                 # note that continues to the next line, mirroring the continues_from_prev_line
                 # behaviour on the previous line and making line crossings always visible.
