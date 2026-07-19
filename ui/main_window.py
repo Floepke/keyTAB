@@ -252,7 +252,8 @@ class MainWindow(QtWidgets.QMainWindow):
         self._direction_btn = QtWidgets.QPushButton("V", self._statusbar)
         self._direction_btn.setFixedSize(22, 20)
         self._direction_btn.setToolTip(self.tr("Toggle read direction (H = horizontal, V = vertical)"))
-        self._direction_btn.clicked.connect(self._on_direction_button_clicked)
+        # Use pressed to reliably capture user interaction across styles/platforms.
+        self._direction_btn.pressed.connect(self._on_direction_button_pressed)
         self._statusbar.addPermanentWidget(self._direction_btn)
         self._sync_direction_button_text()
         self._show_status_default()
@@ -1955,7 +1956,6 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def _set_layout_read_direction(self, layout_obj: object, direction: str) -> None:
         value = 'horizontal' if str(direction or '').strip().lower() == 'horizontal' else 'vertical'
-        print(f"[RD-DBG] _set_layout_read_direction called: target={type(layout_obj).__name__}, new={value}")
         if isinstance(layout_obj, dict):
             layout_obj['read_direction'] = value
         else:
@@ -1965,43 +1965,31 @@ class MainWindow(QtWidgets.QMainWindow):
         try:
             btn = getattr(self, '_direction_btn', None)
             if btn is None:
-                print("[RD-DBG] _sync_direction_button_text: no _direction_btn")
                 return
             score = self.file_manager.current()
             layout = getattr(score, 'layout', None)
             rd = self._layout_read_direction(layout)
             btn.setText('H' if rd == 'horizontal' else 'V')
-            print(f"[RD-DBG] _sync_direction_button_text: layout={type(layout).__name__}, rd={rd}, btn={btn.text()}")
         except Exception:
-            print("[RD-DBG] _sync_direction_button_text: exception")
             pass
 
-    def _on_direction_button_clicked(self, checked: bool = False) -> None:
-        print(f"[RD-DBG] direction button clicked: checked={checked}")
+    def _on_direction_button_pressed(self) -> None:
         self._toggle_read_direction()
 
     def _toggle_read_direction(self) -> None:
-        print("[RD-DBG] _toggle_read_direction entered")
         score = self.file_manager.current()
         layout = getattr(score, 'layout', None)
         if layout is None:
-            print("[RD-DBG] _toggle_read_direction: layout is None")
             return
         current = self._layout_read_direction(layout)
         new_direction = 'horizontal' if current == 'vertical' else 'vertical'
-        print(f"[RD-DBG] _toggle_read_direction: current={current} -> new={new_direction}")
         self._set_layout_read_direction(layout, new_direction)
-        print(f"[RD-DBG] _toggle_read_direction: post-set rd={self._layout_read_direction(layout)}")
         self._sync_direction_button_text()
         self.file_manager.on_model_changed()
-        print("[RD-DBG] _toggle_read_direction: model marked dirty")
         try:
             self.print_view.reset_view_state()
-            print("[RD-DBG] _toggle_read_direction: print_view.reset_view_state ok")
         except Exception:
-            print("[RD-DBG] _toggle_read_direction: print_view.reset_view_state failed")
             pass
-        print("[RD-DBG] _toggle_read_direction: calling _refresh_views_from_score")
         self._refresh_views_from_score()
 
     def _open_preferences(self) -> None:
@@ -2220,24 +2208,19 @@ class MainWindow(QtWidgets.QMainWindow):
             sc_dict = {}
         self.print_view.set_score(sc_dict)
         self._sync_direction_button_text()
-        print(f"[RD-DBG] _refresh_views_from_score: delay={delay_engrave_ms}, page={int(getattr(self, '_page_counter', 0))}")
         # Request engraving via Engraver; render happens on engraved signal
         if delay_engrave_ms and delay_engrave_ms > 0:
             def _delayed_engrave() -> None:
                 try:
-                    print("[RD-DBG] _refresh_views_from_score: delayed engrave start")
                     self.engraver.engrave(self._current_score_dict(), pageno=int(getattr(self, '_page_counter', 0)))
                 except Exception:
-                    print("[RD-DBG] _refresh_views_from_score: delayed engrave failed, fallback render")
                     self.print_view.request_render()
             QtCore.QTimer.singleShot(int(delay_engrave_ms), _delayed_engrave)
         else:
             try:
-                print("[RD-DBG] _refresh_views_from_score: immediate engrave start")
                 self.engraver.engrave(sc_dict, pageno=int(getattr(self, '_page_counter', 0)))
             except Exception:
                 # Fallback: render current content
-                print("[RD-DBG] _refresh_views_from_score: immediate engrave failed, fallback render")
                 self.print_view.request_render()
         # Also refresh the editor view
         self.editor_canvas.update()
