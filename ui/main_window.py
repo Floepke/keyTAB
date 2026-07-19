@@ -249,12 +249,12 @@ class MainWindow(QtWidgets.QMainWindow):
         self._statusbar = QtWidgets.QStatusBar(self)
         self.setStatusBar(self._statusbar)
         self._statusbar.messageChanged.connect(self._on_status_message_changed)
-        # H/V read-direction toggle button on the far right of the statusbar
         self._direction_btn = QtWidgets.QPushButton("V", self._statusbar)
         self._direction_btn.setFixedSize(22, 20)
-        self._direction_btn.setToolTip(self.tr("Toggle read direction  (H = horizontal, V = vertical)"))
-        self._direction_btn.clicked.connect(lambda _checked=False: self._toggle_read_direction())
+        self._direction_btn.setToolTip(self.tr("Toggle read direction (H = horizontal, V = vertical)"))
+        self._direction_btn.clicked.connect(self._on_direction_button_clicked)
         self._statusbar.addPermanentWidget(self._direction_btn)
+        self._sync_direction_button_text()
         self._show_status_default()
         if self._startup_status_message:
             self._status(self._startup_status_message, 7000)
@@ -1934,37 +1934,75 @@ class MainWindow(QtWidgets.QMainWindow):
         if not msg:
             self._show_status_default()
 
-    def _toggle_read_direction(self) -> None:
-        print("Toggling read direction...")
-        score = self.file_manager.current()
-        layout: Layout = getattr(score, 'layout', None)
-        if layout is None:
-            return
-        current = str(getattr(layout, 'read_direction', 'vertical') or 'vertical').strip().lower()
-        new_direction = 'horizontal' if current == 'vertical' else 'vertical'
-        setattr(layout, 'read_direction', new_direction)
-        self._update_direction_button()
-        self.file_manager.on_model_changed()
-        self._refresh_views_from_score()
-        self.print_view.reset_view_state()
-        self._status(
-            self.tr('Read direction: {direction}').format(
-                direction=('H' if new_direction == 'horizontal' else 'V')
-            ),
-            1500,
-        )
+    def _layout_read_direction(self, layout_obj: object) -> str:
+        try:
+            if isinstance(layout_obj, dict):
+                value = layout_obj.get('read_direction', 'vertical')
+            else:
+                value = getattr(layout_obj, 'read_direction', 'vertical')
+            norm = str(value or 'vertical').strip().lower()
+            return 'horizontal' if norm == 'horizontal' else 'vertical'
+        except Exception:
+            return 'vertical'
 
-    def _update_direction_button(self) -> None:
+    def _layout_value(self, layout_obj: object, key: str, default: object) -> object:
+        try:
+            if isinstance(layout_obj, dict):
+                return layout_obj.get(key, default)
+            return getattr(layout_obj, key, default)
+        except Exception:
+            return default
+
+    def _set_layout_read_direction(self, layout_obj: object, direction: str) -> None:
+        value = 'horizontal' if str(direction or '').strip().lower() == 'horizontal' else 'vertical'
+        print(f"[RD-DBG] _set_layout_read_direction called: target={type(layout_obj).__name__}, new={value}")
+        if isinstance(layout_obj, dict):
+            layout_obj['read_direction'] = value
+        else:
+            setattr(layout_obj, 'read_direction', value)
+
+    def _sync_direction_button_text(self) -> None:
         try:
             btn = getattr(self, '_direction_btn', None)
             if btn is None:
+                print("[RD-DBG] _sync_direction_button_text: no _direction_btn")
                 return
             score = self.file_manager.current()
             layout = getattr(score, 'layout', None)
-            rd = str(getattr(layout, 'read_direction', 'vertical') or 'vertical').strip().lower()
+            rd = self._layout_read_direction(layout)
             btn.setText('H' if rd == 'horizontal' else 'V')
+            print(f"[RD-DBG] _sync_direction_button_text: layout={type(layout).__name__}, rd={rd}, btn={btn.text()}")
         except Exception:
+            print("[RD-DBG] _sync_direction_button_text: exception")
             pass
+
+    def _on_direction_button_clicked(self, checked: bool = False) -> None:
+        print(f"[RD-DBG] direction button clicked: checked={checked}")
+        self._toggle_read_direction()
+
+    def _toggle_read_direction(self) -> None:
+        print("[RD-DBG] _toggle_read_direction entered")
+        score = self.file_manager.current()
+        layout = getattr(score, 'layout', None)
+        if layout is None:
+            print("[RD-DBG] _toggle_read_direction: layout is None")
+            return
+        current = self._layout_read_direction(layout)
+        new_direction = 'horizontal' if current == 'vertical' else 'vertical'
+        print(f"[RD-DBG] _toggle_read_direction: current={current} -> new={new_direction}")
+        self._set_layout_read_direction(layout, new_direction)
+        print(f"[RD-DBG] _toggle_read_direction: post-set rd={self._layout_read_direction(layout)}")
+        self._sync_direction_button_text()
+        self.file_manager.on_model_changed()
+        print("[RD-DBG] _toggle_read_direction: model marked dirty")
+        try:
+            self.print_view.reset_view_state()
+            print("[RD-DBG] _toggle_read_direction: print_view.reset_view_state ok")
+        except Exception:
+            print("[RD-DBG] _toggle_read_direction: print_view.reset_view_state failed")
+            pass
+        print("[RD-DBG] _toggle_read_direction: calling _refresh_views_from_score")
+        self._refresh_views_from_score()
 
     def _open_preferences(self) -> None:
         # Ensure preferences file exists and open in system editor
@@ -2181,20 +2219,25 @@ class MainWindow(QtWidgets.QMainWindow):
         except Exception:
             sc_dict = {}
         self.print_view.set_score(sc_dict)
-        self._update_direction_button()
+        self._sync_direction_button_text()
+        print(f"[RD-DBG] _refresh_views_from_score: delay={delay_engrave_ms}, page={int(getattr(self, '_page_counter', 0))}")
         # Request engraving via Engraver; render happens on engraved signal
         if delay_engrave_ms and delay_engrave_ms > 0:
             def _delayed_engrave() -> None:
                 try:
+                    print("[RD-DBG] _refresh_views_from_score: delayed engrave start")
                     self.engraver.engrave(self._current_score_dict(), pageno=int(getattr(self, '_page_counter', 0)))
                 except Exception:
+                    print("[RD-DBG] _refresh_views_from_score: delayed engrave failed, fallback render")
                     self.print_view.request_render()
             QtCore.QTimer.singleShot(int(delay_engrave_ms), _delayed_engrave)
         else:
             try:
+                print("[RD-DBG] _refresh_views_from_score: immediate engrave start")
                 self.engraver.engrave(sc_dict, pageno=int(getattr(self, '_page_counter', 0)))
             except Exception:
                 # Fallback: render current content
+                print("[RD-DBG] _refresh_views_from_score: immediate engrave failed, fallback render")
                 self.print_view.request_render()
         # Also refresh the editor view
         self.editor_canvas.update()
@@ -2942,9 +2985,9 @@ class MainWindow(QtWidgets.QMainWindow):
         if not lay:
             return self.du.current_page_size_mm()
         
-        w_mm = float(getattr(lay, 'page_width_mm', 210.0) or 210.0)
-        h_mm = float(getattr(lay, 'page_height_mm', 297.0) or 297.0)
-        page_orientation = str(getattr(lay, 'page_orientation', 'portrait') or 'portrait').strip().lower()
+        w_mm = float(self._layout_value(lay, 'page_width_mm', 210.0) or 210.0)
+        h_mm = float(self._layout_value(lay, 'page_height_mm', 297.0) or 297.0)
+        page_orientation = str(self._layout_value(lay, 'page_orientation', 'portrait') or 'portrait').strip().lower()
         # Keep compatibility with legacy horizontal/vertical orientation values.
         if page_orientation == 'vertical':
             page_orientation = 'portrait'
@@ -2954,7 +2997,7 @@ class MainWindow(QtWidgets.QMainWindow):
             w_mm, h_mm = h_mm, w_mm
         # The engraver always rotates -90° for horizontal read direction,
         # which swaps the output dimensions reported by DrawUtil.
-        read_direction = str(getattr(lay, 'read_direction', 'vertical') or 'vertical').strip().lower()
+        read_direction = self._layout_read_direction(lay)
         if read_direction == 'horizontal':
             w_mm, h_mm = h_mm, w_mm
         return w_mm, h_mm
@@ -2978,7 +3021,7 @@ class MainWindow(QtWidgets.QMainWindow):
             # switch width and height if layout.read_direction is horizontal-
             # to correct for the engraver's -90° rotation after drawing
             score = self.file_manager.current()
-            if score.layout.read_direction == 'horizontal':
+            if self._layout_read_direction(getattr(score, 'layout', None)) == 'horizontal':
                 w_mm, h_mm = h_mm, w_mm
 
             if w_mm <= 0 or h_mm <= 0:

@@ -107,4 +107,5 @@ change_log = '''
 
 1.1.2 (2026-07-16)
 - fixed: arpeggio rendering bug on new lines works properly now.
+- fixed: arpeggio on new line skips continuation dots correctly now.
 '''
