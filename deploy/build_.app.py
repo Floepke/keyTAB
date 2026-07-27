@@ -10,7 +10,7 @@ When executed directly, the script performs these steps in order:
 5) Run PyInstaller in that workspace to produce a windowed .app bundle.
 6) Copy Qt/PySide6 license files into the bundle for compliance.
 7) Ensure a document icon exists in Resources and update Info.plist with bundle IDs,
-    category, author, and UTI/file-association declarations for .piano and MIDI files.
+    category, author, and UTI/file-association declarations for .keytab/.piano and MIDI files.
 8) Optionally build a drag-and-drop DMG containing the .app and an Applications symlink,
     applying a volume icon when possible.
 9) Move the resulting .app (and DMG if built) to <output> and remove the build workspace.
@@ -34,7 +34,7 @@ DEFAULT_ENTRY = PROJECT_ROOT / "keyTAB.py"
 DEFAULT_ICON = PROJECT_ROOT / "icons" / "keyTAB.png"
 
 PREFERRED_APP_CATEGORY = "public.app-category.music"
-PIANO_UTI = "org.philipbergwerf.keytab.piano"
+KEYTAB_UTI = "org.philipbergwerf.keytab.score"
 BUNDLE_IDENTIFIER = "org.philipbergwerf.keytab"
 AUTHOR_NAME = "Philip Bergwerf"
 DOCUMENT_ICON_FILENAME = "keyTABDocument.icns"
@@ -372,11 +372,11 @@ def update_info_plist(app_path: Path, name: str, doc_icon_file: str | None = Non
 
     info["UTExportedTypeDeclarations"] = [
         {
-            "UTTypeIdentifier": PIANO_UTI,
+            "UTTypeIdentifier": KEYTAB_UTI,
             "UTTypeDescription": "keyTAB score",
             "UTTypeConformsTo": ["public.data"],
             "UTTypeTagSpecification": {
-                "public.filename-extension": ["piano"],
+                "public.filename-extension": ["keytab", "piano"],
                 "public.mime-type": ["application/x-keytab"],
             },
         }
@@ -388,8 +388,8 @@ def update_info_plist(app_path: Path, name: str, doc_icon_file: str | None = Non
     piano_doc = {
         "CFBundleTypeName": "keyTAB score",
         "CFBundleTypeRole": "Editor",
-        "LSItemContentTypes": [PIANO_UTI],
-        "CFBundleTypeExtensions": ["piano"],
+        "LSItemContentTypes": [KEYTAB_UTI],
+        "CFBundleTypeExtensions": ["keytab", "piano"],
         "LSHandlerRank": "Owner",
     }
     midi_doc = {
