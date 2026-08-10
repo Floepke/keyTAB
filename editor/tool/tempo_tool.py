@@ -200,11 +200,12 @@ class TempoTool(BaseTool):
         self._min_duration = float(min_du)
         self._drag_initial_duration = float(getattr(existing, 'duration', min_du) or min_du)
 
-    def on_right_click(self, x: float, y: float) -> None:
+    def on_right_unpress(self, x: float, y: float) -> None:
         if self._editor is None:
             return
         score = self._editor.current_score()
-        tempo_id = self._editor.hit_test_tempo(x, y) if hasattr(self._editor, 'hit_test_tempo') else None
+        if score is None:
+            return
         t = self._editor.snap_time(self._editor.widget_px_to_time(x, y))
         op = Operator(float(SHORTEST_DURATION))
         lst = list(getattr(score, 'tempo', []) or [])
@@ -212,26 +213,28 @@ class TempoTool(BaseTool):
             return
         # Do not delete the first tempo marker (earliest time)
         earliest_time = min(float(getattr(ev, 'time', 0.0) or 0.0) for ev in lst)
-        for i, ev in enumerate(lst):
+        kept: list[object] = []
+        deleted_any = False
+        for ev in lst:
             ev_time = float(getattr(ev, 'time', 0.0) or 0.0)
-            ev_id = int(getattr(ev, '_id', -1) or -1)
-            hit = tempo_id is not None and ev_id == int(tempo_id)
-            same_time = op.equal(ev_time, float(t))
-            if hit or same_time:
-                # If this event is at the earliest time, skip deletion
-                if op.equal(ev_time, earliest_time):
-                    return
-                try:
-                    del lst[i]
-                    score.tempo = lst
-                except Exception:
-                    pass
-                self._editor._snapshot_if_changed(coalesce=True, label='tempo_delete')
-                if hasattr(self._editor, 'force_redraw_from_model'):
-                    self._editor.force_redraw_from_model()
-                else:
-                    self._editor.draw_frame()
-                return
+            ev_duration = float(getattr(ev, 'duration', 0.0) or 0.0)
+            ev_end = ev_time + max(0.0, ev_duration)
+            contains_time = op.ge(float(t), ev_time) and op.le(float(t), ev_end)
+            if contains_time and not op.equal(ev_time, earliest_time):
+                deleted_any = True
+                continue
+            kept.append(ev)
+        if not deleted_any:
+            return
+        try:
+            score.tempo = kept
+        except Exception:
+            return
+        self._editor._snapshot_if_changed(coalesce=True, label='tempo_delete')
+        if hasattr(self._editor, 'force_redraw_from_model'):
+            self._editor.force_redraw_from_model()
+        else:
+            self._editor.draw_frame()
 
     def on_mouse_move(self, x: float, y: float) -> None:
         super().on_mouse_move(x, y)

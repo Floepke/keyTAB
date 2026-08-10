@@ -87,10 +87,12 @@ class CountLineTool(BaseTool):
         t_press_raw = float(self._editor.widget_px_to_time(x, y))
         t_press_snap = float(self._editor.snap_time(t_press_raw))
         rp_press = self._x_mm_to_rpitch(x_mm)
-        rp2 = self.clamp_rpitch(rp_press + 4)
+        rp2 = int(rp_press)
         self._active_line = score.new_count_line(time=t_press_snap, rpitch1=rp_press, rpitch2=rp2)
         self._active_handle = 'end'
         self._clear_line_drag_anchor()
+
+        # Request a light repaint to show the new line immediately.
         if hasattr(self._editor, 'force_redraw_from_model'):
             self._editor.force_redraw_from_model()
         else:
@@ -121,10 +123,28 @@ class CountLineTool(BaseTool):
 
         # Update pitch for active handle
         rpitch = self._x_mm_to_rpitch(x_mm)
+        min_gap = 2  # Keep handles at least two semitone steps apart.
         if self._active_handle == 'start':
-            self._active_line.rpitch1 = int(self.clamp_rpitch(rpitch))
+            other = int(getattr(self._active_line, 'rpitch2', 0) or 0)
+            current = int(getattr(self._active_line, 'rpitch1', 0) or 0)
+            target = int(self.clamp_rpitch(rpitch))
+            if current <= other:
+                target = min(target, int(other - min_gap))
+            else:
+                target = max(target, int(other + min_gap))
+            self._active_line.rpitch1 = int(self.clamp_rpitch(target))
         elif self._active_handle == 'end':
-            self._active_line.rpitch2 = int(self.clamp_rpitch(rpitch))
+            other = int(getattr(self._active_line, 'rpitch1', 0) or 0)
+            current = int(getattr(self._active_line, 'rpitch2', 0) or 0)
+            target = int(self.clamp_rpitch(rpitch))
+            if current >= other:
+                target = max(target, int(other + min_gap))
+            else:
+                target = min(target, int(other - min_gap))
+            if current == other:
+                # Initial collapsed state: choose side from cursor direction.
+                target = int(other + min_gap) if target >= other else int(other - min_gap)
+            self._active_line.rpitch2 = int(self.clamp_rpitch(target))
         elif self._active_handle == 'line':
             if (
                 self._line_drag_anchor_cursor_time is None
@@ -176,6 +196,9 @@ class CountLineTool(BaseTool):
             return
         score: SCORE = self._editor.current_score()
         if score is None:
+            return
+        events = self._editor.current_events(score)
+        if events is None:
             return
 
         try:
