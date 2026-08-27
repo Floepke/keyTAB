@@ -420,13 +420,18 @@ def main(argv: list[str] | None = None):
     _install_ui_translator(app, preferences)
     _install_qt_translator(app, preferences)
 
-    # Always register embedded engraving fonts for in-process use.
-    # On Windows, Cairo can require the user font store to see the font.
+    # Always register embedded engraving fonts for in-process use when the
+    # platform/font stack is safe to do so. On Linux, LelandText is optional and
+    # can fail at the native Cairo/fontconfig layer; in that case the editor will
+    # skip missing text rather than crashing the whole app.
     try:
-        for font_name in ("Edwin", "LelandText"):
+        for font_name in ("Edwin",):
             register_font_from_bytes(font_name)
-            if sys.platform.startswith("win") and not has_installed_embedded_font_file(font_name):
-                install_embedded_font_to_system(font_name)
+        if sys.platform.startswith("win"):
+            for font_name in ("LelandText",):
+                register_font_from_bytes(font_name)
+                if not has_installed_embedded_font_file(font_name):
+                    install_embedded_font_to_system(font_name)
         if sys.platform.startswith("win") and not has_installed_embedded_font_file("FiraCode-SemiBold"):
             install_embedded_font_to_system("FiraCode-SemiBold")
     except Exception:

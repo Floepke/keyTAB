@@ -7,7 +7,7 @@ Bump policy (Semantic Versioning):
   PATCH - bug fixes only
 """
 
-__version__ = "1.1.2"
+__version__ = "1.1.3"
 APP_NAME    = "keyTAB"
 
 change_log = '''
@@ -108,4 +108,7 @@ change_log = '''
 1.1.2 (2026-07-16)
 - fixed: arpeggio rendering bug on new lines works properly now.
 - fixed: arpeggio on new line skips continuation dots correctly now.
+
+1.1.3 (2026-08-24)
+- fixed: font rendering issue on Linux
 '''

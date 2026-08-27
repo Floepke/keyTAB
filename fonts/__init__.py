@@ -156,6 +156,8 @@ def _refresh_system_font_cache(installed_path: Path) -> None:
 
 
 def has_system_font(family: str) -> bool:
+    if QFontDatabase is None or QApplication is None or QApplication.instance() is None:
+        return bool(_font_file_exists(str(family)))
     names = _font_file_targets(family)
     if len(names) > 1:
         return all(_check_system_font_family(name) for name in names)
@@ -226,10 +228,17 @@ def register_font_from_bytes(name: str) -> Optional[str]:
     """Register the embedded font by `name` and return the primary family name.
 
     Returns None if registration fails or PySide6 is unavailable.
+
+    On Linux, LelandText is treated as optional because the native Qt/Cairo font
+    backend can crash while resolving it when the font is missing or not
+    installed. The editor handles missing text by skipping that symbol instead of
+    crashing the application.
     """
     if QFontDatabase is None:
         return None
     cache_key = _normalize_font_name(name)
+    if sys.platform.startswith('linux') and cache_key == 'lelandtext':
+        return None
     if cache_key in _REGISTERED_FONT_CACHE:
         return _REGISTERED_FONT_CACHE[cache_key]
     try:
@@ -270,7 +279,7 @@ def resolve_font_family(family: str, fallback_family: str = 'Edwin') -> str:
     - Otherwise, register the embedded fallback font and use it if available.
     - As a last resort, return the original family string.
     """
-    if QFontDatabase is None:
+    if QFontDatabase is None or QApplication is None or QApplication.instance() is None:
         return family
     try:
         families = set(QFontDatabase.families())

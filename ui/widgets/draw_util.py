@@ -1,7 +1,7 @@
 from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Callable, Iterable, List, Optional, Sequence, Tuple
-import os, math
+import os, math, sys
 import multiprocessing as mp
 from functools import lru_cache
 import cairo
@@ -114,12 +114,12 @@ class Text:
 
 
 # ---------------------------------------------------------------------------
-# Module-level scratch Cairo surface/context reused for text-extent queries.
-# Creating a new ImageSurface per measurement leaks native memory; reusing a
-# single 1×1 surface avoids the leak entirely.
+# Do not reuse a single global Cairo context for font selection. Some Linux
+# Cairo/fontconfig stacks are not stable across repeated select_font_face() calls
+# and can segfault or raise MemoryError even when the app itself is otherwise
+# healthy. Per-call scratch surfaces are safer, and unsupported fonts are
+# treated as optional text instead of crashing the whole editor.
 # ---------------------------------------------------------------------------
-_SCRATCH_SURF: cairo.ImageSurface = cairo.ImageSurface(cairo.FORMAT_ARGB32, 1, 1)
-_SCRATCH_CTX: cairo.Context = cairo.Context(_SCRATCH_SURF)
 
 
 @lru_cache(maxsize=64)
@@ -128,6 +128,12 @@ def _resolve_cairo_family(family: str) -> str:
     requested = str(family or "").strip()
     if not requested:
         return "Sans"
+
+    if sys.platform.startswith("linux"):
+        # On Linux, the native font stack is not reliable enough to do any Qt/Cairo
+        # family resolution outside a real GUI process. Use the original family name
+        # and let the per-text fail-safe skip missing fonts instead of aborting.
+        return requested
 
     compact = requested.lower().replace(" ", "")
     if compact != "lelandtext":
@@ -141,8 +147,6 @@ def _resolve_cairo_family(family: str) -> str:
             return "Leland Text"
         return requested
 
-    # Ensure LelandText is registered in Qt and resolve the effective family name
-    # (often "Leland Text" on Windows) so Cairo can select the right face.
     try:
         from fonts import register_font_from_bytes, resolve_font_family
 
@@ -158,25 +162,127 @@ def _resolve_cairo_family(family: str) -> str:
     return requested
 
 
+def _font_candidates_for_cairo(family: str) -> list[str]:
+    """Return a safe ordered list of candidate font names for Cairo.
+
+    The list favors the requested family but includes generic fallbacks so the
+    canvas keeps drawing when the exact family is missing on Linux.
+    """
+    requested = str(family or "").strip()
+    if not requested:
+        return ["Sans"]
+
+    canon = requested.strip()
+    lower = canon.lower()
+    aliases: list[str] = []
+    seen: set[str] = set()
+
+    def add(name: str) -> None:
+        n = str(name or "").strip()
+        if not n or n in seen:
+            return
+        seen.add(n)
+        aliases.append(n)
+
+    add(canon)
+    if " " in canon:
+        add(canon.replace(" ", ""))
+    if lower == "lelandtext":
+        add("Leland Text")
+        add("DejaVu Sans")
+    elif lower == "edwin":
+        add("DejaVu Sans")
+        add("Liberation Sans")
+    elif lower == "fira code":
+        add("FiraCode")
+        add("Fira Code")
+    add("Sans")
+    return aliases
+
+
+def _qt_text_extents_mm(text: str, family: str, size_pt: float,
+                        italic: bool, bold: bool) -> Tuple[float, float, float, float]:
+    """Safe fallback for missing/unsupported Cairo fonts.
+
+    In a real GUI process we prefer Qt font metrics, which preserve the same
+    baseline and bearing semantics the rest of the layout code expects. In a
+    headless process we use a conservative estimate so the app can still render
+    without crashing.
+    """
+    if QtGui.QGuiApplication.instance() is None:
+        estimated_w = max(0.0, float(len(str(text))) * float(size_pt) * 0.55)
+        estimated_h = max(0.1, float(size_pt) * 0.8)
+        width_mm = estimated_w / PT_PER_MM
+        height_mm = estimated_h / PT_PER_MM
+        x_bearing_mm = -0.15 * width_mm
+        y_bearing_mm = -0.75 * height_mm
+        return (x_bearing_mm, y_bearing_mm, width_mm, height_mm)
+
+    try:
+        font = QtGui.QFont(str(family or "Sans"), float(size_pt))
+        font.setItalic(bool(italic))
+        font.setBold(bool(bold))
+        metrics = QtGui.QFontMetricsF(font)
+        rect = metrics.tightBoundingRect(str(text))
+        x_px = float(rect.x())
+        y_px = float(rect.y())
+        width_px = max(0.0, float(rect.width()))
+        height_px = max(0.1, float(rect.height()))
+        factor = 25.4 / 96.0
+        return (
+            x_px * factor,
+            y_px * factor,
+            width_px * factor,
+            height_px * factor,
+        )
+    except Exception:
+        estimated_w = max(0.0, float(len(str(text))) * float(size_pt) * 0.55)
+        estimated_h = max(0.1, float(size_pt) * 0.8)
+        width_mm = estimated_w / PT_PER_MM
+        height_mm = estimated_h / PT_PER_MM
+        x_bearing_mm = -0.15 * width_mm
+        y_bearing_mm = -0.75 * height_mm
+        return (x_bearing_mm, y_bearing_mm, width_mm, height_mm)
+
+
 @lru_cache(maxsize=512)
 def _cached_text_extents_mm(text: str, family: str, size_pt: float,
                               italic: bool, bold: bool) -> Tuple[float, float, float, float]:
     """Return (x_bearing_mm, y_bearing_mm, width_mm, height_mm).
 
     Results are LRU-cached so repeated identical queries (same text/font/size)
-    never touch Cairo at all.  The scratch surface is reused across all calls,
-    so no native surface memory is leaked.
+    never touch Cairo at all. Each attempt uses a fresh 1x1 scratch surface to
+    avoid the Linux font backend instability that can occur when a single shared
+    Cairo context is reused across font selections.
     """
+    if sys.platform.startswith("linux") and str(family or "").strip().lower().replace(" ", "") == "lelandtext":
+        return _qt_text_extents_mm(text, family, size_pt, italic, bold)
+
     slant = cairo.FONT_SLANT_ITALIC if italic else cairo.FONT_SLANT_NORMAL
     weight = cairo.FONT_WEIGHT_BOLD if bold else cairo.FONT_WEIGHT_NORMAL
-    _SCRATCH_CTX.select_font_face(_resolve_cairo_family(family), slant, weight)
-    _SCRATCH_CTX.set_font_size(size_pt)
-    te = _SCRATCH_CTX.text_extents(text)
-    x_bearing_mm = te.x_bearing / PT_PER_MM
-    y_bearing_mm = te.y_bearing / PT_PER_MM
-    width_mm = te.width / PT_PER_MM
-    height_mm = te.height / PT_PER_MM
-    return (x_bearing_mm, y_bearing_mm, width_mm, height_mm)
+    surface = cairo.ImageSurface(cairo.FORMAT_ARGB32, 1, 1)
+    ctx = cairo.Context(surface)
+    try:
+        try:
+            ctx.select_font_face(_resolve_cairo_family(family), slant, weight)
+            ctx.set_font_size(size_pt)
+            te = ctx.text_extents(text)
+        except Exception:
+            # Fallback to Qt metrics when Cairo cannot resolve a family on this
+            # Linux system. We treat the font as optional and never crash the app.
+            return _qt_text_extents_mm(text, family, size_pt, italic, bold)
+        x_bearing_mm = te.x_bearing / PT_PER_MM
+        y_bearing_mm = te.y_bearing / PT_PER_MM
+        width_mm = te.width / PT_PER_MM
+        height_mm = te.height / PT_PER_MM
+        return (x_bearing_mm, y_bearing_mm, width_mm, height_mm)
+    finally:
+        try:
+            surface.finish()
+        except Exception:
+            pass
+        del ctx
+        del surface
 
 
 class DrawUtil:
@@ -1207,50 +1313,76 @@ class DrawUtil:
             ctx.new_path()
 
     def _draw_text(self, ctx: cairo.Context, t: Text):
-        # Cairo toy text: render via text_path + fill to avoid any implicit stroke
-        # and ensure a single-color raster without edge bleed.
-        slant = cairo.FONT_SLANT_ITALIC if t.italic else cairo.FONT_SLANT_NORMAL
-        weight = cairo.FONT_WEIGHT_BOLD if t.bold else cairo.FONT_WEIGHT_NORMAL
-        ctx.save()
-        angle = float(getattr(t, 'angle_deg', 0.0) or 0.0)
-        xb_mm, yb_mm, w_mm, h_mm = self._get_text_extents_mm(t.text, t.family, t.size_pt, t.italic, t.bold)
-        anchor = getattr(t, 'anchor', None)
-        # Compute rotation pivot based on anchor
-        ax = t.x_mm + xb_mm + w_mm * 0.5
-        ay = t.y_mm + yb_mm + h_mm * 0.5
-        if anchor == 'n':
-            ay = t.y_mm + yb_mm
-        elif anchor == 's':
-            ay = t.y_mm + yb_mm + h_mm
-        elif anchor == 'w':
-            ax = t.x_mm + xb_mm
-        elif anchor == 'e':
-            ax = t.x_mm + xb_mm + w_mm
-        elif anchor == 'nw':
-            ax = t.x_mm + xb_mm
-            ay = t.y_mm + yb_mm
-        elif anchor == 'ne':
-            ax = t.x_mm + xb_mm + w_mm
-            ay = t.y_mm + yb_mm
-        elif anchor == 'sw':
-            ax = t.x_mm + xb_mm
-            ay = t.y_mm + yb_mm + h_mm
-        elif anchor == 'se':
-            ax = t.x_mm + xb_mm + w_mm
-            ay = t.y_mm + yb_mm + h_mm
+        # Fail-safe: if the requested font family is unavailable or Cairo rejects it,
+        # skip just this text item instead of crashing the entire editor render pass.
+        try:
+            slant = cairo.FONT_SLANT_ITALIC if t.italic else cairo.FONT_SLANT_NORMAL
+            weight = cairo.FONT_WEIGHT_BOLD if t.bold else cairo.FONT_WEIGHT_NORMAL
+            ctx.save()
+            angle = float(getattr(t, 'angle_deg', 0.0) or 0.0)
+            xb_mm, yb_mm, w_mm, h_mm = self._get_text_extents_mm(t.text, t.family, t.size_pt, t.italic, t.bold)
+            anchor = getattr(t, 'anchor', None)
+            ax = t.x_mm + xb_mm + w_mm * 0.5
+            ay = t.y_mm + yb_mm + h_mm * 0.5
+            if anchor == 'n':
+                ay = t.y_mm + yb_mm
+            elif anchor == 's':
+                ay = t.y_mm + yb_mm + h_mm
+            elif anchor == 'w':
+                ax = t.x_mm + xb_mm
+            elif anchor == 'e':
+                ax = t.x_mm + xb_mm + w_mm
+            elif anchor == 'nw':
+                ax = t.x_mm + xb_mm
+                ay = t.y_mm + yb_mm
+            elif anchor == 'ne':
+                ax = t.x_mm + xb_mm + w_mm
+                ay = t.y_mm + yb_mm
+            elif anchor == 'sw':
+                ax = t.x_mm + xb_mm
+                ay = t.y_mm + yb_mm + h_mm
+            elif anchor == 'se':
+                ax = t.x_mm + xb_mm + w_mm
+                ay = t.y_mm + yb_mm + h_mm
 
-        # Rotate around pivot, then draw at stored position
-        ctx.translate(ax, ay)
-        if angle:
-            ctx.rotate(angle * math.pi / 180.0)
-        ctx.translate(-ax, -ay)
-        ctx.select_font_face(_resolve_cairo_family(t.family), slant, weight)
-        ctx.set_font_size(t.size_pt / PT_PER_MM)
-        ctx.move_to(t.x_mm, t.y_mm)
-        ctx.text_path(t.text)
-        ctx.set_source_rgba(*t.color)
-        ctx.fill()
-        ctx.restore()
+            ctx.translate(ax, ay)
+            if angle:
+                ctx.rotate(angle * math.pi / 180.0)
+            ctx.translate(-ax, -ay)
+
+            for candidate in _font_candidates_for_cairo(t.family):
+                try:
+                    ctx.select_font_face(candidate, slant, weight)
+                    ctx.set_font_size(t.size_pt / PT_PER_MM)
+                    ctx.move_to(t.x_mm, t.y_mm)
+                    ctx.text_path(t.text)
+                    ctx.set_source_rgba(*t.color)
+                    ctx.fill()
+                    return
+                except Exception:
+                    ctx.new_path()
+                    continue
+
+            for candidate in ("DejaVu Sans", "Liberation Sans", "Sans"):
+                try:
+                    ctx.select_font_face(candidate, slant, weight)
+                    ctx.set_font_size(t.size_pt / PT_PER_MM)
+                    ctx.move_to(t.x_mm, t.y_mm)
+                    ctx.text_path(t.text)
+                    ctx.set_source_rgba(*t.color)
+                    ctx.fill()
+                    return
+                except Exception:
+                    ctx.new_path()
+                    continue
+            return
+        except Exception:
+            return
+        finally:
+            try:
+                ctx.restore()
+            except Exception:
+                pass
 
     def _compute_text_hit_rect_mm(self, x_mm: float, y_mm: float, text: str,
                                   family: str, size_pt: float,
