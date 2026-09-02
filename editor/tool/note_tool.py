@@ -334,14 +334,7 @@ class NoteTool(BaseTool):
         if hit_rect is None:
             return None, None, y_mm
         hit_id = int(hit_rect.get('_id', -1) or -1)
-        cache = getattr(self._editor, '_draw_cache', None) or {}
-        notes_view = cache.get('notes_view') or None
-        events = self._editor.current_events(score)
-        note_list = notes_view if notes_view is not None else (getattr(events, 'note', []) or []) if events is not None else []
-        for n in note_list:
-            if int(getattr(n, '_id', -1) or -1) == hit_id:
-                return n, hit_rect, y_mm
-        return None, hit_rect, y_mm
+        return self._editor.get_note_by_id(hit_id), hit_rect, y_mm
 
     def _resolve_velocity_targets(self, score: SCORE, primary: Note | None) -> list[Note]:
         if primary is None:
@@ -424,10 +417,9 @@ class NoteTool(BaseTool):
         op = Operator(float(SHORTEST_DURATION))
 
         hand = str(getattr(note, 'hand', 'l') or 'l')
-        cache = getattr(self._editor, '_draw_cache', None) or {}
-        notes_view = cache.get('notes_view') or None
         events = self._editor.current_events(score)
-        note_list = notes_view if notes_view is not None else (getattr(events, 'note', []) or []) if events is not None else []
+        # Validation must use the complete canonical model, not the viewport cache.
+        note_list = (getattr(events, 'note', []) or []) if events is not None else []
         for other in note_list:
             other_id = int(getattr(other, '_id', -2) or -2)
             if other_id == note_id:
@@ -454,10 +446,9 @@ class NoteTool(BaseTool):
         op = Operator(float(SHORTEST_DURATION))
 
         hand = str(getattr(note, 'hand', 'l') or 'l')
-        cache = getattr(self._editor, '_draw_cache', None) or {}
-        notes_view = cache.get('notes_view') or None
         events = self._editor.current_events(score)
-        note_list = notes_view if notes_view is not None else (getattr(events, 'note', []) or []) if events is not None else []
+        # Validation must use the complete canonical model, not the viewport cache.
+        note_list = (getattr(events, 'note', []) or []) if events is not None else []
         for other in note_list:
             other_id = int(getattr(other, '_id', -2) or -2)
             if other_id == note_id:
@@ -513,7 +504,7 @@ class NoteTool(BaseTool):
         found: Note | None = None
         found, hit_rect, y_mm_abs = self._hit_note_and_rect(score, x, y)
         mode = "existing" if found else "new"
-        if mode == "existing" and found is not None and found.pitch == self._editor.pitch_cursor:
+        if mode == "existing" and found is not None:
             '''Edit existing note'''
             self.edit_note = found
             self._editing_existing = True
@@ -636,15 +627,7 @@ class NoteTool(BaseTool):
         if score is None:
             return
 
-        found = None
-        cache = getattr(self._editor, '_draw_cache', None) or {}
-        notes_view = cache.get('notes_view') or None
-        events = self._editor.current_events(score)
-        note_list = notes_view if notes_view is not None else (getattr(events, 'note', []) or []) if events is not None else []
-        for n in note_list:
-            if int(getattr(n, '_id', -1) or -1) == int(note_id):
-                found = n
-                break
+        found = self._editor.get_note_by_id(int(note_id))
         if found is None:
             return
 
@@ -910,28 +893,15 @@ class NoteTool(BaseTool):
 
         deleted_any = False
         if target is not None:
-            cache = getattr(self._editor, '_draw_cache', None) or {}
-            notes_view = cache.get('notes_view') or None
-            cached_notes_list = notes_view if notes_view is not None else None
             events = self._editor.current_events(score)
             notes_list = (getattr(events, 'note', []) or []) if events is not None else []
-
-            # Fast path: remove the exact detected note object by identity and use cache.
-            if cached_notes_list is not None:
-                for i, note_item in enumerate(cached_notes_list):
-                    if note_item is target:
+            tid = int(getattr(target, '_id', -1) or -1)
+            if tid >= 0:
+                for note_item in notes_list:
+                    if int(getattr(note_item, '_id', -2) or -2) == tid:
                         notes_list.remove(note_item)
                         deleted_any = True
                         break
-            else:
-                # Fallback to ID-based removal if cache is not available, use whole note list.
-                tid = int(getattr(target, '_id', -1) or -1)
-                if tid >= 0:
-                    for i, note_item in enumerate(notes_list):
-                        if int(getattr(note_item, '_id', -2) or -2) == tid:
-                            notes_list.remove(note_item)
-                            deleted_any = True
-                            break
         if deleted_any:
             # Keep base_grid in sync and trigger engrave via snapshot.
             self._editor.update_score_length()

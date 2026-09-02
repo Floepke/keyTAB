@@ -370,22 +370,20 @@ class Editor(QtCore.QObject,
     '''
 
     def get_note_by_id(self, note_id: int):
-        """Return the note event for id, preferring current viewport cache.
+        """Return the canonical note event for ``note_id`` from the active model.
 
-        Falls back to scanning all notes if cache is unavailable.
+        Render caches may briefly outlive a SCORE replacement.  Returning a note
+        from such a cache lets tools mutate a detached object: the repaint can
+        show the edit even though the active SCORE (and therefore the saved file)
+        never changed.  Hit-test caches should only supply IDs, never editable
+        model objects.
         """
-        # Prefer notes in the current viewport draw cache
-        cache = getattr(self, '_draw_cache', None) or {}
-        notes_view = cache.get('notes_view') or []
-        if notes_view:
-            for n in notes_view:
-                if int(getattr(n, '_id', -1) or -1) == note_id:
-                    return n
-        # Fallback: global scan
         score: SCORE | None = self.current_score()
         if score is None:
             return None
         events = self.current_events(score)
+        if events is None:
+            return None
         for n in getattr(events, 'note', []) or []:
             if int(getattr(n, '_id', -1) or -1) == note_id:
                 return n
@@ -759,11 +757,36 @@ class Editor(QtCore.QObject,
             right_phys_down = self._right_pressed
 
         if self._left_pressed and not left_phys_down:
-            if not self._left_selection_mode:
+            was_dragging = bool(self._dragging_left)
+            was_selection = bool(self._left_selection_mode)
+            if not was_selection:
+                if was_dragging:
+                    self._tool.on_left_drag_end(x, y)
+                    # Match the normal release path: commit before on_left_unpress
+                    # clears tool-local gesture state.
+                    self._snapshot_if_changed(coalesce=True, label="left_drag_recovered")
+                else:
+                    px, py = self._press_pos
+                    is_left_double_release = bool(self._pending_left_double_release)
+                    if (not is_left_double_release
+                        and abs(x - px) <= self.DRAG_THRESHOLD
+                        and abs(y - py) <= self.DRAG_THRESHOLD):
+                        self._tool.on_left_click(x, y)
+                    # Some tools (notably NoteTool) edit on press, so a missing
+                    # release still needs a model-change notification.
+                    self._snapshot_if_changed(coalesce=False, label="left_click_recovered")
                 self._tool.on_left_unpress(x, y)
             self._left_pressed = False
             self._dragging_left = False
             self._left_selection_mode = False
+            widget = getattr(self, 'widget', None)
+            if widget is not None:
+                setattr(widget, '_left_down', False)
+                if not bool(getattr(widget, '_right_down', False)):
+                    try:
+                        widget.releaseMouse()
+                    except Exception:
+                        pass
 
         if self._right_pressed and not right_phys_down:
             if self._dragging_right and not self._right_selection_mode:
@@ -1590,4 +1613,3 @@ class Editor(QtCore.QObject,
 
     def set_ctrl_down(self, down: bool) -> None:
         self._ctrl_down = bool(down)
-
