@@ -5,6 +5,7 @@ import subprocess
 import sys
 import threading
 import multiprocessing as mp
+import re
 
 
 def _install_fluidsynth_warning_filter() -> None:
@@ -71,6 +72,7 @@ from ui.main_window import MainWindow
 from ui.style import Style
 from settings_manager import get_preferences, set_ui_scale
 from appdata_manager import get_appdata_manager
+from version import __version__ as APP_VERSION
 from icons.icons import get_qicon
 from fonts import (
     has_installed_embedded_font_file,
@@ -88,6 +90,18 @@ MIME_TYPES_MUSICXML = [
     "application/vnd.recordare.musicxml+xml",
     "application/vnd.recordare.musicxml",
 ]
+
+
+def _is_newer_version(current: str, previous: str) -> bool:
+    """Compare dotted version strings without adding a runtime dependency."""
+    current_parts = [int(part) for part in re.findall(r"\d+", str(current or ""))]
+    previous_parts = [int(part) for part in re.findall(r"\d+", str(previous or ""))]
+    if not current_parts or not previous_parts:
+        return False
+    length = max(len(current_parts), len(previous_parts))
+    current_parts.extend([0] * (length - len(current_parts)))
+    previous_parts.extend([0] * (length - len(previous_parts)))
+    return current_parts > previous_parts
 SUPPORTED_UI_LANGUAGES = {"en", "nl"}
 
 
@@ -297,6 +311,10 @@ def install_desktop_integration() -> None:
     _write_desktop_entry(appimage_path, _find_appimage_icon())
     _write_mime_package()
     _update_xdg_databases()
+    adm = get_appdata_manager()
+    adm.set("app_version", APP_VERSION)
+    adm.set("show_install_question", False)
+    adm.save()
     print(QtCore.QCoreApplication.translate("keyTAB", "Installed desktop entry and MIME types."))
 
 
@@ -308,7 +326,18 @@ def prompt_install_if_needed() -> None:
 
     adm = get_appdata_manager()
     show_prompt = bool(adm.get("show_install_question", True))
-    if not show_prompt:
+    previous_version = str(adm.get("app_version", "") or "").strip()
+    is_newer_version = _is_newer_version(APP_VERSION, previous_version)
+    if is_newer_version:
+        QtWidgets.QMessageBox.information(
+            None,
+            QtCore.QCoreApplication.translate("keyTAB", "keyTAB update"),
+            QtCore.QCoreApplication.translate(
+                "keyTAB",
+                "This is version {version} of keyTAB. It is a newer version than you had previously installed ({old_version}).",
+            ).format(version=APP_VERSION, old_version=previous_version),
+        )
+    if not show_prompt and not is_newer_version:
         return
 
     message = (
@@ -339,13 +368,7 @@ def prompt_install_if_needed() -> None:
     )
     dialog.exec()
 
-    if dont_show_checkbox.isChecked():
-        adm.set("show_install_question", False)
-        adm.save()
-
     if dialog.clickedButton() == install_button:
-        adm.set("show_install_question", False)
-        adm.save()
         try:
             install_desktop_integration()
         except Exception as exc:
@@ -355,6 +378,9 @@ def prompt_install_if_needed() -> None:
                 QtCore.QCoreApplication.translate("keyTAB", "Install failed: {error}").format(error=exc),
                 QtCore.QCoreApplication.translate("keyTAB", "You can still use the AppImage without installing."),
             )
+    elif dont_show_checkbox.isChecked():
+        adm.set("show_install_question", False)
+        adm.save()
 
 
 def main(argv: list[str] | None = None):

@@ -267,6 +267,11 @@ def get_appdata_manager() -> AppDataManager:
             True,
             "Ask once to install AppImage desktop integration on Linux",
         )
+        adm.register(
+            "app_version",
+            "",
+            "Version of keyTAB last installed for desktop integration",
+        )
         # Playback preferences
         adm.register("playback_mode", "system", "Playback mode: 'system' or 'external'")
         adm.register("midi_out_port", "", "Last selected external MIDI output port name")
