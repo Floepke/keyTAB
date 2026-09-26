@@ -111,4 +111,5 @@ change_log = '''
 
 1.1.3 (2026-08-24)
 - fixed: font rendering issue on Linux
+- fixed hopefully: Stave config dialog now always has a working live preview. we changed to modal dialog.
 '''
