@@ -140,8 +140,8 @@ class StaveConfigDialog(DialogGeometryMixin, QtWidgets.QDialog):
         self.setWindowFlag(QtCore.Qt.WindowType.WindowMinMaxButtonsHint, True)
         self.setSizeGripEnabled(True)
         self.setWindowTitle(self.tr("Stave Configuration / Document Layout"))
-        self.setModal(False)
-        self.setWindowModality(QtCore.Qt.NonModal)
+        self.setModal(True)
+        self.setWindowModality(QtCore.Qt.WindowModality.ApplicationModal)
         self.resize(900, 200)
 
         lay = QtWidgets.QVBoxLayout(self)
@@ -149,7 +149,7 @@ class StaveConfigDialog(DialogGeometryMixin, QtWidgets.QDialog):
         lay.setSpacing(8)
 
         self._score = score
-        self._active_stave_index = 0
+        self._active_stave_index = self._selected_stave_index()
         self._line_breaks: list[LineBreak] = []
         self._selected_line_break: Optional[LineBreak] = selected_line_break if selected_line_break in self._line_breaks else (self._line_breaks[0] if self._line_breaks else None)
         self._measure_resolver = measure_resolver
@@ -362,6 +362,29 @@ class StaveConfigDialog(DialogGeometryMixin, QtWidgets.QDialog):
                 stave_name = candidate
         return self.tr("Stave {idx}: {name}").format(idx=int(stave_index) + 1, name=stave_name)
 
+    def _selected_stave_index(self) -> int:
+        staves = list(getattr(self._score, 'staves', []) or []) if self._score is not None else []
+        if not staves:
+            return 0
+        try:
+            selected = int(getattr(getattr(self._score, 'app_state', None), 'selected_stave_index', 0) or 0)
+        except Exception:
+            selected = 0
+        return int(selected % len(staves))
+
+    def _sync_active_stave_selection(self) -> None:
+        if self._score is None:
+            return
+        app_state = getattr(self._score, 'app_state', None)
+        if app_state is not None:
+            try:
+                app_state.selected_stave_index = int(self._active_stave_index)
+            except Exception:
+                pass
+        events = self._current_stave_events()
+        if events is not None:
+            self._score.events = events
+
     def _init_stave_tabs(self) -> None:
         target_count = 4
         self._tab_pages = []
@@ -541,6 +564,7 @@ class StaveConfigDialog(DialogGeometryMixin, QtWidgets.QDialog):
             self._update_stave_tabs()
             return
         self._active_stave_index = normalized
+        self._sync_active_stave_selection()
         self._update_stave_tabs()
         self._reload_line_breaks(keep_row=True)
 
@@ -1083,6 +1107,9 @@ class StaveConfigDialog(DialogGeometryMixin, QtWidgets.QDialog):
         return not bool(msg)
 
     def _on_values_changed(self) -> None:
+        # The editor renders line breaks from the selected stave's event container.
+        # Keep that selection aligned with this dialog's active tab before snapshotting.
+        self._sync_active_stave_selection()
         callback_ok = False
         if callable(self._on_change_cb):
             try:

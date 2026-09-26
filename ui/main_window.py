@@ -7,6 +7,7 @@ from utils.file_associations import is_supported_document
 from datetime import datetime
 from file_model.appstate import AppState
 from file_model.file_manager import FileManager
+from file_model.SCORE import SCORE
 from file_model.analysis import Analysis
 from file_model.layout import Layout
 from ui.widgets.toolbar_splitter import ToolbarSplitter
@@ -2424,51 +2425,30 @@ class MainWindow(QtWidgets.QMainWindow):
         from ui.dialogs.stave_config_dialog import StaveConfigDialog
         from ui.preview_service import PreviewSession
 
-        score = self.file_manager.current()
-        if score is None:
+        current_score = self.file_manager.current()
+        if current_score is None:
             return
 
         # Keep a baseline snapshot so Cancel can fully restore pre-dialog state,
         # including dirty flag semantics.
         preview = PreviewSession(self.file_manager, self.editor_controller, parent=self, debounce_ms=0)
+        working_score = SCORE.from_dict(current_score.get_dict())
 
         def _apply_dialog_values() -> None:
-            try:
-                self.file_manager.on_model_changed()
-            except Exception:
-                pass
-            try:
-                if hasattr(self.editor_controller, 'force_redraw_from_model'):
-                    self.editor_controller.force_redraw_from_model()
-                else:
-                    self.editor_controller.draw_frame()
-            except Exception:
-                pass
-            try:
-                self._refresh_views_from_score()
-            except Exception:
-                pass
+            preview.schedule_score_dict_preview(working_score.get_dict())
 
         dlg = StaveConfigDialog(
             parent=self,
-            score=score,
+            score=working_score,
             selected_line_break=None,
             measure_resolver=(lambda t: self.editor_controller.get_measure_index_for_time(t)) if hasattr(self.editor_controller, 'get_measure_index_for_time') else None,
             on_change=_apply_dialog_values,
         )
 
         def _on_accept() -> None:
-            try:
-                cur = self.file_manager.current()
-                if hasattr(cur, 'sync_linked_line_breaks'):
-                    cur.sync_linked_line_breaks()
-            except Exception:
-                pass
-            try:
-                # Accept final state and record one undo snapshot for the dialog edit.
-                preview.commit(label='line_break_dialog', restore_first=False)
-            except Exception:
-                pass
+            # Commit the dialog's isolated model as one preview transaction.
+            preview.commit_score_dict(working_score.get_dict(), label='line_break_dialog')
+            self._refresh_views_from_score()
 
         def _on_reject() -> None:
             try:

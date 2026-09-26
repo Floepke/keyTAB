@@ -4,7 +4,9 @@ from typing import Optional, Tuple
 from PySide6 import QtWidgets
 
 from editor.tool.base_tool import BaseTool
+from file_model.SCORE import SCORE
 from file_model.events.line_break import LineBreak
+from ui.preview_service import PreviewSession
 from utils.CONSTANT import QUARTER_NOTE_UNIT, SHORTEST_DURATION
 from utils.operator import Operator
 
@@ -237,34 +239,29 @@ class LineBreakTool(BaseTool):
         self._dialog_open = True
         from ui.dialogs.stave_config_dialog import StaveConfigDialog
         parent_w = QtWidgets.QApplication.activeWindow() if hasattr(QtWidgets, 'QApplication') else None
-        score = self._editor.current_score()
+        current_score = self._editor.current_score()
+        if current_score is None:
+            self._dialog_open = False
+            return
+        working_score = SCORE.from_dict(current_score.get_dict())
+        preview = PreviewSession(self._editor._file_manager, self._editor, parent=parent_w, debounce_ms=0)
 
         def _apply_dialog_values() -> None:
-            try:
-                if hasattr(self._editor, '_file_manager') and self._editor._file_manager is not None:
-                    self._editor._file_manager.on_model_changed()
-            except Exception:
-                pass
-            if hasattr(self._editor, 'force_redraw_from_model'):
-                self._editor.force_redraw_from_model()
-            else:
-                self._editor.draw_frame()
+            preview.schedule_score_dict_preview(working_score.get_dict())
 
         dlg = StaveConfigDialog(
             parent=parent_w,
-            score=score,
+            score=working_score,
             selected_line_break=lb,
             measure_resolver=(lambda t: self._editor.get_measure_index_for_time(t)) if hasattr(self._editor, 'get_measure_index_for_time') else None,
             on_change=_apply_dialog_values,
         )
 
         def _on_accept() -> None:
-            if hasattr(score, 'sync_linked_line_breaks'):
-                score.sync_linked_line_breaks()
-            self._editor._snapshot_if_changed(coalesce=False, label='line_break_edit')
+            preview.commit_score_dict(working_score.get_dict(), label='line_break_edit')
 
         def _on_reject() -> None:
-            pass
+            preview.restore_original()
 
         def _on_finished(_result: int) -> None:
             self._dialog_open = False

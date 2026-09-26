@@ -76,6 +76,14 @@ class PreviewSession:
     def schedule_refresh(self) -> None:
         self.schedule_preview(mutator=None, restore_first=False)
 
+    def schedule_score_dict_preview(self, score_data: dict) -> None:
+        """Preview an isolated score snapshot without retaining stale model references."""
+        snapshot = copy.deepcopy(score_data)
+        self.schedule_preview(
+            mutator=lambda: self._file_manager.replace_current(SCORE.from_dict(copy.deepcopy(snapshot))),
+            restore_first=True,
+        )
+
     def preview(self, mutator: Callable[[], None] | None = None, *, restore_first: bool = True) -> None:
         if restore_first:
             self._restore_snapshot(dirty_state=self._dirty_before)
@@ -101,6 +109,15 @@ class PreviewSession:
             except Exception:
                 pass
         self.refresh()
+
+    def commit_score_dict(self, score_data: dict, *, label: str | None = None) -> None:
+        """Commit an isolated score snapshot as one undoable transaction."""
+        snapshot = copy.deepcopy(score_data)
+        self.commit(
+            label=label,
+            mutator=lambda: self._file_manager.replace_current(SCORE.from_dict(copy.deepcopy(snapshot))),
+            restore_first=True,
+        )
 
     def restore_original(self) -> None:
         self._timer.stop()
