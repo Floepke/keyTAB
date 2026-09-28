@@ -28,7 +28,12 @@ class ScriptContext:
 
     @property
     def score(self):
-        return self._file_manager.current()
+        score = self._file_manager.current()
+        try:
+            self._editor._bind_events_to_selected_stave(score)
+        except Exception:
+            pass
+        return score
 
     def score_dict(self) -> dict:
         try:
