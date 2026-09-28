@@ -18,7 +18,6 @@ from file_model.base_grid import BaseGrid
 from file_model.appstate import AppState
 from file_model.layout import Layout
 from midi.midi_exporter import export_score_to_midi
-from utils.piano2musicxml import export_score_to_musicxml
 from utils.CONSTANT import UTILS_SAVE_DIR
 from appdata_manager import get_appdata_manager
 
@@ -43,7 +42,6 @@ class FileManager:
     SAVE_FILE_FILTER = (
         "keyTAB Score (*.keytab);;"
         "MIDI File (*.mid *.midi);;"
-        "MusicXML File [unusable in its current state] (*.musicxml *.xml);;"
     )
 
     def __init__(self, parent: Optional[QWidget] = None) -> None:
@@ -365,14 +363,6 @@ class FileManager:
         suffix = str(target.suffix or '').lower()
         if suffix in ('.mid', '.midi'):
             export_score_to_midi(self._current, target)
-            self._last_dir = target.parent
-            adm = get_appdata_manager()
-            adm.set("last_file_dialog_dir", str(self._last_dir))
-            adm.save()
-            return True
-        elif suffix in ('.musicxml', '.xml'):
-            self._apply_before_save_hook()
-            export_score_to_musicxml(self._current, target)
             self._last_dir = target.parent
             adm = get_appdata_manager()
             adm.set("last_file_dialog_dir", str(self._last_dir))

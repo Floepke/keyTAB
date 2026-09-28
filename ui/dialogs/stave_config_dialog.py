@@ -191,7 +191,7 @@ class StaveConfigDialog(DialogGeometryMixin, QtWidgets.QDialog):
         content_palette.setColor(QtGui.QPalette.ColorRole.Window, QtGui.QColor(base_color))
         self._tab_content_host.setPalette(content_palette)
 
-        self.staves_group = QtWidgets.QGroupBox(self.tr("Staves"), self._tab_content_host)
+        self.staves_group = QtWidgets.QGroupBox(self.tr("Stave"), self._tab_content_host)
         staves_group_lay = QtWidgets.QVBoxLayout(self.staves_group)
         staves_group_lay.setContentsMargins(6, 6, 6, 6)
         staves_group_lay.setSpacing(6)
@@ -535,7 +535,7 @@ class StaveConfigDialog(DialogGeometryMixin, QtWidgets.QDialog):
             "- Name: rename the stave.\n"
             "- Scale: change this stave's drawing scale (0.25 to 3.00).\n\n"
             "Line/Page break markers:\n"
-            "- Start Measure: choose where a marker starts.\n"
+            "- Start Measure: Move line/page over barlines by using the spinbox (the first line/page break cannot move).\n"
             "- Type: L for line break, P for page break.\n"
             "- Margins: set left/right (or bottom/top in horizontal read direction) per stave.\n"
             "- Key range: set automatic or manual key range for each marker.\n"

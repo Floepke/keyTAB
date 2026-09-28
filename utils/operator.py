@@ -14,20 +14,19 @@ class Operator:
     precision might cause tiny differences that aren't musically significant.
     
     Example:
-        >>> op = OperatorThreshold(threshold=0.01)
+        >>> op = Operator(threshold=0.01)
         >>> op.equal(1.0, 1.005)  # True - difference is 0.005 <= 0.01
         >>> op.equal(1.0, 1.02)   # False - difference is 0.02 > 0.01
         >>> op.greater(1.02, 1.0) # True - 1.02 is significantly greater
         >>> op.greater(1.005, 1.0) # False - within threshold, considered equal
     """
     
-    def __init__(self, threshold: float = 0.000001):
+    def __init__(self, threshold: float = 1):
         """
         Initialize the operator with a comparison threshold.
         
         Args:
             threshold: Maximum difference to consider two values equal.
-                      Default is 0.001 (1 tick in a 1000-tick system).
         """
         self.threshold = abs(threshold)  # Ensure positive
     
