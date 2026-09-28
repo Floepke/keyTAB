@@ -20,6 +20,7 @@ from ui.widgets.draw_util import DrawUtil
 from ui.widgets.draw_view import DrawUtilView
 from ui.about_dialog import AboutDialog
 from ui.dialogs.keyboard_shortcuts_dialog import KeyboardShortcutsDialog
+from ui.dialogs.file_inspector import FileInspectorDialog
 from ui.error_dialog import show_error_dialog
 from ui.style import Style
 from ui.dialogs.fluidsynth_reverb_config_dialog import FluidSynthReverbConfigDialog
@@ -770,6 +771,9 @@ class MainWindow(QtWidgets.QMainWindow):
         shortcuts_act = QtGui.QAction(tr("Keyboard Shortcut Card"), self)
         shortcuts_act.setToolTip(tr("Display a reference card with all keyboard shortcuts."))
         shortcuts_act.triggered.connect(self._open_keyboard_shortcuts_dialog)
+        file_inspector_act = QtGui.QAction(tr("File Inspector"), self)
+        file_inspector_act.setToolTip(tr("Inspect the current score as a collapsible JSON tree."))
+        file_inspector_act.triggered.connect(self._open_file_inspector)
         
         about_act = QtGui.QAction(tr("About keyTAB"), self)
         about_act.setToolTip(tr("Show information about keyTAB."))
@@ -778,6 +782,7 @@ class MainWindow(QtWidgets.QMainWindow):
         about_qt_act.setToolTip(tr("Show information about the Qt framework."))
         about_qt_act.triggered.connect(lambda: QtWidgets.QMessageBox.aboutQt(self))
         help_menu.addAction(shortcuts_act)
+        help_menu.addAction(file_inspector_act)
         help_menu.addSeparator()
         help_menu.addAction(about_act)
         help_menu.addSeparator()
@@ -2065,6 +2070,20 @@ class MainWindow(QtWidgets.QMainWindow):
         """Show keyboard shortcuts reference card."""
         dlg = KeyboardShortcutsDialog(self)
         dlg.show()
+
+    def _open_file_inspector(self) -> None:
+        """Show the current score using the JSON structure written to disk."""
+        try:
+            payload = self.file_manager.current().get_dict()
+            payload.pop('editor', None)
+            payload.pop('events', None)
+            FileInspectorDialog(payload, self).exec()
+        except Exception as exc:
+            show_error_dialog(
+                self,
+                self.tr("File Inspector"),
+                self.tr("Could not inspect the current score: {error}").format(error=exc),
+            )
 
     def _confirm_exit_to_os_then_close(self) -> None:
         """Ask for explicit OS exit confirmation, then run normal close flow."""

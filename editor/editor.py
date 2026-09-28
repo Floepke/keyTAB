@@ -24,6 +24,7 @@ from editor.tool.dynamic_tool import DynamicTool
 from editor.tool.tempo_tool import TempoTool
 from editor.tool.grid_band_tool import GridBandTool
 from editor.tool.arpeggio_tool import ArpeggioTool
+from editor.tool.idle import IdleTool
 from editor.ctlz import CtlZ
 from file_model.base_grid import BaseGrid
 from settings_manager import get_preferences_manager
@@ -104,6 +105,7 @@ class Editor(QtCore.QObject,
         self._file_manager = None
         self._score: SCORE = None
         self._tool_classes: Dict[str, Type[BaseTool]] = {
+            'idle': IdleTool,
             'beam': BeamTool,
             'barline': BarlineTool,
             'count_line': CountLineTool,

@@ -21,6 +21,7 @@ def _scaled(base: int) -> int:
 # - 'icon': icon key from icons, defaults to 'name' when omitted
 # - 'tooltip': hover text description (optional)
 TOOL_ITEMS: list[dict] = [
+    { 'name': 'idle',           'displayed_name': 'Idle',           'tooltip': 'In this mode you can do nothing at all.' },
     # basic notation elements
     { 'name': 'note',           'displayed_name': 'Note',           'icon': 'note',           'tooltip': 'Left Click/Drag: edit an existing note (duration on body, pitch+time on notehead). Left Click/Drag in empty space: create a note, then drag to set it. Right Click: delete note. Double Click: set/reset custom notehead.' },
     { 'name': 'grace_note',     'displayed_name': 'Grace Note',     'icon': 'grace_note',     'tooltip': 'Left Click/Drag: move an existing grace note (pitch+time). Left Click/Drag in empty space: create a grace note, then drag to adjust. Right Click: delete grace note.' },
@@ -93,6 +94,7 @@ class ToolSelectorWidget(QtWidgets.QListWidget):
     def _populate(self) -> None:
         self.clear()
         _names = {
+            'idle':           self.tr("Idle"),
             'note':           self.tr("Note"),
             'grace_note':     self.tr("Grace Note"),
             'count_line':     self.tr("Count Line"),
@@ -109,6 +111,7 @@ class ToolSelectorWidget(QtWidgets.QListWidget):
             'pedal':          self.tr("Pedal"),
         }
         _tooltips = {
+            'idle':           self.tr("In this mode you can do nothing at all."),
             'note':           self.tr("Left Click/Drag: edit an existing note (duration on body, pitch+time on notehead). Left Click/Drag in empty space: create a note, then drag to set it. Right Click: delete note. Double Click: set/reset custom notehead."),
             'grace_note':     self.tr("Left Click/Drag: move an existing grace note (pitch+time). Left Click/Drag in empty space: create a grace note, then drag to adjust. Right Click: delete grace note."),
             'count_line':     self.tr("Left Click/Drag: edit an existing count line handle (start/end and time). Left Click/Drag in empty space: create a count line, then drag its end handle. Right Click: delete count line by handle."),
