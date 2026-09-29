@@ -2532,7 +2532,7 @@ Boven stok: zwarte noten worden volgens Klavarskribo standaard boven de stok gep
 
 Onder stok, botsingen vermijden: keyTAB gebruikt 30% 'zwarte noot vernauwing' voor botsende notenkoppen.
 
-Akkorden boven stok: zwarte noten worden boven de stok geplaatst, maar alleen voor akkoorden met 1 of meer witte noten.
+Akkoorden boven stok: zwarte noten worden boven de stok geplaatst, maar alleen voor akkoorden met 1 of meer witte noten.
 </translation>
     </message>
     <message>

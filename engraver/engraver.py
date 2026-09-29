@@ -4359,7 +4359,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                     dot_x = float(_key_to_x(int(dot_pitch)))
                     min_collision_gap = max(0.0, float(semitone_mm) * 2.0 - 1e-6)
                     for t in sorted(set(dot_times)):
-                        y_center = _time_to_y(float(t)) + w
+                        y_center = _time_to_y(float(t)) + float(semitone_mm) * float(layout.get('notehead_height_scaling', 1.0) or 1.0)
                         # Shift dot down one semitone when it lands on a double barline
                         # so the two vertical lines don't overlap the dot.
                         if any(op_time.eq(float(t), dbt) for dbt in _double_bar_ticks):
