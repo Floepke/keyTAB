@@ -234,12 +234,12 @@ class Editor(QtCore.QObject,
         self.midi_input: MidiInputManager | None = None
 
     # ---- Drawing via mixins ----
-    def draw_background_gray(self, du) -> None:
+    def draw_background_gray(self, du: DrawUtil) -> None:
         """Fill the current page with print-view grey."""
         w_mm, h_mm = du.current_page_size_mm()
         du.add_rectangle(0.0, 0.0, w_mm, h_mm, stroke_color=None, fill_color=self.paper_color, id=0, tags=["background"])
 
-    def draw_all(self, du) -> None:
+    def draw_all(self, du: DrawUtil) -> None:
         """Invoke drawer mixin methods; layer order is enforced by DrawUtil tags.
 
         We simply call all drawer methods; DrawUtil sorts items by tag layering.
@@ -287,18 +287,7 @@ class Editor(QtCore.QObject,
         for fn in methods:
             if fn is None:
                 continue
-            # drawer_start = time.perf_counter()
             fn(du)
-        #     timing_rows.append((fn.__name__, (time.perf_counter() - drawer_start) * 1000.0))
-
-        # total_ms = (time.perf_counter() - frame_start) * 1000.0
-        # print("NEW FRAME:")
-        # for name, elapsed_ms in timing_rows:
-        #     print(f"{name}={elapsed_ms:.3f} ms")
-        # print(f"total={total_ms:.3f} ms")
-
-        # Keep render cache available for hit detection until next frame rebuild
-        # (cleared at the start of _build_render_cache)
 
     def refresh_context_toolbar(self) -> None:
         """Ask ToolManager to rebuild contextual toolbar from current tool state."""

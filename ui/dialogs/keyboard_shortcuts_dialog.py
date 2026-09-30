@@ -147,6 +147,7 @@ class KeyboardShortcutsDialog(QtWidgets.QDialog):
                 (self.tr("Map Selected Notes to Right Hand"), "]"),
                 (self.tr("(in note tool) Switch Cursor to Left Hand"), ","),
                 (self.tr("(in note tool) Switch Cursor to Right Hand"), "."),
+                (self.tr("(in note tool) Cycle Accidental"), "Shift+A"),
                 (self.tr("Set Snap Size to Whole Note Length"), "1"),
                 (self.tr("Set Snap Size to Half Note Length"), "2"),
                 (self.tr("Set Snap Size to Quarter Note Length"), "4"),

@@ -975,7 +975,7 @@ class NoteTool(BaseTool):
     def on_key_press(self, key: int, modifiers) -> bool:
         if self._editor is None:
             return False
-        if key == QtCore.Qt.Key.Key_A and modifiers == QtCore.Qt.KeyboardModifier.NoModifier:
+        if key == QtCore.Qt.Key.Key_A and modifiers == QtCore.Qt.KeyboardModifier.ShiftModifier:
             self._cycle_accidental_toggle()
             if hasattr(self._editor, 'widget') and getattr(self._editor, 'widget', None) is not None:
                 w = getattr(self._editor, 'widget')
