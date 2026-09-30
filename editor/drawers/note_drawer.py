@@ -501,7 +501,9 @@ class NoteDrawerMixin:
         dot_x = float(self.pitch_to_x(dot_pitch))
         min_collision_gap = max(0.0, float(self.semitone_dist or 0.5) * 2.0 - 1e-6)
         for t in sorted(set(dot_times)):
-            y_center = float(self.time_to_mm(t)) + w
+            y_center = float(self.time_to_mm(t)) + w * float(
+                getattr(layout, 'notehead_height_scaling', 1.0) or 1.0
+            )
             # Shift dot down one semitone when it lands on a double barline
             # so the two vertical lines don't overlap the dot.
             # Bisect finds the leftmost candidate >= tf-thr; if it is also <= tf+thr
