@@ -8,6 +8,17 @@ def _norm_round(v: float, ndigits: int = 6) -> float:
     return float(round(float(v), ndigits))
 
 
+def notehead_full_height_mm(
+    *,
+    form: str,
+    semitone_space_mm: float,
+    height_scale: float,
+) -> float:
+    """Return the rendered vertical extent for a notehead form."""
+    full_height = max(1e-6, float(semitone_space_mm)) * 2.0 * max(0.1, float(height_scale))
+    return float(full_height * 1.5) if str(form) == "bullet" else float(full_height)
+
+
 @lru_cache(maxsize=4096)
 def _cached_sheared_outline_points(
     hand: str,

@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, cast
 
 from file_model.events.note import Note
-from symbol_design.noteheads import resolve_notehead_spec
+from symbol_design.noteheads import notehead_full_height_mm, resolve_notehead_spec
 
 if TYPE_CHECKING:
     from editor.editor import Editor
@@ -35,7 +35,11 @@ class AccidentalDrawerMixin:
         is_above_stem = bool(getattr(spec, 'is_up', False))
 
         semitone = float(getattr(self, 'semitone_dist', 0.5) or 0.5)
-        note_h = 2.0 * semitone
+        note_h = notehead_full_height_mm(
+            form=str(getattr(spec, 'form', 'circle')),
+            semitone_space_mm=semitone,
+            height_scale=float(getattr(layout, 'notehead_height_scaling', 1.0) or 1.0),
+        )
 
         # Anchor from top (above-stem heads) or bottom (under-stem heads).
         y_anchor = float(y_start - note_h) if is_above_stem else float(y_start + note_h)

@@ -4,6 +4,7 @@ import math
 from typing import TYPE_CHECKING
 
 from ui.widgets.draw_util import DrawUtil
+from symbol_design.noteheads.geometry import notehead_full_height_mm
 from symbol_design.symbol_util import SymbolUtil
 
 if TYPE_CHECKING:
@@ -11,9 +12,11 @@ if TYPE_CHECKING:
 
 
 def _bullet_height_mm(symbol: SymbolUtil) -> float:
-    base_h = float(symbol.semitone_space_mm) * 2.0
-    # Make the bullet 50% longer than the base notehead height.
-    return base_h * 1.5
+    return notehead_full_height_mm(
+        form="bullet",
+        semitone_space_mm=float(symbol.semitone_space_mm),
+        height_scale=float(symbol.notehead_height_scaling),
+    )
 
 
 def _down_bullet_points(x_mm: float, top_y: float, half_w: float, bullet_h: float, curve_points: int) -> list[tuple[float, float]]:

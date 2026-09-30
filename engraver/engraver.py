@@ -16,6 +16,7 @@ from file_model.analysis import Analysis
 from ui.style import Style
 from symbol_design.noteheads import (
     Notehead,
+    notehead_full_height_mm,
     normalize_notehead_literal,
     resolve_notehead_spec,
     sheared_notehead_outline_points,
@@ -4227,7 +4228,11 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                 if acc != 0 and Note.is_valid_accidental(n) and bool(layout.get('accidental_visible', True)):
                     derived_pitch = int(p + acc)
                     x_target = _key_to_x(derived_pitch)
-                    note_h = float(semitone_mm * 2.0)
+                    note_h = notehead_full_height_mm(
+                        form=str(getattr(spec, 'form', 'circle')),
+                        semitone_space_mm=float(semitone_mm),
+                        height_scale=float(layout.get('notehead_height_scaling', 1.0) or 1.0),
+                    )
                     is_above_stem = bool(getattr(spec, 'is_up', False))
                     y_anchor = float(y_start - note_h) if is_above_stem else float(y_start + note_h)
                     y_target = float(y_anchor - semitone_mm) if is_above_stem else float(y_anchor + semitone_mm)

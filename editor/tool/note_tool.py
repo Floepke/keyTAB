@@ -79,10 +79,10 @@ class NoteTool(BaseTool):
 
         accidental_icon = {
             0: 'accidental',
-            -1: 'flat',
-            1: 'sharp',
-            -2: 'double_flat',
-            2: 'double_sharp',
+            1: 'flat',
+            -1: 'sharp',
+            2: 'double_flat',
+            -2: 'double_sharp',
         }.get(self._acc_toggle, 'accidental')
 
         return [

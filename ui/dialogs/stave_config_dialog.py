@@ -1,4 +1,5 @@
 from __future__ import annotations
+from copy import deepcopy
 from typing import Callable, Optional, Tuple
 from PySide6 import QtCore, QtGui, QtWidgets
 from ui.dialogs import DialogGeometryMixin
@@ -372,19 +373,6 @@ class StaveConfigDialog(DialogGeometryMixin, QtWidgets.QDialog):
             selected = 0
         return int(selected % len(staves))
 
-    def _sync_active_stave_selection(self) -> None:
-        if self._score is None:
-            return
-        app_state = getattr(self._score, 'app_state', None)
-        if app_state is not None:
-            try:
-                app_state.selected_stave_index = int(self._active_stave_index)
-            except Exception:
-                pass
-        events = self._current_stave_events()
-        if events is not None:
-            self._score.events = events
-
     def _init_stave_tabs(self) -> None:
         target_count = 4
         self._tab_pages = []
@@ -564,7 +552,6 @@ class StaveConfigDialog(DialogGeometryMixin, QtWidgets.QDialog):
             self._update_stave_tabs()
             return
         self._active_stave_index = normalized
-        self._sync_active_stave_selection()
         self._update_stave_tabs()
         self._reload_line_breaks(keep_row=True)
 
@@ -1107,9 +1094,7 @@ class StaveConfigDialog(DialogGeometryMixin, QtWidgets.QDialog):
         return not bool(msg)
 
     def _on_values_changed(self) -> None:
-        # The editor renders line breaks from the selected stave's event container.
-        # Keep that selection aligned with this dialog's active tab before snapshotting.
-        self._sync_active_stave_selection()
+        self._sync_legacy_events_for_preview()
         callback_ok = False
         if callable(self._on_change_cb):
             try:
@@ -1134,6 +1119,17 @@ class StaveConfigDialog(DialogGeometryMixin, QtWidgets.QDialog):
                 editor_controller.force_redraw_from_model()
             elif hasattr(editor_controller, 'draw_frame'):
                 editor_controller.draw_frame()
+
+    def _sync_legacy_events_for_preview(self) -> None:
+        """Keep preview serialization from treating stale legacy events as score data."""
+        if self._score is None:
+            return
+        staves = list(getattr(self._score, 'staves', []) or [])
+        if not staves:
+            return
+        first_events = getattr(staves[0], 'events', None)
+        if first_events is not None:
+            self._score.events = deepcopy(first_events)
 
     def _persist_measure_grouping(self) -> None:
         if self._layout is None:

@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from ui.widgets.draw_util import DrawUtil
-from symbol_design.noteheads.geometry import sheared_notehead_outline_points
+from symbol_design.noteheads.geometry import notehead_full_height_mm, sheared_notehead_outline_points
 from symbol_design.symbol_util import SymbolUtil
 from utils.CONSTANT import BLACK_KEYS
 
@@ -27,7 +27,11 @@ def draw_circle_notehead(
     apply_tilt: bool = True,
 ) -> None:
     half_w = float(symbol.semitone_space_mm) * float(symbol.note_width_scaling)
-    full_h = float(symbol.semitone_space_mm) * 2.0 * float(symbol.notehead_height_scaling)
+    full_h = notehead_full_height_mm(
+        form="circle",
+        semitone_space_mm=float(symbol.semitone_space_mm),
+        height_scale=float(symbol.notehead_height_scaling),
+    )
     top_y = float(y_mm) - full_h if str(direction) == "up" else float(y_mm)
 
     stroke_color = stroke_color_override if stroke_color_override is not None else symbol.notation_color

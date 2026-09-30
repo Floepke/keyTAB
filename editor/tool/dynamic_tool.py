@@ -65,7 +65,8 @@ class DynamicTool(BaseTool):
             },
             {
                 'name': self._MODE_DYNAMIC_SYMBOL,
-                'icon': 'dynamics',
+                'icon': 'mf',
+                'text': 'mf',
                 'tooltip': QtCore.QCoreApplication.translate('DynamicTool', 'Click to insert or edit an existing dynamic symbol. Drag to adjust position. Right-click to delete.'),
                 'active': self._mode == self._MODE_DYNAMIC_SYMBOL,
             },

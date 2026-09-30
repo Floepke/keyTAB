@@ -5,6 +5,7 @@ from .notehead import (
     normalize_notehead_literal,
 )
 from .geometry import (
+    notehead_full_height_mm,
     sheared_notehead_outline_points,
     support_point_from_outline_points,
     support_v_from_outline_points,
@@ -16,6 +17,7 @@ __all__ = [
     "NoteheadSpec",
     "resolve_notehead_spec",
     "normalize_notehead_literal",
+    "notehead_full_height_mm",
     "sheared_notehead_outline_points",
     "support_point_from_outline_points",
     "support_v_from_outline_points",
