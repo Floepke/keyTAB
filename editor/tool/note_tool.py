@@ -77,6 +77,14 @@ class NoteTool(BaseTool):
         else:
             editor_orientation = 'vertical'
 
+        accidental_icon = {
+            0: 'accidental',
+            -1: 'flat',
+            1: 'sharp',
+            -2: 'double_flat',
+            2: 'double_sharp',
+        }.get(self._acc_toggle, 'accidental')
+
         return [
             {
                 'name': 'hand_right',
@@ -92,6 +100,13 @@ class NoteTool(BaseTool):
                 'tooltip': QtCore.QCoreApplication.translate('NoteTool', 'Click to write left hand notes (shortcut: , ).'),
                 'rotation': 270.0 if editor_orientation == 'horizontal' else 0.0,
             },
+            {
+                'name': 'accidental_toggle',
+                'icon': accidental_icon,
+                'active': self._acc_toggle != 0,
+                'tooltip': QtCore.QCoreApplication.translate('NoteTool', 'Cycle accidental mode (shortcut: Shift+A).'),
+            },
+            {'type': 'separator'},
             {
                 'name': 'midi_input_toggle',
                 'icon': 'midi',
@@ -991,6 +1006,8 @@ class NoteTool(BaseTool):
             self._editor.hand_cursor = 'l'
         elif name == 'hand_right':
             self._editor.hand_cursor = 'r'
+        elif name == 'accidental_toggle':
+            self._cycle_accidental_toggle()
         elif name == 'midi_input_toggle':
             self._set_midi_input_enabled(not self._midi_input_enabled)
         elif name == 'velocity_toggle':

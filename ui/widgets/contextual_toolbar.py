@@ -53,6 +53,13 @@ class ContextualToolbar(QtWidgets.QWidget):
         
         # Add new buttons
         for d in defs or []:
+            if d.get('type') == 'separator':
+                separator = QtWidgets.QFrame(self._toolbar_area)
+                separator.setFrameShape(QtWidgets.QFrame.Shape.HLine)
+                separator.setFrameShadow(QtWidgets.QFrame.Shadow.Sunken)
+                self._toolbar_layout.addWidget(separator)
+                continue
+
             name = d.get('name', '')
             icon_name = d.get('icon', '')
             text = str(d.get('text', '') or '')
