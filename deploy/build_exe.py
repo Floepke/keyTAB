@@ -120,6 +120,8 @@ def ensure_requirements_installed(project_root: Path) -> None:
 
 
 _ISCC_CANDIDATES: list[str] = [
+    r"C:\Program Files (x86)\Inno Setup 7\ISCC.exe",
+    r"C:\Program Files\Inno Setup 7\ISCC.exe",
     r"C:\Program Files (x86)\Inno Setup 6\ISCC.exe",
     r"C:\Program Files\Inno Setup 6\ISCC.exe",
     r"C:\Program Files (x86)\Inno Setup 5\ISCC.exe",
