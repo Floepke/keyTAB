@@ -110,7 +110,7 @@ class NoteTool(BaseTool):
             {
                 'name': 'midi_input_toggle',
                 'icon': 'midi',
-                'text': 'MIDI',
+                'text': 'MID',
                 'active': bool(self._midi_input_enabled),
                 'tooltip': (QtCore.QCoreApplication.translate('NoteTool', 'MIDI input editing is on. Press keys/chords on a connected MIDI controller and adjust duration with mouse movement.') if self._midi_input_enabled else QtCore.QCoreApplication.translate('NoteTool', 'MIDI input editing is off. Toggle to enter notes/chords from connected MIDI controllers at cursor time.')),
             },
@@ -992,6 +992,7 @@ class NoteTool(BaseTool):
             return False
         if key == QtCore.Qt.Key.Key_A and modifiers == QtCore.Qt.KeyboardModifier.ShiftModifier:
             self._cycle_accidental_toggle()
+            self._editor.refresh_context_toolbar()
             if hasattr(self._editor, 'widget') and getattr(self._editor, 'widget', None) is not None:
                 w = getattr(self._editor, 'widget')
                 if hasattr(w, 'request_overlay_refresh'):

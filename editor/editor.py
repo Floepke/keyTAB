@@ -793,7 +793,8 @@ class Editor(QtCore.QObject,
             self._right_selection_mode = False
 
         if self._left_pressed:
-            if not self._dragging_left and (abs(dx) > self.DRAG_THRESHOLD or abs(dy) > self.DRAG_THRESHOLD):
+            press_x, press_y = self._press_pos
+            if not self._dragging_left and (abs(x - press_x) > self.DRAG_THRESHOLD or abs(y - press_y) > self.DRAG_THRESHOLD):
                 self._dragging_left = True
                 if not self._left_selection_mode:
                     self._tool.on_left_drag_start(x, y)
@@ -805,7 +806,8 @@ class Editor(QtCore.QObject,
                     self._update_selection_drag(x, y)
                 # Do not capture multiple intermediate drag snapshots
         elif self._right_pressed:
-            if not self._dragging_right and (abs(dx) > self.DRAG_THRESHOLD or abs(dy) > self.DRAG_THRESHOLD):
+            press_x, press_y = self._press_pos
+            if not self._dragging_right and (abs(x - press_x) > self.DRAG_THRESHOLD or abs(y - press_y) > self.DRAG_THRESHOLD):
                 self._dragging_right = True
                 if not self._right_selection_mode:
                     self._tool.on_right_drag_start(x, y)
