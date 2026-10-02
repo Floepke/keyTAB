@@ -178,6 +178,12 @@ def parse_args() -> argparse.Namespace:
         default=DEFAULT_ICON,
         help="Path to an icon image (PNG or ICNS) to embed into the app bundle.",
     )
+    parser.add_argument(
+        "--target-arch",
+        choices=("x86_64", "arm64", "universal2"),
+        default="x86_64",
+        help="macOS target architecture (default: x86_64 for Intel Macs).",
+    )
     return parser.parse_args()
 
 
@@ -287,6 +293,7 @@ def run_pyinstaller(
     work_dir: Path,
     icon: Path,
     exclude_modules: list[str],
+    target_arch: str,
 ) -> Path:
     entry_path = entry.resolve()
     if not entry_path.exists():
@@ -307,6 +314,8 @@ def run_pyinstaller(
         "--windowed",
         "--name",
         name,
+        "--target-arch",
+        target_arch,
         "--icon",
         str(icon_to_use),
     ]
@@ -503,6 +512,7 @@ def main() -> None:
             build_dir,
             args.icon,
             exclude_modules=unused_modules,
+            target_arch=args.target_arch,
         )
         copy_qt_licenses(result_path)
         doc_icon_file = ensure_document_icon(result_path, build_dir, args.icon)
