@@ -35,9 +35,9 @@ class Layout:
     tenuto_thickness_mm: float = 2.0
     accent_thickness_mm: float = 2.0
     accent_height_span_mm: float = 8.0
-    marcato_thickness_mm: float = 2.0
-    marcato_width_mm: float = 8.0
-    marcato_height_mm: float = 8.0
+    marcato_thickness_mm: float = 1.75
+    marcato_width_mm: float = 5.0
+    marcato_height_mm: float = 5.0
     articulation_gap_mm: float = 2.0
 
     # Beam appearance

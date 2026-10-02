@@ -118,7 +118,7 @@ class CachingMixin:
         return (old_notes_sorted, old_starts, old_ends, rebased_end_pairs, old_end_values)
 
     def _compute_note_time_cache_key(self, notes: list) -> tuple[int, int]:
-        """Cheap content hash for note timing/pitch fields used by sorting/culling."""
+        """Cheap content hash for note sorting/culling and object replacement."""
         h = 1469598103934665603
         fnv_prime = 1099511628211
         mask = (1 << 64) - 1
@@ -128,8 +128,9 @@ class CachingMixin:
                 d_i = int(round(float(getattr(n, "duration", 0.0) or 0.0) * 1000.0))
                 p_i = int(getattr(n, "pitch", 0) or 0)
                 nid = int(getattr(n, "_id", 0) or 0)
+                object_id = id(n)
             except Exception:
-                t_i, d_i, p_i, nid = (0, 0, 0, 0)
+                t_i, d_i, p_i, nid, object_id = (0, 0, 0, 0, 0)
             h ^= t_i & mask
             h = (h * fnv_prime) & mask
             h ^= d_i & mask
@@ -137,6 +138,8 @@ class CachingMixin:
             h ^= p_i & mask
             h = (h * fnv_prime) & mask
             h ^= nid & mask
+            h = (h * fnv_prime) & mask
+            h ^= object_id & mask
             h = (h * fnv_prime) & mask
         return (len(notes), int(h))
 
