@@ -1721,9 +1721,9 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                     1.0,
                 )
 
-            def _draw_classical_ts(numerator: int, denominator: int, enabled: bool, y_mm: float) -> None:
+            def _draw_classical_ts(numerator: int, denominator: int, enabled: bool, y_mm: float, x_offset_mm: float) -> None:
                 color = _ts_color(enabled)
-                x = ts_x_right
+                x = ts_x_right + float(x_offset_mm)
                 size_pt = classic_size_pt
                 classic_angle = 90.0 if horizontal_read_direction else 0.0
                 num_txt = f"{int(numerator)}"
@@ -1784,7 +1784,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                     angle_deg=classic_angle,
                 )
 
-            def _draw_klavarskribo_ts(numerator: int, denominator: int, enabled: bool, y_mm: float, grid_positions: list[int]) -> None:
+            def _draw_klavarskribo_ts(numerator: int, denominator: int, enabled: bool, y_mm: float, grid_positions: list[int], x_offset_mm: float) -> None:
                 """Match editor time-signature Klavarskribo indicator (three columns)."""
                 color = _ts_color(enabled)
                 klav_text_angle = 90.0 if horizontal_read_direction else 0.0
@@ -1799,9 +1799,9 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                 # Right column: guide lines (also aligns with the classical indicator).
                 # Middle column: beat numbers.
                 # Left column: group numbers.
-                x_right = ts_x_right
-                x_mid = ts_x_mid
-                x_left = ts_x_left
+                x_right = ts_x_right + float(x_offset_mm)
+                x_mid = ts_x_mid + float(x_offset_mm)
+                x_left = ts_x_left + float(x_offset_mm)
 
                 grid_bar_off, grid_off = resolve_grid_layer_offsets(
                     [float(v) for v in (grid_positions or []) if isinstance(v, (int, float))],
@@ -2503,6 +2503,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                 measure_amount = int(bg.get('measure_amount', 1) or 1)
                 beat_grouping = list(bg.get('beat_grouping', []) or [])
                 indicator_enabled = bool(bg.get('indicator_enabled', True))
+                indicator_x_offset = float(bg.get('indicator_x_offset', 0.0) or 0.0)
                 bar_offsets, grid_offsets = resolve_grid_layer_offsets(beat_grouping, numerator, denominator)
                 if bar_offsets:
                     has_any_barlines = True
@@ -2512,12 +2513,12 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                 if op_time.ge(float(time_cursor), float(line['time_start'])) and op_time.lt(float(time_cursor), float(line['time_end'])) and indicator_enabled and bool(layout.get('time_signature_visible', True)) and is_first_enabled_stave:
                     y_ts = _time_to_y(float(time_cursor))
                     if indicator_type == 'classical':
-                        _draw_classical_ts(numerator, denominator, indicator_enabled, y_ts)
+                        _draw_classical_ts(numerator, denominator, indicator_enabled, y_ts, indicator_x_offset)
                     elif indicator_type == 'klavarskribo':
-                        _draw_klavarskribo_ts(numerator, denominator, indicator_enabled, y_ts, beat_grouping)
+                        _draw_klavarskribo_ts(numerator, denominator, indicator_enabled, y_ts, beat_grouping, indicator_x_offset)
                     elif indicator_type == 'classical & klavarskribo':
-                        _draw_classical_ts(numerator, denominator, indicator_enabled, y_ts)
-                        _draw_klavarskribo_ts(numerator, denominator, indicator_enabled, y_ts, beat_grouping)
+                        _draw_classical_ts(numerator, denominator, indicator_enabled, y_ts, indicator_x_offset)
+                        _draw_klavarskribo_ts(numerator, denominator, indicator_enabled, y_ts, beat_grouping, indicator_x_offset)
                 for _ in range(measure_amount):
                     if op_time.gt(time_cursor, float(line['time_end'])):
                         break
@@ -2870,6 +2871,9 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                 notes_by_hand_line[hand_norm].append(item)
 
             beam_groups_by_hand: dict[str, tuple[list[list[dict]], list[tuple[float, float]]]] = {}
+            # Articulations share a hand-aware anchor: beamed notes sit beyond the
+            # beam edge, while standalone notes sit beyond the stem tip. Add tenuto,
+            # accent, and marcato rendering here using the same anchor calculation.
             line_start = float(line_time_start_render)
             line_start_actual = float(line.get('time_start', 0.0) or 0.0)
             line_end = float(line.get('time_end', 0.0) or 0.0)
@@ -3860,6 +3864,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                     )
 
             # ---- Beam drawing per line ----
+            beamed_articulation_x_by_note_idx: dict[int, float] = {}
             if bool(layout.get('beam_visible', True)):
                 notes_by_hand_line: dict[str, list[dict]] = {'l': [], 'r': []}
                 for item in line_notes:
@@ -4036,6 +4041,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                                 x_on_beam = x1 + t_ratio * (x2 - x1)
                             else:
                                 x_on_beam = x1
+                            beamed_articulation_x_by_note_idx[int(n.get('idx', -1))] = float(x_on_beam)
                             du.add_line(
                                 x_tip,
                                 y_note,
@@ -4050,6 +4056,36 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
             line_start = float(line_time_start_render)
             line_start_actual = float(line.get('time_start', 0.0) or 0.0)
             line_end = float(line.get('time_end', 0.0) or 0.0)
+            articulation_stem_len = float(layout.get('note_stem_length_semitone', 3.0) or 3.0) * semitone_mm
+            articulation_gap = max(0.0, float(layout.get('articulation_gap_mm', 1.0))) * line_scale
+            articulation_radius = max(0.1, float(layout.get('articulation_staccato_diameter_mm', 1.6) or 1.6) * line_scale * 0.5)
+            articulation_beam_half_width = max(0.0, float(layout.get('beam_thickness_mm', 1.0) or 1.0) * line_scale * 0.5)
+            for item in line_notes:
+                note_time = float(item.get('time', 0.0) or 0.0)
+                if op_time.lt(note_time, float(line_start)) or op_time.gt(note_time, float(line_end)):
+                    continue
+                raw_articulation = (item.get('raw', {}) or {}).get('articulation', {})
+                if not isinstance(raw_articulation, dict) or not bool(raw_articulation.get('staccato', False)):
+                    continue
+                hand = 'l' if str(item.get('hand', 'l') or 'l') == 'l' else 'r'
+                direction = -1.0 if hand == 'l' else 1.0
+                note_idx = int(item.get('idx', -1))
+                beam_x = beamed_articulation_x_by_note_idx.get(note_idx)
+                if beam_x is None:
+                    x = float(_key_to_x(int(item.get('pitch', 0) or 0))) + (direction * (articulation_stem_len + articulation_gap))
+                else:
+                    x = float(beam_x) + (direction * (articulation_beam_half_width + articulation_radius + articulation_gap))
+                y = float(_time_to_y(note_time))
+                du.add_oval(
+                    x - articulation_radius,
+                    y - articulation_radius,
+                    x + articulation_radius,
+                    y + articulation_radius,
+                    stroke_color=None,
+                    fill_color=notation_color,
+                    id=int(item.get('id', 0) or 0),
+                    tags=['articulation', 'articulation_staccato'],
+                )
 
             def _clip_poly_y(poly: list[tuple[float, float]], y_min: float, y_max: float) -> list[tuple[float, float]]:
                 if not poly:

@@ -7,7 +7,7 @@ import cairo
 from PySide6 import QtCore, QtGui, QtWidgets
 from ui.dialogs import DialogGeometryMixin
 
-from file_model.events.note import Note
+from file_model.events.note import Articulation, Note
 from symbol_design.noteheads import Notehead, normalize_notehead_literal, resolve_notehead_spec
 from ui.widgets.draw_util import DrawUtil, finalize_image_surface, make_image_surface
 
@@ -86,6 +86,7 @@ class NoteheadDialog(DialogGeometryMixin, QtWidgets.QDialog):
         default_black_above: bool,
         choices: Optional[list[tuple[str, str]]] = None,
         show_stem: bool = True,
+        show_articulations: bool = False,
         outline_width_mm_override: float | None = None,
         parent: Optional[QtWidgets.QWidget] = None,
     ) -> None:
@@ -105,6 +106,7 @@ class NoteheadDialog(DialogGeometryMixin, QtWidgets.QDialog):
         self._default_black_above = bool(default_black_above)
         self._choices = list(choices or _NOTEHEAD_CHOICES)
         self._show_stem = bool(show_stem)
+        self._show_articulations = bool(show_articulations)
         self._outline_width_mm_override = None if outline_width_mm_override is None else float(outline_width_mm_override)
 
         lay = QtWidgets.QVBoxLayout(self)
@@ -125,6 +127,23 @@ class NoteheadDialog(DialogGeometryMixin, QtWidgets.QDialog):
             view.setStyleSheet("QListView::item { min-height: 56px; padding: 3px 6px; }")
         self._populate_choices()
         lay.addWidget(self.combo)
+
+        self._articulation_checks: dict[str, QtWidgets.QCheckBox] = {}
+        if self._show_articulations:
+            articulation = getattr(note, 'articulation', Articulation())
+            group = QtWidgets.QGroupBox(self.tr("Articulation"), self)
+            articulation_layout = QtWidgets.QGridLayout(group)
+            for index, (name, label) in enumerate((
+                ('staccato', self.tr('Staccato')),
+                ('tenuto', self.tr('Tenuto')),
+                ('accent', self.tr('Accent')),
+                ('marcato', self.tr('Marcato')),
+            )):
+                check = QtWidgets.QCheckBox(label, group)
+                check.setChecked(bool(getattr(articulation, name, False)))
+                articulation_layout.addWidget(check, index // 2, index % 2)
+                self._articulation_checks[name] = check
+            lay.addWidget(group)
 
         btns = QtWidgets.QDialogButtonBox(QtWidgets.QDialogButtonBox.StandardButton.Ok | QtWidgets.QDialogButtonBox.StandardButton.Cancel, self)
         btns.accepted.connect(self.accept)
@@ -215,6 +234,12 @@ class NoteheadDialog(DialogGeometryMixin, QtWidgets.QDialog):
     def selected_notehead(self) -> str:
         return str(self.combo.currentData(QtCore.Qt.ItemDataRole.UserRole) or "auto")
 
+    def selected_articulation(self) -> Articulation:
+        return Articulation(**{
+            name: check.isChecked()
+            for name, check in self._articulation_checks.items()
+        })
+
     @classmethod
     def get_notehead(
         cls,
@@ -227,6 +252,7 @@ class NoteheadDialog(DialogGeometryMixin, QtWidgets.QDialog):
         default_black_above: bool,
         choices: Optional[list[tuple[str, str]]] = None,
         show_stem: bool = True,
+        show_articulations: bool = False,
         outline_width_mm_override: float | None = None,
         parent: Optional[QtWidgets.QWidget] = None,
     ) -> tuple[str, bool]:
@@ -239,9 +265,12 @@ class NoteheadDialog(DialogGeometryMixin, QtWidgets.QDialog):
             default_black_above=default_black_above,
             choices=choices,
             show_stem=show_stem,
+            show_articulations=show_articulations,
             outline_width_mm_override=outline_width_mm_override,
             parent=parent,
         )
         if dlg.exec() == int(QtWidgets.QDialog.DialogCode.Accepted):
+            if show_articulations:
+                note.articulation = dlg.selected_articulation()
             return dlg.selected_notehead(), True
         return normalize_notehead_literal(getattr(note, "notehead", "auto")), False

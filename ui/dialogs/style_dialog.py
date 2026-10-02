@@ -612,6 +612,8 @@ class StyleDialog(DialogGeometryMixin, QtWidgets.QDialog):
                 self.tr('Notehead tilt'),
                 self.tr('0 = circle/oval, 1 = fully tilted'),
             ),
+            'articulation_staccato_diameter_mm': self.tr('Staccato dot diameter (mm)'),
+            'articulation_gap_mm': self.tr('Articulation gap (mm)'),
             'beam_visible': self.tr('Beam'),
             'beam_thickness_mm': self.tr('Beam thickness (mm)'),
             'beam_corner_radius_mm': (
@@ -839,6 +841,7 @@ class StyleDialog(DialogGeometryMixin, QtWidgets.QDialog):
             self.tr("Measure Numbering"),
             self.tr("Barline Symbols"),
             self.tr("Note"),
+            self.tr("Articulation"),
             self.tr("Grace note"),
             self.tr("Beam"),
             self.tr("Dynamic"),
@@ -900,6 +903,9 @@ class StyleDialog(DialogGeometryMixin, QtWidgets.QDialog):
             'note_continuation_dot_size_mm': 'Note',
             'note_midinote_left_color': 'Note',
             'note_midinote_right_color': 'Note',
+            # Articulation
+            'articulation_staccato_diameter_mm': 'Articulation',
+            'articulation_gap_mm': 'Articulation',
             # Beam
             'beam_thickness_mm': 'Beam',
             'beam_corner_radius_mm': 'Beam',

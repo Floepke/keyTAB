@@ -33,6 +33,7 @@ class BaseGrid:
     beat_grouping: List[float] = field(default_factory=lambda: [1, 2, 3, 4])
     measure_amount: int = 1
     indicator_enabled: bool = True
+    indicator_x_offset: float = 0.0
 
 
 def _is_legacy_group_sequence(seq: List[float], numerator: int) -> bool:

@@ -676,6 +676,7 @@ class NoteTool(BaseTool):
             notation_color=self._editor.notation_color,
             paper_color=self._editor.paper_color,
             default_black_above=is_black_above_stem,
+            show_articulations=True,
             parent=parent,
         )
         self._notehead_dialog_active = False
@@ -686,10 +687,13 @@ class NoteTool(BaseTool):
         found.notehead = selected
         self._cancel_active_note_edit(redraw=False)
         self._refresh_cursor_overlay_from_pointer()
+        self._editor._draw_cache = None
+        self._editor._reuse_draw_cache_once = False
         if hasattr(self._editor, 'force_redraw_from_model'):
             self._editor.force_redraw_from_model()
         else:
             self._editor.draw_frame()
+        self._editor.score_changed.emit()
         if hasattr(self._editor, '_snapshot_if_changed'):
             self._editor._snapshot_if_changed(coalesce=True, label='notehead_override')
 

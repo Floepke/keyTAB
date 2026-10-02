@@ -136,6 +136,9 @@ class GridDrawerMixin:
         stem_collision_pad = max(0.15, float(getattr(layout, 'note_stem_thickness_mm', 0.5) or 0.5) * SCALE) if layout is not None else 0.5
         head_collision_pad = max(0.15, semitone_mm * 0.15)
         beam_collision_pad = max(0.2, float(getattr(layout, 'beam_thickness_mm', 1.0) or 1.0) * SCALE * 0.7) if layout is not None else 0.2
+        articulation_dot_radius_mm = max(0.1, float(getattr(layout, 'articulation_staccato_diameter_mm', 1.6) or 1.6) * SCALE * 0.5) if layout is not None else 0.4
+        articulation_gap_mm = max(0.0, float(getattr(layout, 'articulation_gap_mm', 1.0))) * SCALE if layout is not None else 0.0
+        beam_half_width_mm = max(0.0, float(getattr(layout, 'beam_thickness_mm', 1.0) or 1.0) * SCALE * 0.5) if layout is not None else 0.5
         barline_symbol_gap_mm = max(0.0, semitone_mm)
         barline_time_eps = 1e-4
         barline_time_op = Operator(float(SHORTEST_DURATION))
@@ -212,6 +215,7 @@ class GridDrawerMixin:
 
         beam_segments: list[dict[str, float]] = []
         beam_connect_segments: list[dict[str, float]] = []
+        beam_x_by_note_id: dict[int, float] = {}
         # Use a combined boundary timeline so the first measure start (t=0)
         # is always included even when grid_den_times has only subdivisions.
         beam_time_boundaries = sorted(
@@ -271,6 +275,9 @@ class GridDrawerMixin:
                         x_on_beam = float(x1b) + ratio * (float(x2b) - float(x1b))
                     else:
                         x_on_beam = float(x1b)
+                    note_id = int(getattr(m, '_id', 0) or 0)
+                    if note_id > 0:
+                        beam_x_by_note_id[note_id] = float(x_on_beam)
                     beam_connect_segments.append({
                         'time': float(mt),
                         'x0': float(min(x_tip, x_on_beam)),
@@ -343,6 +350,20 @@ class GridDrawerMixin:
                     intervals.append((
                         min(x_note, x_stem_tip) - stem_collision_pad - barline_symbol_gap_mm,
                         max(x_note, x_stem_tip) + stem_collision_pad + barline_symbol_gap_mm,
+                    ))
+                articulation = getattr(n, 'articulation', None)
+                if bool(getattr(articulation, 'staccato', False)):
+                    hand_key = 'l' if str(getattr(n, 'hand', 'l') or 'l') == 'l' else 'r'
+                    direction = -1.0 if hand_key == 'l' else 1.0
+                    note_id = int(getattr(n, '_id', 0) or 0)
+                    beam_x = beam_x_by_note_id.get(note_id)
+                    if beam_x is None:
+                        dot_x = x_note + (direction * stem_len_mm) + (direction * articulation_gap_mm)
+                    else:
+                        dot_x = beam_x + (direction * (beam_half_width_mm + articulation_dot_radius_mm + articulation_gap_mm))
+                    intervals.append((
+                        dot_x - articulation_dot_radius_mm - barline_symbol_gap_mm,
+                        dot_x + articulation_dot_radius_mm + barline_symbol_gap_mm,
                     ))
             for chord_hand_key in ('l', 'r'):
                 chord_span = chord_span_at_tick_hand.get((tick_key, chord_hand_key))

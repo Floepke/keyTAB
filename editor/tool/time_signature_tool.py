@@ -226,6 +226,7 @@ class TimeSignatureTool(BaseTool):
                 initial_denom=int(getattr(seg_bg, 'denominator', 4) or 4),
                 initial_grid_positions=list(initial_grid),
                 initial_indicator_enabled=bool(getattr(seg_bg, 'indicator_enabled', True)),
+                initial_indicator_x_offset=float(getattr(seg_bg, 'indicator_x_offset', 0.0) or 0.0),
                 editor_widget=getattr(self._editor, 'widget', None),
             )
 
@@ -235,12 +236,13 @@ class TimeSignatureTool(BaseTool):
                 self._editor.force_redraw_from_model()
 
             def _on_accepted():
-                numer, denom, grid_positions, indicator_enabled = dlg.get_values()
+                numer, denom, grid_positions, indicator_enabled, indicator_x_offset = dlg.get_values()
                 seg_bg.numerator = int(numer)
                 seg_bg.denominator = int(denom)
                 seg_bg.measure_amount = len(grid_positions) if grid_positions else 1
                 seg_bg.beat_grouping = [float(v) for v in (grid_positions or [])]
                 seg_bg.indicator_enabled = bool(indicator_enabled)
+                seg_bg.indicator_x_offset = float(indicator_x_offset)
                 _finalize_change()
 
             def _on_rejected():

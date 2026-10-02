@@ -39,6 +39,7 @@ from editor.drawers.note_drawer import NoteDrawerMixin
 from editor.drawers.accidental_drawer import AccidentalDrawerMixin
 from editor.drawers.grace_note_drawer import GraceNoteDrawerMixin
 from editor.drawers.beam_drawer import BeamDrawerMixin
+from editor.drawers.articulation_drawer import ArticulationDrawerMixin
 from editor.drawers.pedal_drawer import PedalDrawerMixin
 from editor.drawers.text_drawer import TextDrawerMixin
 from editor.drawers.slur_drawer import SlurDrawerMixin
@@ -77,6 +78,7 @@ class Editor(QtCore.QObject,
              ArpeggioDrawerMixin,
              GraceNoteDrawerMixin,
              BeamDrawerMixin,
+             ArticulationDrawerMixin,
              SlurDrawerMixin,
              TextDrawerMixin,
              PedalDrawerMixin,
@@ -272,6 +274,7 @@ class Editor(QtCore.QObject,
             getattr(self, 'draw_arpeggio', None),
             getattr(self, 'draw_grace_note', None),
             getattr(self, 'draw_beam', None),
+            getattr(self, 'draw_articulation', None),
             getattr(self, 'draw_pedal', None),
             getattr(self, 'draw_dynamic', None),
             getattr(self, 'draw_crescendo', None),

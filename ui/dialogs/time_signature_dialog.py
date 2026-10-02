@@ -19,6 +19,7 @@ class TimeSignatureDialog(DialogGeometryMixin, QtWidgets.QDialog):
         initial_denom: int = 4,
         initial_grid_positions: Optional[list[float]] = None,
         initial_indicator_enabled: Optional[bool] = True,
+        initial_indicator_x_offset: float = 0.0,
         indicator_type: Optional[str] = None,
         editor_widget: Optional[QtWidgets.QWidget] = None,
     ):
@@ -37,6 +38,7 @@ class TimeSignatureDialog(DialogGeometryMixin, QtWidgets.QDialog):
             self._denom = 4
         self._grid_positions: list[float] = [float(v) for v in (initial_grid_positions or []) if isinstance(v, (int, float))]
         self._indicator_enabled = bool(initial_indicator_enabled if initial_indicator_enabled is not None else True)
+        self._indicator_x_offset = float(initial_indicator_x_offset or 0.0)
         self._enforcing_min_height = False
 
         lay = QtWidgets.QVBoxLayout(self)
@@ -56,6 +58,19 @@ class TimeSignatureDialog(DialogGeometryMixin, QtWidgets.QDialog):
         self.indicator_enabled_cb = QtWidgets.QCheckBox(self.tr("Time-signature indicator enabled"), self)
         self.indicator_enabled_cb.setChecked(self._indicator_enabled)
         lay.addWidget(self.indicator_enabled_cb)
+
+        offset_row = QtWidgets.QHBoxLayout()
+        offset_row.setContentsMargins(0, 0, 0, 0)
+        offset_row.setSpacing(6)
+        offset_row.addWidget(QtWidgets.QLabel(self.tr("Indicator X offset:"), self))
+        self.indicator_x_offset_spin = QtWidgets.QDoubleSpinBox(self)
+        self.indicator_x_offset_spin.setRange(-100.0, 100.0)
+        self.indicator_x_offset_spin.setDecimals(2)
+        self.indicator_x_offset_spin.setSingleStep(0.5)
+        self.indicator_x_offset_spin.setSuffix(self.tr(" mm"))
+        self.indicator_x_offset_spin.setValue(self._indicator_x_offset)
+        offset_row.addWidget(self.indicator_x_offset_spin, 1)
+        lay.addLayout(offset_row)
 
         self.expl_label = QtWidgets.QLabel(
             self.tr(
@@ -87,6 +102,7 @@ class TimeSignatureDialog(DialogGeometryMixin, QtWidgets.QDialog):
 
         self.ts_edit.textChanged.connect(self._on_any_changed)
         self.indicator_enabled_cb.toggled.connect(self._on_any_changed)
+        self.indicator_x_offset_spin.valueChanged.connect(self._on_any_changed)
 
         self._install_validators()
         self._on_any_changed()
@@ -169,6 +185,7 @@ class TimeSignatureDialog(DialogGeometryMixin, QtWidgets.QDialog):
         self._denom = int(d)
         self._grid_positions = self._default_grid_positions(self._numer, self._denom)
         self._indicator_enabled = bool(self.indicator_enabled_cb.isChecked())
+        self._indicator_x_offset = float(self.indicator_x_offset_spin.value())
 
     def _on_accept(self) -> None:
         self._on_any_changed()
@@ -176,5 +193,11 @@ class TimeSignatureDialog(DialogGeometryMixin, QtWidgets.QDialog):
             return
         self.accept()
 
-    def get_values(self) -> tuple[int, int, list[float], bool]:
-        return int(self._numer), int(self._denom), list(self._grid_positions), bool(self._indicator_enabled)
+    def get_values(self) -> tuple[int, int, list[float], bool, float]:
+        return (
+            int(self._numer),
+            int(self._denom),
+            list(self._grid_positions),
+            bool(self._indicator_enabled),
+            float(self._indicator_x_offset),
+        )

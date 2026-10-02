@@ -1,9 +1,18 @@
 from __future__ import annotations
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Literal
 from utils.CONSTANT import BLACK_KEYS, PIANO_KEY_AMOUNT
 
 NoteColor = Literal['auto'] | str
+
+
+@dataclass
+class Articulation:
+    staccato: bool = False
+    tenuto: bool = False
+    accent: bool = False
+    marcato: bool = False
+
 
 @dataclass
 class Note:
@@ -41,6 +50,7 @@ class Note:
     # Compact accidental offset in semitones; valid range: -2..2.
     # 0 means no accidental marker.
     acc: int = 0
+    articulation: Articulation = field(default_factory=Articulation)
     _id: int = 0
 
     @staticmethod

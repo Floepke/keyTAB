@@ -6,7 +6,7 @@ import json
 from datetime import datetime
 from pathlib import Path
 
-from file_model.events.note import Note
+from file_model.events.note import Articulation, Note
 from file_model.events.grace_note import GraceNote
 from file_model.events.pedal import Pedal
 from file_model.events.text import Text
@@ -145,6 +145,18 @@ def _merge_with_defaults(dc_type, incoming: dict, context: str, skip_keys: set =
 		else:
 			color = ''
 		incoming['color'] = color if color else 'auto'
+		raw_articulation = incoming.get('articulation', None)
+		if isinstance(raw_articulation, Articulation):
+			incoming['articulation'] = raw_articulation
+		elif isinstance(raw_articulation, dict):
+			incoming['articulation'] = Articulation(
+				staccato=bool(raw_articulation.get('staccato', False)),
+				tenuto=bool(raw_articulation.get('tenuto', False)),
+				accent=bool(raw_articulation.get('accent', False)),
+				marcato=bool(raw_articulation.get('marcato', False)),
+			)
+		else:
+			incoming['articulation'] = Articulation()
 	defaults = _defaults_for(dc_type)
 	try:
 		type_hints = get_type_hints(dc_type, globals(), locals())
@@ -217,6 +229,18 @@ class SCORE:
 		else:
 			color = ''
 		base['color'] = color if color else 'auto'
+		raw_articulation = base.get('articulation', None)
+		if isinstance(raw_articulation, Articulation):
+			base['articulation'] = raw_articulation
+		elif isinstance(raw_articulation, dict):
+			base['articulation'] = Articulation(
+				staccato=bool(raw_articulation.get('staccato', False)),
+				tenuto=bool(raw_articulation.get('tenuto', False)),
+				accent=bool(raw_articulation.get('accent', False)),
+				marcato=bool(raw_articulation.get('marcato', False)),
+			)
+		else:
+			base['articulation'] = Articulation()
 		obj = Note(**base, _id=self._gen_id())
 		self.events.note.append(obj)
 		return obj
