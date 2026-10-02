@@ -9,6 +9,7 @@ NoteColor = Literal['auto'] | str
 class Articulation:
     """Resolve compact note-articulation symbols."""
 
+    LEFT_HAND_STACK_ORDER = ('tenuto', 'accent', 'staccato', 'marcato')
     SYMBOLS = {
         'staccato': '.',
         'tenuto': '-',
@@ -30,6 +31,13 @@ class Articulation:
     def is_enabled(cls, value: str, name: str) -> bool:
         symbol = cls.SYMBOLS.get(name)
         return symbol is not None and symbol in cls.resolve(value)
+
+    @classmethod
+    def enabled_stack_order(cls, value: str, hand: str) -> tuple[str, ...]:
+        order = cls.LEFT_HAND_STACK_ORDER
+        if str(hand or 'l') != 'l':
+            order = tuple(reversed(order))
+        return tuple(name for name in order if cls.is_enabled(value, name))
 
     @classmethod
     def normalize(cls, value: str) -> str:

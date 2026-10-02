@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING, cast
 from editor.editor_defaults import SCALE
 from file_model.events.note import Articulation
 from file_model.SCORE import SCORE
+from symbol_design.articulations import AccentSym, MarcatoSym
 from file_model.base_grid import resolve_grid_layer_offsets
 from ui.widgets.draw_util import DrawUtil
 from utils.CONSTANT import QUARTER_NOTE_UNIT, SHORTEST_DURATION, PIANO_KEY_AMOUNT
@@ -139,6 +140,12 @@ class GridDrawerMixin:
         beam_collision_pad = max(0.2, float(getattr(layout, 'beam_thickness_mm', 1.0) or 1.0) * SCALE * 0.7) if layout is not None else 0.2
         articulation_dot_radius_mm = max(0.1, float(getattr(layout, 'staccato_diameter_mm', 1.6) or 1.6) * SCALE * 0.5) if layout is not None else 0.4
         tenuto_half_thickness_mm = max(0.05, float(getattr(layout, 'tenuto_thickness_mm', 1.0) or 1.0) * SCALE * 0.5) if layout is not None else 0.05
+        accent_thickness_mm = max(0.05, float(getattr(layout, 'accent_thickness_mm', 2.0) or 2.0) * SCALE) if layout is not None else 0.05
+        accent_height_span_mm = max(0.05, float(getattr(layout, 'accent_height_span_mm', 8.0) or 8.0) * SCALE) if layout is not None else 0.05
+        accent_half_width_mm = AccentSym.half_width_mm(accent_height_span_mm)
+        marcato_thickness_mm = max(0.05, float(getattr(layout, 'marcato_thickness_mm', 2.0) or 2.0) * SCALE) if layout is not None else 0.05
+        marcato_width_mm = max(0.05, float(getattr(layout, 'marcato_width_mm', 8.0) or 8.0) * SCALE) if layout is not None else 0.05
+        marcato_half_width_mm = MarcatoSym.half_width_mm(marcato_width_mm, marcato_thickness_mm)
         articulation_gap_mm = max(0.0, float(getattr(layout, 'articulation_gap_mm', 1.0))) * SCALE if layout is not None else 0.0
         beam_half_width_mm = max(0.0, float(getattr(layout, 'beam_thickness_mm', 1.0) or 1.0) * SCALE * 0.5) if layout is not None else 0.5
         barline_symbol_gap_mm = max(0.0, semitone_mm)
@@ -354,27 +361,46 @@ class GridDrawerMixin:
                         max(x_note, x_stem_tip) + stem_collision_pad + barline_symbol_gap_mm,
                     ))
                 articulation = str(getattr(n, 'articulation', '') or '')
-                has_staccato = Articulation.is_enabled(articulation, 'staccato')
-                has_tenuto = Articulation.is_enabled(articulation, 'tenuto')
-                if has_staccato or has_tenuto:
-                    hand_key = 'l' if str(getattr(n, 'hand', 'l') or 'l') == 'l' else 'r'
+                hand_key = 'l' if str(getattr(n, 'hand', 'l') or 'l') == 'l' else 'r'
+                stack_order = Articulation.enabled_stack_order(articulation, hand_key)
+                if stack_order:
                     direction = -1.0 if hand_key == 'l' else 1.0
                     note_id = int(getattr(n, '_id', 0) or 0)
                     beam_x = beam_x_by_note_id.get(note_id)
                     anchor_edge_x = x_note + (direction * stem_len_mm) if beam_x is None else beam_x + (direction * beam_half_width_mm)
                     anchor_edge_x += float(getattr(n, 'articulation_x_offset', 0.0) or 0.0) * (semitone_mm * 0.5)
-                    if has_staccato:
-                        dot_x = anchor_edge_x + (direction * (articulation_dot_radius_mm + articulation_gap_mm))
-                        intervals.append((
-                            dot_x - articulation_dot_radius_mm - barline_symbol_gap_mm,
-                            dot_x + articulation_dot_radius_mm + barline_symbol_gap_mm,
-                        ))
-                    if has_tenuto:
-                        tenuto_x = anchor_edge_x + (direction * (tenuto_half_thickness_mm + articulation_gap_mm))
-                        intervals.append((
-                            tenuto_x - tenuto_half_thickness_mm - barline_symbol_gap_mm,
-                            tenuto_x + tenuto_half_thickness_mm + barline_symbol_gap_mm,
-                        ))
+                    half_widths = {
+                        'staccato': articulation_dot_radius_mm,
+                        'tenuto': tenuto_half_thickness_mm,
+                        'accent': accent_half_width_mm,
+                        'marcato': marcato_half_width_mm,
+                    }
+                    edge_distance = 0.0
+                    for name in stack_order:
+                        half_width = half_widths[name]
+                        edge_distance += articulation_gap_mm + half_width
+                        symbol_x = anchor_edge_x + (direction * edge_distance)
+                        if name == 'staccato':
+                            intervals.append((
+                                symbol_x - articulation_dot_radius_mm - barline_symbol_gap_mm,
+                                symbol_x + articulation_dot_radius_mm + barline_symbol_gap_mm,
+                            ))
+                        elif name == 'tenuto':
+                            intervals.append((
+                                symbol_x - tenuto_half_thickness_mm - barline_symbol_gap_mm,
+                                symbol_x + tenuto_half_thickness_mm + barline_symbol_gap_mm,
+                            ))
+                        elif name == 'accent':
+                            intervals.append((
+                                symbol_x - accent_half_width_mm - barline_symbol_gap_mm,
+                                symbol_x + accent_half_width_mm + barline_symbol_gap_mm,
+                            ))
+                        elif name == 'marcato':
+                            intervals.append((
+                                symbol_x - marcato_half_width_mm - barline_symbol_gap_mm,
+                                symbol_x + marcato_half_width_mm + barline_symbol_gap_mm,
+                            ))
+                        edge_distance += half_width
             for chord_hand_key in ('l', 'r'):
                 chord_span = chord_span_at_tick_hand.get((tick_key, chord_hand_key))
                 if chord_span is not None:

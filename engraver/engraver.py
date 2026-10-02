@@ -13,7 +13,7 @@ from file_model.layout import Layout
 from file_model.base_grid import resolve_grid_layer_offsets
 from file_model.info import Info
 from file_model.analysis import Analysis
-from symbol_design.articulations import StaccatoSym, TenutoSym
+from symbol_design.articulations import AccentSym, MarcatoSym, StaccatoSym, TenutoSym
 from ui.style import Style
 from symbol_design.noteheads import (
     Notehead,
@@ -4063,17 +4063,23 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
             tenuto_length = max(0.05, float(layout.get('tenuto_length_mm', 5.0) or 5.0) * line_scale)
             tenuto_thickness = max(0.05, float(layout.get('tenuto_thickness_mm', 1.0) or 1.0) * line_scale)
             tenuto_half_thickness = tenuto_thickness * 0.5
+            accent_thickness = max(0.05, float(layout.get('accent_thickness_mm', 2.0) or 2.0) * line_scale)
+            accent_height_span = max(0.05, float(layout.get('accent_height_span_mm', 8.0) or 8.0) * line_scale)
+            accent_half_width = AccentSym.half_width_mm(accent_height_span)
+            marcato_thickness = max(0.05, float(layout.get('marcato_thickness_mm', 2.0) or 2.0) * line_scale)
+            marcato_width = max(0.05, float(layout.get('marcato_width_mm', 8.0) or 8.0) * line_scale)
+            marcato_height = max(0.05, float(layout.get('marcato_height_mm', 8.0) or 8.0) * line_scale)
+            marcato_half_width = MarcatoSym.half_width_mm(marcato_width, marcato_thickness)
             articulation_beam_half_width = max(0.0, float(layout.get('beam_thickness_mm', 1.0) or 1.0) * line_scale * 0.5)
             for item in line_notes:
                 note_time = float(item.get('time', 0.0) or 0.0)
                 if op_time.lt(note_time, float(line_start)) or op_time.gt(note_time, float(line_end)):
                     continue
                 raw_articulation = (item.get('raw', {}) or {}).get('articulation', '')
-                has_staccato = Articulation.is_enabled(raw_articulation, 'staccato')
-                has_tenuto = Articulation.is_enabled(raw_articulation, 'tenuto')
-                if not has_staccato and not has_tenuto:
-                    continue
                 hand = 'l' if str(item.get('hand', 'l') or 'l') == 'l' else 'r'
+                stack_order = Articulation.enabled_stack_order(raw_articulation, hand)
+                if not stack_order:
+                    continue
                 direction = -1.0 if hand == 'l' else 1.0
                 note_idx = int(item.get('idx', -1))
                 beam_x = beamed_articulation_x_by_note_idx.get(note_idx)
@@ -4083,25 +4089,50 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                     anchor_edge_x = float(beam_x) + (direction * articulation_beam_half_width)
                 anchor_edge_x += float((item.get('raw', {}) or {}).get('articulation_x_offset', 0.0) or 0.0) * line_scale
                 y = float(_time_to_y(note_time))
-                if has_staccato:
-                    StaccatoSym(
-                        anchor_edge_x + (direction * (articulation_radius + articulation_gap)),
-                        y,
-                        articulation_radius,
-                        notation_color,
-                    ).draw(du, item_id=int(item.get('id', 0) or 0), tags=['articulation', 'articulation_staccato'])
-                if has_tenuto:
-                    TenutoSym(
-                        anchor_edge_x + (direction * (tenuto_half_thickness + articulation_gap)),
-                        y,
-                        notation_color,
-                    ).draw(
-                        du,
-                        length_mm=tenuto_length,
-                        thickness_mm=tenuto_thickness,
-                        item_id=int(item.get('id', 0) or 0),
-                        tags=['articulation', 'articulation_tenuto'],
-                    )
+                half_widths = {
+                    'staccato': articulation_radius,
+                    'tenuto': tenuto_half_thickness,
+                    'accent': accent_half_width,
+                    'marcato': marcato_half_width,
+                }
+                edge_distance = 0.0
+                for name in stack_order:
+                    half_width = half_widths[name]
+                    edge_distance += articulation_gap + half_width
+                    symbol_x = anchor_edge_x + (direction * edge_distance)
+                    if name == 'staccato':
+                        StaccatoSym(symbol_x, y, articulation_radius, notation_color).draw(
+                            du,
+                            item_id=int(item.get('id', 0) or 0),
+                            tags=['articulation', 'articulation_staccato'],
+                        )
+                    elif name == 'tenuto':
+                        TenutoSym(symbol_x, y, notation_color).draw(
+                            du,
+                            length_mm=tenuto_length,
+                            thickness_mm=tenuto_thickness,
+                            item_id=int(item.get('id', 0) or 0),
+                            tags=['articulation', 'articulation_tenuto'],
+                        )
+                    elif name == 'accent':
+                        AccentSym(symbol_x, y, notation_color).draw(
+                            du,
+                            height_span_mm=accent_height_span,
+                            thickness_mm=accent_thickness,
+                            item_id=int(item.get('id', 0) or 0),
+                            tags=['articulation', 'articulation_accent'],
+                        )
+                    elif name == 'marcato':
+                        MarcatoSym(symbol_x, y, notation_color).draw(
+                            du,
+                            hand=hand,
+                            width_mm=marcato_width,
+                            height_mm=marcato_height,
+                            thickness_mm=marcato_thickness,
+                            item_id=int(item.get('id', 0) or 0),
+                            tags=['articulation', 'articulation_marcato'],
+                        )
+                    edge_distance += half_width
 
             def _clip_poly_y(poly: list[tuple[float, float]], y_min: float, y_max: float) -> list[tuple[float, float]]:
                 if not poly:

@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING, cast
 
 from editor.editor_defaults import SCALE
 from file_model.events.note import Articulation
-from symbol_design.articulations import StaccatoSym, TenutoSym
+from symbol_design.articulations import AccentSym, MarcatoSym, StaccatoSym, TenutoSym
 from ui.style import Style
 from ui.widgets.draw_util import DrawUtil
 from utils.CONSTANT import SHORTEST_DURATION
@@ -91,6 +91,13 @@ class ArticulationDrawerMixin:
         tenuto_length_mm = max(0.05, float(getattr(layout, 'tenuto_length_mm', 5.0) or 5.0) * SCALE)
         tenuto_thickness_mm = max(0.05, float(getattr(layout, 'tenuto_thickness_mm', 1.0) or 1.0) * SCALE)
         tenuto_half_thickness_mm = tenuto_thickness_mm * 0.5
+        accent_thickness_mm = max(0.05, float(getattr(layout, 'accent_thickness_mm', 2.0) or 2.0) * SCALE)
+        accent_height_span_mm = max(0.05, float(getattr(layout, 'accent_height_span_mm', 8.0) or 8.0) * SCALE)
+        accent_half_width_mm = AccentSym.half_width_mm(accent_height_span_mm)
+        marcato_thickness_mm = max(0.05, float(getattr(layout, 'marcato_thickness_mm', 2.0) or 2.0) * SCALE)
+        marcato_width_mm = max(0.05, float(getattr(layout, 'marcato_width_mm', 8.0) or 8.0) * SCALE)
+        marcato_height_mm = max(0.05, float(getattr(layout, 'marcato_height_mm', 8.0) or 8.0) * SCALE)
+        marcato_half_width_mm = MarcatoSym.half_width_mm(marcato_width_mm, marcato_thickness_mm)
         beam_half_width_mm = max(0.0, float(getattr(layout, 'beam_thickness_mm', 1.0) or 1.0) * SCALE * 0.5)
         articulation_rgb = Style.get_named_rgb('accent_color2', (128, 0, 0))
         articulation_color = (articulation_rgb[0] / 255.0, articulation_rgb[1] / 255.0, articulation_rgb[2] / 255.0, 1.0)
@@ -99,12 +106,10 @@ class ArticulationDrawerMixin:
 
         for note in notes:
             articulation = str(getattr(note, 'articulation', '') or '')
-            has_staccato = Articulation.is_enabled(articulation, 'staccato')
-            has_tenuto = Articulation.is_enabled(articulation, 'tenuto')
-            if not has_staccato and not has_tenuto:
-                continue
-
             hand = 'l' if str(getattr(note, 'hand', 'l') or 'l') == 'l' else 'r'
+            stack_order = Articulation.enabled_stack_order(articulation, hand)
+            if not stack_order:
+                continue
             direction = -1.0 if hand == 'l' else 1.0
             note_id = int(getattr(note, '_id', 0) or 0)
             anchor = beam_anchors.get(note_id)
@@ -120,22 +125,47 @@ class ArticulationDrawerMixin:
             else:
                 anchor_edge_x = x
             anchor_edge_x += float(getattr(note, 'articulation_x_offset', 0.0) or 0.0) * (float(self.semitone_dist or 0.5) * 0.5)
-            if has_staccato:
-                StaccatoSym(
-                    anchor_edge_x + (direction * (dot_radius_mm + gap_mm)),
-                    y,
-                    dot_radius_mm,
-                    articulation_color,
-                ).draw(du, item_id=note_id, tags=['articulation', 'articulation_staccato'])
-            if has_tenuto:
-                TenutoSym(
-                    anchor_edge_x + (direction * (tenuto_half_thickness_mm + gap_mm)),
-                    y,
-                    articulation_color,
-                ).draw(
-                    du,
-                    length_mm=tenuto_length_mm,
-                    thickness_mm=tenuto_thickness_mm,
-                    item_id=note_id,
-                    tags=['articulation', 'articulation_tenuto'],
-                )
+            half_widths = {
+                'staccato': dot_radius_mm,
+                'tenuto': tenuto_half_thickness_mm,
+                'accent': accent_half_width_mm,
+                'marcato': marcato_half_width_mm,
+            }
+            edge_distance = 0.0
+            for name in stack_order:
+                half_width = half_widths[name]
+                edge_distance += gap_mm + half_width
+                symbol_x = anchor_edge_x + (direction * edge_distance)
+                if name == 'staccato':
+                    StaccatoSym(symbol_x, y, dot_radius_mm, articulation_color).draw(
+                        du,
+                        item_id=note_id,
+                        tags=['articulation', 'articulation_staccato'],
+                    )
+                elif name == 'tenuto':
+                    TenutoSym(symbol_x, y, articulation_color).draw(
+                        du,
+                        length_mm=tenuto_length_mm,
+                        thickness_mm=tenuto_thickness_mm,
+                        item_id=note_id,
+                        tags=['articulation', 'articulation_tenuto'],
+                    )
+                elif name == 'accent':
+                    AccentSym(symbol_x, y, articulation_color).draw(
+                        du,
+                        height_span_mm=accent_height_span_mm,
+                        thickness_mm=accent_thickness_mm,
+                        item_id=note_id,
+                        tags=['articulation', 'articulation_accent'],
+                    )
+                elif name == 'marcato':
+                    MarcatoSym(symbol_x, y, articulation_color).draw(
+                        du,
+                        hand=hand,
+                        width_mm=marcato_width_mm,
+                        height_mm=marcato_height_mm,
+                        thickness_mm=marcato_thickness_mm,
+                        item_id=note_id,
+                        tags=['articulation', 'articulation_marcato'],
+                    )
+                edge_distance += half_width
