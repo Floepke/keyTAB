@@ -30,7 +30,9 @@ class Layout:
     notehead_tilt: float = 0.30 # Diagonal shear tilt of noteheads (0 = perfect circle/oval, higher = traditional tilted notehead, lower = traditional tilted notehead in the opposite direction).
     
     # Articulation appearance
-    articulation_staccato_diameter_mm: float = 3.0
+    staccato_diameter_mm: float = 3.0
+    tenuto_length_mm: float = 8.0
+    tenuto_thickness_mm: float = 2.0
     articulation_gap_mm: float = 2.0
 
     # Beam appearance
@@ -190,7 +192,9 @@ LAYOUT_FLOAT_CONFIG: dict[str, dict[str, float]] = {
     'note_width_scaling': {'min': 0.05, 'max': 2.0, 'step': 0.01},
     'notehead_height_scaling': {'min': 0.1, 'max': 3.0, 'step': 0.01},
     'notehead_tilt': {'min': 0.0, 'max': 0.5, 'step': 0.01},
-    'articulation_staccato_diameter_mm': {'min': 0.05, 'max': 10.0, 'step': 0.05},
+    'staccato_diameter_mm': {'min': 0.05, 'max': 10.0, 'step': 0.05},
+    'tenuto_length_mm': {'min': 0.05, 'max': 20.0, 'step': 0.05},
+    'tenuto_thickness_mm': {'min': 0.05, 'max': 10.0, 'step': 0.05},
     'articulation_gap_mm': {'min': 0.0, 'max': 20.0, 'step': 0.05},
     'beam_thickness_mm': {'min': 0.05, 'max': 5.0, 'step': 0.05},
     'beam_corner_radius_mm': {'min': 0.0, 'max': 5.0, 'step': 0.05},

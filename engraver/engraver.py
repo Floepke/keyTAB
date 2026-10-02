@@ -13,6 +13,7 @@ from file_model.layout import Layout
 from file_model.base_grid import resolve_grid_layer_offsets
 from file_model.info import Info
 from file_model.analysis import Analysis
+from symbol_design.articulations import StaccatoSym, TenutoSym
 from ui.style import Style
 from symbol_design.noteheads import (
     Notehead,
@@ -24,7 +25,7 @@ from symbol_design.noteheads import (
     sheared_notehead_support_v,
 )
 from symbol_design.pedal import draw_pedal_symbol
-from file_model.events.note import Note
+from file_model.events.note import Articulation, Note
 from engraver.helpers import (
     allow_font_registry as _allow_font_registry,
     black_note_above_stem as _black_note_above_stem,
@@ -4058,34 +4059,49 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
             line_end = float(line.get('time_end', 0.0) or 0.0)
             articulation_stem_len = float(layout.get('note_stem_length_semitone', 3.0) or 3.0) * semitone_mm
             articulation_gap = max(0.0, float(layout.get('articulation_gap_mm', 1.0))) * line_scale
-            articulation_radius = max(0.1, float(layout.get('articulation_staccato_diameter_mm', 1.6) or 1.6) * line_scale * 0.5)
+            articulation_radius = max(0.1, float(layout.get('staccato_diameter_mm', 1.6) or 1.6) * line_scale * 0.5)
+            tenuto_length = max(0.05, float(layout.get('tenuto_length_mm', 5.0) or 5.0) * line_scale)
+            tenuto_thickness = max(0.05, float(layout.get('tenuto_thickness_mm', 1.0) or 1.0) * line_scale)
+            tenuto_half_thickness = tenuto_thickness * 0.5
             articulation_beam_half_width = max(0.0, float(layout.get('beam_thickness_mm', 1.0) or 1.0) * line_scale * 0.5)
             for item in line_notes:
                 note_time = float(item.get('time', 0.0) or 0.0)
                 if op_time.lt(note_time, float(line_start)) or op_time.gt(note_time, float(line_end)):
                     continue
-                raw_articulation = (item.get('raw', {}) or {}).get('articulation', {})
-                if not isinstance(raw_articulation, dict) or not bool(raw_articulation.get('staccato', False)):
+                raw_articulation = (item.get('raw', {}) or {}).get('articulation', '')
+                has_staccato = Articulation.is_enabled(raw_articulation, 'staccato')
+                has_tenuto = Articulation.is_enabled(raw_articulation, 'tenuto')
+                if not has_staccato and not has_tenuto:
                     continue
                 hand = 'l' if str(item.get('hand', 'l') or 'l') == 'l' else 'r'
                 direction = -1.0 if hand == 'l' else 1.0
                 note_idx = int(item.get('idx', -1))
                 beam_x = beamed_articulation_x_by_note_idx.get(note_idx)
                 if beam_x is None:
-                    x = float(_key_to_x(int(item.get('pitch', 0) or 0))) + (direction * (articulation_stem_len + articulation_gap))
+                    anchor_edge_x = float(_key_to_x(int(item.get('pitch', 0) or 0))) + (direction * articulation_stem_len)
                 else:
-                    x = float(beam_x) + (direction * (articulation_beam_half_width + articulation_radius + articulation_gap))
+                    anchor_edge_x = float(beam_x) + (direction * articulation_beam_half_width)
+                anchor_edge_x += float((item.get('raw', {}) or {}).get('articulation_x_offset', 0.0) or 0.0) * line_scale
                 y = float(_time_to_y(note_time))
-                du.add_oval(
-                    x - articulation_radius,
-                    y - articulation_radius,
-                    x + articulation_radius,
-                    y + articulation_radius,
-                    stroke_color=None,
-                    fill_color=notation_color,
-                    id=int(item.get('id', 0) or 0),
-                    tags=['articulation', 'articulation_staccato'],
-                )
+                if has_staccato:
+                    StaccatoSym(
+                        anchor_edge_x + (direction * (articulation_radius + articulation_gap)),
+                        y,
+                        articulation_radius,
+                        notation_color,
+                    ).draw(du, item_id=int(item.get('id', 0) or 0), tags=['articulation', 'articulation_staccato'])
+                if has_tenuto:
+                    TenutoSym(
+                        anchor_edge_x + (direction * (tenuto_half_thickness + articulation_gap)),
+                        y,
+                        notation_color,
+                    ).draw(
+                        du,
+                        length_mm=tenuto_length,
+                        thickness_mm=tenuto_thickness,
+                        item_id=int(item.get('id', 0) or 0),
+                        tags=['articulation', 'articulation_tenuto'],
+                    )
 
             def _clip_poly_y(poly: list[tuple[float, float]], y_min: float, y_max: float) -> list[tuple[float, float]]:
                 if not poly:

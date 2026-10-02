@@ -3,6 +3,8 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, cast
 
 from editor.editor_defaults import SCALE
+from file_model.events.note import Articulation
+from symbol_design.articulations import StaccatoSym, TenutoSym
 from ui.style import Style
 from ui.widgets.draw_util import DrawUtil
 from utils.CONSTANT import SHORTEST_DURATION
@@ -84,8 +86,11 @@ class ArticulationDrawerMixin:
 
         stem_len_mm = float(getattr(layout, 'note_stem_length_semitone', 3.0) or 3.0) * float(self.semitone_dist or 0.5)
         gap_mm = max(0.0, float(getattr(layout, 'articulation_gap_mm', 1.0))) * SCALE
-        dot_diameter_mm = float(getattr(layout, 'articulation_staccato_diameter_mm', 1.6) or 1.6) * SCALE
+        dot_diameter_mm = float(getattr(layout, 'staccato_diameter_mm', 1.6) or 1.6) * SCALE
         dot_radius_mm = max(0.1, dot_diameter_mm * 0.5)
+        tenuto_length_mm = max(0.05, float(getattr(layout, 'tenuto_length_mm', 5.0) or 5.0) * SCALE)
+        tenuto_thickness_mm = max(0.05, float(getattr(layout, 'tenuto_thickness_mm', 1.0) or 1.0) * SCALE)
+        tenuto_half_thickness_mm = tenuto_thickness_mm * 0.5
         beam_half_width_mm = max(0.0, float(getattr(layout, 'beam_thickness_mm', 1.0) or 1.0) * SCALE * 0.5)
         articulation_rgb = Style.get_named_rgb('accent_color2', (128, 0, 0))
         articulation_color = (articulation_rgb[0] / 255.0, articulation_rgb[1] / 255.0, articulation_rgb[2] / 255.0, 1.0)
@@ -93,8 +98,10 @@ class ArticulationDrawerMixin:
         stem_metrics = dict(cache.get('note_stem_metrics_by_id') or {})
 
         for note in notes:
-            articulation = getattr(note, 'articulation', None)
-            if not bool(getattr(articulation, 'staccato', False)):
+            articulation = str(getattr(note, 'articulation', '') or '')
+            has_staccato = Articulation.is_enabled(articulation, 'staccato')
+            has_tenuto = Articulation.is_enabled(articulation, 'tenuto')
+            if not has_staccato and not has_tenuto:
                 continue
 
             hand = 'l' if str(getattr(note, 'hand', 'l') or 'l') == 'l' else 'r'
@@ -109,16 +116,26 @@ class ArticulationDrawerMixin:
 
             x, y = anchor
             if note_id in beam_anchors:
-                x += direction * (beam_half_width_mm + dot_radius_mm + gap_mm)
+                anchor_edge_x = x + (direction * beam_half_width_mm)
             else:
-                x += direction * gap_mm
-            du.add_oval(
-                x - dot_radius_mm,
-                y - dot_radius_mm,
-                x + dot_radius_mm,
-                y + dot_radius_mm,
-                stroke_color=None,
-                fill_color=articulation_color,
-                id=note_id,
-                tags=['articulation', 'articulation_staccato'],
-            )
+                anchor_edge_x = x
+            anchor_edge_x += float(getattr(note, 'articulation_x_offset', 0.0) or 0.0) * (float(self.semitone_dist or 0.5) * 0.5)
+            if has_staccato:
+                StaccatoSym(
+                    anchor_edge_x + (direction * (dot_radius_mm + gap_mm)),
+                    y,
+                    dot_radius_mm,
+                    articulation_color,
+                ).draw(du, item_id=note_id, tags=['articulation', 'articulation_staccato'])
+            if has_tenuto:
+                TenutoSym(
+                    anchor_edge_x + (direction * (tenuto_half_thickness_mm + gap_mm)),
+                    y,
+                    articulation_color,
+                ).draw(
+                    du,
+                    length_mm=tenuto_length_mm,
+                    thickness_mm=tenuto_thickness_mm,
+                    item_id=note_id,
+                    tags=['articulation', 'articulation_tenuto'],
+                )

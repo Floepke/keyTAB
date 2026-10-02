@@ -612,7 +612,9 @@ class StyleDialog(DialogGeometryMixin, QtWidgets.QDialog):
                 self.tr('Notehead tilt'),
                 self.tr('0 = circle/oval, 1 = fully tilted'),
             ),
-            'articulation_staccato_diameter_mm': self.tr('Staccato dot diameter (mm)'),
+            'staccato_diameter_mm': self.tr('Staccato dot diameter (mm)'),
+            'tenuto_length_mm': self.tr('Tenuto length (mm)'),
+            'tenuto_thickness_mm': self.tr('Tenuto thickness (mm)'),
             'articulation_gap_mm': self.tr('Articulation gap (mm)'),
             'beam_visible': self.tr('Beam'),
             'beam_thickness_mm': self.tr('Beam thickness (mm)'),
@@ -904,7 +906,9 @@ class StyleDialog(DialogGeometryMixin, QtWidgets.QDialog):
             'note_midinote_left_color': 'Note',
             'note_midinote_right_color': 'Note',
             # Articulation
-            'articulation_staccato_diameter_mm': 'Articulation',
+            'staccato_diameter_mm': 'Articulation',
+            'tenuto_length_mm': 'Articulation',
+            'tenuto_thickness_mm': 'Articulation',
             'articulation_gap_mm': 'Articulation',
             # Beam
             'beam_thickness_mm': 'Beam',

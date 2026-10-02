@@ -130,7 +130,7 @@ class NoteheadDialog(DialogGeometryMixin, QtWidgets.QDialog):
 
         self._articulation_checks: dict[str, QtWidgets.QCheckBox] = {}
         if self._show_articulations:
-            articulation = getattr(note, 'articulation', Articulation())
+            articulation = str(getattr(note, 'articulation', '') or '')
             group = QtWidgets.QGroupBox(self.tr("Articulation"), self)
             articulation_layout = QtWidgets.QGridLayout(group)
             for index, (name, label) in enumerate((
@@ -140,9 +140,18 @@ class NoteheadDialog(DialogGeometryMixin, QtWidgets.QDialog):
                 ('marcato', self.tr('Marcato')),
             )):
                 check = QtWidgets.QCheckBox(label, group)
-                check.setChecked(bool(getattr(articulation, name, False)))
+                check.setChecked(Articulation.is_enabled(articulation, name))
                 articulation_layout.addWidget(check, index // 2, index % 2)
                 self._articulation_checks[name] = check
+
+            articulation_layout.addWidget(QtWidgets.QLabel(self.tr('X offset:'), group), 2, 0)
+            self.articulation_x_offset_spin = QtWidgets.QDoubleSpinBox(group)
+            self.articulation_x_offset_spin.setRange(-100.0, 100.0)
+            self.articulation_x_offset_spin.setDecimals(2)
+            self.articulation_x_offset_spin.setSingleStep(0.5)
+            self.articulation_x_offset_spin.setSuffix(self.tr(' mm'))
+            self.articulation_x_offset_spin.setValue(float(getattr(note, 'articulation_x_offset', 0.0) or 0.0))
+            articulation_layout.addWidget(self.articulation_x_offset_spin, 2, 1)
             lay.addWidget(group)
 
         btns = QtWidgets.QDialogButtonBox(QtWidgets.QDialogButtonBox.StandardButton.Ok | QtWidgets.QDialogButtonBox.StandardButton.Cancel, self)
@@ -234,11 +243,14 @@ class NoteheadDialog(DialogGeometryMixin, QtWidgets.QDialog):
     def selected_notehead(self) -> str:
         return str(self.combo.currentData(QtCore.Qt.ItemDataRole.UserRole) or "auto")
 
-    def selected_articulation(self) -> Articulation:
-        return Articulation(**{
-            name: check.isChecked()
-            for name, check in self._articulation_checks.items()
-        })
+    def selected_articulation(self) -> str:
+        return Articulation.encode([
+            name for name, check in self._articulation_checks.items()
+            if check.isChecked()
+        ])
+
+    def selected_articulation_x_offset(self) -> float:
+        return float(getattr(self, 'articulation_x_offset_spin', None).value()) if self._show_articulations else 0.0
 
     @classmethod
     def get_notehead(
@@ -272,5 +284,6 @@ class NoteheadDialog(DialogGeometryMixin, QtWidgets.QDialog):
         if dlg.exec() == int(QtWidgets.QDialog.DialogCode.Accepted):
             if show_articulations:
                 note.articulation = dlg.selected_articulation()
+                note.articulation_x_offset = dlg.selected_articulation_x_offset()
             return dlg.selected_notehead(), True
         return normalize_notehead_literal(getattr(note, "notehead", "auto")), False
