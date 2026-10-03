@@ -381,6 +381,18 @@ class SCORE:
 					# Skip private/internal fields like _next_id
 					if k.startswith('_'):
 						continue
+					if isinstance(obj, Note) and k == 'notehead' and obj.notehead == 'auto':
+						continue
+					if isinstance(obj, Note) and k == 'color' and obj.color == 'auto':
+						continue
+					if isinstance(obj, Note) and k == 'velocity' and obj.velocity == 64:
+						continue
+					if isinstance(obj, Note) and k == 'acc' and obj.acc == 0:
+						continue
+					if isinstance(obj, Note) and k == 'articulation' and obj.articulation == '':
+						continue
+					if isinstance(obj, Note) and k == 'articulation_x_offset' and obj.articulation == '':
+						continue
 					out[k] = to_dict(getattr(obj, k))
 				return out
 			return obj
@@ -1057,4 +1069,3 @@ class SCORE:
 		events.line_break.sort(key=lambda lb: float(getattr(lb, 'time', 0.0) or 0.0))
 		self.sync_linked_line_breaks()
 		return True
-
