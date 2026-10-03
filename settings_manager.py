@@ -239,7 +239,7 @@ class PreferencesManager:
 
     def _emit_toml_file(self, values: Dict[str, object]) -> str:
         lines: list[str] = []
-        lines.append("# PianoScript preferences (TOML)\n")
+        lines.append("# keyTAB preferences (TOML)\n")
         lines.append("# You can edit this file to change the application preferences.")
         lines.append("# Lines starting with '#' are comments. Changes take effect after restarting the app.\n")
         order = list(self._schema.keys()) + [k for k in values.keys() if k not in self._schema]

@@ -206,7 +206,7 @@ class AppDataManager:
 
     def _emit_toml_file(self, values: Dict[str, object]) -> str:
         lines: list[str] = []
-        lines.append("# PianoScript app data (TOML)\n")
+        lines.append("# keyTAB app data (TOML)\n")
         lines.append("# Application-managed data. Editing is possible but not generally required.\n")
         order = list(self._schema.keys()) + [k for k in values.keys() if k not in self._schema]
         seen: set[str] = set()
