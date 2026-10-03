@@ -371,29 +371,27 @@ class SCORE:
 	def set_before_save_hook(self, hook: Optional[Callable[["SCORE"], None]]) -> None:
 		self._before_save_hook = hook
 
-	def get_dict(self) -> dict:
+	def get_dict(self, *, omit_defaults: bool = False) -> dict:
+		"""Convert the score to a dictionary, optionally omitting dataclass defaults."""
 		def to_dict(obj):
 			if isinstance(obj, list):
 				return [to_dict(x) for x in obj]
 			if hasattr(obj, "__dataclass_fields__"):
 				out = {}
-				for k in obj.__dataclass_fields__.keys():
+				for dataclass_field in fields(obj):
+					k = dataclass_field.name
 					# Skip private/internal fields like _next_id
 					if k.startswith('_'):
 						continue
-					if isinstance(obj, Note) and k == 'notehead' and obj.notehead == 'auto':
+					if dataclass_field.default is not MISSING:
+						default_value = dataclass_field.default
+					elif dataclass_field.default_factory is not MISSING:
+						default_value = dataclass_field.default_factory()
+					else:
+						out[k] = to_dict(getattr(obj, k))
 						continue
-					if isinstance(obj, Note) and k == 'color' and obj.color == 'auto':
-						continue
-					if isinstance(obj, Note) and k == 'velocity' and obj.velocity == 64:
-						continue
-					if isinstance(obj, Note) and k == 'acc' and obj.acc == 0:
-						continue
-					if isinstance(obj, Note) and k == 'articulation' and obj.articulation == '':
-						continue
-					if isinstance(obj, Note) and k == 'articulation_x_offset' and obj.articulation == '':
-						continue
-					out[k] = to_dict(getattr(obj, k))
+					if isinstance(obj, MetaData) or not omit_defaults or getattr(obj, k) != default_value:
+						out[k] = to_dict(getattr(obj, k))
 				return out
 			return obj
 		return to_dict(self)
@@ -647,7 +645,7 @@ class SCORE:
 		self.meta_data.modification_timestamp = _timestamp_now()
 		self.meta_data.extension = '.keytab'
 		self._sync_events_staves_legacy_bridge(commit_to_selected_stave=True)
-		payload = self.get_dict()
+		payload = self.get_dict(omit_defaults=True)
 		if isinstance(payload, dict):
 			payload.pop('editor', None)
 			# New schema: only per-stave event containers are persisted.

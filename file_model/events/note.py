@@ -49,9 +49,9 @@ class Articulation:
 class Note:
     pitch: int = 40
     time: float = 0.0
-    duration: float = 100.0
+    duration: float = 128.0
     velocity: int = 64
-    hand: Literal['l', 'r'] = 'l'
+    hand: Literal['l', 'r'] = 'r'
     '''
         Notehead types:
         in default mode:
