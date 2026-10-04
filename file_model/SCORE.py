@@ -204,7 +204,7 @@ class SCORE:
 		return i
 
 	def new_note(self, **kwargs) -> Note:
-		base = {'pitch': 40, 'time': 0.0, 'duration': 100.0, 'hand': 'l', 'color': 'auto', 'acc': 0}
+		base = {'pitch': 40, 'time': 0.0, 'duration': 128.0, 'hand': 'l', 'color': 'auto', 'acc': 0}
 		base.update(kwargs)
 		h = str(base.get('hand', 'l') or 'l').strip()
 		if h not in ('l', 'r'):

@@ -1513,7 +1513,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
             line_time_start = float(line.get('time_start', 0.0) or 0.0)
             line_time_end = float(line.get('time_end', 0.0) or 0.0)
             is_first_system_line = bool(page_index == 0 and op_time.eq(line_time_start, first_system_start))
-            mini_piano_enabled = bool(layout.get('mini_piano_visible', True)) and is_first_system_line
+            mini_piano_enabled = bool(layout.get('mini_piano_visible', True))
             mini_piano_height_mm = (7.0 * float(semitone_mm)) if mini_piano_enabled else 0.0
             y2_draw = max(y1 + 1.0, y2 - mini_piano_height_mm) if mini_piano_enabled else y2
             if y2_draw <= y1:
