@@ -7,45 +7,40 @@ from ui.widgets.draw_util import DrawUtil
 
 @dataclass(frozen=True)
 class AccentSym:
-    """Sharp-bottomed accent symbol with square upper ends."""
+    """Downward-facing accent chevron."""
 
     x_mm: float
     y_mm: float
     color: tuple[float, float, float, float]
 
     @staticmethod
-    def half_width_mm(height_span_mm: float) -> float:
-        return max(0.05, float(height_span_mm)) * 0.5
+    def half_width_mm(width_mm: float, thickness_mm: float) -> float:
+        """Return the painted horizontal extent, including round stroke ends."""
+        return (max(0.05, float(width_mm)) + max(0.05, float(thickness_mm))) * 0.5
 
     def draw(
         self,
         du: DrawUtil,
         *,
-        height_span_mm: float,
+        width_mm: float,
+        height_mm: float,
         thickness_mm: float,
         item_id: int = 0,
         tags: list[str] | None = None,
     ) -> None:
-        height_span = max(0.05, float(height_span_mm))
-        thickness = max(0.05, float(thickness_mm))
-        half_span = height_span * 0.5
-        inset = min(thickness, half_span * 0.9)
+        half_width = max(0.05, float(width_mm)) * 0.5
+        half_height = max(0.05, float(height_mm)) * 0.5
         x_center = float(self.x_mm)
         y_center = float(self.y_mm)
-        y_top = y_center - half_span
-        y_bottom = y_center + half_span
         points = [
-            (x_center - half_span, y_top),
-            (x_center, y_bottom),
-            (x_center + half_span, y_top),
-            (x_center + half_span - inset, y_top),
-            (x_center, y_bottom - inset),
-            (x_center - half_span + inset, y_top),
+            (x_center - half_width, y_center - half_height),
+            (x_center, y_center + half_height),
+            (x_center + half_width, y_center - half_height),
         ]
-        du.add_polygon(
+        du.add_polyline(
             points,
-            stroke_color=None,
-            fill_color=self.color,
+            stroke_color=self.color,
+            stroke_width_mm=max(0.05, float(thickness_mm)),
             id=int(item_id),
             tags=list(tags or []),
         )

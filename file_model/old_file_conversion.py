@@ -107,7 +107,7 @@ def convert_legacy_piano_data(data: dict) -> dict:
     for note in notes:
         if not isinstance(note, dict):
             continue
-        note['hand'] = _normalize_hand_value(note.get('hand', 'l'))
+        note['hand'] = _normalize_hand_value(note.get('hand', 'r'))
         note['color'] = _normalize_color_value(note.get('color', None))
         note['notehead'] = _normalize_notehead_value(note.get('notehead', None))
 

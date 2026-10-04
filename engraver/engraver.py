@@ -4064,8 +4064,9 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
             tenuto_thickness = max(0.05, float(layout.get('tenuto_thickness_mm', 1.0) or 1.0) * line_scale)
             tenuto_half_thickness = tenuto_thickness * 0.5
             accent_thickness = max(0.05, float(layout.get('accent_thickness_mm', 2.0) or 2.0) * line_scale)
-            accent_height_span = max(0.05, float(layout.get('accent_height_span_mm', 8.0) or 8.0) * line_scale)
-            accent_half_width = AccentSym.half_width_mm(accent_height_span)
+            accent_width = max(0.05, float(layout.get('accent_width_mm', 8.0) or 8.0) * line_scale)
+            accent_height_span = max(0.05, float(layout.get('accent_height_mm', 8.0) or 8.0) * line_scale)
+            accent_half_width = AccentSym.half_width_mm(accent_width, accent_thickness)
             marcato_thickness = max(0.05, float(layout.get('marcato_thickness_mm', 2.0) or 2.0) * line_scale)
             marcato_width = max(0.05, float(layout.get('marcato_width_mm', 8.0) or 8.0) * line_scale)
             marcato_height = max(0.05, float(layout.get('marcato_height_mm', 8.0) or 8.0) * line_scale)
@@ -4117,7 +4118,8 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                     elif name == 'accent':
                         AccentSym(symbol_x, y, notation_color).draw(
                             du,
-                            height_span_mm=accent_height_span,
+                            width_mm=accent_width,
+                            height_mm=accent_height_span,
                             thickness_mm=accent_thickness,
                             item_id=int(item.get('id', 0) or 0),
                             tags=['articulation', 'articulation_accent'],

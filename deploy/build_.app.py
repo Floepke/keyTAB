@@ -181,8 +181,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--target-arch",
         choices=("x86_64", "arm64", "universal2"),
-        default="x86_64",
-        help="macOS target architecture (default: x86_64 for Intel Macs).",
+        default="arm64",
+        help="macOS target architecture (default: arm64 for Apple Silicon Macs).",
     )
     return parser.parse_args()
 

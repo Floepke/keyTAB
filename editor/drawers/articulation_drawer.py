@@ -92,8 +92,9 @@ class ArticulationDrawerMixin:
         tenuto_thickness_mm = max(0.05, float(getattr(layout, 'tenuto_thickness_mm', 1.0) or 1.0) * SCALE)
         tenuto_half_thickness_mm = tenuto_thickness_mm * 0.5
         accent_thickness_mm = max(0.05, float(getattr(layout, 'accent_thickness_mm', 2.0) or 2.0) * SCALE)
-        accent_height_span_mm = max(0.05, float(getattr(layout, 'accent_height_span_mm', 8.0) or 8.0) * SCALE)
-        accent_half_width_mm = AccentSym.half_width_mm(accent_height_span_mm)
+        accent_width_mm = max(0.05, float(getattr(layout, 'accent_width_mm', 8.0) or 8.0) * SCALE)
+        accent_height_mm = max(0.05, float(getattr(layout, 'accent_height_mm', 8.0) or 8.0) * SCALE)
+        accent_half_width_mm = AccentSym.half_width_mm(accent_width_mm, accent_thickness_mm)
         marcato_thickness_mm = max(0.05, float(getattr(layout, 'marcato_thickness_mm', 2.0) or 2.0) * SCALE)
         marcato_width_mm = max(0.05, float(getattr(layout, 'marcato_width_mm', 8.0) or 8.0) * SCALE)
         marcato_height_mm = max(0.05, float(getattr(layout, 'marcato_height_mm', 8.0) or 8.0) * SCALE)
@@ -153,7 +154,8 @@ class ArticulationDrawerMixin:
                 elif name == 'accent':
                     AccentSym(symbol_x, y, articulation_color).draw(
                         du,
-                        height_span_mm=accent_height_span_mm,
+                        width_mm=accent_width_mm,
+                        height_mm=accent_height_mm,
                         thickness_mm=accent_thickness_mm,
                         item_id=note_id,
                         tags=['articulation', 'articulation_accent'],

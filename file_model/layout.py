@@ -33,11 +33,12 @@ class Layout:
     staccato_diameter_mm: float = 3.0
     tenuto_length_mm: float = 8.0
     tenuto_thickness_mm: float = 2.0
-    accent_thickness_mm: float = 2.0
-    accent_height_span_mm: float = 8.0
+    accent_thickness_mm: float = 1.75
+    accent_width_mm: float = 4.0
+    accent_height_mm: float = 4.0
     marcato_thickness_mm: float = 1.75
-    marcato_width_mm: float = 5.0
-    marcato_height_mm: float = 5.0
+    marcato_width_mm: float = 4.0
+    marcato_height_mm: float = 4.0
     articulation_gap_mm: float = 2.0
 
     # Beam appearance
@@ -201,7 +202,8 @@ LAYOUT_FLOAT_CONFIG: dict[str, dict[str, float]] = {
     'tenuto_length_mm': {'min': 0.05, 'max': 20.0, 'step': 0.05},
     'tenuto_thickness_mm': {'min': 0.05, 'max': 10.0, 'step': 0.05},
     'accent_thickness_mm': {'min': 0.05, 'max': 10.0, 'step': 0.05},
-    'accent_height_span_mm': {'min': 0.05, 'max': 20.0, 'step': 0.05},
+    'accent_width_mm': {'min': 0.05, 'max': 20.0, 'step': 0.05},
+    'accent_height_mm': {'min': 0.05, 'max': 20.0, 'step': 0.05},
     'marcato_thickness_mm': {'min': 0.05, 'max': 10.0, 'step': 0.05},
     'marcato_width_mm': {'min': 0.05, 'max': 20.0, 'step': 0.05},
     'marcato_height_mm': {'min': 0.05, 'max': 20.0, 'step': 0.05},

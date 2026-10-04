@@ -3,6 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field, fields, MISSING, is_dataclass
 from typing import Callable, List, Optional, get_args, get_origin, get_type_hints, Literal
 import json
+import os
+import tempfile
 from datetime import datetime
 from pathlib import Path
 
@@ -636,11 +638,8 @@ class SCORE:
 
 	# ---- Persistence ----
 	def save(self, path: str) -> None:
-		try:
-			if callable(self._before_save_hook):
-				self._before_save_hook(self)
-		except Exception:
-			pass
+		if callable(self._before_save_hook):
+			self._before_save_hook(self)
 		# Update modification timestamp before writing
 		self.meta_data.modification_timestamp = _timestamp_now()
 		self.meta_data.extension = '.keytab'
@@ -653,9 +652,23 @@ class SCORE:
 		target_path = str(Path(path).with_suffix('.keytab')) if str(path or '').lower().endswith('.piano') else str(path)
 		if str(Path(target_path).suffix or '').lower() != '.keytab':
 			target_path = str(Path(target_path).with_suffix('.keytab'))
-		with open(target_path, 'w', encoding='utf-8') as f:
-			# Store non-ASCII symbols (e.g., dynamic glyphs) as \uXXXX escapes for stable/plain-text readability.
-			json.dump(payload, f, indent=4, ensure_ascii=True, separators=(',', ':'))
+		target = Path(target_path)
+		temp_path: str | None = None
+		try:
+			fd, temp_path = tempfile.mkstemp(prefix=f'.{target.name}.', suffix='.tmp', dir=target.parent)
+			with os.fdopen(fd, 'w', encoding='utf-8') as f:
+				# Store non-ASCII symbols (e.g., dynamic glyphs) as \uXXXX escapes for stable/plain-text readability.
+				json.dump(payload, f, indent=4, ensure_ascii=True, separators=(',', ':'))
+				f.flush()
+				os.fsync(f.fileno())
+			os.replace(temp_path, target)
+			temp_path = None
+		finally:
+			if temp_path is not None:
+				try:
+					os.unlink(temp_path)
+				except FileNotFoundError:
+					pass
 
 	def load(self, path: str) -> "SCORE":
 		with open(path, 'r', encoding='utf-8') as f:
@@ -870,21 +883,21 @@ class SCORE:
 		op_load = Operator(float(SHORTEST_DURATION))
 		for n in getattr(self.events, 'note', []) or []:
 			# hand
-			h = str(getattr(n, 'hand', 'l') or 'l').strip()
+			h = str(getattr(n, 'hand', 'r') or 'r').strip()
 			if h not in ('l', 'r'):
-				h = 'l'
+				h = 'r'
 			setattr(n, 'hand', h)
-			
+
 			# accidental
 			acc = int(getattr(n, 'acc', 0) or 0)
 			acc = int(max(-2, min(2, acc)))
 			setattr(n, 'acc', acc)
-			
+
 			# color
 			c = str(getattr(n, 'color', '') or '').strip()
 			if not c:
 				setattr(n, 'color', 'auto')
-			
+
 			# duration -> grace note conversion
 			dur = float(getattr(n, 'duration', 0.0) or 0.0)
 			if dur < float(GRACENOTE_THRESHOLD):

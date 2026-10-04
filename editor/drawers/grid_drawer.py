@@ -141,8 +141,9 @@ class GridDrawerMixin:
         articulation_dot_radius_mm = max(0.1, float(getattr(layout, 'staccato_diameter_mm', 1.6) or 1.6) * SCALE * 0.5) if layout is not None else 0.4
         tenuto_half_thickness_mm = max(0.05, float(getattr(layout, 'tenuto_thickness_mm', 1.0) or 1.0) * SCALE * 0.5) if layout is not None else 0.05
         accent_thickness_mm = max(0.05, float(getattr(layout, 'accent_thickness_mm', 2.0) or 2.0) * SCALE) if layout is not None else 0.05
-        accent_height_span_mm = max(0.05, float(getattr(layout, 'accent_height_span_mm', 8.0) or 8.0) * SCALE) if layout is not None else 0.05
-        accent_half_width_mm = AccentSym.half_width_mm(accent_height_span_mm)
+        accent_width_mm = max(0.05, float(getattr(layout, 'accent_width_mm', 8.0) or 8.0) * SCALE) if layout is not None else 0.05
+        accent_height_mm = max(0.05, float(getattr(layout, 'accent_height_mm', 8.0) or 8.0) * SCALE) if layout is not None else 0.05
+        accent_half_width_mm = AccentSym.half_width_mm(accent_width_mm, accent_thickness_mm)
         marcato_thickness_mm = max(0.05, float(getattr(layout, 'marcato_thickness_mm', 2.0) or 2.0) * SCALE) if layout is not None else 0.05
         marcato_width_mm = max(0.05, float(getattr(layout, 'marcato_width_mm', 8.0) or 8.0) * SCALE) if layout is not None else 0.05
         marcato_half_width_mm = MarcatoSym.half_width_mm(marcato_width_mm, marcato_thickness_mm)
