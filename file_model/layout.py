@@ -112,6 +112,7 @@ class Layout:
         italic=True,
     ))
 
+    # The text element font settings
     font_text: Font = field(default_factory=lambda: Font(
         family="Edwin",
         size_pt=12.0,
@@ -132,15 +133,15 @@ class Layout:
     ))
     font_copyright: Font = field(default_factory=lambda: Font(
         family="Edwin",
-        size_pt=30.0,
+        size_pt=40.0,
     ))
     font_arranger: Font = field(default_factory=lambda: Font(
         family="Edwin",
-        size_pt=15.0,
+        size_pt=40.0,
     ))
     font_lyricist: Font = field(default_factory=lambda: Font(
         family="Edwin",
-        size_pt=15.0,
+        size_pt=40.0,
     ))
 
     # Stave appearence
