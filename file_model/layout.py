@@ -20,17 +20,17 @@ class Layout:
 
     # Note appearance
     note_stem_length_semitone: float = 7.0
-    note_stem_thickness_mm: float = 0.8 # Thickness of the stem as well the notehead outline width
+    note_stem_thickness_mm: float = 1.0 # Thickness of the stem as well the notehead outline width
     note_stopsign_thickness_mm: float = 1.0
     note_continuation_dot_size_mm: float = 2.5
     note_midinote_left_color: str = '#ccc'
     note_midinote_right_color: str = '#ccc'
     note_width_scaling: float = 1.0 # Scaling factor for the horizontal size of the noteheads, to make them wider or narrower.
     notehead_height_scaling: float = 1.2 # Scaling factor for the vertical size of the noteheads, relative to width.
-    notehead_tilt: float = 0.30 # Diagonal shear tilt of noteheads (0 = perfect circle/oval, higher = traditional tilted notehead, lower = traditional tilted notehead in the opposite direction).
+    notehead_tilt: float = 0.4 # Diagonal shear tilt of noteheads (0 = perfect circle/oval, higher = traditional tilted notehead, lower = traditional tilted notehead in the opposite direction).
     
     # Articulation appearance
-    staccato_diameter_mm: float = 3.0
+    staccato_diameter_mm: float = 4.0
     tenuto_length_mm: float = 8.0
     tenuto_thickness_mm: float = 2.0
     accent_thickness_mm: float = 1.75

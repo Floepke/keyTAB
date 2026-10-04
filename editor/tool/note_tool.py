@@ -5,7 +5,7 @@ from settings_manager import get_preferences
 from utils.operator import Operator
 from ui.widgets.draw_util import DrawUtil
 from utils.CONSTANT import BLACK_KEYS, PIANO_KEY_AMOUNT, QUARTER_NOTE_UNIT, SHORTEST_DURATION
-from file_model.events.note import Note
+from file_model.events.note import Articulation, Note
 from symbol_design.noteheads import resolve_notehead_spec
 from ui.dialogs.notehead_dialog import NoteheadDialog
 from PySide6 import QtCore, QtGui, QtWidgets
@@ -84,6 +84,22 @@ class NoteTool(BaseTool):
             2: 'double_flat',
             -2: 'double_sharp',
         }.get(self._acc_toggle, 'accidental')
+        articulation_buttons = [
+            {
+                'name': f'articulation_{name}',
+                'text': label,
+                'tooltip': QtCore.QCoreApplication.translate(
+                    'NoteTool',
+                    f'Toggle {label.lower()} on the selected notes.',
+                ),
+            }
+            for name, label in (
+                ('staccato', 'Stac'),
+                ('tenuto', 'Ten'),
+                ('accent', 'Acc'),
+                ('marcato', 'Marc'),
+            )
+        ]
 
         return [
             {
@@ -121,7 +137,51 @@ class NoteTool(BaseTool):
                 'active': bool(self._velocity_mode),
                 'tooltip': (QtCore.QCoreApplication.translate('NoteTool', 'Velocity editing is on. Toggle on/off to edit the note velocities using the sliders on the sides of the editor.') if self._velocity_mode else QtCore.QCoreApplication.translate('NoteTool', 'Velocity editing is off. Toggle on/off to edit the note velocities using the sliders on the sides of the editor.')),
             },
+            {'type': 'separator'},
+            *articulation_buttons,
         ]
+
+    def _selected_notes(self) -> list[Note]:
+        if self._editor is None:
+            return []
+        score = self._editor.current_score()
+        if score is None:
+            return []
+        selected_ids = set(self._editor.get_selected_note_ids_cached(score) or set())
+        if not selected_ids:
+            return []
+        events = self._editor.current_events(score)
+        if events is None:
+            return []
+        return [
+            note for note in (getattr(events, 'note', []) or [])
+            if int(getattr(note, '_id', 0) or 0) in selected_ids
+        ]
+
+    def _toggle_selected_articulation(self, name: str) -> None:
+        notes = self._selected_notes()
+        if not notes:
+            return
+        enable = not all(
+            Articulation.is_enabled(str(getattr(note, 'articulation', '') or ''), name)
+            for note in notes
+        )
+        for note in notes:
+            enabled = [
+                articulation_name
+                for articulation_name in Articulation.SYMBOLS
+                if Articulation.is_enabled(str(getattr(note, 'articulation', '') or ''), articulation_name)
+            ]
+            if enable:
+                enabled.append(name)
+            else:
+                enabled = [articulation_name for articulation_name in enabled if articulation_name != name]
+            note.articulation = Articulation.encode(enabled)
+        self._editor._draw_cache = None
+        self._editor._reuse_draw_cache_once = False
+        self._editor.score_changed.emit()
+        if hasattr(self._editor, '_snapshot_if_changed'):
+            self._editor._snapshot_if_changed(coalesce=True, label=f'toggle_articulation_{name}')
 
     def _midi_input_manager(self):
         if self._editor is None:
@@ -1028,6 +1088,8 @@ class NoteTool(BaseTool):
                 w = getattr(self._editor, 'widget')
                 if hasattr(w, 'request_overlay_refresh'):
                     w.request_overlay_refresh()
+        elif name.startswith('articulation_'):
+            self._toggle_selected_articulation(name.removeprefix('articulation_'))
         # Refresh overlay guides to reflect the change immediately
         if hasattr(self._editor, 'widget') and getattr(self._editor, 'widget', None) is not None:
             w = getattr(self._editor, 'widget')

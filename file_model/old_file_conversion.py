@@ -75,17 +75,14 @@ def convert_legacy_piano_data(data: dict) -> dict:
             layout['notehead_tilt'] = abs(notehead_tilt)
 
     # Legacy schema migration: move editor zoom into app_state.
-    try:
-        editor = data.get('editor', None)
-        if isinstance(editor, dict) and 'zoom_mm_per_quarter' in editor:
-            app_state = data.get('app_state', None)
-            if not isinstance(app_state, dict):
-                app_state = {}
-                data['app_state'] = app_state
-            if 'zoom_mm_per_quarter' not in app_state:
-                app_state['zoom_mm_per_quarter'] = editor.get('zoom_mm_per_quarter')
-    except Exception:
-        pass
+    editor = data.get('editor', None)
+    if isinstance(editor, dict) and 'zoom_mm_per_quarter' in editor:
+        app_state = data.get('app_state', None)
+        if not isinstance(app_state, dict):
+            app_state = {}
+            data['app_state'] = app_state
+        if 'zoom_mm_per_quarter' not in app_state:
+            app_state['zoom_mm_per_quarter'] = editor.get('zoom_mm_per_quarter')
 
     events = data.get('events', None)
     if not isinstance(events, dict):

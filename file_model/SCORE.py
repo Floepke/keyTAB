@@ -422,10 +422,7 @@ class SCORE:
 			for idx, item in enumerate(items):
 				incoming = item if isinstance(item, dict) else {}
 				obj = elem_type(**_merge_with_defaults(elem_type, incoming, f'{context_prefix}.{name}[{idx}]'))
-				try:
-					setattr(obj, '_id', self._gen_id())
-				except Exception:
-					pass
+				setattr(obj, '_id', self._gen_id())
 				lst.append(obj)
 		return out
 
@@ -436,10 +433,7 @@ class SCORE:
 		for idx, item in enumerate(items):
 			incoming = item if isinstance(item, dict) else {}
 			obj = Tempo(**_merge_with_defaults(Tempo, incoming, f'tempo[{idx}]'))
-			try:
-				setattr(obj, '_id', self._gen_id())
-			except Exception:
-				pass
+			setattr(obj, '_id', self._gen_id())
 			out.append(obj)
 		return out
 
