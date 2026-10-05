@@ -90,14 +90,14 @@ class NoteTool(BaseTool):
                 'text': label,
                 'tooltip': QtCore.QCoreApplication.translate(
                     'NoteTool',
-                    f'Toggle {label.lower()} on the selected notes.',
+                    f'Toggle {full_name} on the selected notes.',
                 ),
             }
-            for name, label in (
-                ('staccato', 'Stac'),
-                ('tenuto', 'Ten'),
-                ('accent', 'Acc'),
-                ('marcato', 'Marc'),
+            for name, label, full_name in (
+                ('staccato', '•', 'staccato'),
+                ('tenuto', '—', 'tenuto'),
+                ('accent', '>', 'accent'),
+                ('marcato', '^', 'marcato'),
             )
         ]
 

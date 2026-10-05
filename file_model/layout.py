@@ -46,7 +46,7 @@ class Layout:
     beam_corner_radius_mm: float = 0.75
 
     # Grace note appearance
-    grace_note_outline_width_mm: float = 0.8
+    grace_note_outline_width_mm: float = 1.0
     grace_note_scale: float = 0.75
 
     # Pedal appearance

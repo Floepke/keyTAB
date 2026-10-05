@@ -52,7 +52,7 @@ class GraceNoteDrawerMixin:
         grace_scale = float(getattr(layout, 'grace_note_scale', 0.75) or 0.75)
         semitone_scaled = semitone_dist * max(0.05, grace_scale)
         style_scale = float(getattr(layout, 'scale', 1.0) or 1.0)
-        outline_w = float(getattr(layout, 'note_stem_thickness_mm', 0.5) or 0.5) * style_scale * 2
+        outline_w = float(getattr(layout, 'note_stem_thickness_mm', 0.5) or 0.5) * style_scale
         paper_r, paper_g, paper_b = Style.get_named_rgb('paper', (255, 255, 255))
         paper_color = (paper_r / 255.0, paper_g / 255.0, paper_b / 255.0, 1.0)
         grace_layout = self._grace_layout_no_tilt(layout)
