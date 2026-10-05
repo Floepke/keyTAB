@@ -844,6 +844,7 @@ class StyleDialog(DialogGeometryMixin, QtWidgets.QDialog):
             self.tr("Page"),
             self.tr("Fonts"),
             self.tr("Stave"),
+            self.tr("Mini piano"),
             self.tr("Grid band"),
             self.tr("Time signature"),
             self.tr("Tempo"),
@@ -965,9 +966,10 @@ class StyleDialog(DialogGeometryMixin, QtWidgets.QDialog):
             'stave_clef_line_thickness_mm': 'Stave',
             'stave_ledger_line_length_mm': 'Stave',
             'stave_clef_line_dash_pattern_mm': 'Stave',
-            'mini_piano_octave_numbering': 'Stave',
-            'mini_piano_octave_rectangles': 'Stave',
-            'mini_piano_color': 'Stave',
+            # Mini piano
+            'mini_piano_octave_numbering': 'Mini piano',
+            'mini_piano_octave_rectangles': 'Mini piano',
+            'mini_piano_color': 'Mini piano',
             # Fonts
             'font_text': 'Text',
             'font_title': 'Fonts',
@@ -1004,8 +1006,12 @@ class StyleDialog(DialogGeometryMixin, QtWidgets.QDialog):
                 continue
             field_type = type_hints.get(name, f.type)
             
-            # Skip bool fields
-            if field_type is bool:
+            # Visibility booleans are managed by the Visibility tab. These
+            # mini-piano settings belong in the dedicated Mini piano tab.
+            if field_type is bool and name not in (
+                'mini_piano_octave_numbering',
+                'mini_piano_octave_rectangles',
+            ):
                 continue
             
             # Build editor for non-bool fields and add to the appropriate tab
@@ -1142,7 +1148,10 @@ class StyleDialog(DialogGeometryMixin, QtWidgets.QDialog):
             name = f.name
             field_type = self._type_hints.get(name, f.type)
 
-            if field_type is not bool or name in ("mini_piano_octave_numbering", "mini_piano_octave_rectangles"):
+            if field_type is not bool or name in (
+                "mini_piano_octave_numbering",
+                "mini_piano_octave_rectangles",
+            ):
                 continue # Not a boolean field or not a visibility toggle, skip
             
             # create checkbox mirror
