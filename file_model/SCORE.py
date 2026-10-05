@@ -77,7 +77,6 @@ class Events:
 	double_bar: List[DoubleBar] = field(default_factory=list)
 	count_line: List[CountLine] = field(default_factory=list)
 	line_break: List[LineBreak] = field(default_factory=list)
-	tempo: List[Tempo] = field(default_factory=list)
 	arpeggio: List[Arpeggio] = field(default_factory=list)
 	crescendo: List[Crescendo] = field(default_factory=list)
 	decrescendo: List[Decrescendo] = field(default_factory=list)

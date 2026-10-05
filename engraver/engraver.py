@@ -527,7 +527,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
         page_top = user_page_top
         page_bottom = user_page_bottom
 
-    op_time = Operator(SHORTEST_DURATION)
+    op_time: Operator = Operator(SHORTEST_DURATION)
     barline_positions: list[float] = []
     group_boundary_times: list[float] = []
     cur_bar = 0.0
@@ -3265,6 +3265,16 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                     _append_manual_ledger_collision_for_pitch_at_y(int(p), float(note_y + semitone_mm))
 
                     if not bool(layout.get('note_continuation_dot_visible', True)):
+                        if (
+                            bool(layout.get('note_stop_visible', True))
+                            and not (op_time.lt(n_t, float(line_end)) and op_time.gt(n_end, float(line_end)))
+                            and _has_followed_rest(item)
+                        ):
+                            w_stop = float(semitone_mm) * 2.0
+                            _append_manual_ledger_collision_for_pitch_at_y(
+                                int(p),
+                                float(_time_to_y(n_end) - w_stop + semitone_mm),
+                            )
                         continue
 
                     dot_times: list[float] = []
@@ -3287,14 +3297,21 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                             dot_times.append(bt)
                     if _is_line_continuation(item):
                         dot_times.append(float(line_start_actual))
-
-                    if not dot_times:
-                        continue
+                    if op_time.lt(n_t, float(line_end)) and op_time.gt(n_end, float(line_end)):
+                        dot_times.append(float(line_end))
 
                     dot_x = float(_key_to_x(int(p)))
                     min_collision_gap = max(0.0, float(semitone_mm) * 2.0 - 1e-6)
+                    double_bar_ticks = {
+                        float(ev.get('time', 0.0) or 0.0) for ev in norm_double_bars
+                    }
                     for t in sorted(set(dot_times)):
-                        y_center = _time_to_y(float(t)) + float(semitone_mm)
+                        y_center = _time_to_y(float(t)) + (
+                            float(semitone_mm)
+                            * float(layout.get('notehead_height_scaling', 1.0) or 1.0)
+                        )
+                        if any(op_time.eq(float(t), dbt) for dbt in double_bar_ticks):
+                            y_center += float(semitone_mm)
 
                         has_adjacent_start = False
                         for other in line_notes:
@@ -3321,6 +3338,17 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                             y_center += float(semitone_mm) * 2.0
 
                         _append_manual_ledger_collision_for_pitch_at_y(int(p), float(y_center))
+
+                    if (
+                        bool(layout.get('note_stop_visible', True))
+                        and not (op_time.lt(n_t, float(line_end)) and op_time.gt(n_end, float(line_end)))
+                        and _has_followed_rest(item)
+                    ):
+                        w_stop = float(semitone_mm) * 2.0
+                        _append_manual_ledger_collision_for_pitch_at_y(
+                            int(p),
+                            float(_time_to_y(n_end) - w_stop + semitone_mm),
+                        )
 
             def _ledger_right_extent(t0: float, t1: float) -> float:
                 max_x = grid_right
@@ -3788,7 +3816,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                         if min(raw_x2, kb_fill_x2) > max(raw_x1, kb_fill_x1):
                             visible_spans.append((raw_x1, raw_x2))
 
-                    if visible_spans:
+                    if bool(layout.get('mini_piano_octave_rectangles', False)) and visible_spans:
                         for idx, (raw_x1, raw_x2) in enumerate(visible_spans):
                             gx1 = float(raw_x1)
                             gx2 = float(raw_x2)

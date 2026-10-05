@@ -11,18 +11,18 @@ class Layout:
     read_direction: Literal['horizontal', 'vertical'] = 'vertical'
     page_width_mm: float = 210.0
     page_height_mm: float = 297.0
-    page_top_margin_mm: float = 10.0
-    page_bottom_margin_mm: float = 10.0
-    page_left_margin_mm: float = 10.0
-    page_right_margin_mm: float = 10.0
+    page_top_margin_mm: float = 5.0
+    page_bottom_margin_mm: float = 5.0
+    page_left_margin_mm: float = 5.0
+    page_right_margin_mm: float = 5.0
 
     black_note_rule: Literal['above_stem', 'below_stem', 'above_stem_if_collision', 'above_stem_if_chord_and_white_note_same_hand'] = 'above_stem'
 
     # Note appearance
     note_stem_length_semitone: float = 7.0
-    note_stem_thickness_mm: float = 1.0 # Thickness of the stem as well the notehead outline width
+    note_stem_thickness_mm: float = 1.25 # Thickness of the stem as well the notehead outline width
     note_stopsign_thickness_mm: float = 1.0
-    note_continuation_dot_size_mm: float = 2.5
+    note_continuation_dot_size_mm: float = 3.0
     note_midinote_left_color: str = '#ccc'
     note_midinote_right_color: str = '#ccc'
     note_width_scaling: float = 1.0 # Scaling factor for the horizontal size of the noteheads, to make them wider or narrower.
@@ -153,6 +153,7 @@ class Layout:
 
     # Mini piano keyboard in engraver
     mini_piano_octave_numbering: bool = True
+    mini_piano_octave_rectangles: bool = False
     mini_piano_color: str = '#ccc'
     
     # Visibility toggles for different elements

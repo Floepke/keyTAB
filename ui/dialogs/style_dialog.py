@@ -694,6 +694,7 @@ class StyleDialog(DialogGeometryMixin, QtWidgets.QDialog):
             'stave_clef_line_dash_pattern_mm': self.tr('Stave clef line dash pattern (mm)'),
             'mini_piano_visible': self.tr('Mini piano'),
             'mini_piano_octave_numbering': self.tr('Mini piano octave numbering'),
+            'mini_piano_octave_rectangles': self.tr('Mini piano octave rectangles'),
             'mini_piano_color': self.tr('Mini piano color'),
         }
 
@@ -965,6 +966,7 @@ class StyleDialog(DialogGeometryMixin, QtWidgets.QDialog):
             'stave_ledger_line_length_mm': 'Stave',
             'stave_clef_line_dash_pattern_mm': 'Stave',
             'mini_piano_octave_numbering': 'Stave',
+            'mini_piano_octave_rectangles': 'Stave',
             'mini_piano_color': 'Stave',
             # Fonts
             'font_text': 'Text',
@@ -1140,7 +1142,7 @@ class StyleDialog(DialogGeometryMixin, QtWidgets.QDialog):
             name = f.name
             field_type = self._type_hints.get(name, f.type)
 
-            if field_type is not bool or name in ("mini_piano_octave_numbering"):
+            if field_type is not bool or name in ("mini_piano_octave_numbering", "mini_piano_octave_rectangles"):
                 continue # Not a boolean field or not a visibility toggle, skip
             
             # create checkbox mirror
