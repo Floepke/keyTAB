@@ -495,7 +495,7 @@ class GridDrawerMixin:
         def _draw_grid_line_constructive(ticks: float, width_mm: float, gap_mm: float, ev_id: int) -> None:
             y_mm = float(self.time_to_mm(float(ticks)))
             cuts = _barline_cut_intervals(float(ticks))
-            tags = ["double_barline"]
+            tags = ["grid_line"]
             _draw_line_around_chords(float(y_mm + gap_mm), cuts, float(width_mm), tags, int(ev_id), dash_pattern=[2.0, 2.0])
         
         # Draw measure numbers at each measure start except final end barline.
