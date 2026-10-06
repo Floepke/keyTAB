@@ -1112,6 +1112,11 @@ class Editor(QtCore.QObject,
           < 4.5  → stage 1 (simplified drawing)
           >= 4.5 → stage 0 (full rendering)
         """
+        if self.is_horizontal_editor_orientation():
+            self.tiny_mode_stage = 0
+            self.tiny_mode_alpha = 1.0
+            return
+
         w = float(device_px_width)
         semitone_px = w * 2.0 / (3.0 * 101.0) # TODO: understand formula
         semi_start_stage1_px = 5
