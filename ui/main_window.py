@@ -373,7 +373,6 @@ class MainWindow(QtWidgets.QMainWindow):
         self.is_fit = False
         self.is_startup = True
         # Defer the font install prompt until explicitly scheduled by the app (after AppImage install prompt)
-        self._fonts_prompt_armed = False
 
         # Restore splitter sizes from last session if available; else fall back to fit
         adm = get_appdata_manager()
@@ -3707,108 +3706,6 @@ class MainWindow(QtWidgets.QMainWindow):
         if str(name) != 'note':
             # Leave velocity mode state untouched; it is restored when returning to note tool
             pass
-
-    def schedule_fonts_install_prompt(self, delay_ms: int = 150) -> None:
-        """Schedule one startup prompt to install all required fonts."""
-        if self._fonts_prompt_armed:
-            return
-        self._fonts_prompt_armed = True
-        QtCore.QTimer.singleShot(max(0, int(delay_ms)), self._maybe_prompt_fonts_install)
-
-    def _maybe_prompt_fonts_install(self) -> None:
-        adm = get_appdata_manager()
-        fonts_install_ok = bool(adm.get("fonts_install_ok", False))
-
-        fonts = [
-            {
-                "key": "Edwin",
-                "family": "Edwin",
-                "check_name": "Edwin",
-                "desc": "Edwin font family for headers and engraving.",
-            },
-            {
-                "key": "FiraCode-SemiBold",
-                "family": "Fira Code",
-                "check_name": "FiraCode-SemiBold",
-                "desc": "Fira Code SemiBold for UI consistency.",
-            },
-            {
-                "key": "LelandText",
-                "family": "LelandText",
-                "check_name": "LelandText",
-                "desc": "LelandText for dynamic symbols (f/mp/p etc...).",
-            },
-        ]
-        from fonts import (
-            has_system_font,
-            has_installed_embedded_font_file,
-            install_embedded_font_to_system,
-        )
-        missing: list[dict] = []
-        for f in fonts:
-            check_name = str(f.get("check_name", f["family"]))
-            if not has_system_font(check_name) and not has_installed_embedded_font_file(str(f.get("key", ""))):
-                missing.append(f)
-        if not missing:
-            if not fonts_install_ok:
-                adm.set("fonts_install_ok", True)
-                adm.save()
-            return
-        if fonts_install_ok:
-            adm.set("fonts_install_ok", False)
-            adm.save()
-        msg = QtWidgets.QMessageBox(self)
-        msg.setIcon(QtWidgets.QMessageBox.Icon.Information)
-        msg.setWindowTitle(self.tr("Install required fonts"))
-        lines = [self.tr("keyTAB can install embedded fonts to your user font folder so editing and engraving match:")]
-        for f in missing:
-            lines.append(f"- {f['family']}: {f['desc']}")
-        lines.append(self.tr("Install all missing fonts now?"))
-        msg.setText("\n".join(lines))
-        msg.setStandardButtons(QtWidgets.QMessageBox.StandardButton.Yes | QtWidgets.QMessageBox.StandardButton.No)
-        msg.setDefaultButton(QtWidgets.QMessageBox.StandardButton.Yes)
-        result = msg.exec()
-        if result != QtWidgets.QMessageBox.StandardButton.Yes:
-            adm.save()
-            return
-        successes = []
-        failures = []
-        for f in missing:
-            key = str(f["key"])
-            family = str(f["family"])
-            success, detail = install_embedded_font_to_system(key)
-            if success:
-                successes.append(family)
-            else:
-                failures.append((family, detail))
-
-        still_missing = [
-            f
-            for f in fonts
-            if not has_system_font(str(f.get("check_name", f["family"])))
-            and not has_installed_embedded_font_file(str(f.get("key", "")))
-        ]
-        adm.set("fonts_install_ok", len(still_missing) == 0)
-        adm.save()
-
-        if successes:
-            QtWidgets.QMessageBox.information(
-                self,
-                self.tr("Fonts installed"),
-                self.tr("The following fonts were installed. keyTAB will restart to apply them:\n") + "\n".join(successes),
-            )
-            QtCore.QTimer.singleShot(100, self._request_app_restart)
-        if failures or still_missing:
-            details = "\n".join([f"{n}: {d}" for n, d in failures])
-            if still_missing:
-                if details:
-                    details += "\n"
-                details += "Still missing: " + ", ".join(str(f["family"]) for f in still_missing)
-            QtWidgets.QMessageBox.warning(
-                self,
-                self.tr("Font installation failed"),
-                self.tr("keyTAB could not install some fonts automatically:\n{details}").format(details=details),
-            )
 
     def _request_app_restart(self) -> None:
         try:

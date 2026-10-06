@@ -1,10 +1,8 @@
 from __future__ import annotations
 
 import base64
-import os
-import subprocess
 import sys
-from pathlib import Path
+import ctypes
 from typing import Optional
 
 try:
@@ -28,7 +26,8 @@ except Exception:
 
 _EMBEDDED_FONT_NAMES: set[str] = set()
 _REGISTERED_FONT_CACHE: dict[str, Optional[str]] = {}
-_FONT_EXTS = ('.ttf', '.otf', '.ttc', '.otc')
+_WINDOWS_MEMORY_FONT_HANDLES: dict[str, int] = {}
+_WINDOWS_MEMORY_FONT_BUFFERS: dict[str, ctypes.Array] = {}
 
 
 def _font_members(name: str) -> list[str]:
@@ -39,34 +38,6 @@ def _font_members(name: str) -> list[str]:
     if alias:
         return [str(alias)]
     return [str(name)]
-
-
-def _font_file_targets(name: str) -> list[str]:
-    targets: list[str] = []
-    seen: set[str] = set()
-    for candidate in [name, *_font_members(name)]:
-        text = str(candidate)
-        if text and text not in seen:
-            seen.add(text)
-            targets.append(text)
-    return targets
-
-
-def _check_system_font_family(family: str) -> bool:
-    normalized = _normalize_font_name(family)
-    if not normalized:
-        return False
-    if _font_file_exists(family):
-        return True
-    if QFontDatabase is None:
-        return False
-    try:
-        families = set(QFontDatabase.families())
-    except Exception:
-        return False
-    if family not in families:
-        return False
-    return normalized not in _EMBEDDED_FONT_NAMES
 
 
 def _normalize_font_name(name: str) -> str:
@@ -83,145 +54,39 @@ def _decoded_font_bytes(name: str) -> Optional[bytes]:
         return None
 
 
-def _guess_font_extension(data: bytes) -> str:
-    if data.startswith(b'OTTO'):
-        return '.otf'
-    if data.startswith(b'\x00\x01\x00\x00') or data.startswith(b'true'):
-        return '.ttf'
-    return '.ttf'
-
-
-def _user_font_dir() -> Path:
-    home = Path.home()
-    if sys.platform.startswith('win'):
-        base = Path(os.environ.get('LOCALAPPDATA', home / 'AppData/Local'))
-        return base / 'Microsoft/Windows/Fonts'
-    if sys.platform == 'darwin':
-        return home / 'Library/Fonts'
-    return home / '.local/share/fonts'
-
-
-def _candidate_font_dirs() -> list[Path]:
-    dirs: list[Path] = []
-    user_dir = _user_font_dir()
-    dirs.append(user_dir)
-    if sys.platform.startswith('win'):
-        dirs.append(Path(os.environ.get('WINDIR', 'C:/Windows')) / 'Fonts')
-    elif sys.platform == 'darwin':
-        dirs.extend([Path('/Library/Fonts'), Path('/System/Library/Fonts')])
-    else:
-        dirs.extend([
-            Path.home() / '.fonts',
-            Path('/usr/local/share/fonts'),
-            Path('/usr/share/fonts'),
-        ])
-    return dirs
-
-
-def _font_file_exists(family: str) -> bool:
-    targets: set[str] = set()
-    for target_name in _font_file_targets(family):
-        normalized = _normalize_font_name(target_name)
-        title_case = normalized.title() if normalized else target_name.title()
-        targets.update({target_name, normalized, title_case})
-    for directory in _candidate_font_dirs():
-        for target in list(targets):
-            if not target:
-                continue
-            for ext in _FONT_EXTS:
-                path = directory / f"{target}{ext}"
-                if path.exists():
-                    return True
-    return False
-
-
-def _refresh_system_font_cache(installed_path: Path) -> None:
+def _register_windows_memory_fonts(name: str) -> bool:
+    """Expose embedded fonts to Cairo's Win32 backend without installing files."""
+    if not sys.platform.startswith("win"):
+        return True
     try:
-        if sys.platform.startswith('linux'):
-            subprocess.run(['fc-cache', '-f', str(installed_path.parent)], check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        elif sys.platform.startswith('win'):
-            import ctypes
-
-            try:
-                fr_private = 0x10
-                ctypes.windll.gdi32.AddFontResourceExW(str(installed_path), fr_private, 0)
-                HWND_BROADCAST = 0xFFFF
-                WM_FONTCHANGE = 0x001D
-                ctypes.windll.user32.SendMessageTimeoutW(HWND_BROADCAST, WM_FONTCHANGE, 0, 0, 0, 1000, None)
-            except Exception:
-                pass
-        # macOS picks up fonts automatically from ~/Library/Fonts
-    except Exception:
-        pass
-
-
-def has_system_font(family: str) -> bool:
-    if QFontDatabase is None or QApplication is None or QApplication.instance() is None:
-        return bool(_font_file_exists(str(family)))
-    names = _font_file_targets(family)
-    if len(names) > 1:
-        return all(_check_system_font_family(name) for name in names)
-    return _check_system_font_family(str(family))
-
-
-def has_installed_embedded_font_file(name: str) -> bool:
-    """Return True if the embedded font file is present in the user font directory.
-
-    This is a pragmatic persistence check used by startup install prompts.
-    On Windows, newly added per-user fonts are not always immediately visible
-    via QFontDatabase in a fresh process.
-    """
-    dest_dir = _user_font_dir()
-    if not dest_dir.exists():
+        add_font = ctypes.windll.gdi32.AddFontMemResourceEx
+        add_font.argtypes = (ctypes.c_void_p, ctypes.c_uint32, ctypes.c_void_p, ctypes.POINTER(ctypes.c_uint32))
+        add_font.restype = ctypes.c_void_p
+    except (AttributeError, OSError):
         return False
 
-    members = _font_members(name)
-    for member in members:
-        data = _decoded_font_bytes(member)
-        if not data:
-            return False
-        ext = _guess_font_extension(data)
-        primary = dest_dir / f"{member}{ext}"
-        if primary.exists():
-            continue
-        found = False
-        for candidate_ext in _FONT_EXTS:
-            if (dest_dir / f"{member}{candidate_ext}").exists():
-                found = True
-                break
-        if not found:
-            return False
-    return True
-
-
-def install_embedded_font_to_system(name: str) -> tuple[bool, str]:
-    dest_dir = _user_font_dir()
-    try:
-        dest_dir.mkdir(parents=True, exist_ok=True)
-    except Exception as exc:
-        return False, f"Cannot create font dir: {exc}"
-    installed_paths: list[str] = []
+    registered = True
     for member in _font_members(name):
-        data = _decoded_font_bytes(member)
-        if not data:
-            return False, f"No embedded font named {member}."
-        ext = _guess_font_extension(data)
-        target = dest_dir / f"{member}{ext}"
-        try:
-            if target.exists():
-                try:
-                    if target.read_bytes() == data:
-                        _refresh_system_font_cache(target)
-                        installed_paths.append(str(target))
-                        continue
-                except Exception:
-                    pass
-            target.write_bytes(data)
-        except Exception as exc:
-            return False, f"Failed to write font {member}: {exc}"
-        _refresh_system_font_cache(target)
-        installed_paths.append(str(target))
-    return True, ', '.join(installed_paths)
+        if member in _WINDOWS_MEMORY_FONT_HANDLES:
+            continue
+        raw = _decoded_font_bytes(member)
+        if raw is None:
+            registered = False
+            continue
+        buffer = ctypes.create_string_buffer(raw)
+        count = ctypes.c_uint32()
+        handle = add_font(buffer, len(raw), None, ctypes.byref(count))
+        if not handle or count.value == 0:
+            registered = False
+            continue
+        _WINDOWS_MEMORY_FONT_BUFFERS[member] = buffer
+        _WINDOWS_MEMORY_FONT_HANDLES[member] = int(handle)
+    return registered
+
+
+def register_embedded_font_with_cairo(name: str) -> bool:
+    """Make an embedded font available to Cairo without writing it to disk."""
+    return _register_windows_memory_fonts(name)
 
 
 def register_font_from_bytes(name: str) -> Optional[str]:
@@ -239,6 +104,7 @@ def register_font_from_bytes(name: str) -> Optional[str]:
     cache_key = _normalize_font_name(name)
     if sys.platform.startswith('linux') and cache_key == 'lelandtext':
         return None
+    _register_windows_memory_fonts(name)
     if cache_key in _REGISTERED_FONT_CACHE:
         return _REGISTERED_FONT_CACHE[cache_key]
     try:
@@ -311,20 +177,6 @@ def install_default_ui_font(app: Optional[QApplication] = None, name: str = 'Fir
         return False
 
     family = register_font_from_bytes(name)
-
-    # On macOS, Qt sometimes ignores in-memory fonts for UI widgets.
-    # Install the embedded font to the user font dir and register from the file as a fallback.
-    if not family:
-        ok, path = install_embedded_font_to_system(name)
-        if ok and QFontDatabase is not None:
-            try:
-                fid = QFontDatabase.addApplicationFont(path)
-                if fid >= 0:
-                    fams = [str(f) for f in QFontDatabase.applicationFontFamilies(fid)]
-                    if fams:
-                        family = fams[0]
-            except Exception:
-                pass
 
     # Try a list of likely family names/aliases for Fira Code
     candidates = []

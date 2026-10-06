@@ -143,6 +143,9 @@ def _resolve_cairo_family(family: str) -> str:
     # Qt font registration/database APIs there because that can terminate the
     # worker process before it returns a Python exception.
     if mp.current_process().name != "MainProcess":
+        from fonts import register_embedded_font_with_cairo
+
+        register_embedded_font_with_cairo("LelandText")
         if requested == "LelandText":
             return "Leland Text"
         return requested

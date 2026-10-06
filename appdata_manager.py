@@ -295,12 +295,12 @@ def get_appdata_manager() -> AppDataManager:
         adm.register("midi_import_dialog_geometry", "", "Base64-encoded Qt geometry for the MIDI Import dialog")
         adm.register("notehead_dialog_geometry", "", "Base64-encoded Qt geometry for the Notehead dialog")
         adm.register("score_template", {}, "Default score template for new scores (dict of score fields except events)")
-        adm.register("fonts_install_ok", False, "True when all required embedded fonts are installed to the user font directory")
         adm.register("user_soundfont_path", "", "Absolute path to last selected user soundfont (.sf2/.sf3)")
         # Removed window_state persistence to avoid saving/restoring dock/toolbar layout
         adm.load()
         # Strip any legacy keys from stored values
         adm._values.pop("window_state", None)
+        adm._values.pop("fonts_install_ok", None)
         removed = adm._values.pop("layout_template", None)
         if removed is not None:
             adm.save()
