@@ -7,7 +7,7 @@ Bump policy (Semantic Versioning):
   PATCH - bug fixes only
 """
 
-__version__ = "1.1.3"
+__version__ = "1.1.4"
 APP_NAME    = "keyTAB"
 
 change_log = '''
@@ -112,4 +112,7 @@ change_log = '''
 1.1.3 (2026-08-24)
 - fixed: font rendering issue on Linux
 - fixed hopefully: Stave config dialog now always has a working live preview. we changed to modal dialog.
+
+1.1.4 (2026-09-15)
+- fix: measure number collision handling improved to avoid overlapping with beams.
 '''

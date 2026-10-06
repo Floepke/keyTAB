@@ -3113,6 +3113,18 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                         right = xr
                 return right
 
+            def _beam_right_in_y_span(y0: float, y1: float) -> float | None:
+                right = None
+                span_start = min(float(y0), float(y1))
+                span_end = max(float(y0), float(y1))
+                for seg in beam_line_bounds:
+                    if float(seg['y_max']) < span_start or float(seg['y_min']) > span_end:
+                        continue
+                    xr = float(seg['x_max'])
+                    if right is None or xr > right:
+                        right = xr
+                return right
+
             _record_beam_line_bounds()
 
             # Problem solved: measure numbers must avoid colliding with notes/beams.
@@ -3400,15 +3412,28 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                         continue
                     _raw_w, raw_h_mm, text_w_mm, text_h_eff_mm = _measure_text_metrics_mm(num_txt)
                     t0 = m_start
-                    t1 = min(float(line['time_end']), m_start + (text_h_eff_mm * tick_per_mm))
                     y_text = _time_to_y(t0) + 1.0
+                    if horizontal_read_direction:
+                        # Rotated measure-number width extends forward on the
+                        # timeline. Include its complete span when ducking for
+                        # beams, rather than checking only at the barline.
+                        text_y_end = y_text + text_h_eff_mm
+                        t1 = min(float(line['time_end']), _y_to_time_unclamped(text_y_end))
+                    else:
+                        text_y_end = y_text
+                        t1 = min(float(line['time_end']), m_start + (text_h_eff_mm * tick_per_mm))
 
                     # Default outside-right; only move further right on collision
                     base_right = grid_right + measure_pad
                     guide_y = _time_to_y(t0)
-                    beam_right_candidates = [
-                        br for br in (_beam_right_at_y(guide_y), _beam_right_at_y(y_text)) if br is not None
-                    ]
+                    if horizontal_read_direction:
+                        beam_right_candidates = [
+                            br for br in (_beam_right_in_y_span(guide_y, text_y_end),) if br is not None
+                        ]
+                    else:
+                        beam_right_candidates = [
+                            br for br in (_beam_right_at_y(guide_y), _beam_right_at_y(y_text)) if br is not None
+                        ]
                     beam_right = max(beam_right_candidates) if beam_right_candidates else None
                     needed_right = _right_extent(t0, t1) + measure_pad
                     needed_right = max(needed_right, _ledger_right_extent(t0, t1) + measure_pad)
