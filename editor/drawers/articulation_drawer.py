@@ -69,6 +69,36 @@ class ArticulationDrawerMixin:
                     anchors[note_id] = (float(beam_x0 + (ratio * (beam_x1 - beam_x0))), y)
         return anchors
 
+    def _standalone_articulation_anchors(self, cache: dict, stem_len_mm: float) -> dict[int, tuple[float, float]]:
+        self = cast("Editor", self)
+        op: Operator = cache.get('op') or Operator(float(SHORTEST_DURATION))
+        notes_by_hand = dict(cache.get('notes_by_hand') or {})
+        anchors: dict[int, tuple[float, float]] = {}
+
+        for hand in ('l', 'r'):
+            direction = -1.0 if hand == 'l' else 1.0
+            notes = sorted(
+                list(notes_by_hand.get(hand) or []),
+                key=lambda note: float(getattr(note, 'time', 0.0) or 0.0),
+            )
+            index = 0
+            while index < len(notes):
+                time = float(getattr(notes[index], 'time', 0.0) or 0.0)
+                chord = [notes[index]]
+                index += 1
+                while index < len(notes) and op.eq(float(getattr(notes[index], 'time', 0.0) or 0.0), time):
+                    chord.append(notes[index])
+                    index += 1
+
+                outer_note = min(chord, key=lambda note: int(getattr(note, 'pitch', 0) or 0)) if hand == 'l' else max(chord, key=lambda note: int(getattr(note, 'pitch', 0) or 0))
+                x_tip = float(self.pitch_to_x(int(getattr(outer_note, 'pitch', 0) or 0))) + (direction * stem_len_mm)
+                y = float(self.time_to_mm(time))
+                for note in chord:
+                    note_id = int(getattr(note, '_id', 0) or 0)
+                    if note_id > 0:
+                        anchors[note_id] = (x_tip, y)
+        return anchors
+
     def draw_articulation(self, du: DrawUtil) -> None:
         self = cast("Editor", self)
         if getattr(self, 'is_tiny_mode', None) and self.is_tiny_mode():
@@ -103,6 +133,7 @@ class ArticulationDrawerMixin:
         articulation_rgb = Style.get_named_rgb('accent_color2', (128, 0, 0))
         articulation_color = (articulation_rgb[0] / 255.0, articulation_rgb[1] / 255.0, articulation_rgb[2] / 255.0, 1.0)
         beam_anchors = self._beamed_articulation_anchors(cache, stem_len_mm)
+        standalone_anchors = self._standalone_articulation_anchors(cache, stem_len_mm)
         stem_metrics = dict(cache.get('note_stem_metrics_by_id') or {})
 
         for note in notes:
@@ -115,10 +146,12 @@ class ArticulationDrawerMixin:
             note_id = int(getattr(note, '_id', 0) or 0)
             anchor = beam_anchors.get(note_id)
             if anchor is None:
-                metric = stem_metrics.get(note_id) or {}
-                x_tip = float(metric.get('x_tip')) if 'x_tip' in metric else float(self.pitch_to_x(int(getattr(note, 'pitch', 0) or 0))) + (direction * stem_len_mm)
-                y = float(metric.get('y')) if 'y' in metric else float(self.time_to_mm(float(getattr(note, 'time', 0.0) or 0.0)))
-                anchor = (x_tip, y)
+                anchor = standalone_anchors.get(note_id)
+                if anchor is None:
+                    metric = stem_metrics.get(note_id) or {}
+                    x_tip = float(metric.get('x_tip')) if 'x_tip' in metric else float(self.pitch_to_x(int(getattr(note, 'pitch', 0) or 0))) + (direction * stem_len_mm)
+                    y = float(metric.get('y')) if 'y' in metric else float(self.time_to_mm(float(getattr(note, 'time', 0.0) or 0.0)))
+                    anchor = (x_tip, y)
 
             x, y = anchor
             if note_id in beam_anchors:

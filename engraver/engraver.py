@@ -3919,6 +3919,27 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
 
             # ---- Beam drawing per line ----
             beamed_articulation_x_by_note_idx: dict[int, float] = {}
+            standalone_articulation_x_by_note_idx: dict[int, float] = {}
+            for hand_norm in ('r', 'l'):
+                hand_notes = sorted(
+                    notes_by_hand_line.get(hand_norm, []),
+                    key=lambda note: float(note.get('time', 0.0) or 0.0),
+                )
+                direction = -1.0 if hand_norm == 'l' else 1.0
+                index = 0
+                while index < len(hand_notes):
+                    time = float(hand_notes[index].get('time', 0.0) or 0.0)
+                    chord = [hand_notes[index]]
+                    index += 1
+                    while index < len(hand_notes) and op_time.eq(float(hand_notes[index].get('time', 0.0) or 0.0), time):
+                        chord.append(hand_notes[index])
+                        index += 1
+
+                    outer_note = min(chord, key=lambda note: int(note.get('pitch', 0) or 0)) if hand_norm == 'l' else max(chord, key=lambda note: int(note.get('pitch', 0) or 0))
+                    x_tip = float(_key_to_x(int(outer_note.get('pitch', 0) or 0))) + (direction * stem_len_mm)
+                    for note in chord:
+                        standalone_articulation_x_by_note_idx[int(note.get('idx', -1))] = x_tip
+
             if bool(layout.get('beam_visible', True)):
                 notes_by_hand_line: dict[str, list[dict]] = {'l': [], 'r': []}
                 for item in line_notes:
@@ -4125,6 +4146,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
             marcato_height = max(0.05, float(layout.get('marcato_height_mm', 8.0) or 8.0) * line_scale)
             marcato_half_width = MarcatoSym.half_width_mm(marcato_width, marcato_thickness)
             articulation_beam_half_width = max(0.0, float(layout.get('beam_thickness_mm', 1.0) or 1.0) * line_scale * 0.5)
+            drawn_articulations: set[tuple[str, float, float]] = set()
             for item in line_notes:
                 note_time = float(item.get('time', 0.0) or 0.0)
                 if op_time.lt(note_time, float(line_start)) or op_time.gt(note_time, float(line_end)):
@@ -4138,7 +4160,10 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                 note_idx = int(item.get('idx', -1))
                 beam_x = beamed_articulation_x_by_note_idx.get(note_idx)
                 if beam_x is None:
-                    anchor_edge_x = float(_key_to_x(int(item.get('pitch', 0) or 0))) + (direction * articulation_stem_len)
+                    anchor_edge_x = standalone_articulation_x_by_note_idx.get(
+                        note_idx,
+                        float(_key_to_x(int(item.get('pitch', 0) or 0))) + (direction * articulation_stem_len),
+                    )
                 else:
                     anchor_edge_x = float(beam_x) + (direction * articulation_beam_half_width)
                 anchor_edge_x += float((item.get('raw', {}) or {}).get('articulation_x_offset', 0.0) or 0.0) * line_scale
@@ -4154,6 +4179,11 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                     half_width = half_widths[name]
                     edge_distance += articulation_gap + half_width
                     symbol_x = anchor_edge_x + (direction * edge_distance)
+                    symbol_key = (name, round(symbol_x, 6), round(y, 6))
+                    if symbol_key in drawn_articulations:
+                        edge_distance += half_width
+                        continue
+                    drawn_articulations.add(symbol_key)
                     if name == 'staccato':
                         StaccatoSym(symbol_x, y, articulation_radius, notation_color).draw(
                             du,
