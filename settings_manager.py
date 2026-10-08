@@ -1,307 +1,57 @@
 from __future__ import annotations
+
 import os
-import sys
 import subprocess
-from dataclasses import dataclass
+import sys
 from pathlib import Path
 from typing import Dict, Optional
+
 from utils.CONSTANT import UTILS_SAVE_DIR
+from utils.external_data_manager import ExternalDataDefinition, ExternalDataManager
 
-try:
-    import tomllib as _tomlreader  # Python 3.11+
-except Exception:  # pragma: no cover
-    _tomlreader = None  # type: ignore
-
-# Optional round-trip preservation library
-try:
-    import tomlkit as _tomlkit  # type: ignore
-except Exception:  # pragma: no cover
-    _tomlkit = None  # type: ignore
+PREFERENCES_PATH = Path(UTILS_SAVE_DIR) / "preferences.toml"
+_PrefDef = ExternalDataDefinition
 
 
-# Paths under the user's home folder (~/ .keyTAB)
-# New TOML-based preferences file (supports comments with '#').
-PREFERENCES_PATH: Path = Path(UTILS_SAVE_DIR) / "preferences.toml"
-# Legacy Python-based preferences file retained for one-time migration.
-LEGACY_PREFERENCES_PATH: Path = Path(UTILS_SAVE_DIR) / "preferences.py"
-
-
-def _ensure_dir() -> None:
-    os.makedirs(UTILS_SAVE_DIR, exist_ok=True)
-
-
-@dataclass
-class _PrefDef:
-    default: object
-    description: str
-    min: object | None = None
-    max: object | None = None
-
-
-class PreferencesManager:
-    """Register and persist application preferences in ~/ .keyTAB/preferences.toml.
-
-    Users can edit this file; changes take effect after restarting the app.
-    The TOML format allows comments (lines starting with '#') and is human-friendly.
-    """
+class PreferencesManager(ExternalDataManager):
+    """Persist user preferences in ``preferences.toml``."""
 
     def __init__(self, path: Path = PREFERENCES_PATH) -> None:
-        self.path = path
-        self._schema: Dict[str, _PrefDef] = {}
-        self._values: Dict[str, object] = {}
-        # Keep parsed TOML document for round-trip preservation when tomlkit is available
-        self._doc = None
-
-    def register(
-        self,
-        key: str,
-        default: object,
-        description: str,
-        min: object | None = None,
-        max: object | None = None,
-    ) -> None:
-        self._schema[key] = _PrefDef(default=default, description=description, min=min, max=max)
-        if key not in self._values:
-            self._values[key] = default
-
-    def iter_schema(self) -> list[tuple[str, _PrefDef]]:
-        return list(self._schema.items())
-
-    def get(self, key: str, default: Optional[object] = None) -> object:
-        return self._values.get(key, default)
-
-    def set(self, key: str, value: object) -> None:
-        self._values[key] = value
-
-    def load(self) -> None:
-        _ensure_dir()
-        parsed: Dict[str, object] = {}
-        changed: bool = False
-        if self.path.exists():
-            # Load raw text once
-            try:
-                text = self.path.read_text(encoding="utf-8")
-            except Exception:
-                text = ""
-            # Parse dict using stdlib/fallback
-            parsed = self._parse_toml_dict(self.path)
-            # Parse document using tomlkit if available to preserve comments/formatting
-            try:
-                if _tomlkit is not None and text:
-                    self._doc = _tomlkit.parse(text)
-            except Exception:
-                self._doc = None
-        elif LEGACY_PREFERENCES_PATH.exists():
-            # One-time migration from legacy Python file
-            legacy_text = LEGACY_PREFERENCES_PATH.read_text(encoding="utf-8")
-            parsed = self._parse_py_dict(legacy_text)
-            # Immediately save to TOML for future runs
-            try:
-                self._values = {}
-                for k, d in self._schema.items():
-                    if k in parsed:
-                        self._values[k] = self._coerce(parsed[k], d.default)
-                    else:
-                        self._values.setdefault(k, d.default)
-                for k, v in parsed.items():
-                    if k not in self._values:
-                        self._values[k] = v
-                # Build initial tomlkit document if available
-                if _tomlkit is not None:
-                    try:
-                        doc = _tomlkit.document()
-                        for k in self._values:
-                            doc.add(k, _tomlkit.item(self._values[k]))
-                        self._doc = doc
-                    except Exception:
-                        self._doc = None
-                self.save()
-            except Exception:
-                pass
-        else:
-            # Initialize defaults and write file
-            self.save()
-            parsed = {}
-
-        # Merge loaded values into schema defaults
-        for k, d in self._schema.items():
-            if k in parsed:
-                self._values[k] = self._coerce(parsed[k], d.default)
-            else:
-                self._values.setdefault(k, d.default)
-                changed = True
-        for k, v in parsed.items():
-            if k not in self._values:
-                self._values[k] = v
-
-        # If any schema key was missing from the file, persist the restored defaults
-        if changed:
-            self.save()
-
-    def save(self) -> None:
-        _ensure_dir()
-        # Prefer round-trip preservation when tomlkit is available and we have a document
-        if _tomlkit is not None and self._doc is not None:
-            try:
-                # Update only keys present in _values; preserve unknown keys and comments
-                for k, v in self._values.items():
-                    try:
-                        # Use tomlkit.item to wrap Python value into TOML types
-                        self._doc[k] = _tomlkit.item(v)
-                    except Exception:
-                        # Fallback: add key if missing
-                        if k not in self._doc:
-                            try:
-                                self._doc.add(k, _tomlkit.item(v))
-                            except Exception:
-                                pass
-                content = _tomlkit.dumps(self._doc)
-                self.path.write_text(content, encoding="utf-8")
-                return
-            except Exception:
-                # Fall through to emitter if tomlkit fails
-                pass
-        # Minimal emitter fallback
-        content = self._emit_toml_file(self._values)
-        self.path.write_text(content, encoding="utf-8")
+        super().__init__(
+            path,
+            (
+                "keyTAB preferences (TOML)",
+                "You can edit this file to change the application preferences.",
+                "Lines starting with '#' are comments. Changes take effect after restarting the app.",
+            ),
+        )
 
     def open_in_editor(self) -> None:
-        _ensure_dir()
+        self.path.parent.mkdir(parents=True, exist_ok=True)
         if not self.path.exists():
             self.save()
         try:
-            fpath = str(self.path)
             if os.name == "nt":
-                # Always use Notepad on Windows
-                subprocess.Popen(["notepad", fpath])
-                return
-            if sys.platform == "darwin":
-                # Always use TextEdit on macOS
-                subprocess.Popen(["open", "-a", "TextEdit", fpath])
-                return
-            if sys.platform.startswith("linux"):
-                # Always and only use xdg-open on Linux
-                subprocess.Popen(["xdg-open", fpath])
-                return
-        except Exception as e:
-            # Last-resort: log to stderr to avoid crashing UI
-            try:
-                import sys as _sys
-                print(f"Failed to open preferences editor: {e}", file=_sys.stderr)
-            except Exception:
-                pass
-
-    # Internals
-    def _parse_toml_dict(self, path: Path) -> Dict:
-        try:
-            if _tomlreader is None:
-                # Attempt optional fallback to tomli if available
-                try:
-                    import tomli as _tomli  # type: ignore
-                except Exception:
-                    return {}
-                with open(path, "rb") as f:
-                    return dict(_tomli.load(f) or {})
-            with open(path, "rb") as f:
-                data = _tomlreader.load(f)  # type: ignore
-            return dict(data or {})
-        except Exception:
-            return {}
-    def _parse_py_dict(self, text: str) -> Dict:
-        import ast
-        tree = ast.parse(text, filename=str(self.path), mode='exec')
-        for node in tree.body:
-            if isinstance(node, ast.Assign):
-                for target in node.targets:
-                    if isinstance(target, ast.Name) and target.id == 'preferences':
-                        value = ast.literal_eval(node.value)
-                        if isinstance(value, dict):
-                            return value
-                        return {}
-        return {}
-
-    def _coerce(self, value: object, default: object) -> object:
-        if isinstance(default, bool):
-            return bool(value)
-        if isinstance(default, int):
-            try:
-                return int(value)
-            except Exception:
-                return default
-        if isinstance(default, float):
-            try:
-                return float(value)
-            except Exception:
-                return default
-        if isinstance(default, str):
-            return str(value)
-        return value
-
-    def _emit_toml_file(self, values: Dict[str, object]) -> str:
-        lines: list[str] = []
-        lines.append("# keyTAB preferences (TOML)\n")
-        lines.append("# You can edit this file to change the application preferences.")
-        lines.append("# Lines starting with '#' are comments. Changes take effect after restarting the app.\n")
-        order = list(self._schema.keys()) + [k for k in values.keys() if k not in self._schema]
-        seen: set[str] = set()
-        for k in order:
-            if k in seen:
-                continue
-            seen.add(k)
-            desc = self._schema.get(k).description if k in self._schema else ""
-            if desc:
-                for dline in desc.splitlines():
-                    lines.append(f"# {dline}")
-            v = values.get(k)
-            # Bare keys are fine (alnum + underscore). Values are TOML literals.
-            lines.append(f"{k} = {self._format_toml_value(v)}\n")
-        return "\n".join(lines)
-
-    def _format_toml_value(self, v: object) -> str:
-        if isinstance(v, bool):
-            return "true" if v else "false"
-        if isinstance(v, (int, float)):
-            return str(v)
-        if isinstance(v, str):
-            # Escape backslashes and quotes minimally
-            s = v.replace("\\", "\\\\").replace("\"", "\\\"")
-            return f'"{s}"'
-        if isinstance(v, list):
-            if not v:
-                return "[]"
-            # Single-line small arrays
-            if len(v) <= 4 and all(isinstance(x, (int, float, bool, str)) for x in v):
-                return "[" + ", ".join(self._format_toml_value(x) for x in v) + "]"
-            # Multi-line arrays
-            inner = ",\n".join("    " + self._format_toml_value(x) for x in v)
-            return "[\n" + inner + "\n]"
-        if isinstance(v, dict):
-            if not v:
-                return "{}"  # represent empty inline table
-            # Inline table for small dicts; multi-line inline for larger
-            items = ", ".join(f"{kk} = {self._format_toml_value(v[kk])}" for kk in v)
-            return "{ " + items + " }"
-        # Fallback to repr inside a string to keep TOML valid
-        s = repr(v).replace("\\", "\\\\").replace('"', '\\"')
-        return f'"{s}"'
+                subprocess.Popen(["notepad", str(self.path)])
+            elif sys.platform == "darwin":
+                subprocess.Popen(["open", "-a", "TextEdit", str(self.path)])
+            elif sys.platform.startswith("linux"):
+                subprocess.Popen(["xdg-open", str(self.path)])
+        except Exception as error:
+            print(f"Failed to open preferences editor: {error}", file=sys.stderr)
 
 
-# ---- Registration hub (add new app preferences here) ----
 _prefs_manager: Optional[PreferencesManager] = None
-
-# Active UI scale used by widgets at construction time.
-# Set by keyTAB.py before any widget is created.
-_active_ui_scale: float = 1.0
+_active_ui_scale = 1.0
 
 
 def get_ui_scale() -> float:
-    """Return the active UI scale factor (1.0 = default). Widgets use this
-    at construction time on macOS/Linux where QT_SCALE_FACTOR is not used."""
+    """Return the active UI scale factor (1.0 = default)."""
     return _active_ui_scale
 
 
 def set_ui_scale(scale: float) -> None:
-    """Store the active UI scale factor. Call before creating any widgets."""
+    """Store the active UI scale factor before creating widgets."""
     global _active_ui_scale
     _active_ui_scale = max(0.5, min(3.0, float(scale)))
 
@@ -309,118 +59,40 @@ def set_ui_scale(scale: float) -> None:
 def get_preferences_manager() -> PreferencesManager:
     global _prefs_manager
     if _prefs_manager is None:
-        pm = PreferencesManager(PREFERENCES_PATH)
-        # Register known preferences here
-        pm.register(
-            key="ui_scale",
-            default=1.0,
-            description="Global UI scale (0.5 .. 3.0)\n(I noticed that choosing other then 1.0 may cause some unwanted  UI artifacts)",
+        manager = PreferencesManager()
+        manager.register(
+            "ui_scale", 1.0,
+            "Global UI scale (0.5 .. 3.0)\n(I noticed that choosing other then 1.0 may cause some unwanted  UI artifacts)",
             min=0.5,
             max=3.0,
         )
-        pm.register(
-            key="theme",
-            default="light",
-            description="UI theme 'light' or 'dark'",
-        )
-        pm.register(
-            key="ui_language",
-            default="system",
-            description="User interface language: 'system', 'en', or 'nl'.",
-        )
-        pm.register(
-            key="editor_fps_limit",
-            default=25,
-            description="The maximum frames per second (FPS) for the editor's rendering loop. Higher values may improve visual smoothness but can increase CPU/GPU usage.",
+        manager.register("theme", "light", "UI theme 'light' or 'dark'")
+        manager.register("ui_language", "system", "User interface language: 'system', 'en', or 'nl'.")
+        manager.register(
+            "editor_fps_limit", 25,
+            "The maximum frames per second (FPS) for the editor's rendering loop. Higher values may improve visual smoothness but can increase CPU/GPU usage.",
             min=1,
             max=240,
         )
-        pm.register(
-            key="auto_save",
-            default=True,
-            description="Enable periodic automatic saving of session and project files.",
+        manager.register("auto_save", True, "Enable periodic automatic saving of session and project files.")
+        manager.register("auto_save_interval", 1, "Autosave interval in minutes.", min=1, max=120)
+        manager.register(
+            "save_on_exit", True,
+            "Save the current file if a file is currently open when exiting the app. You will not get the yesnocancel prompt on exit because with this option on you choose 'yes' by default.",
         )
-        pm.register(
-            key="auto_save_interval",
-            default=1,
-            description="Autosave interval in minutes.",
-            min=1,
-            max=120,
+        manager.register("play_note_on_edit", True, "Play a short note when clicking or pitch-editing notes and grace notes.")
+        manager.register(
+            "focus_on_playhead_during_playback", "measure",
+            "Editor playhead focus mode during playback: 'measure' (jump per measure), 'animated' (smoothly keep playhead centered), or 'disabled'.",
         )
-        pm.register(
-            key="save_on_exit",
-            default=True,
-            description="Save the current file if a file is currently open when exiting the app. You will not get the yesnocancel prompt on exit because with this option on you choose 'yes' by default.",
+        manager.register("editor_orientation", "vertical", "Editor orientation: 'vertical' or 'horizontal'.")
+        manager.register(
+            "timestamp_format", "%d-%m-%Y",
+            "Timestamp format for score creation and modification metadata.\nUses Python datetime.strftime notation:\n\t%d=day, \n\t%m=month, \n\t%Y=year, \n\t%H=hour(24h), \n\t%M=minute, \n\t%S=second.\nExamples: \n\t'%d-%m-%Y' becomes \n\t'%Y-%m-%d %H:%M:%S'\nUse '%%' for a literal percent sign.",
         )
-        pm.register(
-            key="play_note_on_edit",
-            default=True,
-            description="Play a short note when clicking or pitch-editing notes and grace notes.",
-        )
-        pm.register(
-            key="focus_on_playhead_during_playback",
-            default="measure",
-            description=(
-                "Editor playhead focus mode during playback: "
-                "'measure' (jump per measure), 'animated' (smoothly keep playhead centered), or 'disabled'."
-            ),
-        )
-        pm.register(
-            key="editor_orientation",
-            default="vertical",
-            description="Editor orientation: 'vertical' or 'horizontal'.",
-        )
-        pm.register(
-            key="timestamp_format",
-            default="%d-%m-%Y",
-            description=(
-                "Timestamp format for score creation and modification metadata.\n"
-                "Uses Python datetime.strftime notation:\n"
-                "\t•%d=day, \n\t•%m=month, \n\t•%Y=year, \n\t•%H=hour(24h), \n\t•%M=minute, \n\t•%S=second.\n"
-                "Examples: \n\t'%d-%m-%Y' becomes \n\t'%Y-%m-%d %H:%M:%S'\nUse '%%' for a literal percent sign."
-            ),
-        )
-        pm.register(
-            key="show_tooltips",
-            default=True,
-            description="Show tooltips throughout the application.",
-        )
-        pm.load()
-        try:
-            raw = pm._parse_toml_dict(pm.path) if pm.path.exists() else {}
-        except Exception:
-            raw = {}
-        if ("play_note_on_edit" not in raw) and ("audition_during_note_input" in raw):
-            pm.set("play_note_on_edit", bool(raw.get("audition_during_note_input", True)))
-            pm.save()
-        # Migrate playhead focus from legacy bool values to mode strings.
-        try:
-            old_focus = raw.get("focus_on_playhead_during_playback", None)
-            if isinstance(old_focus, bool):
-                pm.set("focus_on_playhead_during_playback", "measure" if old_focus else "disabled")
-                pm.save()
-            elif old_focus is not None:
-                focus_txt = str(old_focus).strip().lower()
-                if focus_txt in ("true", "1", "yes", "on"):
-                    pm.set("focus_on_playhead_during_playback", "measure")
-                    pm.save()
-                elif focus_txt in ("false", "0", "no", "off"):
-                    pm.set("focus_on_playhead_during_playback", "disabled")
-                    pm.save()
-                elif focus_txt not in ("measure", "animated", "disabled"):
-                    pm.set("focus_on_playhead_during_playback", "measure")
-                    pm.save()
-        except Exception:
-            pass
-        # Legacy fallback key from older builds.
-        if ("focus_on_playhead_during_playback" not in raw) and ("center_view_on_playhead" in raw):
-            try:
-                legacy = bool(raw.get("center_view_on_playhead", True))
-                pm.set("focus_on_playhead_during_playback", "measure" if legacy else "disabled")
-                pm.save()
-            except Exception:
-                pass
-        _prefs_manager = pm
+        manager.register("show_tooltips", True, "Show tooltips throughout the application.")
+        manager.load()
+        _prefs_manager = manager
     return _prefs_manager
 
 
@@ -431,7 +103,6 @@ def get_preferences() -> Dict:
 def open_preferences(parent=None) -> None:
     try:
         from ui.dialogs.preferences_dialog import PreferencesDialog
-        dlg = PreferencesDialog(parent=parent)
-        dlg.show()
+        PreferencesDialog(parent=parent).show()
     except Exception:
         get_preferences_manager().open_in_editor()
