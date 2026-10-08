@@ -8,7 +8,7 @@ from typing import Optional
 from editor.editor import Editor
 from ui.widgets.draw_util import DrawUtil, make_image_surface, finalize_image_surface
 from ui.style import Style
-from settings_manager import get_preferences
+from utils.settings_manager import get_preferences
 from utils.CONSTANT import ENABLE_MACOS_NATIVE_SCROLLING
 # Stripped renderer, tile cache, and spatial index for static viewport simplicity
 

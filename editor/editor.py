@@ -27,7 +27,7 @@ from editor.tool.arpeggio_tool import ArpeggioTool
 from editor.tool.idle import IdleTool
 from editor.ctlz import CtlZ
 from file_model.base_grid import BaseGrid
-from settings_manager import get_preferences_manager
+from utils.settings_manager import get_preferences_manager
 from ui.style import Style
 from file_model.SCORE import SCORE
 from utils.CONSTANT import BE_KEYS, QUARTER_NOTE_UNIT, SHORTEST_DURATION

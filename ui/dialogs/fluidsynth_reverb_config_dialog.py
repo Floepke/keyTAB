@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from PySide6 import QtCore, QtWidgets
 
-from appdata_manager import get_appdata_manager
+from utils.appdata_manager import get_appdata_manager
 from ui.dialogs import DialogGeometryMixin
 
 

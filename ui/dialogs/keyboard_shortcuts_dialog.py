@@ -4,7 +4,7 @@ from __future__ import annotations
 import sys
 from PySide6 import QtCore, QtGui, QtWidgets
 from icons.icons import get_qicon
-from settings_manager import get_preferences_manager
+from utils.settings_manager import get_preferences_manager
 from ui.style import Style
 
 

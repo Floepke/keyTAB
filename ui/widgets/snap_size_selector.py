@@ -3,7 +3,7 @@ from PySide6 import QtCore, QtGui, QtWidgets
 from fractions import Fraction
 from utils.CONSTANT import QUARTER_NOTE_UNIT, SHORTEST_DURATION
 from ui.widgets.tool_selector import LEFT_PANEL_PADDING_PX
-from settings_manager import get_ui_scale
+from utils.settings_manager import get_ui_scale
 
 BASE_ITEMS: list[tuple[int, str]] = [
     (1, "Whole"),

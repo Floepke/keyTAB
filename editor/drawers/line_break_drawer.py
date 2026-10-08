@@ -1,7 +1,7 @@
 from __future__ import annotations
 from typing import TYPE_CHECKING, cast
 from PySide6 import QtCore
-from settings_manager import get_preferences
+from utils.settings_manager import get_preferences
 from ui.widgets.draw_util import DrawUtil
 
 if TYPE_CHECKING:

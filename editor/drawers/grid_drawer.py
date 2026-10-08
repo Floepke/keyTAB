@@ -14,7 +14,7 @@ from file_model.base_grid import resolve_grid_layer_offsets
 from ui.widgets.draw_util import DrawUtil
 from utils.CONSTANT import QUARTER_NOTE_UNIT, SHORTEST_DURATION, PIANO_KEY_AMOUNT
 from utils.operator import Operator
-from settings_manager import get_preferences
+from utils.settings_manager import get_preferences
 
 if TYPE_CHECKING:
     from editor.editor import Editor

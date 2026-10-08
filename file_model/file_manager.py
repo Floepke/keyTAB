@@ -19,7 +19,7 @@ from file_model.appstate import AppState
 from file_model.layout import Layout
 from midi.midi_exporter import export_score_to_midi
 from utils.CONSTANT import UTILS_SAVE_DIR
-from appdata_manager import get_appdata_manager
+from utils.appdata_manager import get_appdata_manager
 
 
 class FileManager:

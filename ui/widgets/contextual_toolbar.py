@@ -2,7 +2,7 @@ from PySide6 import QtCore, QtGui, QtWidgets
 
 from icons.icons import get_qicon
 from ui.style import Style
-from settings_manager import get_ui_scale
+from utils.settings_manager import get_ui_scale
 
 
 class ContextualToolbar(QtWidgets.QWidget):

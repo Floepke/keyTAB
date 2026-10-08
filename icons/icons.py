@@ -137,7 +137,7 @@ def get_qicon(name: str, size: Optional[Tuple[int, int]] = None):
         # Optional dark-mode tint: render icon as white using its alpha
         theme = None
         # Lazy import to avoid hard dependency during build tools
-        from settings_manager import get_preferences_manager as _get_pm  # type: ignore
+        from utils.settings_manager import get_preferences_manager as _get_pm  # type: ignore
         pm = _get_pm()
         theme = str(pm.get("theme", "light") or "light").lower()
         # Skip tinting for brand assets like the app logo

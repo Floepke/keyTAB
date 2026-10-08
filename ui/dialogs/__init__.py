@@ -196,7 +196,7 @@ class DialogGeometryMixin:
         if not self.DIALOG_KEY:
             return False
 
-        from appdata_manager import get_appdata_manager
+        from utils.appdata_manager import get_appdata_manager
         from PySide6 import QtCore
         adm = get_appdata_manager()
         geom_b64 = str(adm.get(self._geometry_appdata_key(), "") or "")
@@ -221,7 +221,7 @@ class DialogGeometryMixin:
             return
 
         # Save geometry to appdata as base64-encoded QByteArray.
-        from appdata_manager import get_appdata_manager
+        from utils.appdata_manager import get_appdata_manager
         adm = get_appdata_manager()
         geom_b64 = bytes(self.saveGeometry().toBase64()).decode("ascii")
         adm.set(self._geometry_appdata_key(), geom_b64)

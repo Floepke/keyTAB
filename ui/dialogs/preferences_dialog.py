@@ -5,7 +5,7 @@ import sys
 from PySide6 import QtCore, QtGui, QtWidgets
 from ui.dialogs import DialogGeometryMixin
 
-from settings_manager import get_preferences_manager
+from utils.settings_manager import get_preferences_manager
 from utils.restart import restart_current_process
 
 

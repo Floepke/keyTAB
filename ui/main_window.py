@@ -24,8 +24,8 @@ from ui.dialogs.file_inspector import FileInspectorDialog
 from ui.error_dialog import show_error_dialog
 from ui.style import Style
 from ui.dialogs.fluidsynth_reverb_config_dialog import FluidSynthReverbConfigDialog
-from settings_manager import open_preferences, get_preferences_manager
-from appdata_manager import get_appdata_manager
+from utils.settings_manager import open_preferences, get_preferences_manager
+from utils.appdata_manager import get_appdata_manager
 from utils.CONSTANT import UTILS_SAVE_DIR, QUARTER_NOTE_UNIT
 from utils.restart import restart_current_process
 from engraver.engraver import Engraver as LegacyEngraver

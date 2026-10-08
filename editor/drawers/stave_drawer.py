@@ -1,6 +1,6 @@
 from __future__ import annotations
 from file_model.SCORE import SCORE
-from settings_manager import get_preferences
+from utils.settings_manager import get_preferences
 from editor.editor_defaults import SCALE
 from ui.style import Style
 from ui.widgets.draw_util import DrawUtil

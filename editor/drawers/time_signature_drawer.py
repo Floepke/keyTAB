@@ -1,6 +1,6 @@
 from __future__ import annotations
 from typing import TYPE_CHECKING, cast
-from settings_manager import get_preferences
+from utils.settings_manager import get_preferences
 from ui.widgets.draw_util import DrawUtil
 from fonts import register_font_from_bytes
 from utils.CONSTANT import QUARTER_NOTE_UNIT, SHORTEST_DURATION

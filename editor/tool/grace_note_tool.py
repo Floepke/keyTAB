@@ -37,7 +37,7 @@ class GraceNoteTool(BaseTool):
 
     def _play_note_on_edit_enabled(self) -> bool:
         try:
-            from settings_manager import get_preferences_manager
+            from utils.settings_manager import get_preferences_manager
             pm = get_preferences_manager()
             return bool(pm.get("play_note_on_edit", True))
         except Exception:

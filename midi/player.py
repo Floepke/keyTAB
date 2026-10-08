@@ -854,7 +854,7 @@ class Player:
 
     def _load_gain_from_appdata(self) -> None:
         """Load FluidSynth gain from appdata with safe bounds."""
-        from appdata_manager import get_appdata_manager
+        from utils.appdata_manager import get_appdata_manager
         adm = get_appdata_manager()
         if adm is None:
             return
@@ -864,7 +864,7 @@ class Player:
     def _load_reverb_settings_from_appdata(self) -> None:
         """Load and apply reverb settings from appdata to the FluidSynth backend."""
         try:
-            from appdata_manager import get_appdata_manager
+            from utils.appdata_manager import get_appdata_manager
             adm = get_appdata_manager()
             if adm is not None and isinstance(self._backend, _FluidsynthBackend):
                 enabled = bool(adm.get("fluidsynth_reverb_enabled", True))

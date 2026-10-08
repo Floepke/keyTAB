@@ -70,8 +70,8 @@ from pathlib import Path
 from PySide6 import QtCore, QtWidgets, QtGui
 from ui.main_window import MainWindow
 from ui.style import Style
-from settings_manager import get_preferences, set_ui_scale
-from appdata_manager import get_appdata_manager
+from utils.settings_manager import get_preferences, set_ui_scale
+from utils.appdata_manager import get_appdata_manager
 from version import __version__ as APP_VERSION
 from icons.icons import get_qicon
 from fonts import (

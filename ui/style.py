@@ -3,7 +3,7 @@ import sys
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor, QPalette
 from PySide6.QtWidgets import QApplication, QProxyStyle, QStyle
-from settings_manager import get_preferences
+from utils.settings_manager import get_preferences
 
 
 class _InstantTooltipStyle(QProxyStyle):

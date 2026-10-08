@@ -1,7 +1,7 @@
 from typing import Optional
 from editor.tool.base_tool import BaseTool
 from file_model.SCORE import SCORE
-from settings_manager import get_preferences
+from utils.settings_manager import get_preferences
 from utils.operator import Operator
 from ui.widgets.draw_util import DrawUtil
 from utils.CONSTANT import BLACK_KEYS, PIANO_KEY_AMOUNT, QUARTER_NOTE_UNIT, SHORTEST_DURATION
@@ -53,7 +53,7 @@ class NoteTool(BaseTool):
 
     def _play_note_on_edit_enabled(self) -> bool:
         try:
-            from settings_manager import get_preferences_manager
+            from utils.settings_manager import get_preferences_manager
             pm = get_preferences_manager()
             return bool(pm.get("play_note_on_edit", True))
         except Exception:

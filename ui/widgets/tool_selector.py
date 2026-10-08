@@ -3,7 +3,7 @@ import sys
 from PySide6 import QtCore, QtGui, QtWidgets
 from icons.icons import get_qicon
 from ui.style import Style
-from settings_manager import get_ui_scale
+from utils.settings_manager import get_ui_scale
 
 # Fixed row height and padding base values; scaled at widget construction via _scaled()
 _BASE_ITEM_ROW_HEIGHT_PX: int = 42

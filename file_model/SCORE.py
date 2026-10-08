@@ -44,7 +44,7 @@ def _timestamp_now() -> str:
 	"""Return current timestamp formatted from preferences with a safe fallback."""
 	default_fmt = "%d-%m-%Y_%H:%M:%S"
 	fmt = default_fmt
-	from settings_manager import get_preferences_manager
+	from utils.settings_manager import get_preferences_manager
 	pm = get_preferences_manager()
 	raw_fmt = pm.get('timestamp_format', default_fmt)
 	fmt = str(raw_fmt).strip() if raw_fmt is not None else default_fmt
