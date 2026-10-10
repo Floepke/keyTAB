@@ -36,6 +36,47 @@ class CountLineTool(BaseTool):
             return (0.0, 0.0)
         return self._editor.widget_px_to_page_mm(float(x_px), float(y_px))
 
+    def _rpitch_with_handle_gap(
+        self,
+        target: int,
+        other: int,
+        current: int,
+        drag_dx: float,
+    ) -> int:
+        """Return a clamped pitch that stays two semitones from the other handle.
+
+        The target's position selects which side of the other handle to use, so
+        a dragged handle can cross over it. When the target is directly on the
+        other handle, the drag direction (then the current side) breaks the tie.
+        If clamping at a pitch boundary causes overlap, the opposite side is
+        attempted instead.
+        """
+        min_gap = 2
+        target = int(self.clamp_rpitch(target))
+
+        if target < other:
+            side = -1
+        elif target > other:
+            side = 1
+        elif drag_dx < 0:
+            side = -1
+        elif drag_dx > 0:
+            side = 1
+        elif current < other:
+            side = -1
+        else:
+            side = 1
+
+        if side < 0:
+            target = min(target, other - min_gap)
+        else:
+            target = max(target, other + min_gap)
+
+        target = int(self.clamp_rpitch(target))
+        if target == other:
+            target = int(self.clamp_rpitch(other - side * min_gap))
+        return target
+
     def _clear_line_drag_anchor(self) -> None:
         self._line_drag_anchor_cursor_time = None
         self._line_drag_anchor_cursor_x_mm = None
@@ -102,15 +143,7 @@ class CountLineTool(BaseTool):
         self._active_line = None
         self._active_handle = None
         self._clear_line_drag_anchor()
-    def on_left_click(self, x: float, y: float) -> None:
-        super().on_left_click(x, y)
-        return
-    def on_left_double_click(self, x: float, y: float) -> None:
-        super().on_left_double_click(x, y)
-        print('CountLineTool: on_left_double_click()')
-    def on_left_drag_start(self, x: float, y: float) -> None:
-        super().on_left_drag_start(x, y)
-        return
+
     def on_left_drag(self, x: float, y: float, dx: float, dy: float) -> None:
         super().on_left_drag(x, y, dx, dy)
         if self._editor is None or self._active_line is None:
@@ -123,28 +156,24 @@ class CountLineTool(BaseTool):
 
         # Update pitch for active handle
         rpitch = self._x_mm_to_rpitch(x_mm)
-        min_gap = 2  # Keep handles at least two semitone steps apart.
         if self._active_handle == 'start':
             other = int(getattr(self._active_line, 'rpitch2', 0) or 0)
             current = int(getattr(self._active_line, 'rpitch1', 0) or 0)
-            target = int(self.clamp_rpitch(rpitch))
-            if current <= other:
-                target = min(target, int(other - min_gap))
-            else:
-                target = max(target, int(other + min_gap))
-            self._active_line.rpitch1 = int(self.clamp_rpitch(target))
+            self._active_line.rpitch1 = self._rpitch_with_handle_gap(
+                rpitch,
+                other,
+                current,
+                dx,
+            )
         elif self._active_handle == 'end':
             other = int(getattr(self._active_line, 'rpitch1', 0) or 0)
             current = int(getattr(self._active_line, 'rpitch2', 0) or 0)
-            target = int(self.clamp_rpitch(rpitch))
-            if current >= other:
-                target = max(target, int(other + min_gap))
-            else:
-                target = min(target, int(other - min_gap))
-            if current == other:
-                # Initial collapsed state: choose side from cursor direction.
-                target = int(other + min_gap) if target >= other else int(other - min_gap)
-            self._active_line.rpitch2 = int(self.clamp_rpitch(target))
+            self._active_line.rpitch2 = self._rpitch_with_handle_gap(
+                rpitch,
+                other,
+                current,
+                dx,
+            )
         elif self._active_handle == 'line':
             if (
                 self._line_drag_anchor_cursor_time is None
@@ -184,12 +213,6 @@ class CountLineTool(BaseTool):
         self._active_line = None
         self._active_handle = None
         self._clear_line_drag_anchor()
-    def on_right_press(self, x: float, y: float) -> None:
-        super().on_right_press(x, y)
-        print('CountLineTool: on_right_press()')
-    def on_right_unpress(self, x: float, y: float) -> None:
-        super().on_right_unpress(x, y)
-        print('CountLineTool: on_right_unpress()')
     def on_right_click(self, x: float, y: float) -> None:
         super().on_right_click(x, y)
         if self._editor is None:
@@ -221,21 +244,3 @@ class CountLineTool(BaseTool):
             self._editor.force_redraw_from_model()
         else:
             self._editor.draw_frame()
-    def on_right_double_click(self, x: float, y: float) -> None:
-        super().on_right_double_click(x, y)
-        print('CountLineTool: on_right_double_click()')
-    def on_right_drag_start(self, x: float, y: float) -> None:
-        super().on_right_drag_start(x, y)
-        print('CountLineTool: on_right_drag_start()')
-    def on_right_drag(self, x: float, y: float, dx: float, dy: float) -> None:
-        super().on_right_drag(x, y, dx, dy)
-        print('CountLineTool: on_right_drag()')
-    def on_right_drag_end(self, x: float, y: float) -> None:
-        super().on_right_drag_end(x, y)
-        print('CountLineTool: on_right_drag_end()')
-    def on_mouse_move(self, x: float, y: float) -> None:
-        super().on_mouse_move(x, y)
-        # print('CountLineTool: on_mouse_move()')
-
-    def on_toolbar_button(self, name: str) -> None:
-        print(f"CountLineTool: on_toolbar_button(name='{name}')")
