@@ -382,6 +382,10 @@ def midi_load(
 
     # ---- Build SCORE ----------------------------------------------
     score = SCORE().new()
+    from ui.dialogs.style_dialog import load_default_style
+    default_layout = load_default_style()
+    if default_layout is not None:
+        score.layout = default_layout
     score.tempo = []
     score.info.title = str(p.stem or score.info.title)
 
@@ -502,5 +506,4 @@ def midi_load(
     score.base_grid = base_grid_list
     score.apply_quick_line_breaks([6])
     return score
-
 
