@@ -37,6 +37,7 @@ TOOL_ITEMS: list[dict] = [
     { 'name': 'tempo',          'displayed_name': 'Tempo',          'icon': 'metronome',      'tooltip': 'Left Click/Drag: edit existing tempo (click to change BPM, drag to resize duration). Left Click/Drag in empty space: create a tempo marker + drag to set duration. Right Click: delete tempo (first tempo cannot be deleted).'} ,
     { 'name': 'slur',           'displayed_name': 'Slur',           'icon': 'slur',           'tooltip': 'Left Click/Drag: edit existing slur by dragging a control handle. Left Click/Drag in empty space: create a new slur + shape it by dragging. Right Click: delete slur at handle.' },
     { 'name': 'barline',        'displayed_name': 'Barline Symbols','icon': 'repeats',        'tooltip': 'Left Click/Drag: edit existing barline symbol placement by inserting selected symbol at clicked position. Left Click/Drag in empty space: create selected barline symbol (start repeat, end repeat, or double barline). Right Click: delete any barline symbol at nearest event position.' },
+    { 'name': 'pedal',          'displayed_name': 'Pedal',          'icon': 'pedal',          'tooltip': 'Left Click: insert the selected pedal symbol. Drag an existing pedal symbol to move it. Right Click: delete pedal symbol.' },
 ]
 
 
@@ -107,6 +108,7 @@ class ToolSelectorWidget(QtWidgets.QListWidget):
             'slur':           self.tr("Slur"),
             'text':           self.tr("Text"),
             'barline':        self.tr("Barline Symbols"),
+            'pedal':          self.tr("Pedal"),
         }
         _tooltips = {
             'idle':           self.tr("In this mode you can do nothing at all."),
@@ -123,6 +125,7 @@ class ToolSelectorWidget(QtWidgets.QListWidget):
             'slur':           self.tr("Left Click/Drag: edit existing slur by dragging a control handle. Left Click/Drag in empty space: create a new slur + shape it by dragging. Right Click: delete slur at handle."),
             'text':           self.tr("Left Click/Drag: move existing text, or drag the red handle to rotate. Left Click/Drag in empty space: create new text + edit afterwards in the dialog. Right Click: delete text item."),
             'barline':        self.tr("Left Click/Drag: edit existing barline symbol placement by inserting selected symbol at clicked position. Left Click/Drag in empty space: create selected barline symbol (start repeat, end repeat, or double barline). Right Click: delete any barline symbol at nearest event position."),
+            'pedal':          self.tr("Left Click: insert the selected pedal symbol. Drag an existing pedal symbol to move it. Right Click: delete pedal symbol."),
         }
         for conf in TOOL_ITEMS:
             name = str(conf.get('name', ''))

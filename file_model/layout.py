@@ -10,10 +10,10 @@ class Layout:
     read_direction: Literal['horizontal', 'vertical'] = 'vertical'
     page_width_mm: float = 210.0
     page_height_mm: float = 297.0
-    page_top_margin_mm: float = 5.0
-    page_bottom_margin_mm: float = 5.0
-    page_left_margin_mm: float = 5.0
-    page_right_margin_mm: float = 5.0
+    page_top_margin_mm: float = 10.0
+    page_bottom_margin_mm: float = 10.0
+    page_left_margin_mm: float = 10.0
+    page_right_margin_mm: float = 10.0
 
     black_note_rule: Literal['above_stem', 'below_stem', 'above_stem_if_collision', 'above_stem_if_chord_and_white_note_same_hand'] = 'above_stem'
 
@@ -62,7 +62,8 @@ class Layout:
     dynamic_symbol_background_padding_mm: float = 1.5
     dynamic_rotation: float = 0.0
 
-    # Repeat markers
+    # Pedal appearance
+    pedal_thickness_mm: float = 1.25
     
     # Measure grouping (prefill for line break tool; not applied automatically)
     measure_grouping: str = ""
@@ -163,6 +164,7 @@ class Layout:
     slur_visible: bool = True
     hairpin_visible: bool = True
     dynamic_symbol_visible: bool = True
+    pedal_visible: bool = True
     repeat_start_visible: bool = True
     repeat_end_visible: bool = True
     double_barline_visible: bool = True
@@ -208,6 +210,7 @@ LAYOUT_FLOAT_CONFIG: dict[str, dict[str, float]] = {
     'beam_corner_radius_mm': {'min': 0.0, 'max': 5.0, 'step': 0.05},
     'grace_note_outline_width_mm': {'min': 0.05, 'max': 5.0, 'step': 0.05},
     'grace_note_scale': {'min': 0.05, 'max': 1.0, 'step': 0.05},
+    'pedal_thickness_mm': {'min': 0.05, 'max': 5.0, 'step': 0.05},
     'text_background_padding_mm': {'min': 0.0, 'max': 20.0, 'step': 0.05},
     'hairpin_line_width_mm': {'min': 0.05, 'max': 5.0, 'step': 0.05},
     'hairpin_width_mm': {'min': 0.05, 'max': 20.0, 'step': 0.05},

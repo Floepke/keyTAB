@@ -2702,6 +2702,11 @@ Akkoorden boven stok: zwarte noten worden boven de stok geplaatst, maar alleen v
         <translation>Voorslagnoot-schaal</translation>
     </message>
     <message>
+        <location filename="../ui/dialogs/style_dialog.py" line="634" />
+        <source>Pedal thickness (mm)</source>
+        <translation>Pedaaldikte (mm)</translation>
+    </message>
+    <message>
         <location filename="../ui/dialogs/style_dialog.py" line="859" />
         <location filename="../ui/dialogs/style_dialog.py" line="636" />
         <source>Text</source>
@@ -3053,6 +3058,11 @@ Akkoorden boven stok: zwarte noten worden boven de stok geplaatst, maar alleen v
         <location filename="../ui/dialogs/style_dialog.py" line="860" />
         <source>Countline</source>
         <translation>Tellijn</translation>
+    </message>
+    <message>
+        <location filename="../ui/dialogs/style_dialog.py" line="861" />
+        <source>Pedal</source>
+        <translation>Pedaal</translation>
     </message>
     <message>
         <location filename="../ui/dialogs/style_dialog.py" line="1139" />
@@ -3534,6 +3544,11 @@ Daar kunt u het objecttype kiezen om te plaatsen of te bewerken;</translation>
         <translation>Maatstreep Symbolen</translation>
     </message>
     <message>
+        <location filename="../ui/widgets/tool_selector.py" line="111" />
+        <source>Pedal</source>
+        <translation>Pedaal</translation>
+    </message>
+    <message>
         <location filename="../ui/widgets/tool_selector.py" line="114" />
         <source>In this mode you can do nothing at all.</source>
         <translation>In deze modus kun je helemaal niets doen.</translation>
@@ -3602,6 +3617,11 @@ Daar kunt u het objecttype kiezen om te plaatsen of te bewerken;</translation>
         <location filename="../ui/widgets/tool_selector.py" line="127" />
         <source>Left Click/Drag: edit existing barline symbol placement by inserting selected symbol at clicked position. Left Click/Drag in empty space: create selected barline symbol (start repeat, end repeat, or double barline). Right Click: delete any barline symbol at nearest event position.</source>
         <translation>Linksklik/sleep: bewerk plaatsing van bestaand maatstreepsymbool door het gekozen symbool op de aangeklikte positie in te voegen. Linksklik/sleep in lege ruimte: maak gekozen maatstreepsymbool (herhaalbegin, herhaaleinde of dubbele maatstreep). Rechtsklik: verwijder elk maatstreepsymbool op de dichtstbijzijnde eventpositie.</translation>
+    </message>
+    <message>
+        <location filename="../ui/widgets/tool_selector.py" line="128" />
+        <source>Left Click: insert the selected pedal symbol. Drag an existing pedal symbol to move it. Right Click: delete pedal symbol.</source>
+        <translation>Linksklik: voeg het gekozen pedaalsymbool in. Sleep een bestaand pedaalsymbool om het te verplaatsen. Rechtsklik: verwijder pedaalsymbool.</translation>
     </message>
 </context><context>
     <name>ToolbarHandle</name>

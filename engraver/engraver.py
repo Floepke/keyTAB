@@ -14,6 +14,8 @@ from file_model.base_grid import resolve_grid_layer_offsets
 from file_model.info import Info
 from file_model.analysis import Analysis
 from symbol_design.articulations import AccentSym, MarcatoSym, StaccatoSym, TenutoSym
+from symbol_design.pedal.down import draw_down_symbol
+from symbol_design.pedal.up import draw_up_symbol
 from ui.style import Style
 from symbol_design.noteheads import (
     Notehead,
@@ -118,6 +120,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
     crescendos: list = []
     decrescendos: list = []
     dynamic_symbols: list = []
+    pedals: list = []
     start_repeats: list = []
     end_repeats: list = []
     double_bars: list = []
@@ -135,6 +138,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
         crescendos.extend(_tagged_events(st_events, 'crescendo', st_idx))
         decrescendos.extend(_tagged_events(st_events, 'decrescendo', st_idx))
         dynamic_symbols.extend(_tagged_events(st_events, 'dynamic_symbol', st_idx))
+        pedals.extend(_tagged_events(st_events, 'pedal', st_idx))
         start_repeats.extend(_tagged_events(st_events, 'start_repeat', st_idx))
         end_repeats.extend(_tagged_events(st_events, 'end_repeat', st_idx))
         double_bars.extend(_tagged_events(st_events, 'double_bar', st_idx))
@@ -357,6 +361,24 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
     if norm_dynamic_symbols:
         norm_dynamic_symbols = sorted(norm_dynamic_symbols, key=lambda m: float(m.get('time', 0.0) or 0.0))
 
+    norm_pedals: list[dict] = []
+    for idx, ev in enumerate(pedals):
+        if not isinstance(ev, dict):
+            continue
+        symbol = str(ev.get('symbol', '') or '')
+        if symbol not in ('up', 'down'):
+            continue
+        norm_pedals.append({
+            'time': float(ev.get('time', 0.0) or 0.0),
+            'stave_i': int(ev.get('_stave_i', 0) or 0),
+            'rpitch': float(ev.get('rpitch', 0.0) or 0.0),
+            'symbol': symbol,
+            'id': int(ev.get('_id', 0) or 0),
+            'idx': int(idx),
+        })
+    if norm_pedals:
+        norm_pedals = sorted(norm_pedals, key=lambda m: float(m.get('time', 0.0) or 0.0))
+
     all_norm_notes = list(norm_notes)
     all_norm_grace = list(norm_grace)
     all_norm_slurs = list(norm_slurs)
@@ -364,6 +386,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
     all_norm_crescendos = list(norm_crescendos)
     all_norm_decrescendos = list(norm_decrescendos)
     all_norm_dynamic_symbols = list(norm_dynamic_symbols)
+    all_norm_pedals = list(norm_pedals)
 
     norm_start_repeats: list[dict] = []
     for idx, ev in enumerate(start_repeats):
@@ -1439,6 +1462,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
             norm_crescendos = [it for it in all_norm_crescendos if int(it.get('stave_i', 0) or 0) == line_stave_i]
             norm_decrescendos = [it for it in all_norm_decrescendos if int(it.get('stave_i', 0) or 0) == line_stave_i]
             norm_dynamic_symbols = [it for it in all_norm_dynamic_symbols if int(it.get('stave_i', 0) or 0) == line_stave_i]
+            norm_pedals = [it for it in all_norm_pedals if int(it.get('stave_i', 0) or 0) == line_stave_i]
             norm_start_repeats = [it for it in all_norm_start_repeats if int(it.get('stave_i', 0) or 0) == line_stave_i]
             norm_end_repeats = [it for it in all_norm_end_repeats if int(it.get('stave_i', 0) or 0) == line_stave_i]
             norm_double_bars = [it for it in all_norm_double_bars if int(it.get('stave_i', 0) or 0) == line_stave_i]
@@ -2758,6 +2782,16 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                     if op_time.lt(t_time, float(line_start)) or op_time.ge(t_time, float(line_end)):
                         continue
                     line_dynamic_symbols.append(ds)
+
+            line_pedals: list[dict] = []
+            if norm_pedals:
+                line_start = float(line_time_start_render)
+                line_end = float(line.get('time_end', 0.0) or 0.0)
+                for pedal in norm_pedals:
+                    pedal_time = float(pedal.get('time', 0.0) or 0.0)
+                    if op_time.lt(pedal_time, float(line_start)) or op_time.ge(pedal_time, float(line_end)):
+                        continue
+                    line_pedals.append(pedal)
 
             line_crescendos: list[dict] = []
             if norm_crescendos:
@@ -4818,6 +4852,35 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                         angle_deg=dynamic_symbol_angle_deg,
                         id=int(ds.get('id', 0) or 0),
                         tags=['dynamic_symbol_text'],
+                    )
+
+            if bool(layout.get('pedal_visible', True)) and line_pedals:
+                pedal_thickness_mm = max(
+                    0.05,
+                    float(layout.get('pedal_thickness_mm', 1.0) or 1.0) * line_scale,
+                )
+                pedal_width_mm = float(semitone_mm) * 4.0
+                pedal_height_mm = float(semitone_mm) * 3.0
+
+                for pedal in line_pedals:
+                    x_mm = rpitch_to_x(float(pedal.get('rpitch', 0.0) or 0.0))
+                    y_mm = _time_to_y(float(pedal.get('time', 0.0) or 0.0))
+                    draw_symbol = (
+                        draw_up_symbol
+                        if str(pedal.get('symbol', '') or '') == 'up'
+                        else draw_down_symbol
+                    )
+                    draw_symbol(
+                        du,
+                        x_mm=x_mm,
+                        y_mm=y_mm,
+                        width_mm=pedal_width_mm,
+                        height_mm=pedal_height_mm,
+                        thickness_mm=pedal_thickness_mm,
+                        color=notation_color,
+                        paper_color=paper_color,
+                        item_id=int(pedal.get('id', 0) or 0),
+                        tags=['pedal_symbol'],
                     )
 
             '''Text drawing.'''
