@@ -1650,12 +1650,6 @@ def _layout_from_dict(data: dict) -> Layout:
             fixed["font_text"] = Font(family=fam, size_pt=size)
         except Exception:
             pass
-    # Legacy migration: merge left/right grid band tracks into the unified track
-    if not fixed.get("grid_band_track"):
-        legacy_left = data.get("grid_band_left_track", []) or []
-        legacy_right = data.get("grid_band_right_track", []) or []
-        if legacy_left or legacy_right:
-            fixed["grid_band_track"] = list(legacy_left) + list(legacy_right)
     return Layout(**fixed)
 
 

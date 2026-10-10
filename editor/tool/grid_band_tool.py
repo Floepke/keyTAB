@@ -31,7 +31,7 @@ class GridBandTool(BaseTool):
                 'name': 'clear_all_grid_bands',
                 'text': 'X',
                 'icon': '',
-                'tooltip': 'Clear all grid band markers.',
+                'tooltip': 'Clear grid band markers from the selected stave.',
             }
         ]
 
@@ -41,22 +41,12 @@ class GridBandTool(BaseTool):
         score = self._score()
         if score is None:
             return
-        layout = getattr(score, 'layout', None)
-        if layout is None:
+        events = score.stave_events_at()
+        if events is None:
             return
 
-        had_any = bool(list(getattr(layout, 'grid_band_track', []) or []))
-        if not had_any:
-            had_any = bool(list(getattr(layout, 'grid_band_left_track', []) or []))
-        if not had_any:
-            had_any = bool(list(getattr(layout, 'grid_band_right_track', []) or []))
-
-        setattr(layout, 'grid_band_track', [])
-        try:
-            setattr(layout, 'grid_band_left_track', [])
-            setattr(layout, 'grid_band_right_track', [])
-        except Exception:
-            pass
+        had_any = bool(list(getattr(events, 'grid_band', []) or []))
+        events.grid_band = []
 
         self._drag_marker = None
         self._drag_markers = {}
@@ -92,19 +82,15 @@ class GridBandTool(BaseTool):
         return ['*']
 
     def _get_hand_tracks(self, _hand: str) -> Tuple[str, list]:
-        """Get the single grid band track (merging legacy tracks when present)."""
+        """Get the selected stave's grid band event list."""
         score = self._score()
         if score is None:
             return (None, [])
-        layout = getattr(score, 'layout', None)
-        if layout is None:
+        events = score.stave_events_at()
+        if events is None:
             return (None, [])
 
-        raw_markers = list(getattr(layout, 'grid_band_track', []) or [])
-        if not raw_markers:
-            legacy_left = list(getattr(layout, 'grid_band_left_track', []) or [])
-            legacy_right = list(getattr(layout, 'grid_band_right_track', []) or [])
-            raw_markers = legacy_left + legacy_right
+        raw_markers = list(getattr(events, 'grid_band', []) or [])
         markers: list[GridBand] = []
         changed = False
         for mk in raw_markers:
@@ -128,13 +114,8 @@ class GridBandTool(BaseTool):
             changed = True
 
         if changed:
-            setattr(layout, 'grid_band_track', markers)
-            try:
-                setattr(layout, 'grid_band_left_track', [])
-                setattr(layout, 'grid_band_right_track', [])
-            except Exception:
-                pass
-        return ('grid_band_track', markers)
+            events.grid_band = markers
+        return ('grid_band', markers)
 
     def _marker_field(self, marker, name: str, default):
         if isinstance(marker, dict):
@@ -145,15 +126,10 @@ class GridBandTool(BaseTool):
         score = self._score()
         if score is None:
             return
-        layout = getattr(score, 'layout', None)
-        if layout is None:
+        events = score.stave_events_at()
+        if events is None:
             return
-        setattr(layout, 'grid_band_track', markers)
-        try:
-            setattr(layout, 'grid_band_left_track', [])
-            setattr(layout, 'grid_band_right_track', [])
-        except Exception:
-            pass
+        events.grid_band = markers
 
     def _normalize_markers(self, markers: list[GridBand], active: GridBand | None = None) -> list[GridBand]:
         """Return a valid marker list: sorted, de-duplicated, and overlap-pruned."""

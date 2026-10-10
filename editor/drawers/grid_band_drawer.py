@@ -255,6 +255,9 @@ class GridBandDrawerMixin:
         if score is None:
             return
         layout = score.layout
+        events = score.stave_events_at()
+        if events is None:
+            return
 
         # Fixed horizontal span: draw a single band area from key 10 to key 77.
         x10 = float(self.pitch_to_x(10))
@@ -262,10 +265,7 @@ class GridBandDrawerMixin:
         band_x_a = min(x10, x77)
         band_x_b = max(x10, x77)
 
-        # Single grid band track with legacy fallback.
-        markers = list(getattr(layout, 'grid_band_track', []) or [])
-        if not markers:
-            markers = list(getattr(layout, 'grid_band_left_track', []) or []) + list(getattr(layout, 'grid_band_right_track', []) or [])
+        markers = list(getattr(events, 'grid_band', []) or [])
         bars = self._all_barlines(score)
         score_end = float(bars[-1]) if bars else 0.0
         phase = str(getattr(layout, 'grid_band_start_phase', 'dark') or 'dark').strip().lower()

@@ -1,7 +1,6 @@
 from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Literal
-from file_model.events.grid_band import GridBand
 from file_model.font import Font
 
 @dataclass
@@ -77,7 +76,6 @@ class Layout:
     countline_thickness_mm: float = 1.5
 
     # Grid lines
-    grid_band_track: list[GridBand] = field(default_factory=list) # Grid Band track. Single track for alternating bands.
     grid_barline_thickness_mm: float = 1.25
     grid_gridline_thickness_mm: float = 1.0
     grid_gridline_dash_pattern_mm: list[float] = field(default_factory=lambda: [3.0, 4.0])

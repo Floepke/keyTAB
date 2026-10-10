@@ -105,6 +105,10 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
         int(st['index']): list((st.get('events', {}) or {}).get('line_break', []) or [])
         for st in enabled_staves
     }
+    grid_bands_by_stave: dict[int, list] = {
+        int(st['index']): list((st.get('events', {}) or {}).get('grid_band', []) or [])
+        for st in enabled_staves
+    }
 
     notes: list = []
     grace_notes: list = []
@@ -167,7 +171,6 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
         scale,
     )
     grid_dash_mm = list(getattr(Layout(), 'grid_gridline_dash_pattern_mm', [2.5, 4.0]) or [2.5, 4.0])
-    grid_bands = list(layout.get('grid_band_track', []) or [])
     grid_band_start_phase = str(layout.get('grid_band_start_phase', 'dark') or 'dark').strip().lower()
     ts_lane_width_mm = layout['time_signature_indicator_lane_width_mm'] * scale
     leftdot_visible = bool(layout.get('measure_numbering_guide_visible', True))
@@ -563,14 +566,17 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
     )
     all_barlines = sorted(list(dict.fromkeys([0.0] + [float(v) for v in barline_positions] + [float(cur_bar)])))
 
-    # Get grid band track from layout and precompute dark intervals for efficient lookup during engraving.
+    # Precompute dark intervals for each stave's grid band events.
     grid_bands_start_dark = bool(grid_band_start_phase != 'light')
-    grid_dark_intervals_global = _build_grid_band_dark_intervals(
-        grid_bands,
-        all_barlines,
-        float(cur_bar),
-        starts_dark=grid_bands_start_dark,
-    )
+    grid_dark_intervals_by_stave = {
+        stave_i: _build_grid_band_dark_intervals(
+            markers,
+            all_barlines,
+            float(cur_bar),
+            starts_dark=grid_bands_start_dark,
+        )
+        for stave_i, markers in grid_bands_by_stave.items()
+    }
 
     # Problem solved: continuation dots count for grid_band pitch sizing by
     # creating synthetic starts at beat-group boundaries crossed by held notes.
@@ -2538,7 +2544,11 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                         group_boundaries.append(float(ov_end))
                         group_boundaries = sorted(list(dict.fromkeys(round(float(t), 6) for t in group_boundaries)))
 
-                        dark_intervals = _clip_intervals(grid_dark_intervals_global, float(ov_start), float(ov_end))
+                        dark_intervals = _clip_intervals(
+                            grid_dark_intervals_by_stave.get(line_stave_i, []),
+                            float(ov_start),
+                            float(ov_end),
+                        )
 
                         if dark_intervals:
                             for t0, t1 in dark_intervals:
