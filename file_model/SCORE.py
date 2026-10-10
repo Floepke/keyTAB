@@ -10,7 +10,6 @@ from pathlib import Path
 
 from file_model.events.note import Articulation, Note
 from file_model.events.grace_note import GraceNote
-from file_model.events.pedal import Pedal
 from file_model.events.text import Text
 from copy import deepcopy
 from file_model.events.slur import Slur
@@ -67,7 +66,6 @@ class MetaData:
 class Events:
 	note: List[Note] = field(default_factory=list)
 	grace_note: List[GraceNote] = field(default_factory=list)
-	pedal: List[Pedal] = field(default_factory=list)
 	text: List[Text] = field(default_factory=list)
 	slur: List[Slur] = field(default_factory=list)
 	beam: List[Beam] = field(default_factory=list)
@@ -231,13 +229,6 @@ class SCORE:
 		base.update(kwargs)
 		obj = GraceNote(**base, _id=self._gen_id())
 		self.events.grace_note.append(obj)
-		return obj
-
-	def new_pedal(self, **kwargs) -> Pedal:
-		base = {'time': 0.0, 'rpitch': 0, 'symbol': 'down_keytab'}
-		base.update(kwargs)
-		obj = Pedal(**base, _id=self._gen_id())
-		self.events.pedal.append(obj)
 		return obj
 
 	def new_text(self, **kwargs) -> Text:

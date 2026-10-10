@@ -13,7 +13,7 @@ Welcome to **keyTAB**, a passion project for creating, editing, and engraving Kl
 - Session safety: autosave, undo/redo, recent files, and embedded fonts/icons for consistent output.
 
 ## Core Features
-- Editing tools for notes, grace notes, beams, slurs, pedal, dynamics, cresc/decresc, text, tempo, repeats, and line breaks.
+- Editing tools for notes, grace notes, beams, slurs, dynamics, cresc/decresc, text, tempo, repeats, and line breaks.
 - Selection operations: transpose by semitone, shift in time by snap units, assign hand (`<` left, `>` right; note color set to `auto`), cut/copy/paste, delete, select-all.
 - Layout & style: adjustable zoom (mm per quarter), page margins, stave ranges, color presets, and per-hand coloring that flows into engraving.
 - Engraving: multi-page rendering with headers/footers, document info, creation timestamp, and page numbering suitable for print/PDF.

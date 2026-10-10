@@ -81,8 +81,6 @@ EDITOR_LAYERING = [
     'dynamic_symbol_text',
     'hairpin_handle',
     'hairpin',
-    'pedal_symbol_bg',
-    'pedal_symbol',
     'tempo_bg',
     'tempo_text',
 ]
@@ -133,8 +131,6 @@ ENGRAVER_LAYERING = [
     'hairpin',
     'ts_klavarskribo',
     'ts_classic',
-    'pedal_symbol_bg',
-    'pedal_symbol',
 ]
 
 # Keyboard constants

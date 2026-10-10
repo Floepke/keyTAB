@@ -811,7 +811,6 @@ class Player:
         self._playhead_timeline: Optional[List[Tuple[float, float, float, float]]] = None
         self._playhead_sync_delay_ms: int = 0
         self._off_epsilon_sec: float = 0.003  # ~3 ms safety gap before offs
-        self._repedal_gap_sec: float = 0.012  # ~12 ms gap for quick up->down re-pedal
         self._min_duration_units: float = 4.0
         self._grace_duration_units: float = 32.0  # Default grace note length (32nd note)
 
@@ -1061,37 +1060,6 @@ class Player:
 
         self._playhead_timeline = playhead_timeline
 
-        # Sustain pedal symbols are mapped to CC64 (0 = up, 127 = down).
-        pedal_points = self._collect_sustain_pedal_points(score)
-        if pedal_points:
-            prev_seg_end: Optional[float] = None
-            for seg_start, seg_end, seg_sec_start in timed_segments:
-                seg_start = float(seg_start)
-                seg_end = float(seg_end)
-                seg_sec_start = float(seg_sec_start)
-                if prev_seg_end is None or abs(seg_start - float(prev_seg_end)) > 1e-9:
-                    state_at_start = self._sustain_state_at(seg_start, pedal_points)
-                    events.append(('cc', seg_sec_start, 64, int(state_at_start)))
-
-                prev_src_time: Optional[float] = None
-                prev_src_val: Optional[int] = None
-                for p_time, p_val in pedal_points:
-                    if p_time < seg_start or p_time >= seg_end:
-                        continue
-                    cc_t = seg_sec_start + self._seconds_between(seg_start, float(p_time), segs)
-                    if (
-                        prev_src_time is not None
-                        and abs(float(p_time) - float(prev_src_time)) <= 1e-9
-                        and int(prev_src_val or 0) == 0
-                        and int(p_val) == 127
-                    ):
-                        cc_t = float(cc_t) + float(self._repedal_gap_sec)
-                    events.append(('cc', float(cc_t), 64, int(p_val)))
-                    prev_src_time = float(p_time)
-                    prev_src_val = int(p_val)
-
-                prev_seg_end = seg_end
-
         for note_start, note_end, midi_pitch, vel in playable:
             for seg_start, seg_end, seg_sec_start in timed_segments:
                 ov_start = max(note_start, seg_start)
@@ -1121,26 +1089,6 @@ class Player:
             pass
         events: List[Tuple[str, float, int, int]] = []
 
-        pedal_points = self._collect_sustain_pedal_points(score)
-        if pedal_points:
-            state_at_start = self._sustain_state_at(su, pedal_points)
-            events.append(('cc', 0.0, 64, int(state_at_start)))
-            prev_src_time: Optional[float] = None
-            prev_src_val: Optional[int] = None
-            for p_time, p_val in pedal_points:
-                if p_time < su:
-                    continue
-                cc_t = self._seconds_between(su, float(p_time), segs)
-                if (
-                    prev_src_time is not None
-                    and abs(float(p_time) - float(prev_src_time)) <= 1e-9
-                    and int(prev_src_val or 0) == 0
-                    and int(p_val) == 127
-                ):
-                    cc_t = float(cc_t) + float(self._repedal_gap_sec)
-                events.append(('cc', float(cc_t), 64, int(p_val)))
-                prev_src_time = float(p_time)
-                prev_src_val = int(p_val)
         for start, dur_units, app_pitch, vel in self._iter_playable_note_specs(score):
             start = float(start)
             end = float(start + dur_units)
@@ -1463,46 +1411,6 @@ class Player:
                 continue
             out.extend(list(getattr(events_obj, event_name, []) or []))
         return out
-
-    def _collect_sustain_pedal_points(self, score) -> List[Tuple[float, int]]:
-        """Collect sustain pedal CC64 points from pedal symbols.
-
-        Returns sorted list of (time_units, cc_value) where cc_value is 127 (down)
-        or 0 (up). Only *_keytab and *_klavarskribo up/down symbols are considered.
-
-        Two consecutive down symbols are interpreted as a quick re-pedal:
-        release and immediately press again at the second symbol time.
-        """
-        out: List[Tuple[float, int]] = []
-        events_obj = getattr(score, 'events', None)
-        pedal_events = list(getattr(events_obj, 'pedal', []) or [])
-        pedal_events = sorted(pedal_events, key=lambda ev: float(getattr(ev, 'time', 0.0) or 0.0))
-        last_symbol: Optional[str] = None
-        for ev in pedal_events:
-            p_time = float(getattr(ev, 'time', 0.0) or 0.0)
-            symbol = str(getattr(ev, 'symbol', '') or '').strip().lower()
-            
-            if symbol in ('down_keytab', 'down_klavarskribo'):
-                if last_symbol == 'down':
-                    out.append((p_time, 0))
-                out.append((p_time, 127))
-                last_symbol = 'down'
-            elif symbol in ('up_keytab', 'up_klavarskribo'):
-                out.append((p_time, 0))
-                last_symbol = 'up'
-
-        out.sort(key=lambda m: float(m[0]))
-        return out
-
-    def _sustain_state_at(self, t_units: float, pedal_points: List[Tuple[float, int]]) -> int:
-        """Return sustain state (CC64 value) at source time, defaulting to off."""
-        state = 0
-        t = float(t_units)
-        for p_time, p_val in pedal_points:
-            if float(p_time) > t:
-                break
-            state = int(p_val)
-        return int(state)
 
     def _build_repeat_play_segments(self, score, score_end_units: float) -> List[Tuple[float, float]]:
         """Build source-time segments in playback order using start/end repeat symbols.

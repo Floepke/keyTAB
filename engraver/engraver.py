@@ -24,7 +24,6 @@ from symbol_design.noteheads import (
     support_point_from_outline_points,
     sheared_notehead_support_v,
 )
-from symbol_design.pedal import draw_pedal_symbol
 from file_model.events.note import Articulation, Note
 from engraver.helpers import (
     allow_font_registry as _allow_font_registry,
@@ -123,7 +122,6 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
     end_repeats: list = []
     double_bars: list = []
     tempos: list = list(score.get('tempo', []) or [])
-    pedals: list = []
     arpeggios: list = []
     for st in enabled_staves:
         st_idx = int(st.get('index', 0) or 0)
@@ -140,7 +138,6 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
         start_repeats.extend(_tagged_events(st_events, 'start_repeat', st_idx))
         end_repeats.extend(_tagged_events(st_events, 'end_repeat', st_idx))
         double_bars.extend(_tagged_events(st_events, 'double_bar', st_idx))
-        pedals.extend(_tagged_events(st_events, 'pedal', st_idx))
         arpeggios.extend(_tagged_events(st_events, 'arpeggio', st_idx))
 
     # Theme colors
@@ -438,22 +435,6 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
     all_norm_double_bars = list(norm_double_bars)
     all_norm_tempos = list(norm_tempos)
 
-    norm_pedals: list[dict] = []
-    for idx, ev in enumerate(pedals):
-        if not isinstance(ev, dict):
-            continue
-        type_raw = str(ev.get('type', 'v') or 'v').strip()
-        pedal_type = '^' if type_raw == '^' else 'v'
-        norm_pedals.append({
-            'time': float(ev.get('time', 0.0) or 0.0),
-            'stave_i': int(ev.get('_stave_i', 0) or 0),
-            'type': pedal_type,
-            'id': int(ev.get('_id', 0) or 0),
-            'idx': int(idx),
-        })
-    if norm_pedals:
-        norm_pedals = sorted(norm_pedals, key=lambda m: float(m.get('time', 0.0) or 0.0))
-
     all_beam_markers = list(beam_markers)
     all_count_lines = list(count_lines)
 
@@ -478,28 +459,6 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
         norm_arpeggios = sorted(norm_arpeggios, key=lambda m: float(m.get('time', 0.0) or 0.0))
 
     all_norm_arpeggios = list(norm_arpeggios)
-
-    pedal_segments: list[dict] = []
-    if norm_pedals:
-        pedal_time_op = Operator(SHORTEST_DURATION)
-        pedal_down_time: float | None = None
-        pedal_down_id: int = 0
-        for pe in norm_pedals:
-            p_t = float(pe.get('time', 0.0) or 0.0)
-            p_type = str(pe.get('type', 'v') or 'v')
-            if p_type == 'v':
-                if pedal_down_time is None:
-                    pedal_down_time = p_t
-                    pedal_down_id = int(pe.get('id', 0) or 0)
-            else:
-                if pedal_down_time is not None and pedal_time_op.ge(p_t, pedal_down_time):
-                    pedal_segments.append({
-                        'start': float(pedal_down_time),
-                        'end': float(p_t),
-                        'id': int(pedal_down_id),
-                    })
-                pedal_down_time = None
-                pedal_down_id = 0
 
     # Problem solved: materialize layout values early to keep math predictable.
     
@@ -2691,63 +2650,6 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                         float(double_w_mm),
                         float(double_gap_mm),
                         int(ev.get('id', 0) or 0),
-                    )
-
-            # Problem solved: draw pedal symbols using draw_pedal_symbol for keyboard-aware positioning
-            if pedals:
-                pedal_thickness_mm = float(layout.get('pedal_symbol_thickness_mm', 0.3) or 0.3) * line_scale
-
-                def _read_pedal_field(pedal_ev, name: str, default):
-                    if isinstance(pedal_ev, dict):
-                        return pedal_ev.get(name, default)
-                    return getattr(pedal_ev, name, default)
-                
-                def _pedal_time_to_y(time_val: float) -> float:
-                    """Convert time to Y coordinate for this line."""
-                    total = max(1e-6, float(line['time_end'] - line['time_start']))
-                    rel = (float(time_val) - float(line['time_start'])) / total
-                    rel = max(0.0, min(1.0, rel))
-                    return y1 + (y2 - y1) * rel
-
-                def _pedal_rpitch_to_x(rpitch_val: int) -> float:
-                    """Convert C4-relative semitone offset to page X coordinate."""
-                    base_x_c4 = float(_key_to_x(40))
-                    return base_x_c4 + (float(rpitch_val) * float(semitone_mm))
-
-                for pedal_ev in pedals:
-                    p_t = float(_read_pedal_field(pedal_ev, 'time', 0.0) or 0.0)
-                    p_symbol = str(_read_pedal_field(pedal_ev, 'symbol', '') or '')
-                    _is_up_symbol = p_symbol in ('up_keytab', 'up_klavarskribo')
-                    # up symbols at line_end belong to the ending line only (drawn upward);
-                    # skip them at line_start so they don't repeat on the new line.
-                    # All other symbols at line_end belong to the next line.
-                    if _is_up_symbol:
-                        if op_time.le(p_t, float(line['time_start'])) or op_time.gt(p_t, float(line['time_end'])):
-                            continue
-                    else:
-                        if op_time.lt(p_t, float(line['time_start'])) or op_time.ge(p_t, float(line['time_end'])):
-                            continue
-
-                    invisible_raw = _read_pedal_field(pedal_ev, 'invisible', False)
-                    if isinstance(invisible_raw, str):
-                        is_invisible = str(invisible_raw).strip().lower() in ('1', 'true', 'yes', 'on')
-                    else:
-                        is_invisible = bool(invisible_raw)
-                    if is_invisible:
-                        continue
-
-                    draw_pedal_symbol(
-                        du,
-                        pedal_ev,
-                        time_to_y_mm=_pedal_time_to_y,
-                        rpitch_to_x_mm=_pedal_rpitch_to_x,
-                        color=notation_color,
-                        background_color=paper_color,
-                        width_mm=pedal_thickness_mm,
-                        semitone_space_mm=semitone_mm,
-                        layout=layout,
-                        id=int(_read_pedal_field(pedal_ev, '_id', _read_pedal_field(pedal_ev, 'id', 0)) or 0),
-                        tags=['pedal_symbol'],
                     )
 
             # Problem solved: render count lines as lightweight guides.

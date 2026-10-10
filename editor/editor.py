@@ -15,7 +15,6 @@ from editor.tool.count_line_tool import CountLineTool
 from editor.tool.grace_note_tool import GraceNoteTool
 from editor.tool.line_break_tool import LineBreakTool
 from editor.tool.note_tool import NoteTool
-from editor.tool.pedal_tool import PedalTool
 from editor.tool.slur_tool import SlurTool
 from editor.tool.text_tool import TextTool
 from editor.tool.base_grid_tool import BaseGridTool
@@ -40,7 +39,6 @@ from editor.drawers.accidental_drawer import AccidentalDrawerMixin
 from editor.drawers.grace_note_drawer import GraceNoteDrawerMixin
 from editor.drawers.beam_drawer import BeamDrawerMixin
 from editor.drawers.articulation_drawer import ArticulationDrawerMixin
-from editor.drawers.pedal_drawer import PedalDrawerMixin
 from editor.drawers.text_drawer import TextDrawerMixin
 from editor.drawers.slur_drawer import SlurDrawerMixin
 from editor.drawers.repeat_drawer import RepeatDrawerMixin
@@ -81,7 +79,6 @@ class Editor(QtCore.QObject,
              ArticulationDrawerMixin,
              SlurDrawerMixin,
              TextDrawerMixin,
-             PedalDrawerMixin,
              DynamicDrawerMixin,
              CrescendoDrawerMixin,
              DecrescendoDrawerMixin,
@@ -114,7 +111,6 @@ class Editor(QtCore.QObject,
             'grace_note': GraceNoteTool,
             'line_break': LineBreakTool,
             'note': NoteTool,
-            'pedal': PedalTool,
             'slur': SlurTool,
             # Backward compatibility: legacy tool names map to the unified barline tool.
             'start_repeat': BarlineTool,
@@ -275,7 +271,6 @@ class Editor(QtCore.QObject,
             getattr(self, 'draw_grace_note', None),
             getattr(self, 'draw_beam', None),
             getattr(self, 'draw_articulation', None),
-            getattr(self, 'draw_pedal', None),
             getattr(self, 'draw_dynamic', None),
             getattr(self, 'draw_crescendo', None),
             getattr(self, 'draw_decrescendo', None),

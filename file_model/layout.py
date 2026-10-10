@@ -48,10 +48,6 @@ class Layout:
     grace_note_outline_width_mm: float = 1.0
     grace_note_scale: float = 0.75
 
-    # Pedal appearance
-    pedal_symbol_thickness_mm: float = 1.0
-    pedal_background_padding_mm: float = 1.0
-
     # Text appearance
     text_background_padding_mm: float = 0.5
 
@@ -212,8 +208,6 @@ LAYOUT_FLOAT_CONFIG: dict[str, dict[str, float]] = {
     'beam_corner_radius_mm': {'min': 0.0, 'max': 5.0, 'step': 0.05},
     'grace_note_outline_width_mm': {'min': 0.05, 'max': 5.0, 'step': 0.05},
     'grace_note_scale': {'min': 0.05, 'max': 1.0, 'step': 0.05},
-    'pedal_symbol_thickness_mm': {'min': 0.05, 'max': 5.0, 'step': 0.05},
-    'pedal_background_padding_mm': {'min': 0.0, 'max': 10.0, 'step': 0.05},
     'text_background_padding_mm': {'min': 0.0, 'max': 20.0, 'step': 0.05},
     'hairpin_line_width_mm': {'min': 0.05, 'max': 5.0, 'step': 0.05},
     'hairpin_width_mm': {'min': 0.05, 'max': 20.0, 'step': 0.05},

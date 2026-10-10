@@ -631,8 +631,6 @@ class StyleDialog(DialogGeometryMixin, QtWidgets.QDialog):
             'grace_note_visible': self.tr('Grace note'),
             'grace_note_outline_width_mm': self.tr('Grace note outline thickness (mm)'),
             'grace_note_scale': self.tr('Grace note scale'),
-            'pedal_symbol_thickness_mm': self.tr('Pedal symbol thickness (mm)'),
-            'pedal_background_padding_mm': self.tr('Pedal background padding (mm)'),
             'text_visible': self.tr('Text'),
             'text_background_padding_mm': self.tr('Text background padding (mm)'),
             'slur_visible': self.tr('Slur'),
@@ -858,7 +856,6 @@ class StyleDialog(DialogGeometryMixin, QtWidgets.QDialog):
             self.tr("Slur"),
             self.tr("Text"),
             self.tr("Countline"),
-            self.tr("Pedal"),
             self.tr("Visibility"),
         ]
 
@@ -935,9 +932,6 @@ class StyleDialog(DialogGeometryMixin, QtWidgets.QDialog):
             'dynamic_symbol_font_size_pt': 'Dynamic',
             'dynamic_symbol_background_padding_mm': 'Dynamic',
             'dynamic_rotation': 'Dynamic',
-            # Pedal
-            'pedal_symbol_thickness_mm': 'Pedal',
-            'pedal_background_padding_mm': 'Pedal',
             # Grace note
             'grace_note_outline_width_mm': 'Grace note',
             'grace_note_scale': 'Grace note',
