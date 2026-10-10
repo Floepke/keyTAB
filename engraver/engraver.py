@@ -151,6 +151,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
 
     # layout values
     scale = float(layout.get('scale', 1.0) or 1.0)
+    mini_piano_semitone_mm = 2.0 * scale
     black_rule = str(layout.get('black_note_rule', 'below_stem') or 'below_stem')
     page_orientation = str(layout.get('page_orientation', 'portrait') or 'portrait').strip().lower()
     read_direction = str(layout.get('read_direction', 'vertical') or 'vertical').strip().lower()
@@ -406,6 +407,11 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
     if norm_double_bars:
         norm_double_bars = sorted(norm_double_bars, key=lambda m: float(m.get('time', 0.0) or 0.0))
 
+    tempo_stave_i = (
+        int(first_enabled_stave_i)
+        if read_direction == 'horizontal'
+        else int(last_enabled_stave_i)
+    )
     norm_tempos: list[dict] = []
     for idx, ev in enumerate(tempos):
         if not isinstance(ev, dict):
@@ -415,7 +421,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
         tempo_val = int(ev.get('tempo', 60) or 60)
         norm_tempos.append({
             'time': t0,
-            'stave_i': int(last_enabled_stave_i),
+            'stave_i': tempo_stave_i,
             'duration': dur,
             'end': t0 + dur,
             'tempo': tempo_val,
@@ -1454,6 +1460,15 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
             line_stave_i = int(line.get('stave_i', 0) or 0)
             is_first_enabled_stave = int(line_stave_i) == int(first_enabled_stave_i)
             is_last_enabled_stave = int(line_stave_i) == int(last_enabled_stave_i)
+            renders_time_signature = (
+                is_last_enabled_stave if horizontal_read_direction else is_first_enabled_stave
+            )
+            renders_tempo = (
+                is_first_enabled_stave if horizontal_read_direction else is_last_enabled_stave
+            )
+            renders_measure_numbers = (
+                is_first_enabled_stave if horizontal_read_direction else is_last_enabled_stave
+            )
             line_stave_scale = max(0.01, float(line.get('stave_scale', enabled_stave_scale_by_index.get(line_stave_i, 1.0)) or 1.0))
             line_scale = float(scale) * float(line_stave_scale)
             semitone_mm = 2.0 * line_scale
@@ -1520,7 +1535,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
             line_time_end = float(line.get('time_end', 0.0) or 0.0)
             is_first_system_line = bool(page_index == 0 and op_time.eq(line_time_start, first_system_start))
             mini_piano_enabled = bool(layout.get('mini_piano_visible', True))
-            mini_piano_height_mm = (7.0 * float(semitone_mm)) if mini_piano_enabled else 0.0
+            mini_piano_height_mm = (7.0 * mini_piano_semitone_mm) if mini_piano_enabled else 0.0
             y2_draw = max(y1 + 1.0, y2 - mini_piano_height_mm) if mini_piano_enabled else y2
             if y2_draw <= y1:
                 y2_draw = y1 + 1.0
@@ -2517,7 +2532,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                 if measure_amount <= 0:
                     continue
                 measure_len = float(numerator) * (4.0 / float(max(1, denominator))) * float(QUARTER_NOTE_UNIT)
-                if op_time.ge(float(time_cursor), float(line['time_start'])) and op_time.lt(float(time_cursor), float(line['time_end'])) and indicator_enabled and bool(layout.get('time_signature_visible', True)) and is_first_enabled_stave:
+                if op_time.ge(float(time_cursor), float(line['time_start'])) and op_time.lt(float(time_cursor), float(line['time_end'])) and indicator_enabled and bool(layout.get('time_signature_visible', True)) and renders_time_signature:
                     y_ts = _time_to_y(float(time_cursor))
                     if indicator_type == 'classical':
                         _draw_classical_ts(numerator, denominator, indicator_enabled, y_ts, indicator_x_offset)
@@ -3406,7 +3421,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                         return True
                 return False
 
-            if is_last_enabled_stave:
+            if renders_measure_numbers:
                 for mw in measure_windows:
                     m_start = float(mw.get('start', 0.0))
                     m_end = float(mw.get('end', 0.0))
@@ -3507,7 +3522,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                         float(x_pos_guide + text_w_mm),
                     )
 
-            if is_last_enabled_stave and tempo_indicator_visible and line_tempos:
+            if renders_tempo and tempo_indicator_visible and line_tempos:
                 try:
                     tempo_font_family = _resolve_font_family('Edwin') or 'Edwin'
                 except Exception:
@@ -3820,12 +3835,12 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
             if mini_piano_enabled:
                 kb_y1 = float(y2_draw)
                 kb_y2 = float(y2)
-                kb_x1 = float(_key_to_x(int(natural_bound_left))) - float(semitone_mm)
-                kb_x2 = float(_key_to_x(int(natural_bound_right))) + float(semitone_mm)
+                kb_x1 = float(_key_to_x(int(natural_bound_left))) - mini_piano_semitone_mm
+                kb_x2 = float(_key_to_x(int(natural_bound_right))) + mini_piano_semitone_mm
                 if kb_x2 > kb_x1:
-                    bar_width_mm = max(0.01, float(1.125 * line_scale))
-                    key_len_mm = float(semitone_mm) * 4.0
-                    black_key_width_mm = semitone_mm
+                    bar_width_mm = max(0.01, float(1.125 * scale))
+                    key_len_mm = mini_piano_semitone_mm * 4.0
+                    black_key_width_mm = mini_piano_semitone_mm
                     black_key_set = set(BLACK_KEYS)
 
                     def _octave_number(key: int) -> int:
@@ -3842,12 +3857,12 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                     mr, mg, mb, _ = hex_to_rgba(_normalize_hex_color(mini_piano_color) or '#ccc', 1.0)
                     grey_fill = (float(mr) / 255.0, float(mg) / 255.0, float(mb) / 255.0, 1.0)
                     # Grey bands should fill to the same x-bounds as the keyboard outline.
-                    kb_fill_x1 = float(kb_x1 - semitone_mm)
-                    kb_fill_x2 = float(kb_x2 + semitone_mm)
+                    kb_fill_x1 = float(kb_x1 - mini_piano_semitone_mm)
+                    kb_fill_x2 = float(kb_x2 + mini_piano_semitone_mm)
                     visible_spans: list[tuple[float, float]] = []
                     for span_start, span_end in grey_octave_spans:
-                        raw_x1 = float(_key_to_x(int(span_start))) - semitone_mm
-                        raw_x2 = float(_key_to_x(int(span_end))) + semitone_mm
+                        raw_x1 = float(_key_to_x(int(span_start))) - mini_piano_semitone_mm
+                        raw_x2 = float(_key_to_x(int(span_end))) + mini_piano_semitone_mm
                         if min(raw_x2, kb_fill_x2) > max(raw_x1, kb_fill_x1):
                             visible_spans.append((raw_x1, raw_x2))
 
@@ -3902,26 +3917,26 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                             if not (kb_x1 <= x_pos <= kb_x2):
                                 continue
                             du.add_text(
-                                x_pos if read_direction == 'vertical' else x_pos + semitone_mm,
-                                kb_y1 + semitone_mm * 5.5 if read_direction == 'vertical' else kb_y1 + key_len_mm + semitone_mm * 1.75,
+                                x_pos if read_direction == 'vertical' else x_pos + mini_piano_semitone_mm,
+                                kb_y1 + mini_piano_semitone_mm * 5.5 if read_direction == 'vertical' else kb_y1 + key_len_mm + mini_piano_semitone_mm * 1.75,
                                 str(_octave_number(key)),
                                 family='Edwin',
                                 color=notation_color,
                                 anchor='center',
-                                size_pt=16.0 * line_scale,
+                                size_pt=16.0 * scale,
                                 angle_deg=90.0 if read_direction == 'horizontal' else 0.0,
                                 id=0,
                                 tags=['piano_octave_number'],
                             )
 
                     du.add_rectangle(
-                        kb_x1 - semitone_mm,
+                        kb_x1 - mini_piano_semitone_mm,
                         kb_y1,
-                        kb_x2 + semitone_mm,
+                        kb_x2 + mini_piano_semitone_mm,
                         kb_y2,
                         stroke_color=notation_color,
                         stroke_width_mm=bar_width_mm,
-                        corner_radius=0.75 * line_scale,
+                        corner_radius=0.75 * scale,
                         fill_color=None,
                         id=0,
                         tags=['piano_outline'],
