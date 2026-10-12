@@ -19,6 +19,7 @@ from file_model.events.start_repeat import StartRepeat
 from file_model.events.end_repeat import EndRepeat
 from file_model.events.double_bar import DoubleBar
 from file_model.events.count_line import CountLine
+from file_model.events.line import Line
 from file_model.events.line_break import LineBreak
 from file_model.events.tempo import Tempo
 from file_model.events.grid_band import GridBand
@@ -76,6 +77,7 @@ class Events:
 	end_repeat: List[EndRepeat] = field(default_factory=list)
 	double_bar: List[DoubleBar] = field(default_factory=list)
 	count_line: List[CountLine] = field(default_factory=list)
+	line: List[Line] = field(default_factory=list)
 	line_break: List[LineBreak] = field(default_factory=list)
 	arpeggio: List[Arpeggio] = field(default_factory=list)
 	crescendo: List[Crescendo] = field(default_factory=list)
@@ -311,6 +313,16 @@ class SCORE:
 		base.update(kwargs)
 		obj = CountLine(**base, _id=self._gen_id())
 		self.events.count_line.append(obj)
+		return obj
+
+	def new_line(self, **kwargs) -> Line:
+		base = {'time1': 0.0, 'time2': 0.0, 'rpitch1': 0, 'rpitch2': 4}
+		base.update(kwargs)
+		base['time1'] = float(base['time1'])
+		base['time2'] = float(base['time2'])
+		base['time'] = min(base['time1'], base['time2'])
+		obj = Line(**base, _id=self._gen_id())
+		self.events.line.append(obj)
 		return obj
 
 

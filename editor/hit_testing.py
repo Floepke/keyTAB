@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 
 class HitTestingMixin:
     # ---- Hit rectangles ----
@@ -144,3 +145,52 @@ class HitTestingMixin:
             if int(getattr(ev, "_id", -1) or -1) == count_line_id:
                 return (ev, part)
         return (None, None)
+
+    def hit_test_line_mm(self, x_mm: float, y_mm: float):
+        score = self.current_score()
+        if score is None:
+            return (None, None)
+        score_events = self.current_events(score)
+        if score_events is None:
+            return (None, None)
+
+        best_handle = None
+        best_handle_distance = float('inf')
+        best_line = None
+        best_line_distance = float('inf')
+        handle_half_size = max(2.0, float(getattr(self, "semitone_dist", 2.5) or 2.5)) * 0.7
+        for line in getattr(score_events, "line", []) or []:
+            try:
+                x1 = float(self.relative_c4pitch_to_x(int(getattr(line, "rpitch1", 0) or 0)))
+                y1 = float(self.time_to_mm(float(getattr(line, "time1", 0.0) or 0.0)))
+                x2 = float(self.relative_c4pitch_to_x(int(getattr(line, "rpitch2", 0) or 0)))
+                y2 = float(self.time_to_mm(float(getattr(line, "time2", 0.0) or 0.0)))
+            except Exception:
+                continue
+
+            for part, px, py in (("start", x1, y1), ("end", x2, y2)):
+                distance = math.hypot(float(x_mm) - px, float(y_mm) - py)
+                if (
+                    abs(float(x_mm) - px) <= handle_half_size + 1e-9
+                    and abs(float(y_mm) - py) <= handle_half_size + 1e-9
+                    and distance < best_handle_distance
+                ):
+                    best_handle = (line, part)
+                    best_handle_distance = distance
+
+            dx = x2 - x1
+            dy = y2 - y1
+            length_squared = dx * dx + dy * dy
+            if length_squared <= 1e-9:
+                continue
+            ratio = max(0.0, min(1.0, ((float(x_mm) - x1) * dx + (float(y_mm) - y1) * dy) / length_squared))
+            nearest_x = x1 + ratio * dx
+            nearest_y = y1 + ratio * dy
+            distance = math.hypot(float(x_mm) - nearest_x, float(y_mm) - nearest_y)
+            if distance <= 3.0 and distance < best_line_distance:
+                best_line = (line, "line")
+                best_line_distance = distance
+
+        if best_handle is not None:
+            return best_handle
+        return best_line if best_line is not None else (None, None)

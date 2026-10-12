@@ -12,6 +12,7 @@ from editor.tool_manager import ToolManager
 from editor.tool.beam_tool import BeamTool
 from editor.tool.barline_tool import BarlineTool
 from editor.tool.count_line_tool import CountLineTool
+from editor.tool.line_tool import LineTool
 from editor.tool.grace_note_tool import GraceNoteTool
 from editor.tool.line_break_tool import LineBreakTool
 from editor.tool.note_tool import NoteTool
@@ -45,6 +46,7 @@ from editor.drawers.text_drawer import TextDrawerMixin
 from editor.drawers.slur_drawer import SlurDrawerMixin
 from editor.drawers.repeat_drawer import RepeatDrawerMixin
 from editor.drawers.count_line_drawer import CountLineDrawerMixin
+from editor.drawers.line_drawer import LineDrawerMixin
 from editor.drawers.line_break_drawer import LineBreakDrawerMixin
 from editor.drawers.tempo_drawer import TempoDrawerMixin
 from editor.drawers.dynamic_drawer import DynamicDrawerMixin
@@ -87,6 +89,7 @@ class Editor(QtCore.QObject,
              DecrescendoDrawerMixin,
              RepeatDrawerMixin,
              CountLineDrawerMixin,
+             LineDrawerMixin,
              LineBreakDrawerMixin,
              TempoDrawerMixin):
     """Main editor class: routes UI events to the current tool.
@@ -111,6 +114,7 @@ class Editor(QtCore.QObject,
             'beam': BeamTool,
             'barline': BarlineTool,
             'count_line': CountLineTool,
+            'line': LineTool,
             'grace_note': GraceNoteTool,
             'line_break': LineBreakTool,
             'note': NoteTool,
@@ -284,6 +288,7 @@ class Editor(QtCore.QObject,
             getattr(self, 'draw_start_repeat', None),
             getattr(self, 'draw_end_repeat', None),
             getattr(self, 'draw_count_line', None),
+            getattr(self, 'draw_line', None),
             getattr(self, 'draw_tempo', None),
             getattr(self, 'draw_line_break', None),
         ]

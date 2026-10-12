@@ -114,6 +114,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
     notes: list = []
     grace_notes: list = []
     count_lines: list = []
+    line_events: list = []
     beam_markers: list = []
     slurs: list = []
     texts: list = []
@@ -132,6 +133,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
         notes.extend(_tagged_events(st_events, 'note', st_idx))
         grace_notes.extend(_tagged_events(st_events, 'grace_note', st_idx))
         count_lines.extend(_tagged_events(st_events, 'count_line', st_idx))
+        line_events.extend(_tagged_events(st_events, 'line', st_idx))
         beam_markers.extend(_tagged_events(st_events, 'beam', st_idx))
         slurs.extend(_tagged_events(st_events, 'slur', st_idx))
         texts.extend(_tagged_events(st_events, 'text', st_idx))
@@ -460,6 +462,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
 
     all_beam_markers = list(beam_markers)
     all_count_lines = list(count_lines)
+    all_line_events = list(line_events)
 
     norm_arpeggios: list[dict] = []
     for idx, ev in enumerate(arpeggios):
@@ -1469,6 +1472,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
             norm_tempos = [it for it in all_norm_tempos if int(it.get('stave_i', 0) or 0) == line_stave_i]
             norm_arpeggios = [it for it in all_norm_arpeggios if int(it.get('stave_i', 0) or 0) == line_stave_i]
             count_lines = [it for it in all_count_lines if int(it.get('_stave_i', 0) or 0) == line_stave_i]
+            line_events = [it for it in all_line_events if int(it.get('_stave_i', 0) or 0) == line_stave_i]
 
             beam_by_hand = {'l': [], 'r': []}
             for b in all_beam_markers:
@@ -4619,6 +4623,161 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
 
             def rpitch_to_x(rp: float) -> float:
                 return clamp_x(base_x_c4 + float(rp) * semitone_mm)
+
+            if line_events:
+                def _line_color(value: object) -> tuple[float, float, float, float]:
+                    text = str(value or "auto").strip()
+                    if text.lower() == "auto":
+                        return notation_color
+                    normalized = _normalize_hex_color(text)
+                    if normalized is None:
+                        return notation_color
+                    try:
+                        red, green, blue, _ = hex_to_rgba(normalized, 1.0)
+                        raw = text.lstrip("#")
+                        alpha = int(raw[6:8], 16) / 255.0 if len(raw) == 8 else 1.0
+                        return (red / 255.0, green / 255.0, blue / 255.0, alpha)
+                    except (TypeError, ValueError):
+                        return notation_color
+
+                def _line_point(
+                    x1: float,
+                    y1: float,
+                    x2: float,
+                    y2: float,
+                    progress: float,
+                ) -> tuple[float, float]:
+                    return (
+                        x1 + (x2 - x1) * progress,
+                        y1 + (y2 - y1) * progress,
+                    )
+
+                for event in line_events:
+                    try:
+                        time1 = float(event.get("time1", 0.0) or 0.0)
+                        time2 = float(event.get("time2", 0.0) or 0.0)
+                        x1 = rpitch_to_x(float(event.get("rpitch1", 0) or 0))
+                        x2 = rpitch_to_x(float(event.get("rpitch2", 0) or 0))
+                    except (TypeError, ValueError):
+                        continue
+
+                    if abs(time2 - time1) <= 1e-9:
+                        if op_time.lt(time1, line_time_start) or op_time.gt(time1, line_time_end):
+                            continue
+                        segment_start, segment_end = 0.0, 1.0
+                    else:
+                        visible_start = max(min(time1, time2), line_time_start)
+                        visible_end = min(max(time1, time2), line_time_end)
+                        if visible_end < visible_start:
+                            continue
+                        first_progress = (visible_start - time1) / (time2 - time1)
+                        last_progress = (visible_end - time1) / (time2 - time1)
+                        segment_start = max(0.0, min(1.0, min(first_progress, last_progress)))
+                        segment_end = max(0.0, min(1.0, max(first_progress, last_progress)))
+
+                    endpoint_time1 = time1 + (time2 - time1) * segment_start
+                    endpoint_time2 = time1 + (time2 - time1) * segment_end
+                    point1 = _line_point(x1, _time_to_y(time1), x2, _time_to_y(time2), segment_start)
+                    point2 = _line_point(x1, _time_to_y(time1), x2, _time_to_y(time2), segment_end)
+                    point1 = (point1[0], _time_to_y(endpoint_time1))
+                    point2 = (point2[0], _time_to_y(endpoint_time2))
+
+                    try:
+                        dash_pattern = [
+                            max(0.01, float(value)) * line_scale
+                            for value in list(event.get("dash_pattern_mm", []) or [])
+                        ]
+                    except (TypeError, ValueError):
+                        dash_pattern = []
+                    dash_pattern = dash_pattern if dash_pattern else None
+                    try:
+                        dash_offset = float(event.get("dash_offset_mm", 0.0) or 0.0) * line_scale
+                        thickness = max(0.05, float(event.get("thickness_mm", 0.5) or 0.5) * line_scale)
+                    except (TypeError, ValueError):
+                        continue
+                    draw_color = _line_color(event.get("color", "auto"))
+                    points = [point1, point2]
+                    zigzag_type = event.get("zigzag_type", None)
+                    if zigzag_type in ("triangle", "sine"):
+                        dx = point2[0] - point1[0]
+                        dy = point2[1] - point1[1]
+                        segment_length = math.hypot(dx, dy)
+                        try:
+                            frequency = max(1e-6, float(event.get("zigzag_freq", 64.0) or 64.0))
+                            amplitude = abs(float(event.get("zigzag_amp_semitone", 2.0) or 0.0)) * semitone_mm
+                        except (TypeError, ValueError):
+                            frequency, amplitude = 64.0, 0.0
+                        wavelength = frequency * (y2_draw - y1) / line_span_ticks
+                        if segment_length > 1e-6 and wavelength > 1e-6:
+                            cycles = segment_length / wavelength
+                            steps = max(8, min(512, int(math.ceil(cycles * 16.0))))
+                            nx, ny = -dy / segment_length, dx / segment_length
+                            points = []
+                            for index in range(steps + 1):
+                                progress = segment_start + (segment_end - segment_start) * (index / steps)
+                                px, py = _line_point(x1, _time_to_y(time1), x2, _time_to_y(time2), progress)
+                                py = _time_to_y(time1 + (time2 - time1) * progress)
+                                phase = 2.0 * math.pi * cycles * progress
+                                wave = math.sin(phase) if zigzag_type == "sine" else (2.0 / math.pi) * math.asin(math.sin(phase))
+                                points.append((px + nx * amplitude * wave, py + ny * amplitude * wave))
+
+                    event_id = int(event.get("_id", 0) or 0)
+                    if len(points) == 2:
+                        du.add_line(
+                            *points[0],
+                            *points[1],
+                            color=draw_color,
+                            width_mm=thickness,
+                            dash_pattern=dash_pattern,
+                            dash_offset_mm=dash_offset,
+                            id=event_id,
+                            tags=["line"],
+                        )
+                    else:
+                        du.add_polyline(
+                            points,
+                            stroke_color=draw_color,
+                            stroke_width_mm=thickness,
+                            dash_pattern=dash_pattern,
+                            dash_offset_mm=dash_offset,
+                            id=event_id,
+                            tags=["line"],
+                        )
+
+                    arrow = event.get("arrow", None)
+                    if arrow in ("left", "right", "both"):
+                        try:
+                            arrow_form = list(event.get("arrow_form", [0.5, 0.5]) or [])
+                            arrow_length = max(0.1, float(arrow_form[0] if arrow_form else 0.5) * line_scale)
+                            arrow_width = max(0.1, float(arrow_form[1] if len(arrow_form) > 1 else 0.5) * line_scale)
+                        except (TypeError, ValueError):
+                            arrow_length, arrow_width = 0.5 * line_scale, 0.5 * line_scale
+                        dx = point2[0] - point1[0]
+                        dy = point2[1] - point1[1]
+                        length = math.hypot(dx, dy)
+                        if length > 1e-6:
+                            ux, uy = dx / length, dy / length
+                            arrows = (
+                                (points[0], (-ux, -uy), "left", segment_start <= 1e-9),
+                                (points[-1], (ux, uy), "right", segment_end >= 1.0 - 1e-9),
+                            )
+                            for endpoint, direction, side, is_endpoint in arrows:
+                                if not is_endpoint or arrow not in (side, "both"):
+                                    continue
+                                base_x = endpoint[0] - direction[0] * arrow_length
+                                base_y = endpoint[1] - direction[1] * arrow_length
+                                perpendicular = (-direction[1] * arrow_width * 0.5, direction[0] * arrow_width * 0.5)
+                                du.add_polygon(
+                                    [
+                                        endpoint,
+                                        (base_x + perpendicular[0], base_y + perpendicular[1]),
+                                        (base_x - perpendicular[0], base_y - perpendicular[1]),
+                                    ],
+                                    stroke_color=None,
+                                    fill_color=draw_color,
+                                    id=event_id,
+                                    tags=["line"],
+                                )
 
             if bool(layout.get('hairpin_visible', True)) and (line_crescendos or line_decrescendos):
                 hairpin_w = float(layout.get('hairpin_line_width_mm', 0.5) or 0.5) * line_scale

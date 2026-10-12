@@ -18,19 +18,19 @@ class Line:
     time: float = 0.0 # lowest time value among the handles
     time1: float = 0.0
     time2: float = 0.0
-    rpitch1: float = 0.0
-    rpitch2: float = 0.0
+    rpitch1: int = 0
+    rpitch2: int = 0
 
     # VISUAL
-    width_mm: float = 0.5
-    dash_pattern_mm: list[float] = field(default_factory=lambda: [3.0])
+    thickness_mm: float = 0.5
+    dash_pattern_mm: list[float] = field(default_factory=lambda: [])
     dash_offset_mm: float = 0.0 # Offset in mm applied to the dash pattern cycle.
     # color: 'auto' means the color uses the default notation color.
     # otherwise it tries to resolve hex color, falls back to notation color if invalid.
     color: Literal['auto'] | str = "auto"
     zigzag_type: Literal['triangle', 'sine'] | None = None
-    zigzag_amp_semitone: float = 0.0 # in semitones (0.5 means half a semitone distance up and down, 1.0 means a full semitone up and down, etc.)
-    zigzag_freq: float = 64.0 # only for zigzag lines, in time (256.0 == quarter note length)
+    zigzag_amp_semitone: float = 0.5 # in semitones (0.5 means half a semitone distance up and down, 1.0 means a full semitone up and down, etc.)
+    zigzag_freq: float = 32.0 # only for zigzag lines, in time (256.0 == quarter note length)
     arrow: Literal['left', 'right', 'both'] | None = None
     arrow_form: list[float] = field(default_factory=lambda: [0.5, 0.5]) # [length_mm, width_mm]
 
