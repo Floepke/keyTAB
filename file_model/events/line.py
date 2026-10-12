@@ -22,7 +22,7 @@ class Line:
     rpitch2: int = 0
 
     # VISUAL
-    thickness_mm: float = 0.5
+    thickness_mm: float = 1.0
     dash_pattern_mm: list[float] = field(default_factory=lambda: [])
     dash_offset_mm: float = 0.0 # Offset in mm applied to the dash pattern cycle.
     # color: 'auto' means the color uses the default notation color.
