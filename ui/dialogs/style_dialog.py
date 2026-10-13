@@ -142,6 +142,9 @@ class FloatSliderEdit(QtWidgets.QWidget):
         val = self._slider_to_value(self._slider.value())
         return self._snap(self._clamp(val))
 
+    def commit(self) -> None:
+        self._on_edit_finished()
+
     def _on_slider_changed(self, _v: int) -> None:
         val = self.value()
         self._edit.setText(self._format_value(val))

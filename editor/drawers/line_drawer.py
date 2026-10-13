@@ -91,14 +91,20 @@ class LineDrawerMixin:
                 length = math.hypot(dx, dy)
                 if length > 1e-6:
                     ux, uy = dx / length, dy / length
-                    for endpoint, direction, name in ((points[0], (-ux, -uy), "left"), (points[-1], (ux, uy), "right")):
+                    for endpoint, direction, name in (
+                        ((x1, y1), (-ux, -uy), "left"),
+                        ((x2, y2), (ux, uy), "right"),
+                    ):
                         if getattr(line, "arrow", None) not in (name, "both"):
                             continue
-                        bx, by = endpoint[0] - direction[0] * arrow_length, endpoint[1] - direction[1] * arrow_length
                         perpendicular = (-direction[1] * arrow_width * 0.5, direction[0] * arrow_width * 0.5)
-                        du.add_polygon([endpoint, (bx + perpendicular[0], by + perpendicular[1]), (bx - perpendicular[0], by - perpendicular[1])], stroke_color=None, fill_color=draw_color, id=line_id, tags=["line"])
+                        tip = (
+                            endpoint[0] + direction[0] * arrow_length,
+                            endpoint[1] + direction[1] * arrow_length,
+                        )
+                        du.add_polygon([tip, (endpoint[0] + perpendicular[0], endpoint[1] + perpendicular[1]), (endpoint[0] - perpendicular[0], endpoint[1] - perpendicular[1])], stroke_color=None, fill_color=draw_color, id=line_id, tags=["line"])
 
             if active:
                 handle = max(2.0, float(self.semitone_dist or 2.5)) * 0.7
-                for px, py in (points[0], points[-1]):
+                for px, py in ((x1, y1), (x2, y2)):
                     du.add_rectangle(px - handle, py - handle, px + handle, py + handle, stroke_color=None, fill_color=(0.5, 0.0, 0.0, 1.0), id=line_id, tags=["line"])

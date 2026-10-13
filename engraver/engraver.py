@@ -4758,20 +4758,22 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                         if length > 1e-6:
                             ux, uy = dx / length, dy / length
                             arrows = (
-                                (points[0], (-ux, -uy), "left", segment_start <= 1e-9),
-                                (points[-1], (ux, uy), "right", segment_end >= 1.0 - 1e-9),
+                                (point1, (-ux, -uy), "left", segment_start <= 1e-9),
+                                (point2, (ux, uy), "right", segment_end >= 1.0 - 1e-9),
                             )
                             for endpoint, direction, side, is_endpoint in arrows:
                                 if not is_endpoint or arrow not in (side, "both"):
                                     continue
-                                base_x = endpoint[0] - direction[0] * arrow_length
-                                base_y = endpoint[1] - direction[1] * arrow_length
                                 perpendicular = (-direction[1] * arrow_width * 0.5, direction[0] * arrow_width * 0.5)
+                                tip = (
+                                    endpoint[0] + direction[0] * arrow_length,
+                                    endpoint[1] + direction[1] * arrow_length,
+                                )
                                 du.add_polygon(
                                     [
-                                        endpoint,
-                                        (base_x + perpendicular[0], base_y + perpendicular[1]),
-                                        (base_x - perpendicular[0], base_y - perpendicular[1]),
+                                        tip,
+                                        (endpoint[0] + perpendicular[0], endpoint[1] + perpendicular[1]),
+                                        (endpoint[0] - perpendicular[0], endpoint[1] - perpendicular[1]),
                                     ],
                                     stroke_color=None,
                                     fill_color=draw_color,

@@ -111,7 +111,7 @@
 </context><context>
     <name>ColorPickerEdit</name>
     <message>
-        <location filename="../ui/dialogs/style_dialog.py" line="289" />
+        <location filename="../ui/dialogs/style_dialog.py" line="292" />
         <source>Pick</source>
         <translation>Kies</translation>
     </message>
@@ -307,37 +307,37 @@
 </context><context>
     <name>FontPicker</name>
     <message>
-        <location filename="../ui/dialogs/style_dialog.py" line="402" />
+        <location filename="../ui/dialogs/style_dialog.py" line="405" />
         <source>Bold</source>
         <translation>Vet</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs/style_dialog.py" line="403" />
+        <location filename="../ui/dialogs/style_dialog.py" line="406" />
         <source>Italic</source>
         <translation>Cursief</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs/style_dialog.py" line="404" />
+        <location filename="../ui/dialogs/style_dialog.py" line="407" />
         <source>Underline</source>
         <translation>Onderstrepen</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs/style_dialog.py" line="426" />
+        <location filename="../ui/dialogs/style_dialog.py" line="429" />
         <source>Font family:</source>
         <translation>Lettertype:</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs/style_dialog.py" line="433" />
+        <location filename="../ui/dialogs/style_dialog.py" line="436" />
         <source>Size (pt):</source>
         <translation>Grootte (pt):</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs/style_dialog.py" line="450" />
+        <location filename="../ui/dialogs/style_dialog.py" line="453" />
         <source>X offset (mm):</source>
         <translation>X-verschuiving (mm):</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs/style_dialog.py" line="452" />
+        <location filename="../ui/dialogs/style_dialog.py" line="455" />
         <source>Y offset (mm):</source>
         <translation>Y-verschuiving (mm):</translation>
     </message>
@@ -724,6 +724,188 @@ Scroll naar beneden om alle sneltoetsen te zien.</translation>
         <location filename="../ui/dialogs/keyboard_shortcuts_dialog.py" line="168" />
         <source>Line Breaks &amp; Pages</source>
         <translation>Regelonderbrekingen &amp; Pagina's</translation>
+    </message>
+</context><context>
+    <name>LineDialog</name>
+    <message>
+        <location filename="../ui/dialogs/line_dialog.py" line="16" />
+        <source>Line Properties</source>
+        <translation>Lijneigenschappen</translation>
+    </message>
+    <message>
+        <location filename="../ui/dialogs/line_dialog.py" line="24" />
+        <source>General</source>
+        <translation>Algemeen</translation>
+    </message>
+    <message>
+        <location filename="../ui/dialogs/line_dialog.py" line="34" />
+        <source>Thickness (mm)</source>
+        <translation>Dikte (mm)</translation>
+    </message>
+    <message>
+        <location filename="../ui/dialogs/line_dialog.py" line="36" />
+        <source>The line stroke thickness in millimeters.</source>
+        <translation>De lijndikte in millimeters.</translation>
+    </message>
+    <message>
+        <location filename="../ui/dialogs/line_dialog.py" line="54" />
+        <source>Show dash pattern help.</source>
+        <translation>Help over het streeppatroon tonen.</translation>
+    </message>
+    <message>
+        <location filename="../ui/dialogs/line_dialog.py" line="55" />
+        <source>Dash pattern help</source>
+        <translation>Help over het streeppatroon</translation>
+    </message>
+    <message>
+        <location filename="../ui/dialogs/line_dialog.py" line="60" />
+        <source>Dash pattern (mm)</source>
+        <translation>Streeppatroon (mm)</translation>
+    </message>
+    <message>
+        <location filename="../ui/dialogs/line_dialog.py" line="62" />
+        <source>Space-separated dash and gap lengths. Use 0 for a dot; leave empty for a solid line.</source>
+        <translation>Door spaties gescheiden lengtes voor strepen en tussenruimten. Gebruik 0 voor een stip; laat leeg voor een ononderbroken lijn.</translation>
+    </message>
+    <message>
+        <location filename="../ui/dialogs/line_dialog.py" line="70" />
+        <source>Dash offset (mm)</source>
+        <translation>Verschuiving streeppatroon (mm)</translation>
+    </message>
+    <message>
+        <location filename="../ui/dialogs/line_dialog.py" line="72" />
+        <source>Offset applied to the dash pattern cycle.</source>
+        <translation>Verschuiving toegepast op de cyclus van het streeppatroon.</translation>
+    </message>
+    <message>
+        <location filename="../ui/dialogs/line_dialog.py" line="76" />
+        <source>Use Custom Color</source>
+        <translation>Aangepaste kleur gebruiken</translation>
+    </message>
+    <message>
+        <location filename="../ui/dialogs/line_dialog.py" line="82" />
+        <source>Color</source>
+        <translation>Kleur</translation>
+    </message>
+    <message>
+        <location filename="../ui/dialogs/line_dialog.py" line="84" />
+        <source>Custom line color.</source>
+        <translation>Aangepaste lijnkleur.</translation>
+    </message>
+    <message>
+        <location filename="../ui/dialogs/line_dialog.py" line="87" />
+        <source>Zigzag</source>
+        <translation>Zigzag</translation>
+    </message>
+    <message>
+        <location filename="../ui/dialogs/line_dialog.py" line="133" />
+        <location filename="../ui/dialogs/line_dialog.py" line="93" />
+        <source>Off</source>
+        <translation>Uit</translation>
+    </message>
+    <message>
+        <location filename="../ui/dialogs/line_dialog.py" line="94" />
+        <source>Triangle</source>
+        <translation>Driehoek</translation>
+    </message>
+    <message>
+        <location filename="../ui/dialogs/line_dialog.py" line="95" />
+        <source>Sine</source>
+        <translation>Sinus</translation>
+    </message>
+    <message>
+        <location filename="../ui/dialogs/line_dialog.py" line="102" />
+        <source>Zigzag type</source>
+        <translation>Zigzagtype</translation>
+    </message>
+    <message>
+        <location filename="../ui/dialogs/line_dialog.py" line="104" />
+        <source>Choose an off, triangle-zigzag, or sine-zigzag line.</source>
+        <translation>Kies geen zigzag, een driehoekige zigzag of een sinus-zigzaglijn.</translation>
+    </message>
+    <message>
+        <location filename="../ui/dialogs/line_dialog.py" line="112" />
+        <source>Zigzag amplitude (semitones)</source>
+        <translation>Zigzagamplitude (halve tonen)</translation>
+    </message>
+    <message>
+        <location filename="../ui/dialogs/line_dialog.py" line="114" />
+        <source>Maximum zigzag displacement, measured in keyboard semitone spacing.</source>
+        <translation>Maximale zigzaguitwijking, gemeten in afstanden tussen halve tonen op het toetsenbord.</translation>
+    </message>
+    <message>
+        <location filename="../ui/dialogs/line_dialog.py" line="122" />
+        <source>Zigzag wavelength (time units)</source>
+        <translation>Zigzaggolflengte (tijdseenheden)</translation>
+    </message>
+    <message>
+        <location filename="../ui/dialogs/line_dialog.py" line="124" />
+        <source>The zigzag wavelength in score time units; 256 units equal one quarter note.</source>
+        <translation>De zigzaggolflengte in tijdseenheden van de partituur; 256 eenheden zijn gelijk aan een kwartnoot.</translation>
+    </message>
+    <message>
+        <location filename="../ui/dialogs/line_dialog.py" line="127" />
+        <source>Arrow</source>
+        <translation>Pijl</translation>
+    </message>
+    <message>
+        <location filename="../ui/dialogs/line_dialog.py" line="134" />
+        <source>Left</source>
+        <translation>Links</translation>
+    </message>
+    <message>
+        <location filename="../ui/dialogs/line_dialog.py" line="135" />
+        <source>Right</source>
+        <translation>Rechts</translation>
+    </message>
+    <message>
+        <location filename="../ui/dialogs/line_dialog.py" line="136" />
+        <source>Both</source>
+        <translation>Beide</translation>
+    </message>
+    <message>
+        <location filename="../ui/dialogs/line_dialog.py" line="140" />
+        <source>Arrowheads</source>
+        <translation>Pijlkoppen</translation>
+    </message>
+    <message>
+        <location filename="../ui/dialogs/line_dialog.py" line="142" />
+        <source>Show arrowheads at either endpoint.</source>
+        <translation>Toon pijlkoppen aan een of beide eindpunten.</translation>
+    </message>
+    <message>
+        <location filename="../ui/dialogs/line_dialog.py" line="151" />
+        <source>Arrow length (mm)</source>
+        <translation>Pijlkoplengte (mm)</translation>
+    </message>
+    <message>
+        <location filename="../ui/dialogs/line_dialog.py" line="153" />
+        <source>Arrowhead length in millimeters.</source>
+        <translation>Lengte van de pijlkop in millimeters.</translation>
+    </message>
+    <message>
+        <location filename="../ui/dialogs/line_dialog.py" line="158" />
+        <source>Arrow width (mm)</source>
+        <translation>Pijlkopbreedte (mm)</translation>
+    </message>
+    <message>
+        <location filename="../ui/dialogs/line_dialog.py" line="160" />
+        <source>Arrowhead width in millimeters.</source>
+        <translation>Breedte van de pijlkop in millimeters.</translation>
+    </message>
+    <message>
+        <location filename="../ui/dialogs/line_dialog.py" line="214" />
+        <source>Dash Pattern Help</source>
+        <translation>Help over het streeppatroon</translation>
+    </message>
+    <message>
+        <location filename="../ui/dialogs/line_dialog.py" line="215" />
+        <source>Enter space-separated lengths in millimeters. Values alternate between drawn dashes and gaps.
+
+For example, "4 2" draws a 4 mm dash followed by a 2 mm gap. Use "0 2" for a dot followed by a 2 mm gap. Leave the field empty for a solid line.</source>
+        <translation>Voer door spaties gescheiden lengtes in millimeters in. Waarden wisselen af tussen getekende strepen en tussenruimten.
+
+Bijvoorbeeld: "4 2" tekent een streep van 4 mm gevolgd door een tussenruimte van 2 mm. Gebruik "0 2" voor een stip gevolgd door een tussenruimte van 2 mm. Laat het veld leeg voor een ononderbroken lijn.</translation>
     </message>
 </context><context>
     <name>MainWindow</name>
@@ -2431,67 +2613,67 @@ Met OK worden de wijzigingen geaccepteerd. Annuleren maakt de wijzigingen in de 
 </context><context>
     <name>StyleDialog</name>
     <message>
-        <location filename="../ui/dialogs/style_dialog.py" line="562" />
+        <location filename="../ui/dialogs/style_dialog.py" line="565" />
         <source>Scale</source>
         <translation>Schaal</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs/style_dialog.py" line="563" />
+        <location filename="../ui/dialogs/style_dialog.py" line="566" />
         <source>Page orientation</source>
         <translation>Pagina-oriëntatie</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs/style_dialog.py" line="564" />
+        <location filename="../ui/dialogs/style_dialog.py" line="567" />
         <source>Read direction</source>
         <translation>Leesrichting</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs/style_dialog.py" line="565" />
+        <location filename="../ui/dialogs/style_dialog.py" line="568" />
         <source>Page width (mm)</source>
         <translation>Paginabreedte (mm)</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs/style_dialog.py" line="566" />
+        <location filename="../ui/dialogs/style_dialog.py" line="569" />
         <source>Page height (mm)</source>
         <translation>Paginahoogte (mm)</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs/style_dialog.py" line="567" />
+        <location filename="../ui/dialogs/style_dialog.py" line="570" />
         <source>Top margin (mm)</source>
         <translation>Bovenmarge (mm)</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs/style_dialog.py" line="568" />
+        <location filename="../ui/dialogs/style_dialog.py" line="571" />
         <source>Bottom margin (mm)</source>
         <translation>Ondermarge (mm)</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs/style_dialog.py" line="569" />
+        <location filename="../ui/dialogs/style_dialog.py" line="572" />
         <source>Left margin (mm)</source>
         <translation>Linkermarge (mm)</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs/style_dialog.py" line="570" />
+        <location filename="../ui/dialogs/style_dialog.py" line="573" />
         <source>Right margin (mm)</source>
         <translation>Rechtermarge (mm)</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs/style_dialog.py" line="571" />
+        <location filename="../ui/dialogs/style_dialog.py" line="574" />
         <source>Header height (mm)</source>
         <translation>Kopteksthoogte (mm)</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs/style_dialog.py" line="572" />
+        <location filename="../ui/dialogs/style_dialog.py" line="575" />
         <source>Footer height (mm)</source>
         <translation>Voetteksthoogte (mm)</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs/style_dialog.py" line="574" />
+        <location filename="../ui/dialogs/style_dialog.py" line="577" />
         <source>Black note rule</source>
         <translation>Regel voor zwarte noot</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs/style_dialog.py" line="575" />
+        <location filename="../ui/dialogs/style_dialog.py" line="578" />
         <source>Controls how black notes are positioned on the stem.
 
 Above stem: black notes are placed above the stem according to Klavarskribo default.
@@ -2510,726 +2692,727 @@ Akkoorden boven stok: zwarte noten worden boven de stok geplaatst, maar alleen v
 </translation>
     </message>
     <message>
-        <location filename="../ui/dialogs/style_dialog.py" line="582" />
+        <location filename="../ui/dialogs/style_dialog.py" line="585" />
         <source>Notehead</source>
         <translation>Nootkop</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs/style_dialog.py" line="583" />
+        <location filename="../ui/dialogs/style_dialog.py" line="586" />
         <source>Stem</source>
         <translation>Stok</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs/style_dialog.py" line="584" />
+        <location filename="../ui/dialogs/style_dialog.py" line="587" />
         <source>Accidental</source>
         <translation>Voorteken</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs/style_dialog.py" line="585" />
+        <location filename="../ui/dialogs/style_dialog.py" line="588" />
         <source>Stop symbol</source>
         <translation>Stopteken</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs/style_dialog.py" line="587" />
+        <location filename="../ui/dialogs/style_dialog.py" line="590" />
         <source>Note stem length in semitones</source>
         <translation>Notestoklengte in halve tonen</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs/style_dialog.py" line="588" />
+        <location filename="../ui/dialogs/style_dialog.py" line="591" />
         <source>Distance from notehead to the end of the stem.</source>
         <translation>Afstand van nootkop tot het einde van de stok.</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs/style_dialog.py" line="591" />
+        <location filename="../ui/dialogs/style_dialog.py" line="594" />
         <source>Note thickness (mm)</source>
         <translation>Notedikte (mm)</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs/style_dialog.py" line="592" />
+        <location filename="../ui/dialogs/style_dialog.py" line="595" />
         <source>Applies to the stem and the notehead outline.</source>
         <translation>Van toepassing op de stok en de notekopomtrek.</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs/style_dialog.py" line="594" />
+        <location filename="../ui/dialogs/style_dialog.py" line="597" />
         <source>Stop symbol thickness (mm)</source>
         <translation>Stopteken dikte (mm)</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs/style_dialog.py" line="595" />
+        <location filename="../ui/dialogs/style_dialog.py" line="598" />
         <source>Continuation dot</source>
         <translation>Doorklink stip</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs/style_dialog.py" line="596" />
+        <location filename="../ui/dialogs/style_dialog.py" line="599" />
         <source>Continuation dot size (mm)</source>
         <translation>Doorklink stip grootte (mm)</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs/style_dialog.py" line="598" />
+        <location filename="../ui/dialogs/style_dialog.py" line="601" />
         <source>MIDI note blocks</source>
         <translation>MIDI-nootblokken</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs/style_dialog.py" line="599" />
+        <location filename="../ui/dialogs/style_dialog.py" line="602" />
         <source>Visualize MIDI notes as colored duration blocks.</source>
         <translation>Visualiseer MIDI-noten als gekleurde duurblokken.</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs/style_dialog.py" line="601" />
+        <location filename="../ui/dialogs/style_dialog.py" line="604" />
         <source>MIDI note color left hand</source>
         <translation>MIDI-nootkleur linkse hand</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs/style_dialog.py" line="602" />
+        <location filename="../ui/dialogs/style_dialog.py" line="605" />
         <source>MIDI note color right hand</source>
         <translation>MIDI-nootkleur rechtse hand</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs/style_dialog.py" line="604" />
+        <location filename="../ui/dialogs/style_dialog.py" line="607" />
         <source>Note width scaling</source>
         <translation>Nootbreedte schaling</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs/style_dialog.py" line="605" />
+        <location filename="../ui/dialogs/style_dialog.py" line="608" />
         <source>1 = default width, higher = wider, lower = narrower</source>
         <translation>1 = standaardbreedte, hoger = breder, lager = smaller</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs/style_dialog.py" line="608" />
+        <location filename="../ui/dialogs/style_dialog.py" line="611" />
         <source>Notehead height scaling</source>
         <translation>Notekophoogten schaling</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs/style_dialog.py" line="609" />
+        <location filename="../ui/dialogs/style_dialog.py" line="612" />
         <source>1.0 = default height, higher = taller, lower = shorter</source>
         <translation>1.0 = standaardhoogte, hoger = groter, lager = kleiner</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs/style_dialog.py" line="612" />
+        <location filename="../ui/dialogs/style_dialog.py" line="615" />
         <source>Notehead tilt</source>
         <translation>Nootkop tilt</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs/style_dialog.py" line="613" />
+        <location filename="../ui/dialogs/style_dialog.py" line="616" />
         <source>0 = circle/oval, 1 = fully tilted</source>
         <translation>0 = cirkel/ovaal, 1 = volledig gekanteld</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs/style_dialog.py" line="615" />
+        <location filename="../ui/dialogs/style_dialog.py" line="618" />
         <source>Staccato dot diameter (mm)</source>
         <translation>Diameter staccatopunt (mm)</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs/style_dialog.py" line="616" />
+        <location filename="../ui/dialogs/style_dialog.py" line="619" />
         <source>Tenuto length (mm)</source>
         <translation>Lengte tenuto (mm)</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs/style_dialog.py" line="617" />
+        <location filename="../ui/dialogs/style_dialog.py" line="620" />
         <source>Tenuto thickness (mm)</source>
         <translation>Dikte tenuto (mm)</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs/style_dialog.py" line="618" />
+        <location filename="../ui/dialogs/style_dialog.py" line="621" />
         <source>Accent thickness (mm)</source>
         <translation>Dikte accent (mm)</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs/style_dialog.py" line="619" />
+        <location filename="../ui/dialogs/style_dialog.py" line="622" />
         <source>Accent width (mm)</source>
         <translation>Breedte accent (mm)</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs/style_dialog.py" line="620" />
+        <location filename="../ui/dialogs/style_dialog.py" line="623" />
         <source>Accent height (mm)</source>
         <translation>Hoogte accent (mm)</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs/style_dialog.py" line="621" />
+        <location filename="../ui/dialogs/style_dialog.py" line="624" />
         <source>Marcato thickness (mm)</source>
         <translation>Dikte marcato (mm)</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs/style_dialog.py" line="622" />
+        <location filename="../ui/dialogs/style_dialog.py" line="625" />
         <source>Marcato width (mm)</source>
         <translation>Breedte marcato (mm)</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs/style_dialog.py" line="623" />
+        <location filename="../ui/dialogs/style_dialog.py" line="626" />
         <source>Marcato height (mm)</source>
         <translation>Hoogte marcato (mm)</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs/style_dialog.py" line="624" />
+        <location filename="../ui/dialogs/style_dialog.py" line="627" />
         <source>Articulation gap (mm)</source>
         <translation>Afstand tussen articulaties (mm)</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs/style_dialog.py" line="856" />
-        <location filename="../ui/dialogs/style_dialog.py" line="625" />
+        <location filename="../ui/dialogs/style_dialog.py" line="860" />
+        <location filename="../ui/dialogs/style_dialog.py" line="628" />
         <source>Beam</source>
         <translation>Noot Groepering</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs/style_dialog.py" line="626" />
+        <location filename="../ui/dialogs/style_dialog.py" line="629" />
         <source>Beam thickness (mm)</source>
         <translation>Groeperingssymbool dikte (mm)</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs/style_dialog.py" line="628" />
+        <location filename="../ui/dialogs/style_dialog.py" line="631" />
         <source>Beam corner radius (mm)</source>
         <translation>Groeperingshoekstraal (mm)</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs/style_dialog.py" line="629" />
+        <location filename="../ui/dialogs/style_dialog.py" line="632" />
         <source>Sets the beam's rounded corner radius. 0 for sharp corners, higher for more rounded.</source>
         <translation>Stelt de afgeronde hoekstraal van de groepering in. 0 voor scherpe hoeken, hoger voor meer afgerond.</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs/style_dialog.py" line="855" />
-        <location filename="../ui/dialogs/style_dialog.py" line="631" />
+        <location filename="../ui/dialogs/style_dialog.py" line="858" />
+        <location filename="../ui/dialogs/style_dialog.py" line="634" />
         <source>Grace note</source>
         <translation>Voorslagnoot</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs/style_dialog.py" line="632" />
+        <location filename="../ui/dialogs/style_dialog.py" line="635" />
         <source>Grace note outline thickness (mm)</source>
         <translation>Omtrekdikte voorslagnoot (mm)</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs/style_dialog.py" line="633" />
+        <location filename="../ui/dialogs/style_dialog.py" line="636" />
         <source>Grace note scale</source>
         <translation>Voorslagnoot-schaal</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs/style_dialog.py" line="634" />
+        <location filename="../ui/dialogs/style_dialog.py" line="637" />
         <source>Pedal thickness (mm)</source>
         <translation>Pedaaldikte (mm)</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs/style_dialog.py" line="859" />
-        <location filename="../ui/dialogs/style_dialog.py" line="636" />
+        <location filename="../ui/dialogs/style_dialog.py" line="863" />
+        <location filename="../ui/dialogs/style_dialog.py" line="638" />
         <source>Text</source>
         <translation>Tekst</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs/style_dialog.py" line="637" />
+        <location filename="../ui/dialogs/style_dialog.py" line="639" />
         <source>Text background padding (mm)</source>
         <translation>Tekstachtergrond opvulling (mm)</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs/style_dialog.py" line="858" />
-        <location filename="../ui/dialogs/style_dialog.py" line="638" />
+        <location filename="../ui/dialogs/style_dialog.py" line="862" />
+        <location filename="../ui/dialogs/style_dialog.py" line="640" />
         <source>Slur</source>
         <translation>Legatoboog</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs/style_dialog.py" line="639" />
+        <location filename="../ui/dialogs/style_dialog.py" line="641" />
         <source>Slur side thickness (mm)</source>
         <translation>Legatoboog zijkantdikte (mm)</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs/style_dialog.py" line="640" />
+        <location filename="../ui/dialogs/style_dialog.py" line="642" />
         <source>Slur middle thickness (mm)</source>
         <translation>Legatoboog middendikte (mm)</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs/style_dialog.py" line="641" />
+        <location filename="../ui/dialogs/style_dialog.py" line="643" />
         <source>Hairpin</source>
         <translation>Haarspeld</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs/style_dialog.py" line="642" />
+        <location filename="../ui/dialogs/style_dialog.py" line="644" />
         <source>Hairpin line thickness (mm)</source>
         <translation>Haarspeld lijndikte (mm)</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs/style_dialog.py" line="643" />
+        <location filename="../ui/dialogs/style_dialog.py" line="645" />
         <source>Hairpin width (mm)</source>
         <translation>Haarspeld breedte (mm)</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs/style_dialog.py" line="644" />
+        <location filename="../ui/dialogs/style_dialog.py" line="646" />
         <source>Hairpin text gap (mm)</source>
         <translation>Haarspeld tekstafstand (mm)</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs/style_dialog.py" line="646" />
+        <location filename="../ui/dialogs/style_dialog.py" line="648" />
         <source>Dynamic symbol font size</source>
         <translation>Dynamiek symbool lettergrootte</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs/style_dialog.py" line="647" />
+        <location filename="../ui/dialogs/style_dialog.py" line="649" />
         <source>pt</source>
         <translation>pt</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs/style_dialog.py" line="649" />
+        <location filename="../ui/dialogs/style_dialog.py" line="651" />
         <source>Dynamic symbol background padding (mm)</source>
         <translation>Dynamiek symbool achtergrondopvulling (mm)</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs/style_dialog.py" line="651" />
+        <location filename="../ui/dialogs/style_dialog.py" line="653" />
         <source>Dynamic symbol rotation</source>
         <translation>Dynamiek symbool rotatie</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs/style_dialog.py" line="652" />
+        <location filename="../ui/dialogs/style_dialog.py" line="654" />
         <source>degrees</source>
         <translation>graden</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs/style_dialog.py" line="654" />
+        <location filename="../ui/dialogs/style_dialog.py" line="656" />
         <source>Dynamic symbol</source>
         <translation>Dynamiek symbool</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs/style_dialog.py" line="655" />
-        <source>Start repeat</source>
-        <translation>Begin herhaling</translation>
-    </message>
-    <message>
-        <location filename="../ui/dialogs/style_dialog.py" line="656" />
-        <source>End repeat</source>
-        <translation>Einde herhaling</translation>
-    </message>
-    <message>
+        <location filename="../ui/dialogs/style_dialog.py" line="859" />
         <location filename="../ui/dialogs/style_dialog.py" line="657" />
-        <source>Double barline</source>
-        <translation>Dubbele maatstreep</translation>
-    </message>
-    <message>
-        <location filename="../ui/dialogs/style_dialog.py" line="658" />
-        <source>Count line</source>
-        <translation>Tellijn</translation>
-    </message>
-    <message>
-        <location filename="../ui/dialogs/style_dialog.py" line="659" />
-        <source>Count line dash pattern</source>
-        <translation>Streeppatroon tellijn</translation>
-    </message>
-    <message>
-        <location filename="../ui/dialogs/style_dialog.py" line="660" />
-        <source>Count line thickness (mm)</source>
-        <translation>Tellijndikte (mm)</translation>
-    </message>
-    <message>
-        <location filename="../ui/dialogs/style_dialog.py" line="846" />
-        <location filename="../ui/dialogs/style_dialog.py" line="661" />
-        <source>Stave</source>
-        <translation>Notenbalk</translation>
-    </message>
-    <message>
-        <location filename="../ui/dialogs/style_dialog.py" line="662" />
-        <source>Barline</source>
-        <translation>Maatstreep</translation>
-    </message>
-    <message>
-        <location filename="../ui/dialogs/style_dialog.py" line="663" />
-        <source>Grid line</source>
-        <translation>Rasterlijn</translation>
-    </message>
-    <message>
-        <location filename="../ui/dialogs/style_dialog.py" line="848" />
-        <location filename="../ui/dialogs/style_dialog.py" line="664" />
-        <source>Grid band</source>
-        <translation>Rasterband</translation>
-    </message>
-    <message>
-        <location filename="../ui/dialogs/style_dialog.py" line="665" />
-        <source>Grid barline thickness (mm)</source>
-        <translation>Maatstreep dikte (mm)</translation>
-    </message>
-    <message>
-        <location filename="../ui/dialogs/style_dialog.py" line="666" />
-        <source>Grid line thickness (mm)</source>
-        <translation>Basis tellijn dikte (mm)</translation>
-    </message>
-    <message>
-        <location filename="../ui/dialogs/style_dialog.py" line="667" />
-        <source>Grid line dash pattern (mm)</source>
-        <translation>Basis tellijn streeppatroon (mm)</translation>
-    </message>
-    <message>
-        <location filename="../ui/dialogs/style_dialog.py" line="668" />
-        <source>Grid band color</source>
-        <translation>Rasterband kleur</translation>
-    </message>
-    <message>
-        <location filename="../ui/dialogs/style_dialog.py" line="669" />
-        <source>Grid band start phase</source>
-        <translation>Rasterband start fase</translation>
-    </message>
-    <message>
-        <location filename="../ui/dialogs/style_dialog.py" line="849" />
-        <location filename="../ui/dialogs/style_dialog.py" line="670" />
-        <source>Time signature</source>
-        <translation>Maatsoort</translation>
-    </message>
-    <message>
-        <location filename="../ui/dialogs/style_dialog.py" line="671" />
-        <source>Time signature indicator type</source>
-        <translation>Type maatsoortindicator</translation>
-    </message>
-    <message>
-        <location filename="../ui/dialogs/style_dialog.py" line="672" />
-        <source>Time signature lane width (mm)</source>
-        <translation>Breedte maatsoort baan (mm)</translation>
-    </message>
-    <message>
-        <location filename="../ui/dialogs/style_dialog.py" line="673" />
-        <source>Time signature guide thickness (mm)</source>
-        <translation>Dikte maatsoorthulplijn (mm)</translation>
-    </message>
-    <message>
-        <location filename="../ui/dialogs/style_dialog.py" line="674" />
-        <source>Time signature divider thickness (mm)</source>
-        <translation>Dikte maatsoortscheiderlijn (mm)</translation>
-    </message>
-    <message>
-        <location filename="../ui/dialogs/style_dialog.py" line="675" />
-        <source>Time signature classic font</source>
-        <translation>Klassiek lettertype maatsoort</translation>
-    </message>
-    <message>
-        <location filename="../ui/dialogs/style_dialog.py" line="676" />
-        <source>Time signature Klavarskribo font</source>
-        <translation>Klavarskribo-lettertype maatsoort</translation>
-    </message>
-    <message>
-        <location filename="../ui/dialogs/style_dialog.py" line="677" />
-        <source>Measure numbering guide thickness (mm)</source>
-        <translation>Dikte hulplijn maat nummering (mm)</translation>
-    </message>
-    <message>
-        <location filename="../ui/dialogs/style_dialog.py" line="678" />
-        <source>Measure numbering guide dash pattern (mm)</source>
-        <translation>Streeppatroon hulplijn maatnummering (mm)</translation>
-    </message>
-    <message>
-        <location filename="../ui/dialogs/style_dialog.py" line="679" />
-        <source>Measure numbering placement</source>
-        <translation>Plaatsing maat nummering</translation>
-    </message>
-    <message>
-        <location filename="../ui/dialogs/style_dialog.py" line="680" />
-        <source>Measure numbering guide</source>
-        <translation>Hulplijn maatnummering</translation>
-    </message>
-    <message>
-        <location filename="../ui/dialogs/style_dialog.py" line="681" />
-        <source>Measure numbers</source>
-        <translation>Maatnummers</translation>
-    </message>
-    <message>
-        <location filename="../ui/dialogs/style_dialog.py" line="682" />
-        <source>Tempo indicator</source>
-        <translation>Tempo-indicator</translation>
-    </message>
-    <message>
-        <location filename="../ui/dialogs/style_dialog.py" line="683" />
-        <source>Measure numbering font</source>
-        <translation>Lettertype maat nummering</translation>
-    </message>
-    <message>
-        <location filename="../ui/dialogs/style_dialog.py" line="684" />
-        <source>Text font</source>
-        <translation>Tekstlettertype</translation>
-    </message>
-    <message>
-        <location filename="../ui/dialogs/style_dialog.py" line="685" />
-        <source>Title font</source>
-        <translation>Titellettertype</translation>
-    </message>
-    <message>
-        <location filename="../ui/dialogs/style_dialog.py" line="686" />
-        <source>Composer font</source>
-        <translation>Lettertype componist</translation>
-    </message>
-    <message>
-        <location filename="../ui/dialogs/style_dialog.py" line="687" />
-        <source>Copyright font</source>
-        <translation>Lettertype copyright</translation>
-    </message>
-    <message>
-        <location filename="../ui/dialogs/style_dialog.py" line="688" />
-        <source>Arranger font</source>
-        <translation>Lettertype arrangeur</translation>
-    </message>
-    <message>
-        <location filename="../ui/dialogs/style_dialog.py" line="689" />
-        <source>Lyricist font</source>
-        <translation>Lettertype tekstdichter</translation>
-    </message>
-    <message>
-        <location filename="../ui/dialogs/style_dialog.py" line="690" />
-        <source>Stave two-line thickness (mm)</source>
-        <translation>Dikte tweelijnsbalk (mm)</translation>
-    </message>
-    <message>
-        <location filename="../ui/dialogs/style_dialog.py" line="691" />
-        <source>Stave three-line thickness (mm)</source>
-        <translation>Dikte drielijnsbalk (mm)</translation>
-    </message>
-    <message>
-        <location filename="../ui/dialogs/style_dialog.py" line="692" />
-        <source>Stave clef line thickness (mm)</source>
-        <translation>Dikte sleutellijnbalk (mm)</translation>
-    </message>
-    <message>
-        <location filename="../ui/dialogs/style_dialog.py" line="693" />
-        <source>Stave ledger line length (mm)</source>
-        <translation>Lengte hulplijnbalk (mm)</translation>
-    </message>
-    <message>
-        <location filename="../ui/dialogs/style_dialog.py" line="694" />
-        <source>Stave clef line dash pattern (mm)</source>
-        <translation>Streeppatroon sleutellijnbalk (mm)</translation>
-    </message>
-    <message>
-        <location filename="../ui/dialogs/style_dialog.py" line="847" />
-        <location filename="../ui/dialogs/style_dialog.py" line="695" />
-        <source>Mini piano</source>
-        <translation>Mini piano</translation>
-    </message>
-    <message>
-        <location filename="../ui/dialogs/style_dialog.py" line="696" />
-        <source>Mini piano octave numbering</source>
-        <translation>Octaafnummering mini piano</translation>
-    </message>
-    <message>
-        <location filename="../ui/dialogs/style_dialog.py" line="697" />
-        <source>Mini piano octave rectangles</source>
-        <translation>Octaafrechthoeken van minipiano</translation>
-    </message>
-    <message>
-        <location filename="../ui/dialogs/style_dialog.py" line="698" />
-        <source>Mini piano color</source>
-        <translation>Kleur mini piano</translation>
-    </message>
-    <message>
-        <location filename="../ui/dialogs/style_dialog.py" line="778" />
-        <source>Style</source>
-        <translation>Stijl</translation>
-    </message>
-    <message>
-        <location filename="../ui/dialogs/style_dialog.py" line="1029" />
-        <location filename="../ui/dialogs/style_dialog.py" line="844" />
-        <source>Page</source>
-        <translation>Pagina</translation>
-    </message>
-    <message>
-        <location filename="../ui/dialogs/style_dialog.py" line="1047" />
-        <location filename="../ui/dialogs/style_dialog.py" line="845" />
-        <source>Fonts</source>
-        <translation>Lettertypen</translation>
-    </message>
-    <message>
-        <location filename="../ui/dialogs/style_dialog.py" line="850" />
-        <source>Tempo</source>
-        <translation>Tempo</translation>
-    </message>
-    <message>
-        <location filename="../ui/dialogs/style_dialog.py" line="851" />
-        <source>Measure Numbering</source>
-        <translation>Maatnummering</translation>
-    </message>
-    <message>
-        <location filename="../ui/dialogs/style_dialog.py" line="852" />
-        <source>Barline Symbols</source>
-        <translation>Maatstreep Symbolen</translation>
-    </message>
-    <message>
-        <location filename="../ui/dialogs/style_dialog.py" line="853" />
-        <source>Note</source>
-        <translation>Noot</translation>
-    </message>
-    <message>
-        <location filename="../ui/dialogs/style_dialog.py" line="854" />
-        <source>Articulation</source>
-        <translation>Articulatie</translation>
-    </message>
-    <message>
-        <location filename="../ui/dialogs/style_dialog.py" line="857" />
-        <source>Dynamic</source>
-        <translation>Dynamiek</translation>
-    </message>
-    <message>
-        <location filename="../ui/dialogs/style_dialog.py" line="860" />
-        <source>Countline</source>
-        <translation>Tellijn</translation>
-    </message>
-    <message>
-        <location filename="../ui/dialogs/style_dialog.py" line="861" />
         <source>Pedal</source>
         <translation>Pedaal</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs/style_dialog.py" line="1139" />
-        <location filename="../ui/dialogs/style_dialog.py" line="862" />
+        <location filename="../ui/dialogs/style_dialog.py" line="658" />
+        <source>Start repeat</source>
+        <translation>Begin herhaling</translation>
+    </message>
+    <message>
+        <location filename="../ui/dialogs/style_dialog.py" line="659" />
+        <source>End repeat</source>
+        <translation>Einde herhaling</translation>
+    </message>
+    <message>
+        <location filename="../ui/dialogs/style_dialog.py" line="660" />
+        <source>Double barline</source>
+        <translation>Dubbele maatstreep</translation>
+    </message>
+    <message>
+        <location filename="../ui/dialogs/style_dialog.py" line="661" />
+        <source>Count line</source>
+        <translation>Tellijn</translation>
+    </message>
+    <message>
+        <location filename="../ui/dialogs/style_dialog.py" line="662" />
+        <source>Count line dash pattern</source>
+        <translation>Streeppatroon tellijn</translation>
+    </message>
+    <message>
+        <location filename="../ui/dialogs/style_dialog.py" line="663" />
+        <source>Count line thickness (mm)</source>
+        <translation>Tellijndikte (mm)</translation>
+    </message>
+    <message>
+        <location filename="../ui/dialogs/style_dialog.py" line="849" />
+        <location filename="../ui/dialogs/style_dialog.py" line="664" />
+        <source>Stave</source>
+        <translation>Notenbalk</translation>
+    </message>
+    <message>
+        <location filename="../ui/dialogs/style_dialog.py" line="665" />
+        <source>Barline</source>
+        <translation>Maatstreep</translation>
+    </message>
+    <message>
+        <location filename="../ui/dialogs/style_dialog.py" line="666" />
+        <source>Grid line</source>
+        <translation>Rasterlijn</translation>
+    </message>
+    <message>
+        <location filename="../ui/dialogs/style_dialog.py" line="851" />
+        <location filename="../ui/dialogs/style_dialog.py" line="667" />
+        <source>Grid band</source>
+        <translation>Rasterband</translation>
+    </message>
+    <message>
+        <location filename="../ui/dialogs/style_dialog.py" line="668" />
+        <source>Grid barline thickness (mm)</source>
+        <translation>Maatstreep dikte (mm)</translation>
+    </message>
+    <message>
+        <location filename="../ui/dialogs/style_dialog.py" line="669" />
+        <source>Grid line thickness (mm)</source>
+        <translation>Basis tellijn dikte (mm)</translation>
+    </message>
+    <message>
+        <location filename="../ui/dialogs/style_dialog.py" line="670" />
+        <source>Grid line dash pattern (mm)</source>
+        <translation>Basis tellijn streeppatroon (mm)</translation>
+    </message>
+    <message>
+        <location filename="../ui/dialogs/style_dialog.py" line="671" />
+        <source>Grid band color</source>
+        <translation>Rasterband kleur</translation>
+    </message>
+    <message>
+        <location filename="../ui/dialogs/style_dialog.py" line="672" />
+        <source>Grid band start phase</source>
+        <translation>Rasterband start fase</translation>
+    </message>
+    <message>
+        <location filename="../ui/dialogs/style_dialog.py" line="852" />
+        <location filename="../ui/dialogs/style_dialog.py" line="673" />
+        <source>Time signature</source>
+        <translation>Maatsoort</translation>
+    </message>
+    <message>
+        <location filename="../ui/dialogs/style_dialog.py" line="674" />
+        <source>Time signature indicator type</source>
+        <translation>Type maatsoortindicator</translation>
+    </message>
+    <message>
+        <location filename="../ui/dialogs/style_dialog.py" line="675" />
+        <source>Time signature lane width (mm)</source>
+        <translation>Breedte maatsoort baan (mm)</translation>
+    </message>
+    <message>
+        <location filename="../ui/dialogs/style_dialog.py" line="676" />
+        <source>Time signature guide thickness (mm)</source>
+        <translation>Dikte maatsoorthulplijn (mm)</translation>
+    </message>
+    <message>
+        <location filename="../ui/dialogs/style_dialog.py" line="677" />
+        <source>Time signature divider thickness (mm)</source>
+        <translation>Dikte maatsoortscheiderlijn (mm)</translation>
+    </message>
+    <message>
+        <location filename="../ui/dialogs/style_dialog.py" line="678" />
+        <source>Time signature classic font</source>
+        <translation>Klassiek lettertype maatsoort</translation>
+    </message>
+    <message>
+        <location filename="../ui/dialogs/style_dialog.py" line="679" />
+        <source>Time signature Klavarskribo font</source>
+        <translation>Klavarskribo-lettertype maatsoort</translation>
+    </message>
+    <message>
+        <location filename="../ui/dialogs/style_dialog.py" line="680" />
+        <source>Measure numbering guide thickness (mm)</source>
+        <translation>Dikte hulplijn maat nummering (mm)</translation>
+    </message>
+    <message>
+        <location filename="../ui/dialogs/style_dialog.py" line="681" />
+        <source>Measure numbering guide dash pattern (mm)</source>
+        <translation>Streeppatroon hulplijn maatnummering (mm)</translation>
+    </message>
+    <message>
+        <location filename="../ui/dialogs/style_dialog.py" line="682" />
+        <source>Measure numbering placement</source>
+        <translation>Plaatsing maat nummering</translation>
+    </message>
+    <message>
+        <location filename="../ui/dialogs/style_dialog.py" line="683" />
+        <source>Measure numbering guide</source>
+        <translation>Hulplijn maatnummering</translation>
+    </message>
+    <message>
+        <location filename="../ui/dialogs/style_dialog.py" line="684" />
+        <source>Measure numbers</source>
+        <translation>Maatnummers</translation>
+    </message>
+    <message>
+        <location filename="../ui/dialogs/style_dialog.py" line="685" />
+        <source>Tempo indicator</source>
+        <translation>Tempo-indicator</translation>
+    </message>
+    <message>
+        <location filename="../ui/dialogs/style_dialog.py" line="686" />
+        <source>Measure numbering font</source>
+        <translation>Lettertype maat nummering</translation>
+    </message>
+    <message>
+        <location filename="../ui/dialogs/style_dialog.py" line="687" />
+        <source>Text font</source>
+        <translation>Tekstlettertype</translation>
+    </message>
+    <message>
+        <location filename="../ui/dialogs/style_dialog.py" line="688" />
+        <source>Title font</source>
+        <translation>Titellettertype</translation>
+    </message>
+    <message>
+        <location filename="../ui/dialogs/style_dialog.py" line="689" />
+        <source>Composer font</source>
+        <translation>Lettertype componist</translation>
+    </message>
+    <message>
+        <location filename="../ui/dialogs/style_dialog.py" line="690" />
+        <source>Copyright font</source>
+        <translation>Lettertype copyright</translation>
+    </message>
+    <message>
+        <location filename="../ui/dialogs/style_dialog.py" line="691" />
+        <source>Arranger font</source>
+        <translation>Lettertype arrangeur</translation>
+    </message>
+    <message>
+        <location filename="../ui/dialogs/style_dialog.py" line="692" />
+        <source>Lyricist font</source>
+        <translation>Lettertype tekstdichter</translation>
+    </message>
+    <message>
+        <location filename="../ui/dialogs/style_dialog.py" line="693" />
+        <source>Stave two-line thickness (mm)</source>
+        <translation>Dikte tweelijnsbalk (mm)</translation>
+    </message>
+    <message>
+        <location filename="../ui/dialogs/style_dialog.py" line="694" />
+        <source>Stave three-line thickness (mm)</source>
+        <translation>Dikte drielijnsbalk (mm)</translation>
+    </message>
+    <message>
+        <location filename="../ui/dialogs/style_dialog.py" line="695" />
+        <source>Stave clef line thickness (mm)</source>
+        <translation>Dikte sleutellijnbalk (mm)</translation>
+    </message>
+    <message>
+        <location filename="../ui/dialogs/style_dialog.py" line="696" />
+        <source>Stave ledger line length (mm)</source>
+        <translation>Lengte hulplijnbalk (mm)</translation>
+    </message>
+    <message>
+        <location filename="../ui/dialogs/style_dialog.py" line="697" />
+        <source>Stave clef line dash pattern (mm)</source>
+        <translation>Streeppatroon sleutellijnbalk (mm)</translation>
+    </message>
+    <message>
+        <location filename="../ui/dialogs/style_dialog.py" line="850" />
+        <location filename="../ui/dialogs/style_dialog.py" line="698" />
+        <source>Mini piano</source>
+        <translation>Mini piano</translation>
+    </message>
+    <message>
+        <location filename="../ui/dialogs/style_dialog.py" line="699" />
+        <source>Mini piano octave numbering</source>
+        <translation>Octaafnummering mini piano</translation>
+    </message>
+    <message>
+        <location filename="../ui/dialogs/style_dialog.py" line="700" />
+        <source>Mini piano octave rectangles</source>
+        <translation>Octaafrechthoeken van minipiano</translation>
+    </message>
+    <message>
+        <location filename="../ui/dialogs/style_dialog.py" line="701" />
+        <source>Mini piano color</source>
+        <translation>Kleur mini piano</translation>
+    </message>
+    <message>
+        <location filename="../ui/dialogs/style_dialog.py" line="781" />
+        <source>Style</source>
+        <translation>Stijl</translation>
+    </message>
+    <message>
+        <location filename="../ui/dialogs/style_dialog.py" line="1031" />
+        <location filename="../ui/dialogs/style_dialog.py" line="847" />
+        <source>Page</source>
+        <translation>Pagina</translation>
+    </message>
+    <message>
+        <location filename="../ui/dialogs/style_dialog.py" line="1049" />
+        <location filename="../ui/dialogs/style_dialog.py" line="848" />
+        <source>Fonts</source>
+        <translation>Lettertypen</translation>
+    </message>
+    <message>
+        <location filename="../ui/dialogs/style_dialog.py" line="853" />
+        <source>Tempo</source>
+        <translation>Tempo</translation>
+    </message>
+    <message>
+        <location filename="../ui/dialogs/style_dialog.py" line="854" />
+        <source>Measure Numbering</source>
+        <translation>Maatnummering</translation>
+    </message>
+    <message>
+        <location filename="../ui/dialogs/style_dialog.py" line="855" />
+        <source>Barline Symbols</source>
+        <translation>Maatstreep Symbolen</translation>
+    </message>
+    <message>
+        <location filename="../ui/dialogs/style_dialog.py" line="856" />
+        <source>Note</source>
+        <translation>Noot</translation>
+    </message>
+    <message>
+        <location filename="../ui/dialogs/style_dialog.py" line="857" />
+        <source>Articulation</source>
+        <translation>Articulatie</translation>
+    </message>
+    <message>
+        <location filename="../ui/dialogs/style_dialog.py" line="861" />
+        <source>Dynamic</source>
+        <translation>Dynamiek</translation>
+    </message>
+    <message>
+        <location filename="../ui/dialogs/style_dialog.py" line="864" />
+        <source>Countline</source>
+        <translation>Tellijn</translation>
+    </message>
+    <message>
+        <location filename="../ui/dialogs/style_dialog.py" line="1141" />
+        <location filename="../ui/dialogs/style_dialog.py" line="865" />
         <source>Visibility</source>
         <translation>Zichtbaarheid</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs/style_dialog.py" line="1424" />
-        <location filename="../ui/dialogs/style_dialog.py" line="1057" />
+        <location filename="../ui/dialogs/style_dialog.py" line="1426" />
+        <location filename="../ui/dialogs/style_dialog.py" line="1059" />
         <source>Save Style</source>
         <translation>Stijl opslaan</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs/style_dialog.py" line="1058" />
+        <location filename="../ui/dialogs/style_dialog.py" line="1060" />
         <source>Load…</source>
         <translation>Laden…</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs/style_dialog.py" line="1059" />
+        <location filename="../ui/dialogs/style_dialog.py" line="1061" />
         <source>Load into current tab</source>
         <translation>In huidig tabblad laden</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs/style_dialog.py" line="1142" />
+        <location filename="../ui/dialogs/style_dialog.py" line="1144" />
         <source>Visibility Toggles</source>
         <translation>Zichtbaarheid schakelaars</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs/style_dialog.py" line="1266" />
+        <location filename="../ui/dialogs/style_dialog.py" line="1268" />
         <source>Portrait</source>
         <translation>Staand</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs/style_dialog.py" line="1267" />
+        <location filename="../ui/dialogs/style_dialog.py" line="1269" />
         <source>Landscape</source>
         <translation>Liggend</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs/style_dialog.py" line="1268" />
+        <location filename="../ui/dialogs/style_dialog.py" line="1270" />
         <source>Vertical</source>
         <translation>Verticaal</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs/style_dialog.py" line="1269" />
+        <location filename="../ui/dialogs/style_dialog.py" line="1271" />
         <source>Horizontal</source>
         <translation>Horizontaal</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs/style_dialog.py" line="1270" />
+        <location filename="../ui/dialogs/style_dialog.py" line="1272" />
         <source>Above stem</source>
         <translation>Boven stok</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs/style_dialog.py" line="1271" />
+        <location filename="../ui/dialogs/style_dialog.py" line="1273" />
         <source>Below stem</source>
         <translation>Onder nootstok</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs/style_dialog.py" line="1272" />
+        <location filename="../ui/dialogs/style_dialog.py" line="1274" />
         <source>Below stem, avoiding collisions</source>
         <translation>Onder stok, botsingen vermijden</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs/style_dialog.py" line="1273" />
+        <location filename="../ui/dialogs/style_dialog.py" line="1275" />
         <source>Chords above stem</source>
         <translation>Akkorden boven stok</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs/style_dialog.py" line="1274" />
+        <location filename="../ui/dialogs/style_dialog.py" line="1276" />
         <source>Dark</source>
         <translation>Donker</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs/style_dialog.py" line="1275" />
+        <location filename="../ui/dialogs/style_dialog.py" line="1277" />
         <source>Light</source>
         <translation>Licht</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs/style_dialog.py" line="1276" />
+        <location filename="../ui/dialogs/style_dialog.py" line="1278" />
         <source>Classical</source>
         <translation>Klassiek</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs/style_dialog.py" line="1277" />
+        <location filename="../ui/dialogs/style_dialog.py" line="1279" />
         <source>Klavarskribo</source>
         <translation>Klavarskribo</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs/style_dialog.py" line="1278" />
+        <location filename="../ui/dialogs/style_dialog.py" line="1280" />
         <source>Classical and Klavarskribo</source>
         <translation>Klassiek en Klavarskribo</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs/style_dialog.py" line="1290" />
+        <location filename="../ui/dialogs/style_dialog.py" line="1292" />
         <source>Place measure numbering on top of every system</source>
         <translation>Plaats maat nummering boven elk systeem</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs/style_dialog.py" line="1291" />
+        <location filename="../ui/dialogs/style_dialog.py" line="1293" />
         <source>Place measure numbering on every barline</source>
         <translation>Plaats maat nummering op elke maatstreep</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs/style_dialog.py" line="1369" />
+        <location filename="../ui/dialogs/style_dialog.py" line="1371" />
         <source>Apply family to all fonts</source>
         <translation>Familie op alle lettertypen toepassen</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs/style_dialog.py" line="1424" />
+        <location filename="../ui/dialogs/style_dialog.py" line="1426" />
         <source>Enter your custom style name here:</source>
         <translation>Voer hier je aangepaste stijlnaam in:</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs/style_dialog.py" line="1429" />
+        <location filename="../ui/dialogs/style_dialog.py" line="1431" />
         <source>Style name cannot be empty.</source>
         <translation>Stijlnaam mag niet leeg zijn.</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs/style_dialog.py" line="1434" />
+        <location filename="../ui/dialogs/style_dialog.py" line="1436" />
         <source>Name contains invalid characters.</source>
         <translation>Naam bevat ongeldige tekens.</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs/style_dialog.py" line="1444" />
+        <location filename="../ui/dialogs/style_dialog.py" line="1446" />
         <source>Saved style to {name}.</source>
         <translation>Stijl opgeslagen als {name}.</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs/style_dialog.py" line="1446" />
+        <location filename="../ui/dialogs/style_dialog.py" line="1448" />
         <source>Failed to save style.</source>
         <translation>Stijl opslaan mislukt.</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs/style_dialog.py" line="1450" />
+        <location filename="../ui/dialogs/style_dialog.py" line="1452" />
         <source>keyTAB Default</source>
         <translation>keyTAB Standaard</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs/style_dialog.py" line="1456" />
+        <location filename="../ui/dialogs/style_dialog.py" line="1458" />
         <source>Browse…</source>
         <translation>Bladeren…</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs/style_dialog.py" line="1477" />
+        <location filename="../ui/dialogs/style_dialog.py" line="1479" />
         <source>Load Style</source>
         <translation>Stijl Laden</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs/style_dialog.py" line="1479" />
+        <location filename="../ui/dialogs/style_dialog.py" line="1481" />
         <source>Style Files (*.pstyle)</source>
         <translation>Stijl Bestanden (*.pstyle)</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs/style_dialog.py" line="1498" />
-        <location filename="../ui/dialogs/style_dialog.py" line="1490" />
+        <location filename="../ui/dialogs/style_dialog.py" line="1500" />
+        <location filename="../ui/dialogs/style_dialog.py" line="1492" />
         <source>Loaded style '{name}'.</source>
         <translation>Stijl '{name}' geladen.</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs/style_dialog.py" line="1500" />
-        <location filename="../ui/dialogs/style_dialog.py" line="1492" />
+        <location filename="../ui/dialogs/style_dialog.py" line="1502" />
+        <location filename="../ui/dialogs/style_dialog.py" line="1494" />
         <source>Failed to load style.</source>
         <translation>Stijl laden mislukt.</translation>
     </message>
     <message>
-        <location filename="../ui/dialogs/style_dialog.py" line="1535" />
+        <location filename="../ui/dialogs/style_dialog.py" line="1537" />
         <source>Invalid layout values.</source>
         <translation>Ongeldige layout waarden.</translation>
     </message>
@@ -3442,12 +3625,12 @@ Links klikken om een lijn toe te voegen, rechts klikken om te verwijderen. U kun
 </context><context>
     <name>ToolSelectorDock</name>
     <message>
-        <location filename="../ui/widgets/tool_selector.py" line="192" />
+        <location filename="../ui/widgets/tool_selector.py" line="195" />
         <source>Tools</source>
         <translation>Gereedschap</translation>
     </message>
     <message>
-        <location filename="../ui/widgets/tool_selector.py" line="201" />
+        <location filename="../ui/widgets/tool_selector.py" line="204" />
         <source>Select a tool by clicking or scrolling through the list.
 Mouse interaction (applies to all tools):
   • Left-click on empty space — add a new object
@@ -3466,160 +3649,170 @@ Sommige gereedschappen bieden een contextuele toolbar onder de verticale zwarte 
 Daar kunt u het objecttype kiezen om te plaatsen of te bewerken;</translation>
     </message>
     <message>
-        <location filename="../ui/widgets/tool_selector.py" line="279" />
-        <location filename="../ui/widgets/tool_selector.py" line="277" />
+        <location filename="../ui/widgets/tool_selector.py" line="282" />
+        <location filename="../ui/widgets/tool_selector.py" line="280" />
         <source>Tool</source>
         <translation>Gereedschap</translation>
     </message>
 </context><context>
     <name>ToolSelectorWidget</name>
     <message>
-        <location filename="../ui/widgets/tool_selector.py" line="97" />
+        <location filename="../ui/widgets/tool_selector.py" line="98" />
         <source>Idle</source>
         <translation>Inactief</translation>
     </message>
     <message>
-        <location filename="../ui/widgets/tool_selector.py" line="98" />
+        <location filename="../ui/widgets/tool_selector.py" line="99" />
         <source>Note</source>
         <translation>Noot</translation>
     </message>
     <message>
-        <location filename="../ui/widgets/tool_selector.py" line="99" />
+        <location filename="../ui/widgets/tool_selector.py" line="100" />
         <source>Grace Note</source>
         <translation>Voorslagnoot</translation>
     </message>
     <message>
-        <location filename="../ui/widgets/tool_selector.py" line="100" />
+        <location filename="../ui/widgets/tool_selector.py" line="101" />
         <source>Count Line</source>
         <translation>Tellijn</translation>
     </message>
     <message>
-        <location filename="../ui/widgets/tool_selector.py" line="101" />
+        <location filename="../ui/widgets/tool_selector.py" line="102" />
         <source>Dynamics</source>
         <translation>Dynamiek</translation>
     </message>
     <message>
-        <location filename="../ui/widgets/tool_selector.py" line="102" />
+        <location filename="../ui/widgets/tool_selector.py" line="103" />
         <source>Note Grouping</source>
         <translation>Noot Groepering</translation>
     </message>
     <message>
-        <location filename="../ui/widgets/tool_selector.py" line="103" />
+        <location filename="../ui/widgets/tool_selector.py" line="104" />
         <source>Arpeggio</source>
         <translation>Arpeggio</translation>
     </message>
     <message>
-        <location filename="../ui/widgets/tool_selector.py" line="104" />
+        <location filename="../ui/widgets/tool_selector.py" line="105" />
+        <source>Line</source>
+        <translation>Lijn</translation>
+    </message>
+    <message>
+        <location filename="../ui/widgets/tool_selector.py" line="106" />
         <source>Line/Page Break</source>
         <translation>Regel/Pagina breekpunt</translation>
     </message>
     <message>
-        <location filename="../ui/widgets/tool_selector.py" line="105" />
+        <location filename="../ui/widgets/tool_selector.py" line="107" />
         <source>Time Signature</source>
         <translation>Maatsoort</translation>
     </message>
     <message>
-        <location filename="../ui/widgets/tool_selector.py" line="106" />
+        <location filename="../ui/widgets/tool_selector.py" line="108" />
         <source>Grid Band</source>
         <translation>Rasterband</translation>
     </message>
     <message>
-        <location filename="../ui/widgets/tool_selector.py" line="107" />
+        <location filename="../ui/widgets/tool_selector.py" line="109" />
         <source>Tempo</source>
         <translation>Tempo</translation>
     </message>
     <message>
-        <location filename="../ui/widgets/tool_selector.py" line="108" />
+        <location filename="../ui/widgets/tool_selector.py" line="110" />
         <source>Slur</source>
         <translation>Legato Boog</translation>
     </message>
     <message>
-        <location filename="../ui/widgets/tool_selector.py" line="109" />
+        <location filename="../ui/widgets/tool_selector.py" line="111" />
         <source>Text</source>
         <translation>Tekst</translation>
     </message>
     <message>
-        <location filename="../ui/widgets/tool_selector.py" line="110" />
+        <location filename="../ui/widgets/tool_selector.py" line="112" />
         <source>Barline Symbols</source>
         <translation>Maatstreep Symbolen</translation>
     </message>
     <message>
-        <location filename="../ui/widgets/tool_selector.py" line="111" />
+        <location filename="../ui/widgets/tool_selector.py" line="113" />
         <source>Pedal</source>
         <translation>Pedaal</translation>
     </message>
     <message>
-        <location filename="../ui/widgets/tool_selector.py" line="114" />
+        <location filename="../ui/widgets/tool_selector.py" line="116" />
         <source>In this mode you can do nothing at all.</source>
         <translation>In deze modus kun je helemaal niets doen.</translation>
     </message>
     <message>
-        <location filename="../ui/widgets/tool_selector.py" line="115" />
+        <location filename="../ui/widgets/tool_selector.py" line="117" />
         <source>Left Click/Drag: edit an existing note (duration on body, pitch+time on notehead). Left Click/Drag in empty space: create a note, then drag to set it. Right Click: delete note. Double Click: set/reset custom notehead.</source>
         <translation>Linksklik/sleep: bewerk een bestaande noot (duur op de nootstok, toonhoogte+tijd op de nootkop). Linksklik/sleep in lege ruimte: maak een noot en sleep daarna om deze in te stellen. Rechtsklik: verwijder noot. Dubbelklik: stel aangepaste nootkop in/reset.</translation>
     </message>
     <message>
-        <location filename="../ui/widgets/tool_selector.py" line="116" />
+        <location filename="../ui/widgets/tool_selector.py" line="118" />
         <source>Left Click/Drag: move an existing grace note (pitch+time). Left Click/Drag in empty space: create a grace note, then drag to adjust. Right Click: delete grace note.</source>
         <translation>Linksklik/sleep: verplaats een bestaande voorslagnoot (toonhoogte+tijd). Linksklik/sleep in lege ruimte: maak een voorslagnoot en sleep daarna om aan te passen. Rechtsklik: verwijder voorslagnoot.</translation>
     </message>
     <message>
-        <location filename="../ui/widgets/tool_selector.py" line="117" />
+        <location filename="../ui/widgets/tool_selector.py" line="119" />
         <source>Left Click/Drag: edit an existing count line handle (start/end and time). Left Click/Drag in empty space: create a count line, then drag its end handle. Right Click: delete count line by handle.</source>
         <translation>Linksklik/sleep: bewerk een bestaande tellijn-handle (begin/einde en tijd). Linksklik/sleep in lege ruimte: maak een tellijn en sleep daarna de eind-handle. Rechtsklik: verwijder tellijn via een handle.</translation>
     </message>
     <message>
-        <location filename="../ui/widgets/tool_selector.py" line="118" />
+        <location filename="../ui/widgets/tool_selector.py" line="120" />
         <source>Left Click/Drag: edit existing dynamic item (hairpin handle or dynamic symbol). Left Click/Drag in empty space: create new item from current mode (hairpin or symbol), then drag to position/length. Right Click: delete symbol or hairpin.</source>
         <translation>Linksklik/sleep: bewerk bestaand dynamiek-item (hairpin-handle of dynamieksymbool). Linksklik/sleep in lege ruimte: maak een nieuw item vanuit de huidige modus (hairpin of symbool) en sleep daarna voor positie/lengte. Rechtsklik: verwijder symbool of hairpin.</translation>
     </message>
     <message>
-        <location filename="../ui/widgets/tool_selector.py" line="119" />
+        <location filename="../ui/widgets/tool_selector.py" line="121" />
         <source>Left Click/Drag: edit an existing beam marker duration. Left Click/Drag in empty space: create a beam marker, then drag to set duration. Right Click: delete marker under cursor (or create one if none exists there).</source>
         <translation>Linksklik/sleep: bewerk de duur van een bestaande beam-marker. Linksklik/sleep in lege ruimte: maak een beam-marker en sleep daarna om de duur in te stellen. Rechtsklik: verwijder marker onder de cursor (of maak er een als daar geen marker staat).</translation>
     </message>
     <message>
-        <location filename="../ui/widgets/tool_selector.py" line="120" />
+        <location filename="../ui/widgets/tool_selector.py" line="122" />
         <source>Left Click chord note: attach arpeggio to that chord using the selected type. Drag arpeggio end handles to adjust spread duration. Right Click: remove arpeggio under cursor.</source>
         <translation>Linksklik op akkoordnoot: voeg arpeggio toe aan dat akkoord met het geselecteerde type. Sleep de eind-handles van de arpeggio om de spreidingsduur aan te passen. Rechtsklik: verwijder arpeggio onder de cursor.</translation>
     </message>
     <message>
-        <location filename="../ui/widgets/tool_selector.py" line="121" />
+        <location filename="../ui/widgets/tool_selector.py" line="123" />
+        <source>Left Click/Drag: create or edit a line. Drag either endpoint to reshape it, or drag the line body to move it. Double Click: edit line properties. Right Click: delete line.</source>
+        <translation>Linksklik/sleep: maak of bewerk een lijn. Sleep een eindpunt om de vorm aan te passen, of sleep de lijn zelf om deze te verplaatsen. Dubbelklik om lijneigenschappen te bewerken. Rechtsklik: verwijder de lijn.</translation>
+    </message>
+    <message>
+        <location filename="../ui/widgets/tool_selector.py" line="124" />
         <source>Left Click/Drag: edit existing line/page-break marker (toggle L/P on click, move on drag). Left Click/Drag in empty space: create a new line-break marker at cursor time. Right Click: delete marker.</source>
         <translation>Linksklik/sleep: bewerk bestaande regel/pagina-breekmarker (wissel L/P bij klikken, verplaats bij slepen). Linksklik/sleep in lege ruimte: maak een nieuwe regelbreek-marker op de cursortijd. Rechtsklik: verwijder marker.</translation>
     </message>
     <message>
-        <location filename="../ui/widgets/tool_selector.py" line="122" />
+        <location filename="../ui/widgets/tool_selector.py" line="125" />
         <source>Left Click/Drag: edit existing meter/grid context (on barline: open time-signature dialog; off barline: add grid line). Left Click/Drag in empty space: create a new subdivision in current measure. Right Click: remove subdivision, or remove a time-signature change at a barline.</source>
         <translation>Linksklik/sleep: bewerk bestaande maatsoort/raster-context (op maatstreep: open maatsoortdialoog; buiten maatstreep: voeg rasterlijn toe). Linksklik/sleep in lege ruimte: maak een nieuwe onderverdeling in de huidige maat. Rechtsklik: verwijder onderverdeling of verwijder een maatsoortwijziging op een maatstreep.</translation>
     </message>
     <message>
-        <location filename="../ui/widgets/tool_selector.py" line="123" />
+        <location filename="../ui/widgets/tool_selector.py" line="126" />
         <source>Left Click/Drag: edit an existing grid-band marker duration. Left Click/Drag in empty space: create a grid-band marker, then drag to set duration. Right Click: insert/remove a stop marker (zero duration) at the clicked band start.</source>
         <translation>Linksklik/sleep: bewerk de duur van een bestaande rasterband-marker. Linksklik/sleep in lege ruimte: maak een rasterband-marker en sleep daarna om de duur in te stellen. Rechtsklik: voeg een stop-marker in/verwijder die (nulduur) bij het aangeklikte bandbegin.</translation>
     </message>
     <message>
-        <location filename="../ui/widgets/tool_selector.py" line="124" />
+        <location filename="../ui/widgets/tool_selector.py" line="127" />
         <source>Left Click/Drag: edit existing tempo (click to change BPM, drag to resize duration). Left Click/Drag in empty space: create a tempo marker + drag to set duration. Right Click: delete tempo (first tempo cannot be deleted).</source>
         <translation>Linksklik/sleep: bewerk bestaand tempo (klik om BPM te wijzigen, sleep om de duur te veranderen). Linksklik/sleep in lege ruimte: maak een tempo-marker en sleep om de duur in te stellen. Rechtsklik: verwijder tempo (eerste tempo kan niet worden verwijderd).</translation>
     </message>
     <message>
-        <location filename="../ui/widgets/tool_selector.py" line="125" />
+        <location filename="../ui/widgets/tool_selector.py" line="128" />
         <source>Left Click/Drag: edit existing slur by dragging a control handle. Left Click/Drag in empty space: create a new slur + shape it by dragging. Right Click: delete slur at handle.</source>
         <translation>Linksklik/sleep: bewerk bestaande legatoboog door een controlepunt te slepen. Linksklik/sleep in lege ruimte: maak een nieuwe legatoboog en vorm die door te slepen. Rechtsklik: verwijder legatoboog bij het controlepunt.</translation>
     </message>
     <message>
-        <location filename="../ui/widgets/tool_selector.py" line="126" />
+        <location filename="../ui/widgets/tool_selector.py" line="129" />
         <source>Left Click/Drag: move existing text, or drag the red handle to rotate. Left Click/Drag in empty space: create new text + edit afterwards in the dialog. Right Click: delete text item.</source>
         <translation>Linksklik/sleep: verplaats bestaande tekst, of sleep de rode handle om te roteren. Linksklik/sleep in lege ruimte: maak nieuwe tekst en bewerk daarna in de dialoog. Rechtsklik: verwijder tekstitem.</translation>
     </message>
     <message>
-        <location filename="../ui/widgets/tool_selector.py" line="127" />
+        <location filename="../ui/widgets/tool_selector.py" line="130" />
         <source>Left Click/Drag: edit existing barline symbol placement by inserting selected symbol at clicked position. Left Click/Drag in empty space: create selected barline symbol (start repeat, end repeat, or double barline). Right Click: delete any barline symbol at nearest event position.</source>
         <translation>Linksklik/sleep: bewerk plaatsing van bestaand maatstreepsymbool door het gekozen symbool op de aangeklikte positie in te voegen. Linksklik/sleep in lege ruimte: maak gekozen maatstreepsymbool (herhaalbegin, herhaaleinde of dubbele maatstreep). Rechtsklik: verwijder elk maatstreepsymbool op de dichtstbijzijnde eventpositie.</translation>
     </message>
     <message>
-        <location filename="../ui/widgets/tool_selector.py" line="128" />
+        <location filename="../ui/widgets/tool_selector.py" line="131" />
         <source>Left Click: insert the selected pedal symbol. Drag an existing pedal symbol to move it. Right Click: delete pedal symbol.</source>
         <translation>Linksklik: voeg het gekozen pedaalsymbool in. Sleep een bestaand pedaalsymbool om het te verplaatsen. Rechtsklik: verwijder pedaalsymbool.</translation>
     </message>
