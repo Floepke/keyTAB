@@ -40,6 +40,7 @@ EDITOR_LAYERING = [
     'stave_two_line',
     'stave_clef_line',
     'barline',
+    'end_barline',
     'stem_hand_split',
     'stop_sign',
     'accidental',
@@ -59,7 +60,6 @@ EDITOR_LAYERING = [
     'tempo',
     'count_line_handle',
     'count_line',
-    'line',
     'line_break',
     'selection_rect',
     'keyboard_overlay_bg',
@@ -84,6 +84,8 @@ EDITOR_LAYERING = [
     'hairpin',
     'tempo_bg',
     'tempo_text',
+    'piano_keyboard',
+    'line',
 ]
 
 ENGRAVER_LAYERING = [
@@ -94,7 +96,6 @@ ENGRAVER_LAYERING = [
     'midi_note',
     'grid_line',
     'count_line',
-    'line',
     'measure_number_guide',
     'measure_number',
     'barline_symbol',
@@ -128,6 +129,7 @@ ENGRAVER_LAYERING = [
     'tempo_bg',
     'tempo_text',
     'slur',
+    'line',
     'dynamic_symbol_bg',
     'dynamic_symbol_text',
     'hairpin',

@@ -526,17 +526,6 @@ class GridDrawerMixin:
                 if not _is_time_in_viewport(float(t)):
                     continue
                 _draw_grid_line_constructive(float(t), float(grid_width_mm), 0.0, 0)
-                # du.add_line(
-                #     stave_left_position,
-                #     y_mm,
-                #     stave_right_position,
-                #     y_mm,
-                #     color=color,
-                #     width_mm=grid_width_mm,
-                #     id=0,
-                #     tags=["grid_line"],
-                #     dash_pattern=[2.0, 2.0],
-                # )
 
         # Draw regular barlines; draw final end barline twice as thick.
         if barline_visible:
