@@ -51,8 +51,11 @@ Welcome to **keyTAB**, a passion project for creating, editing, and engraving Kl
 - Grace notes are exported with a 1/8-beat duration.
 
 ## Install & Run (Python)
-- Python 3.x with PySide6 and Cairo (see `requirements.txt`).
-- Create a venv, `pip install -r requirements.txt`, then `python keyTAB.py`.
+- **macOS:** follow the [macOS installation and build guide](install_guide_macos.md),
+  including the maintainer's local, **non-venv** PySide6 setup and the `.app`/DMG build steps.
+- Other platforms:
+  - Python 3.x with PySide6 and Cairo (see `requirements.txt`).
+  - Create a venv, `pip install -r requirements.txt`, then `python keyTAB.py`.
 
 ## Translations (PySide6 / Qt Linguist)
 - keyTAB includes a Qt translation workflow with TS/QM files in `i18n/`.
