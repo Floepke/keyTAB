@@ -23,6 +23,7 @@ from editor.tool.base_grid_tool import BaseGridTool
 from editor.tool.time_signature_tool import TimeSignatureTool
 from editor.tool.dynamic_tool import DynamicTool
 from editor.tool.tempo_tool import TempoTool
+from editor.tool.volta_tool import VoltaTool
 from editor.tool.grid_band_tool import GridBandTool
 from editor.tool.arpeggio_tool import ArpeggioTool
 from editor.tool.idle import IdleTool
@@ -49,6 +50,7 @@ from editor.drawers.count_line_drawer import CountLineDrawerMixin
 from editor.drawers.line_drawer import LineDrawerMixin
 from editor.drawers.line_break_drawer import LineBreakDrawerMixin
 from editor.drawers.tempo_drawer import TempoDrawerMixin
+from editor.drawers.volta_drawer import VoltaDrawerMixin
 from editor.drawers.dynamic_drawer import DynamicDrawerMixin
 from editor.drawers.crescendo_drawer import CrescendoDrawerMixin
 from editor.drawers.decrescendo_drawer import DecrescendoDrawerMixin
@@ -91,7 +93,8 @@ class Editor(QtCore.QObject,
              CountLineDrawerMixin,
              LineDrawerMixin,
              LineBreakDrawerMixin,
-             TempoDrawerMixin):
+             TempoDrawerMixin,
+             VoltaDrawerMixin):
     """Main editor class: routes UI events to the current tool.
 
     Handles click vs drag classification using a 3px threshold.
@@ -128,6 +131,7 @@ class Editor(QtCore.QObject,
             'time_signature': TimeSignatureTool,
             'dynamic': DynamicTool,
             'tempo': TempoTool,
+            'volta': VoltaTool,
             'grid_band': GridBandTool,
             'arpeggio': ArpeggioTool,
         }
@@ -290,6 +294,7 @@ class Editor(QtCore.QObject,
             getattr(self, 'draw_count_line', None),
             getattr(self, 'draw_line', None),
             getattr(self, 'draw_tempo', None),
+            getattr(self, 'draw_volta', None),
             getattr(self, 'draw_line_break', None),
         ]
         for fn in methods:

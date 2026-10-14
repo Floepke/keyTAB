@@ -8,6 +8,66 @@ if TYPE_CHECKING:
 
 
 class TempoDrawerMixin:
+    # Point size of the tempo number relative to the layout scale.
+    TEMPO_FONT_SIZE_FACTOR = 32.0
+    # Stroke width of the dashed tempo bracket.
+    TEMPO_BRACKET_STROKE_MM = 0.25
+
+    @staticmethod
+    def _tempo_font_family() -> str:
+        try:
+            from fonts import register_font_from_bytes
+            return register_font_from_bytes('Edwin') or 'Edwin'
+        except Exception:
+            return 'Edwin'
+
+    def tempo_lane_bounds_mm(self, du: DrawUtil) -> tuple[float, float] | None:
+        """Return the (left_mm, right_mm) band that tempo indicators occupy.
+
+        The band covers the tempo numbers and the bracket spine, but not the
+        short horizontal hooks, which reach all the way to the stave edge and
+        would otherwise claim the entire right margin.
+
+        Every tempo marker in the score is measured rather than only the
+        visible ones, so lanes derived from it stay put while scrolling.
+        Returns ``None`` when the score holds no tempo markers.
+        """
+        self = cast("Editor", self)
+        score = self.current_score()
+        if score is None:
+            return None
+        events = [tp for tp in (getattr(score, 'tempo', []) or [])
+                  if float(getattr(tp, 'duration', 0.0) or 0.0) > 0.0]
+        if not events:
+            return None
+
+        layout_obj = getattr(score, 'layout', None)
+        page_w_mm = float(getattr(layout_obj, 'page_width_mm', 210.0) or 210.0)
+        margin = float(self.margin or 0.0)
+        scale = float(getattr(layout_obj, 'scale', 1.0) or 1.0)
+        font_family = self._tempo_font_family()
+        font_size_pt = self.TEMPO_FONT_SIZE_FACTOR * scale
+
+        preferences = get_preferences()
+        is_horizontal = preferences.get("editor_orientation", 'horizontal') == 'horizontal'
+
+        x_right = float(page_w_mm) - margin * 0.5
+        x_text_right = x_right - (0.6 * scale)
+        # Round line caps make the spine bleed half a stroke past x_right.
+        left = x_right - (self.TEMPO_BRACKET_STROKE_MM * 0.5)
+        for tp in events:
+            text = str(int(getattr(tp, 'tempo', 60) or 60))
+            _, _, text_w, text_h = du._get_text_extents_mm(
+                text, font_family, font_size_pt, False, True)
+            if is_horizontal:
+                # Rotated 90 deg about the ink top-centre, so the glyphs extend
+                # left of the anchor by their ink height.
+                text_left = x_text_right - (4.0 * scale) - max(0.1, float(text_h))
+            else:
+                text_left = x_text_right - (2.0 * scale) - max(1.0, float(text_w))
+            left = min(left, float(text_left))
+        return (left, x_right)
+
     def draw_tempo(self, du: DrawUtil) -> None:
         self = cast("Editor", self)
         tool_name = getattr(getattr(self, "_tool", None), "TOOL_NAME", "")
@@ -37,11 +97,7 @@ class TempoDrawerMixin:
         paper_color = tuple(getattr(self, 'paper_color', (1.0, 1.0, 1.0, 1.0)))
 
         # Font setup: mirror engraver tempo typography.
-        try:
-            from fonts import register_font_from_bytes
-            font_family = register_font_from_bytes('Edwin') or 'Edwin'
-        except Exception:
-            font_family = 'Edwin'
+        font_family = self._tempo_font_family()
 
         # read editor orientation
         preferences = get_preferences()
@@ -52,11 +108,11 @@ class TempoDrawerMixin:
         
         # metrics and styling
         scale = float(getattr(layout_obj, 'scale', 1.0) or 1.0)
-        font_size_pt = 32.0 * scale
+        font_size_pt = self.TEMPO_FONT_SIZE_FACTOR * scale
         font_italic = False
         font_bold = True
         bracket_dash = [0.5, 1]
-        bracket_stroke = 0.25
+        bracket_stroke = self.TEMPO_BRACKET_STROKE_MM
         right_outer_stave_x = float(page_w_mm) - margin - (float(self.semitone_dist or 0.0) * 2.0)
 
         for tp in events:

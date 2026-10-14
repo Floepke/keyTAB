@@ -683,6 +683,11 @@ class StyleDialog(DialogGeometryMixin, QtWidgets.QDialog):
             'measure_numbering_guide_visible': self.tr('Measure numbering guide'),
             'measure_numbers_visible': self.tr('Measure numbers'),
             'tempo_indicator_visible': self.tr('Tempo indicator'),
+            'volta_visible': self.tr('Volta'),
+            'volta_thickness_mm': self.tr('Volta bracket thickness (mm)'),
+            'volta_hook_length_mm': self.tr('Volta hook length (mm)'),
+            'volta_number_padding_mm': self.tr('Volta number padding (mm)'),
+            'volta_font': self.tr('Volta number font'),
             'measure_numbering_font': self.tr('Measure numbering font'),
             'font_text': self.tr('Text font'),
             'font_title': self.tr('Title font'),
@@ -851,6 +856,7 @@ class StyleDialog(DialogGeometryMixin, QtWidgets.QDialog):
             self.tr("Grid band"),
             self.tr("Time signature"),
             self.tr("Tempo"),
+            self.tr("Volta"),
             self.tr("Measure Numbering"),
             self.tr("Barline Symbols"),
             self.tr("Note"),
@@ -986,6 +992,11 @@ class StyleDialog(DialogGeometryMixin, QtWidgets.QDialog):
             'measure_numbering_guide_dash_pattern_mm': 'Measure Numbering',
             'measure_numbering_placement': 'Measure Numbering',
             'measure_numbering_font': 'Measure Numbering',
+            # Volta
+            'volta_thickness_mm': 'Volta',
+            'volta_hook_length_mm': 'Volta',
+            'volta_number_padding_mm': 'Volta',
+            'volta_font': 'Volta',
         }
 
         type_hints = {}

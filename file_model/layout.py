@@ -150,6 +150,17 @@ class Layout:
     mini_piano_octave_numbering: bool = True
     mini_piano_octave_rectangles: bool = False
     mini_piano_color: str = '#ccc'
+
+    # Volta settings
+    volta_thickness_mm: float = 1.25
+    volta_hook_length_mm: float = 15.0
+    volta_number_padding_mm: float = 2.0
+    volta_font: Font = field(default_factory=lambda: Font(
+        family="Edwin",
+        size_pt=40.0,
+        bold=True,
+        italic=False,
+    ))
     
     # Visibility toggles for different elements
     note_head_visible: bool = True
@@ -178,6 +189,7 @@ class Layout:
     measure_numbers_visible: bool = True
     tempo_indicator_visible: bool = True
     mini_piano_visible: bool = True
+    volta_visible: bool = True
 
 LAYOUT_FLOAT_CONFIG: dict[str, dict[str, float]] = {
     'page_width_mm': {'min': 50.0, 'max': 5_000.0, 'step': 0.5},
@@ -230,4 +242,7 @@ LAYOUT_FLOAT_CONFIG: dict[str, dict[str, float]] = {
     'stave_three_line_thickness_mm': {'min': 0.05, 'max': 5.0, 'step': 0.05},
     'stave_clef_line_thickness_mm': {'min': 0.05, 'max': 5.0, 'step': 0.05},
     'stave_ledger_line_length_mm': {'min': 0.05, 'max': 100.0, 'step': 0.05},
+    'volta_thickness_mm': {'min': 0.05, 'max': 5.0, 'step': 0.05},
+    'volta_hook_length_mm': {'min': 0.0, 'max': 50.0, 'step': 0.05},
+    'volta_number_padding_mm': {'min': 0.0, 'max': 20.0, 'step': 0.05},
 }

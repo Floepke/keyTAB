@@ -22,6 +22,7 @@ from file_model.events.count_line import CountLine
 from file_model.events.line import Line
 from file_model.events.line_break import LineBreak
 from file_model.events.tempo import Tempo
+from file_model.events.volta import Volta
 from file_model.events.grid_band import GridBand
 from file_model.events.arpeggio import Arpeggio
 from file_model.events.crescendo import Crescendo
@@ -191,6 +192,7 @@ class SCORE:
 	layout: Layout = field(default_factory=Layout)
 	app_state: AppState = field(default_factory=AppState)
 	tempo: List[Tempo] = field(default_factory=list)
+	volta: List[Volta] = field(default_factory=list)
 	events: Events = field(default_factory=Events)
 	staves: List[Stave] = field(default_factory=lambda: [Stave(name=f'Stave {i + 1}', enabled=True) for i in range(DEFAULT_STAVE_COUNT)])
 	_next_id: int = 1
@@ -352,6 +354,13 @@ class SCORE:
 		self.tempo.append(obj)
 		return obj
 
+	def new_volta(self, **kwargs) -> Volta:
+		base = {'time': 0.0, 'duration': Volta().duration, 'number': Volta().number, 'x_offset': 0.0}
+		base.update(kwargs)
+		obj = Volta(**base, _id=self._gen_id())
+		self.volta.append(obj)
+		return obj
+
 	def new_arpeggio(self, **kwargs) -> Arpeggio:
 		base = {'time': 0.0, 'rtime1': 0.0, 'rtime2': 32.0, 'note_pitches': []}
 		base.update(kwargs)
@@ -444,6 +453,17 @@ class SCORE:
 		for idx, item in enumerate(items):
 			incoming = item if isinstance(item, dict) else {}
 			obj = Tempo(**_merge_with_defaults(Tempo, incoming, f'tempo[{idx}]'))
+			setattr(obj, '_id', self._gen_id())
+			out.append(obj)
+		return out
+
+	def _load_top_level_volta(self, volta_data: object) -> List[Volta]:
+		"""Parse top-level volta list into Volta dataclasses with fresh ids."""
+		out: List[Volta] = []
+		items = volta_data if isinstance(volta_data, list) else []
+		for idx, item in enumerate(items):
+			incoming = item if isinstance(item, dict) else {}
+			obj = Volta(**_merge_with_defaults(Volta, incoming, f'volta[{idx}]'))
 			setattr(obj, '_id', self._gen_id())
 			out.append(obj)
 		return out
@@ -716,6 +736,7 @@ class SCORE:
 		ev = data.get('events', {}) or {}
 		self._next_id = 1
 		self.tempo = self._load_top_level_tempo(data.get('tempo', []))
+		self.volta = self._load_top_level_volta(data.get('volta', []))
 		self.events = self._load_events_container(ev, 'events')
 		self.events.tempo = []
 		self.staves = self._load_staves(data.get('staves', None), self.events)
@@ -797,6 +818,7 @@ class SCORE:
 		ev = (data or {}).get('events', {}) or {}
 		self._next_id = 1
 		self.tempo = self._load_top_level_tempo((data or {}).get('tempo', []))
+		self.volta = self._load_top_level_volta((data or {}).get('volta', []))
 		self.events = self._load_events_container(ev, 'events')
 		self.events.tempo = []
 		self.staves = self._load_staves((data or {}).get('staves', None), self.events)
@@ -830,6 +852,7 @@ class SCORE:
 		self.info.copyright = f"© keyTAB {datetime.now().year}"
 		self.base_grid = [BaseGrid()]
 		self.tempo = []
+		self.volta = []
 		self.events = Events()
 		self.events.tempo = []
 		self.staves = [Stave(name=f'Stave {i + 1}', enabled=True if i == 0 else False, events=Events()) for i in range(DEFAULT_STAVE_COUNT)]
