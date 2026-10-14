@@ -100,7 +100,7 @@ def _is_newer_version(current: str, previous: str) -> bool:
     current_parts.extend([0] * (length - len(current_parts)))
     previous_parts.extend([0] * (length - len(previous_parts)))
     return current_parts > previous_parts
-SUPPORTED_UI_LANGUAGES = {"en", "nl"}
+SUPPORTED_UI_LANGUAGES = {"en", "nl", "de"}
 
 
 def _resolve_ui_language(preferences: dict) -> str:

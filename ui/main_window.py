@@ -970,6 +970,15 @@ class MainWindow(QtWidgets.QMainWindow):
         self._language_action_group.addAction(self._language_nl_action)
         language_menu.addAction(self._language_nl_action)
 
+        self._language_de_action = QtGui.QAction(tr("German"), self)
+        self._language_de_action.setToolTip(tr("Use German for the user interface."))
+        self._language_de_action.setCheckable(True)
+        self._language_de_action.triggered.connect(
+            lambda checked: self._set_ui_language_preference("de") if checked else None
+        )
+        self._language_action_group.addAction(self._language_de_action)
+        language_menu.addAction(self._language_de_action)
+
         self._sync_ui_language_actions()
 
         # Wire up triggers
@@ -2003,7 +2012,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def _normalized_ui_language(self, language: str) -> str:
         lang = str(language or "system").strip().lower()
-        if lang not in ("system", "en", "nl"):
+        if lang not in ("system", "en", "nl", "de"):
             return "system"
         return lang
 
@@ -2017,6 +2026,7 @@ class MainWindow(QtWidgets.QMainWindow):
             "system": getattr(self, "_language_system_action", None),
             "en": getattr(self, "_language_en_action", None),
             "nl": getattr(self, "_language_nl_action", None),
+            "de": getattr(self, "_language_de_action", None),
         }
         for key, action in mapping.items():
             if action is not None:
@@ -2028,6 +2038,8 @@ class MainWindow(QtWidgets.QMainWindow):
             return self.tr("English")
         if normalized == "nl":
             return self.tr("Dutch")
+        if normalized == "de":
+            return self.tr("German")
         return self.tr("System")
 
     def _set_ui_language_preference(self, language: str) -> None:

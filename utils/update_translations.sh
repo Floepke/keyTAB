@@ -6,11 +6,13 @@ I18N_DIR="$ROOT_DIR/i18n"
 
 mkdir -p "$I18N_DIR"
 
-pylupdate6 \
-  "$ROOT_DIR" \
-  --exclude "*/__pycache__/*" \
-  --exclude "*/.git/*" \
-  --no-obsolete \
-  --ts "$I18N_DIR/keytab_nl.ts"
+for lang in nl de; do
+  pylupdate6 \
+    "$ROOT_DIR" \
+    --exclude "*/__pycache__/*" \
+    --exclude "*/.git/*" \
+    --no-obsolete \
+    --ts "$I18N_DIR/keytab_${lang}.ts"
 
-echo "Updated translation source: $I18N_DIR/keytab_nl.ts"
+  echo "Updated translation source: $I18N_DIR/keytab_${lang}.ts"
+done

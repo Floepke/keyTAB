@@ -122,6 +122,7 @@ class PreferencesDialog(DialogGeometryMixin, QtWidgets.QDialog):
                 (self.tr("System"), "system"),
                 (self.tr("English"), "en"),
                 (self.tr("Dutch"), "nl"),
+                (self.tr("German"), "de"),
             ]
             return self._build_radio_group(options, str(value)), "ui_language"
         if key == "theme":

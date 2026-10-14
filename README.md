@@ -59,13 +59,14 @@ Welcome to **keyTAB**, a passion project for creating, editing, and engraving Kl
 
 ## Translations (PySide6 / Qt Linguist)
 - keyTAB includes a Qt translation workflow with TS/QM files in `i18n/`.
-- Set `ui_language` in Preferences to `system`, `en`, or `nl`.
+- Set `ui_language` in Preferences to `system`, `en`, `nl`, or `de`.
 - Update translatable source strings:
 	- `bash utils/update_translations.sh`
-- Translate Dutch strings with Qt Linguist:
-	- Open `i18n/keytab_nl.ts` in Qt Linguist and fill missing entries.
+- Translate German or Dutch strings with Qt Linguist:
+	- Open `i18n/keytab_de.ts` or `i18n/keytab_nl.ts` and edit the translations.
 - Optional: prefill untranslated strings using a translation service (LibreTranslate-compatible API):
 	- `python utils/auto_translate_ts.py i18n/keytab_nl.ts --source en --target nl`
+	- `python utils/auto_translate_ts.py i18n/keytab_de.ts --source en --target de`
 	- Restrict to dialog contexts only (example):
 		- `python utils/auto_translate_ts.py i18n/keytab_nl.ts --source en --target nl --only-context InfoDialog --only-context LineBreakDialog --only-context StyleDialog`
 	- If your service requires an API key or custom URL:
