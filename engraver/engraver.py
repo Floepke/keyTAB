@@ -126,6 +126,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
     end_repeats: list = []
     double_bars: list = []
     tempos: list = list(score.get('tempo', []) or [])
+    voltas: list = list(score.get('volta', []) or [])
     arpeggios: list = []
     for st in enabled_staves:
         st_idx = int(st.get('index', 0) or 0)
@@ -3462,6 +3463,13 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                         float(x_pos_guide + text_w_mm),
                     )
 
+            def _right_annotation_left_x(event_time: float) -> float:
+                anchored = measure_symbol_anchor.get(round(float(event_time), 6))
+                if anchored is not None:
+                    x_num, w_num, _y_num = anchored
+                    return float(x_num + w_num)
+                return float(measure_symbol_default_right_x)
+
             if renders_tempo and tempo_indicator_visible and line_tempos:
                 try:
                     tempo_font_family = _resolve_font_family('Edwin') or 'Edwin'
@@ -3473,15 +3481,6 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                 tempo_stroke = 0.25
                 right_outer_stave_x = float(grid_right)
                 tempo_right_pad = max(0.6, 4.0 * line_scale)
-
-                def _tempo_left_x(tp_time: float) -> float:
-                    key = round(float(tp_time), 6)
-                    anchored = measure_symbol_anchor.get(key)
-                    if anchored is not None:
-                        x_num, w_num, _y_num = anchored
-                        return float(x_num + w_num)
-                    # Mid-measure tempo changes: use the outer measure-number guide end.
-                    return float(measure_symbol_default_right_x)
 
                 def _tempo_top_start_x(tp_time: float) -> float:
                     key = round(float(tp_time), 6)
@@ -3530,7 +3529,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
 
                     # Keep the left edge of tempo text aligned with the right edge
                     # of the measure-number text; variable text width grows to the right.
-                    tempo_text_left = _tempo_left_x(t0) + (tempo_x_offset * line_scale)
+                    tempo_text_left = _right_annotation_left_x(t0) + (tempo_x_offset * line_scale)
                     tempo_x_left = float(tempo_text_left)
                     tempo_text_center_x = float(tempo_x_left + (tempo_text_span_x * 0.5))
                     tempo_x_right = float(tempo_x_left + tempo_text_span_x + tempo_right_pad)
@@ -3586,6 +3585,72 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                         tags=['tempo_text'],
                         hit_rect_mm=None,
                         angle_deg=90.0 if horizontal_read_direction else 0.0,
+                    )
+
+            if renders_tempo and layout.get('volta_visible', True) is not False:
+                volta_family, volta_size, volta_bold, volta_italic, _volta_ul = _layout_font(
+                    'volta_font', 'Edwin', 40.0,
+                )
+                volta_size_pt = volta_size * line_scale
+                volta_stroke = float(layout.get('volta_thickness_mm', 1.25)) * line_scale
+                volta_hook = float(layout.get('volta_hook_length_mm', 15.0)) * line_scale
+                volta_padding = float(layout.get('volta_number_padding_mm', 2.0)) * line_scale
+
+                for vt in voltas:
+                    t0 = float(vt.get('time', 0.0))
+                    t1 = t0 + float(vt.get('duration', 0.0))
+                    seg_t0 = max(float(line['time_start']), t0)
+                    seg_t1 = min(float(line['time_end']), t1)
+                    if op_time.le(seg_t1, seg_t0):
+                        continue
+                    y0_volta = _time_to_y(seg_t0)
+                    y1_volta = _time_to_y(seg_t1)
+                    volta_text = str(int(vt.get('number', 1))) + '.'
+                    _, _, text_w, text_h = du._get_text_extents_mm(
+                        volta_text, volta_family, volta_size_pt, volta_italic, volta_bold,
+                    )
+                    text_span_x = float(text_h if horizontal_read_direction else text_w)
+                    text_span_y = float(text_w if horizontal_read_direction else text_h)
+                    text_center_y = (y0_volta + y1_volta) * 0.5
+                    # Centered ink may extend beyond either end of a short bracket.
+                    collision_y_start = min(y0_volta, text_center_y - text_span_y * 0.5)
+                    collision_y_end = max(y1_volta, text_center_y + text_span_y * 0.5)
+                    collision_start = _y_to_time_unclamped(collision_y_start)
+                    collision_end = _y_to_time_unclamped(collision_y_end)
+                    needed_right = max(
+                        _right_extent(collision_start, collision_end),
+                        _ledger_right_extent(collision_start, collision_end),
+                    )
+                    beam_right = _beam_right_in_y_span(collision_y_start, collision_y_end)
+                    if beam_right is not None:
+                        needed_right = max(needed_right, beam_right)
+                    x_left = max(
+                        _right_annotation_left_x(seg_t0),
+                        needed_right + measure_pad + volta_stroke * 0.5,
+                    ) + float(vt.get('x_offset', 0.0)) * line_scale
+                    x_right = x_left + max(
+                        volta_hook, text_span_x + 2.0 * volta_padding + volta_stroke,
+                    )
+                    volta_id = int(vt.get('_id', 0))
+                    for xa, ya, xb, yb in (
+                        (x_left, y0_volta, x_right, y0_volta),
+                        (x_right, y0_volta, x_right, y1_volta),
+                        (x_left, y1_volta, x_right, y1_volta),
+                    ):
+                        du.add_line(
+                            xa, ya, xb, yb,
+                            color=notation_color, width_mm=volta_stroke,
+                            id=volta_id, tags=['volta_bracket'],
+                        )
+                    du.add_text(
+                        (x_left + x_right) * 0.5,
+                        text_center_y,
+                        volta_text,
+                        family=volta_family, size_pt=volta_size_pt,
+                        italic=volta_italic, bold=volta_bold, color=notation_color,
+                        anchor='center',
+                        angle_deg=90.0 if horizontal_read_direction else 0.0,
+                        id=volta_id, tags=['volta_text'],
                     )
 
             symbol_width = max(3.0, semitone_mm * 4.0)

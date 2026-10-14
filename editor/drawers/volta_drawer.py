@@ -15,8 +15,7 @@ class VoltaDrawerMixin:
     """Draws volta brackets alongside the editor stave.
 
     The geometry mirrors the tempo indicator bracket, but the volta bracket is
-    solid instead of dashed and its number sits at the top of the bracket,
-    inside it.
+    solid instead of dashed and its number is centered inside it.
     """
 
     def draw_volta(self, du: DrawUtil) -> None:
@@ -61,7 +60,6 @@ class VoltaDrawerMixin:
         # Editor strokes use the established half-thickness convention; the
         # editor renderer applies its global stroke multiplier afterwards.
         bracket_stroke = configured_thickness * 0.5
-        number_pad = float(getattr(layout_obj, 'volta_number_padding_mm', 1.5) or 1.5) * scale
         hook_len = float(getattr(layout_obj, 'volta_hook_length_mm', 4.0) or 4.0) * scale
 
         x_right = float(page_w_mm) - margin * 0.85
@@ -103,20 +101,17 @@ class VoltaDrawerMixin:
                 max(y0, y1),
             )
 
-            # Number sits at the top of the bracket, inside it.
             text = str(int(getattr(vt, 'number', 1) or 1)) + '.'
-            x_text_right = x_right - number_pad - (bracket_stroke * 0.5)
-            y_text_top = y0 + number_pad + (bracket_stroke * 0.5)
             du.add_text(
-                x_text_right if editor_orientation == 'vertical' else x_text_right - 2.0 * scale,
-                y_text_top,
+                (x_hook_left + x_right) * 0.5,
+                (y0 + y1) * 0.5,
                 text,
                 family=font_family,
                 size_pt=font_size_pt,
                 italic=font_italic,
                 bold=font_bold,
                 color=notation_color,
-                anchor='ne' if editor_orientation == 'vertical' else 'n',
+                anchor='center',
                 id=0,
                 tags=["volta_text"],
                 hit_rect_mm=None,

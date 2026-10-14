@@ -159,7 +159,7 @@ class Layout:
         family="Edwin",
         size_pt=40.0,
         bold=True,
-        italic=False,
+        italic=True,
     ))
     
     # Visibility toggles for different elements

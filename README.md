@@ -17,6 +17,7 @@ Welcome to **keyTAB**, a passion project for creating, editing, and engraving Kl
 - Selection operations: transpose by semitone, shift in time by snap units, assign hand (`<` left, `>` right; note color set to `auto`), cut/copy/paste, delete, select-all.
 - Layout & style: adjustable zoom (mm per quarter), page margins, stave ranges, color presets, and per-hand coloring that flows into engraving.
 - Engraving: multi-page rendering with headers/footers, document info, creation timestamp, and page numbering suitable for print/PDF.
+- Volta brackets: solid endings with centered numbers continue across systems/pages and automatically sit outside note, beam, and ledger geometry, using the same initial placement anchor as tempo markings. Numbers are centered in both editor and engraved views. The volta dialog's X offset adjusts engraved placement only (scaled with the stave); negative offsets can override automatic clearance.
 - Info & analysis: title/author/copyright plus live analysis of notes, measures, lines, pages, and grace notes.
 - Error reporting: failed imports and engraver errors show a dialog with a full traceback and a **Copy Error Log** button.
 
