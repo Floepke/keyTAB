@@ -29,7 +29,7 @@ class Layout:
     notehead_tilt: float = 0.4 # Diagonal shear tilt of noteheads (0 = perfect circle/oval, higher = traditional tilted notehead, lower = traditional tilted notehead in the opposite direction).
     
     # Articulation appearance
-    staccato_diameter_mm: float = 4.0
+    staccato_diameter_mm: float = 3.0
     tenuto_length_mm: float = 8.0
     tenuto_thickness_mm: float = 2.0
     accent_thickness_mm: float = 1.75
