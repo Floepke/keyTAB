@@ -623,12 +623,12 @@ Scroll naar beneden om alle sneltoetsen te zien.</translation>
     <message>
         <location filename="../ui/dialogs/keyboard_shortcuts_dialog.py" line="146" />
         <source>Map Selected Notes to Left Hand</source>
-        <translation>Toewijzen selecteerde noten aan linkse hand</translation>
+        <translation>Wijs geselecteerde noten toe aan linkse hand</translation>
     </message>
     <message>
         <location filename="../ui/dialogs/keyboard_shortcuts_dialog.py" line="147" />
         <source>Map Selected Notes to Right Hand</source>
-        <translation>Toewijzen selecteerde noten aan rechtse hand</translation>
+        <translation>Wijs geselecteerde noten toe aan rechtse hand</translation>
     </message>
     <message>
         <location filename="../ui/dialogs/keyboard_shortcuts_dialog.py" line="148" />
