@@ -1427,12 +1427,12 @@ Bijvoorbeeld: "4 2" tekent een streep van 4 mm gevolgd door een tussenruimte van
         <location filename="../ui/main_window.py" line="2042" />
         <location filename="../ui/main_window.py" line="973" />
         <source>German</source>
-        <translation type="unfinished" />
+        <translation>Duits</translation>
     </message>
     <message>
         <location filename="../ui/main_window.py" line="974" />
         <source>Use German for the user interface.</source>
-        <translation type="unfinished" />
+        <translation>Gebruik Duits voor de gebruikersinterface.</translation>
     </message>
     <message>
         <location filename="../ui/main_window.py" line="1487" />
@@ -2165,7 +2165,7 @@ Choose 'Skip' to exclude a track entirely.</source>
     <message>
         <location filename="../ui/dialogs/preferences_dialog.py" line="125" />
         <source>German</source>
-        <translation type="unfinished" />
+        <translation>Duits</translation>
     </message>
     <message>
         <location filename="../ui/dialogs/preferences_dialog.py" line="130" />
@@ -3134,27 +3134,27 @@ Akkoorden boven stok: zwarte noten worden boven de stok geplaatst, maar alleen v
         <location filename="../ui/dialogs/style_dialog.py" line="859" />
         <location filename="../ui/dialogs/style_dialog.py" line="686" />
         <source>Volta</source>
-        <translation type="unfinished" />
+        <translation>Volta</translation>
     </message>
     <message>
         <location filename="../ui/dialogs/style_dialog.py" line="687" />
         <source>Volta bracket thickness (mm)</source>
-        <translation type="unfinished" />
+        <translation>Dikte haak Volta (mm)</translation>
     </message>
     <message>
         <location filename="../ui/dialogs/style_dialog.py" line="688" />
         <source>Volta hook length (mm)</source>
-        <translation type="unfinished" />
+        <translation>Lengte haak Volta (mm)</translation>
     </message>
     <message>
         <location filename="../ui/dialogs/style_dialog.py" line="689" />
         <source>Volta number padding (mm)</source>
-        <translation type="unfinished" />
+        <translation>Opvulling nummer Volta (mm)</translation>
     </message>
     <message>
         <location filename="../ui/dialogs/style_dialog.py" line="690" />
         <source>Volta number font</source>
-        <translation type="unfinished" />
+        <translation>Lettertype nummer Volta</translation>
     </message>
     <message>
         <location filename="../ui/dialogs/style_dialog.py" line="691" />
@@ -3761,7 +3761,7 @@ Daar kunt u het objecttype kiezen om te plaatsen of te bewerken;</translation>
     <message>
         <location filename="../ui/widgets/tool_selector.py" line="111" />
         <source>Volta</source>
-        <translation type="unfinished" />
+        <translation>Volta</translation>
     </message>
     <message>
         <location filename="../ui/widgets/tool_selector.py" line="112" />
@@ -3846,7 +3846,7 @@ Daar kunt u het objecttype kiezen om te plaatsen of te bewerken;</translation>
     <message>
         <location filename="../ui/widgets/tool_selector.py" line="130" />
         <source>Left Click: create a volta bracket at the cursor time, then drag to set its length. Left Click on an existing bracket: edit its number and X offset. Drag an existing bracket: resize its length. Right Click: delete the volta bracket.</source>
-        <translation type="unfinished" />
+        <translation>Linksklik: maak een volta-haak op de cursorpositie en sleep daarna om de lengte in te stellen. Linksklik op een bestaande haak: bewerk het nummer en de X-offset. Sleep een bestaande haak: wijzig de lengte. Rechtsklik: verwijder de volta-haak.</translation>
     </message>
     <message>
         <location filename="../ui/widgets/tool_selector.py" line="131" />
@@ -3940,28 +3940,29 @@ Daar kunt u het objecttype kiezen om te plaatsen of te bewerken;</translation>
     <message>
         <location filename="../ui/widgets/volta_dialog.py" line="31" />
         <source>Edit Volta</source>
-        <translation type="unfinished" />
+        <translation>Volta bewerken</translation>
     </message>
     <message>
         <location filename="../ui/widgets/volta_dialog.py" line="46" />
         <source>Number:</source>
-        <translation type="unfinished" />
+        <translation>Nummer:</translation>
     </message>
     <message>
         <location filename="../ui/widgets/volta_dialog.py" line="52" />
         <source> mm</source>
-        <translation type="unfinished"> mm</translation>
+        <translation> mm</translation>
     </message>
     <message>
         <location filename="../ui/widgets/volta_dialog.py" line="54" />
         <source>X offset:</source>
-        <translation type="unfinished">X-verschuiving:</translation>
+        <translation>X-verschuiving:</translation>
     </message>
     <message>
         <location filename="../ui/widgets/volta_dialog.py" line="59" />
         <source>INFO:
 The X offset only affects engraved output; in the editor the volta bracket is always drawn alongside the stave.</source>
-        <translation type="unfinished" />
+        <translation>INFO:
+De X-verschuiving beïnvloedt alleen de gegraveerde uitvoer; in de editor wordt de volta-haak altijd naast de notenbalk getekend.</translation>
     </message>
 </context><context>
     <name>keyTAB</name>
