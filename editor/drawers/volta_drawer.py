@@ -101,7 +101,7 @@ class VoltaDrawerMixin:
                 max(y0, y1),
             )
 
-            text = str(int(getattr(vt, 'number', 1) or 1)) + '.'
+            text = str(int(getattr(vt, 'number', 1) or 1))
             du.add_text(
                 (x_hook_left + x_right) * 0.5,
                 (y0 + y1) * 0.5,

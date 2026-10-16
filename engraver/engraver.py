@@ -3605,7 +3605,7 @@ def do_engrave(score: SCORE, du: DrawUtil, pageno: int = 0, pdf_export: bool = F
                         continue
                     y0_volta = _time_to_y(seg_t0)
                     y1_volta = _time_to_y(seg_t1)
-                    volta_text = str(int(vt.get('number', 1))) + '.'
+                    volta_text = str(int(vt.get('number', 1)))
                     _, _, text_w, text_h = du._get_text_extents_mm(
                         volta_text, volta_family, volta_size_pt, volta_italic, volta_bold,
                     )
