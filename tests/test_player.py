@@ -39,7 +39,7 @@ class PlayerRepeatTests(unittest.TestCase):
         self.now += seconds
         self.on_sleep()
 
-    def score(self, notes=None, start_repeat=(), end_repeat=(), tempo=()):
+    def score(self, notes=None, start_repeat=(), end_repeat=(), tempo=(), measures=None):
         if notes is None:
             notes = [(0.0, QUARTER_NOTE_UNIT, 40)]
         return SimpleNamespace(
@@ -55,6 +55,9 @@ class PlayerRepeatTests(unittest.TestCase):
                 end_repeat=[SimpleNamespace(time=t) for t in end_repeat],
             ),
             tempo=list(tempo),
+            base_grid=[] if measures is None else [
+                SimpleNamespace(numerator=4, denominator=4, measure_amount=measures)
+            ],
         )
 
     def run_playback(self, score, start_units=None):
@@ -132,6 +135,23 @@ class PlayerRepeatTests(unittest.TestCase):
         self.run_playback(self.score(notes=[(0, 2 * q, 40)], tempo=tempo))
         self.assertAlmostEqual(self.notes[1][1] - self.notes[0][1], 1.5)
         self.assertAlmostEqual(self.notes[2][1] - self.notes[1][1], 1.5)
+
+    def test_loop_ends_at_final_barline_not_last_note(self):
+        self.player.set_repeat_song(True)
+        self.disable_after(3)
+        self.run_playback(self.score(measures=2))
+        # Two 4/4 measures at 120 bpm last 4 seconds.
+        self.assertAlmostEqual(self.notes[1][1] - self.notes[0][1], 4.0)
+        self.assertAlmostEqual(self.notes[2][1] - self.notes[1][1], 4.0)
+
+    def test_cursor_start_also_loops_to_final_barline(self):
+        self.player.set_repeat_song(True)
+        self.disable_after(3)
+        q = QUARTER_NOTE_UNIT
+        self.run_playback(self.score(notes=[(0, q, 40), (q, q, 42)], measures=2), start_units=q)
+        # First pass: 7 beats remain (3.5 s) before the song restarts at the beginning.
+        self.assertAlmostEqual(self.notes[1][1] - self.notes[0][1], 3.5)
+        self.assertAlmostEqual(self.notes[2][1] - self.notes[1][1], 0.5)
 
     def test_empty_score_does_not_loop(self):
         self.player.set_repeat_song(True)

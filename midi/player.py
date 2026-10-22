@@ -1058,7 +1058,10 @@ class Player:
             self._last_event_count = 0
             return events
 
-        score_end_units = self._resolve_playback_end_units(score, score_end_units)
+        score_end_units = max(
+            self._resolve_playback_end_units(score, score_end_units),
+            self._base_grid_end_units(score),
+        )
 
         # Repeat flow is applied only to full playback (play button from beginning).
         # Inline playback from the current cursor intentionally ignores repeat jumps.
@@ -1104,6 +1107,7 @@ class Player:
         except Exception:
             pass
         events: List[Tuple[str, float, int, int]] = []
+        note_end_units = 0.0
 
         for start, dur_units, app_pitch, vel in self._iter_playable_note_specs(score):
             start = float(start)
@@ -1113,10 +1117,7 @@ class Player:
             midi_pitch = max(0, min(127, app_pitch + self._pitch_offset))
             if not _time_op.greater(end, su):
                 continue
-            self._playback_duration_sec = max(
-                self._playback_duration_sec,
-                self._seconds_between(su, end, segs),
-            )
+            note_end_units = max(note_end_units, end)
             if _time_op.less(start, su) and _time_op.greater(end, su):
                 events.append(('on', 0.0, midi_pitch, vel))
                 off_t = self._seconds_between(su, end, segs)
@@ -1128,6 +1129,12 @@ class Player:
                 events.append(('on', float(on_t), midi_pitch, vel))
                 off_t = float(on_t + max(0.0, dur_t) - float(self._off_epsilon_sec))
                 events.append(('off', max(0.0, off_t), midi_pitch, 0))
+        if events:
+            end_units = max(
+                self._resolve_playback_end_units(score, note_end_units),
+                self._base_grid_end_units(score),
+            )
+            self._playback_duration_sec = self._seconds_between(su, end_units, segs)
         events.sort(key=lambda e: (e[1], 0 if e[0] == 'off' else 1))
         try:
             self._last_event_count = int(len([1 for e in events if e[0] == 'on']))
@@ -1516,6 +1523,20 @@ class Player:
             segments.append((cursor, score_end))
 
         return [(a, b) for (a, b) in segments if b > (a + eps)]
+
+    def _base_grid_end_units(self, score) -> float:
+        """Position of the final barline: the end of the last measure in the base grid."""
+        total = 0.0
+        for bg in list(getattr(score, 'base_grid', []) or []):
+            try:
+                numer = int(getattr(bg, 'numerator', 4) or 4)
+                denom = int(getattr(bg, 'denominator', 4) or 4)
+                measures = int(getattr(bg, 'measure_amount', 0) or 0)
+            except Exception:
+                continue
+            if measures > 0 and numer > 0 and denom > 0:
+                total += measures * numer * (4.0 / denom) * float(QUARTER_NOTE_UNIT)
+        return total
 
     def _resolve_playback_end_units(self, score, note_end_units: float) -> float:
         """Playback end should include explicit repeat end markers, not only note ends."""
