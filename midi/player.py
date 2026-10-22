@@ -804,6 +804,8 @@ class Player:
         self._gain: float = 0.35
         self._thread: Optional[threading.Thread] = None
         self._running: bool = False
+        self._repeat_song: bool = False
+        self._playback_duration_sec: float = 0.0
         self._bpm: float = 120.0
         self._t0: float = 0.0
         self._start_units: float = 0.0
@@ -886,6 +888,9 @@ class Player:
     # ------------------------------------------------------------------
     # Playback control
     # ------------------------------------------------------------------
+    def set_repeat_song(self, enabled: bool) -> None:
+        self._repeat_song = bool(enabled)
+
     def _stop_for_restart(self) -> None:
         self._running = False
         try:
@@ -907,13 +912,13 @@ class Player:
         if self.is_playing():
             self._stop_for_restart()
         events = self._build_events_full(score)
-        self._run_events(events)
+        self._run_events(events, score)
 
     def play_from_time_cursor(self, start_units: float, score) -> None:
         if self.is_playing():
             self._stop_for_restart()
         events = self._build_events_from_time(start_units, score)
-        self._run_events(events)
+        self._run_events(events, score)
 
     def stop(self) -> None:
         self._running = False
@@ -969,40 +974,48 @@ class Player:
     # ------------------------------------------------------------------
     # Event scheduling
     # ------------------------------------------------------------------
-    def _run_events(self, events: List[Tuple[str, float, int, int]]) -> None:
+    def _run_events(self, events: List[Tuple[str, float, int, int]], score) -> None:
         if self._backend is None:
             raise RuntimeError("Audio backend not initialized.")
         self._running = True
 
+        def _wait_until(deadline: float) -> None:
+            while self._running:
+                delay = deadline - time.time()
+                if delay <= 0.0:
+                    break
+                time.sleep(min(delay, 0.01))
+
         def _runner() -> None:
-            t0 = time.time()
+            cycle_events = events
             try:
-                self._t0 = float(t0)
-            except Exception:
-                pass
-            for kind, t_rel, midi_note, vel in events:
-                if not self._running:
-                    break
-                now = time.time()
-                delay = max(0.0, t0 + float(t_rel) - now)
-                if delay > 0:
-                    time.sleep(delay)
-                if not self._running:
-                    break
-                try:
-                    if kind == 'on':
-                        self._backend.note_on(int(midi_note), int(vel))
-                    elif kind == 'cc':
-                        self._backend.control_change(int(midi_note), int(vel))
-                    else:
-                        self._backend.note_off(int(midi_note))
-                except Exception:
-                    pass
-            self._running = False
-            try:
+                while self._running and cycle_events:
+                    t0 = time.time()
+                    self._t0 = float(t0)
+                    for kind, t_rel, midi_note, vel in cycle_events:
+                        _wait_until(t0 + float(t_rel))
+                        if not self._running:
+                            break
+                        try:
+                            if kind == 'on':
+                                self._backend.note_on(int(midi_note), int(vel))
+                            elif kind == 'cc':
+                                self._backend.control_change(int(midi_note), int(vel))
+                            else:
+                                self._backend.note_off(int(midi_note))
+                        except Exception:
+                            pass
+                    if not self._running or not self._repeat_song:
+                        break
+                    # Preserve the final note's duration and any repeat-marker rest.
+                    _wait_until(t0 + self._playback_duration_sec)
+                    if not self._running or not self._repeat_song:
+                        break
+                    self._all_notes_off()
+                    cycle_events = self._build_events_full(score)
+            finally:
+                self._running = False
                 self._all_notes_off()
-            except Exception:
-                pass
 
         th = threading.Thread(target=_runner, daemon=True)
         th.start()
@@ -1021,6 +1034,7 @@ class Player:
     # ------------------------------------------------------------------
     def _build_events_full(self, score) -> List[Tuple[str, float, int, int]]:
         events: List[Tuple[str, float, int, int]] = []
+        self._playback_duration_sec = 0.0
         segs = self._get_tempo_segments(score)
         try:
             self._bpm = float(segs[0][2]) if segs else 120.0
@@ -1059,6 +1073,7 @@ class Player:
             segment_sec_cursor += seg_sec
 
         self._playhead_timeline = playhead_timeline
+        self._playback_duration_sec = segment_sec_cursor
 
         for note_start, note_end, midi_pitch, vel in playable:
             for seg_start, seg_end, seg_sec_start in timed_segments:
@@ -1080,6 +1095,7 @@ class Player:
 
     def _build_events_from_time(self, start_units: float, score) -> List[Tuple[str, float, int, int]]:
         segs = self._get_tempo_segments(score)
+        self._playback_duration_sec = 0.0
         su = float(max(0.0, start_units))
         self._playhead_timeline = None
         try:
@@ -1097,6 +1113,10 @@ class Player:
             midi_pitch = max(0, min(127, app_pitch + self._pitch_offset))
             if not _time_op.greater(end, su):
                 continue
+            self._playback_duration_sec = max(
+                self._playback_duration_sec,
+                self._seconds_between(su, end, segs),
+            )
             if _time_op.less(start, su) and _time_op.greater(end, su):
                 events.append(('on', 0.0, midi_pitch, vel))
                 off_t = self._seconds_between(su, end, segs)

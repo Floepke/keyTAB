@@ -41,6 +41,7 @@ def get_appdata_manager() -> AppDataManager:
         manager.register("show_install_question", True, "Ask once to install AppImage desktop integration on Linux")
         manager.register("app_version", __version__, "Version of keyTAB last installed for desktop integration")
         manager.register("playback_mode", "system", "Playback mode: 'system' or 'external'")
+        manager.register("repeat_song", False, "Loop the whole song during playback")
         manager.register("midi_out_port", "", "Last selected external MIDI output port name")
         manager.register("last_session_saved", False, "Whether the last session at exit was saved to a project file")
         manager.register("last_session_path", "", "Project file path associated with the last session if it was saved")

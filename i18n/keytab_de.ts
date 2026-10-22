@@ -1105,6 +1105,14 @@ Beispielsweise zeichnet „4 2“ einen 4 mm langen Strich mit einer anschließe
         <translation>Über einen externen MIDI-Ausgang wiedergeben</translation>
     </message>
     <message>
+        <source>Repeat song</source>
+        <translation>Stück wiederholen</translation>
+    </message>
+    <message>
+        <source>Loop the whole song until playback is stopped.</source>
+        <translation>Das ganze Stück wiederholen, bis die Wiedergabe gestoppt wird.</translation>
+    </message>
+    <message>
         <location filename="../ui/main_window.py" line="733" />
         <source>Use an external MIDI output port for playback.</source>
         <translation>Einen externen MIDI-Ausgang für die Wiedergabe verwenden.</translation>

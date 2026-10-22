@@ -719,6 +719,13 @@ class MainWindow(QtWidgets.QMainWindow):
 
         # Playback menu
         self._playback_menu = playback_menu
+        self._repeat_song_action = QtGui.QAction(tr("Repeat song"), self)
+        self._repeat_song_action.setToolTip(tr("Loop the whole song until playback is stopped."))
+        self._repeat_song_action.setCheckable(True)
+        self._repeat_song_action.setChecked(bool(get_appdata_manager().get("repeat_song", False)))
+        self._repeat_song_action.toggled.connect(self._set_repeat_song)
+        playback_menu.addAction(self._repeat_song_action)
+        playback_menu.addSeparator()
         self._playback_mode_group = QtGui.QActionGroup(self)
         self._playback_mode_group.setExclusive(True)
 
@@ -1615,8 +1622,16 @@ class MainWindow(QtWidgets.QMainWindow):
                 midi_out_port=(midi_out_port or None),
             )
             self._player_config = cfg
+        self.player.set_repeat_song(self._repeat_song_action.isChecked())
         if hasattr(self, 'editor_controller') and self.editor_controller is not None:
             self.editor_controller.set_player(self.player)
+
+    def _set_repeat_song(self, enabled: bool) -> None:
+        adm = get_appdata_manager()
+        adm.set("repeat_song", bool(enabled))
+        adm.save()
+        if getattr(self, 'player', None) is not None:
+            self.player.set_repeat_song(enabled)
 
     def _get_soundfont_path_from_appdata(self) -> Optional[str]:
         adm = get_appdata_manager()

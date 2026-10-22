@@ -1105,6 +1105,14 @@ Bijvoorbeeld: "4 2" tekent een streep van 4 mm gevolgd door een tussenruimte van
         <translation>Afspelen via externe MIDI-poort</translation>
     </message>
     <message>
+        <source>Repeat song</source>
+        <translation>Nummer herhalen</translation>
+    </message>
+    <message>
+        <source>Loop the whole song until playback is stopped.</source>
+        <translation>Herhaal het hele nummer totdat het afspelen wordt gestopt.</translation>
+    </message>
+    <message>
         <location filename="../ui/main_window.py" line="733" />
         <source>Use an external MIDI output port for playback.</source>
         <translation>Gebruik een externe MIDI-uitvoerpoort voor afspelen.</translation>

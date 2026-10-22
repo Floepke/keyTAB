@@ -8,6 +8,7 @@ Welcome to **keyTAB**, a passion project for creating, editing, and engraving Kl
 - Powerful selection shortcuts: global arrows transpose and time-shift selections; brackets set hand/color; platform-aware undo/redo.
 - MIDI import: load `.mid`/`.midi` files using a pure-Python byte-level parser — no external dependencies. Sets title from filename, handles corrupt/truncated files gracefully, and auto-applies quick line breaks (6 measures per line) to paginate instantly.
 - MIDI export: writes Standard MIDI Files (format 1) with three tracks — track 0 (tempo/time signature), track 1 (left hand, channel 0), track 2 (right hand, channel 1).
+- Repeat playback: enable **Playback → Repeat song** to loop the whole song until stopped. It is off by default, remembers your choice, and can be toggled during playback. When starting from the time cursor, subsequent loops start at the beginning.
 - MusicXML import: load `.musicxml`/`.mxl`/`.xml` files.
 - Smart layout tools: quick line break dialog, measure grouping, beam/slur/dynamic/text tools, and configurable snap size.
 - Session safety: autosave, undo/redo, recent files, and embedded fonts/icons for consistent output.
