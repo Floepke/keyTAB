@@ -101,6 +101,45 @@ Wait for the build to finish. It can take several minutes.
 The script creates the app and puts an installer on your **Desktop**.
 It replaces any previous installer with the same name.
 
+### Universal2 maintainer build
+
+To distribute one `.app` that runs natively on both Apple Silicon and Intel
+Macs, build each architecture from its own virtual environment, then let the
+build script merge them. This is required because compiled packages such as
+NumPy and python-rtmidi are architecture-specific.
+
+On an Apple Silicon Mac, install Rosetta first:
+
+```sh
+softwareupdate --install-rosetta --agree-to-license
+```
+
+With `PYTHON` still set to the universal Python.org interpreter from step 3,
+create and populate both environments:
+
+```sh
+arch -arm64 "$PYTHON" -m venv .venv-arm64
+arch -x86_64 "$PYTHON" -m venv .venv-x86_64
+arch -arm64 .venv-arm64/bin/python -m pip install --upgrade pip setuptools wheel
+arch -x86_64 .venv-x86_64/bin/python -m pip install --upgrade pip setuptools wheel
+arch -arm64 .venv-arm64/bin/python -m pip install -r requirements.txt pyinstaller
+arch -x86_64 .venv-x86_64/bin/python -m pip install -r requirements.txt pyinstaller
+```
+
+Then build the universal bundle:
+
+```sh
+"$PYTHON" deploy/build_.app.py --target-arch universal2
+```
+
+The default paths are `.venv-arm64/bin/python` and
+`.venv-x86_64/bin/python`. Supply `--arm64-python` or `--x86-64-python` to
+use environments stored elsewhere. The script builds two thin bundles, merges
+their shared Mach-O executables and libraries with `lipo`, and verifies that
+each shared binary contains both `arm64` and `x86_64` slices. It retains a
+single-architecture support library only when the other architecture does not
+link to it.
+
 ## 6. Install the app
 
 1. On your Desktop, open **keyTAB-1.1.4.dmg**. The version number may differ.

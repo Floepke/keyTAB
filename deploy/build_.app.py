@@ -21,11 +21,13 @@ from __future__ import annotations
 
 import argparse
 import ast
-import importlib.util
+import filecmp
+import os
 import plistlib
 import shutil
 import subprocess
 import sys
+import zipfile
 from pathlib import Path
 from typing import Iterator
 
@@ -66,6 +68,8 @@ SKIPPED_SCAN_DIRS = {
     ".mypy_cache",
     ".pytest_cache",
 }
+
+MACOS_ARCHITECTURES = ("arm64", "x86_64")
 
 
 def copy_qt_licenses(app_path: Path) -> None:
@@ -181,8 +185,26 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--target-arch",
         choices=("x86_64", "arm64", "universal2"),
-        default="arm64",
-        help="macOS target architecture (default: arm64 for Apple Silicon Macs).",
+        default="universal2",
+        help="macOS target architecture.",
+    )
+    parser.add_argument(
+        "--arm64-python",
+        type=Path,
+        default=PROJECT_ROOT / ".venv-arm64" / "bin" / "python",
+        help=(
+            "Python interpreter with arm64 dependencies for universal2 builds "
+            "(default: .venv-arm64/bin/python)."
+        ),
+    )
+    parser.add_argument(
+        "--x86-64-python",
+        type=Path,
+        default=PROJECT_ROOT / ".venv-x86_64" / "bin" / "python",
+        help=(
+            "Python interpreter with x86_64 dependencies for universal2 builds "
+            "(default: .venv-x86_64/bin/python)."
+        ),
     )
     return parser.parse_args()
 
@@ -194,14 +216,66 @@ def ensure_command(name: str) -> str:
     return path
 
 
-def ensure_pyinstaller_available(python_cmd: str) -> None:
+def ensure_pyinstaller_available(python_cmd: list[str]) -> None:
     """Verify PyInstaller is importable in the interpreter used for the build."""
-    if importlib.util.find_spec("PyInstaller") is not None:
+    result = subprocess.run(
+        [*python_cmd, "-c", "import PyInstaller"],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    if result.returncode == 0:
         return
     raise SystemExit(
-        "PyInstaller is not installed in the active Python environment. "
-        f"Install it with: {python_cmd} -m pip install pyinstaller"
+        f"PyInstaller is not available through {' '.join(python_cmd)}. "
+        "Install it into that architecture-specific environment."
     )
+
+
+def python_command(python: Path, target_arch: str) -> list[str]:
+    """Return a command that always launches Python under target_arch."""
+    if not python.is_file():
+        raise SystemExit(
+            f"Python interpreter for {target_arch} was not found: {python}. "
+            "Create the architecture-specific virtual environment first."
+        )
+    arch = ensure_command("arch")
+    # Keep the venv launcher path intact. Resolving it follows the symlink to
+    # the base interpreter and bypasses the environment's site-packages.
+    command = [arch, f"-{target_arch}", str(python)]
+    result = subprocess.run(
+        [*command, "-c", "import platform; print(platform.machine())"],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    if result.returncode != 0 or result.stdout.strip() != target_arch:
+        detail = result.stderr.strip() or result.stdout.strip() or "unknown error"
+        rosetta_hint = (
+            " Install Rosetta with: softwareupdate --install-rosetta --agree-to-license."
+            if target_arch == "x86_64"
+            else ""
+        )
+        raise SystemExit(
+            f"Unable to run {python} as {target_arch}: {detail}.{rosetta_hint}"
+        )
+    return command
+
+
+def native_macos_tool_environment(work_dir: Path) -> dict[str, str]:
+    """Run Mach-O tools natively when PyInstaller itself runs under Rosetta."""
+    tools_dir = work_dir / "native-tools"
+    tools_dir.mkdir(parents=True, exist_ok=True)
+    for tool in ("codesign", "install_name_tool", "lipo", "otool", "strip"):
+        tool_wrapper = tools_dir / tool
+        tool_wrapper.write_text(
+            f"#!/bin/sh\nexec /usr/bin/arch -arm64 /usr/bin/{tool} \"$@\"\n",
+            encoding="utf-8",
+        )
+        tool_wrapper.chmod(0o755)
+    environment = os.environ.copy()
+    environment["PATH"] = f"{tools_dir}{os.pathsep}{environment.get('PATH', '')}"
+    return environment
 
 
 def prepare_icon(icon_path: Path, work_dir: Path) -> tuple[Path, bool]:
@@ -293,7 +367,9 @@ def run_pyinstaller(
     work_dir: Path,
     icon: Path,
     exclude_modules: list[str],
-    target_arch: str,
+    target_arch: str | None,
+    python_cmd: list[str],
+    environment: dict[str, str] | None = None,
 ) -> Path:
     entry_path = entry.resolve()
     if not entry_path.exists():
@@ -302,10 +378,9 @@ def run_pyinstaller(
     work_dir.mkdir(parents=True, exist_ok=True)
     icon_to_use, generated = prepare_icon(icon, work_dir)
 
-    python_cmd = sys.executable or ensure_command("python3")
     ensure_pyinstaller_available(python_cmd)
     cmd = [
-        python_cmd,
+        *python_cmd,
         "-m",
         "PyInstaller",
         "--noconfirm",
@@ -314,11 +389,11 @@ def run_pyinstaller(
         "--windowed",
         "--name",
         name,
-        "--target-arch",
-        target_arch,
         "--icon",
         str(icon_to_use),
     ]
+    if target_arch is not None:
+        cmd.extend(["--target-arch", target_arch])
 
     # Ensure MIDI backend (python-rtmidi) is bundled even when imported dynamically.
     cmd.extend([
@@ -338,7 +413,7 @@ def run_pyinstaller(
 
     print(f"Running: {' '.join(cmd)} (cwd={work_dir})")
     try:
-        subprocess.run(cmd, cwd=work_dir, check=True)
+        subprocess.run(cmd, cwd=work_dir, check=True, env=environment)
     finally:
         if generated and icon_to_use.exists():
             icon_to_use.unlink()
@@ -352,6 +427,184 @@ def run_pyinstaller(
         shutil.rmtree(final_target, ignore_errors=True)
     shutil.move(str(produced), final_target)
     return final_target
+
+
+def _relative_paths(root: Path) -> set[Path]:
+    return {
+        path.relative_to(root)
+        for path in root.rglob("*")
+        if "_CodeSignature" not in path.parts
+    }
+
+
+def _is_macho_binary(path: Path) -> bool:
+    result = subprocess.run(
+        ["lipo", "-archs", str(path)],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+    return result.returncode == 0
+
+
+def _copy_bundle_path(source: Path, destination: Path) -> None:
+    if source.is_symlink():
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        destination.symlink_to(source.readlink())
+    elif source.is_dir():
+        destination.mkdir(parents=True, exist_ok=True)
+    else:
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(source, destination)
+
+
+def _linked_library_names(app_path: Path) -> set[str]:
+    names: set[str] = set()
+    otool = ensure_command("otool")
+    for path in app_path.rglob("*"):
+        if not path.is_file() or path.is_symlink() or not _is_macho_binary(path):
+            continue
+        result = subprocess.run(
+            [otool, "-L", str(path)],
+            check=True,
+            stdout=subprocess.PIPE,
+            text=True,
+        )
+        for line in result.stdout.splitlines()[1:]:
+            library = line.strip().split(" (", maxsplit=1)[0]
+            if library:
+                names.add(Path(library).name)
+    return names
+
+
+def _matching_python_bytecode_archives(first: Path, second: Path) -> bool:
+    try:
+        with zipfile.ZipFile(first) as first_archive, zipfile.ZipFile(second) as second_archive:
+            first_names = sorted(first_archive.namelist())
+            second_names = sorted(second_archive.namelist())
+    except (OSError, zipfile.BadZipFile):
+        return False
+    return (
+        first_names == second_names
+        and all(name.endswith(".pyc") for name in first_names)
+    )
+
+
+def merge_universal2_apps(arm64_app: Path, x86_64_app: Path, output_app: Path) -> Path:
+    """Merge matching thin macOS app bundles into a universal2 app bundle."""
+    arm64_paths = _relative_paths(arm64_app)
+    x86_64_paths = _relative_paths(x86_64_app)
+    arm64_only = arm64_paths - x86_64_paths
+    x86_64_only = x86_64_paths - arm64_paths
+    common_paths = arm64_paths & x86_64_paths
+
+    if output_app.exists():
+        shutil.rmtree(output_app)
+    shutil.copytree(arm64_app, output_app, symlinks=True)
+    for signature_dir in sorted(output_app.rglob("_CodeSignature"), reverse=True):
+        shutil.rmtree(signature_dir)
+    lipo = ensure_command("lipo")
+    for relative_path in sorted(x86_64_only):
+        _copy_bundle_path(x86_64_app / relative_path, output_app / relative_path)
+
+    arch_specific_binaries: dict[Path, str] = {}
+    for relative_path in arm64_only:
+        path = arm64_app / relative_path
+        if path.is_file() and not path.is_symlink() and _is_macho_binary(path):
+            arch_specific_binaries[relative_path] = "arm64"
+    for relative_path in x86_64_only:
+        path = x86_64_app / relative_path
+        if path.is_file() and not path.is_symlink() and _is_macho_binary(path):
+            arch_specific_binaries[relative_path] = "x86_64"
+
+    arm64_dependencies = _linked_library_names(arm64_app)
+    x86_64_dependencies = _linked_library_names(x86_64_app)
+    for relative_path, architecture in arch_specific_binaries.items():
+        missing_arch_dependencies = (
+            x86_64_dependencies if architecture == "arm64" else arm64_dependencies
+        )
+        if relative_path.name in missing_arch_dependencies:
+            raise SystemExit(
+                f"{architecture}-only binary {relative_path} is required by the "
+                f"other architecture. Install matching dependencies in both "
+                "architecture-specific environments."
+            )
+
+    for relative_path in sorted(common_paths):
+        arm64_path = arm64_app / relative_path
+        x86_64_path = x86_64_app / relative_path
+        output_path = output_app / relative_path
+        if arm64_path.is_symlink() or x86_64_path.is_symlink():
+            if not arm64_path.is_symlink() or not x86_64_path.is_symlink():
+                raise SystemExit(f"Bundle type differs between architectures: {relative_path}")
+            if arm64_path.readlink() != x86_64_path.readlink():
+                raise SystemExit(f"Bundle symlink differs between architectures: {relative_path}")
+            continue
+        if not arm64_path.is_file():
+            continue
+        arm64_is_macho = _is_macho_binary(arm64_path)
+        x86_64_is_macho = _is_macho_binary(x86_64_path)
+        if arm64_is_macho != x86_64_is_macho:
+            raise SystemExit(f"Bundle binary type differs between architectures: {relative_path}")
+        if arm64_is_macho:
+            merged_path = output_path.with_suffix(f"{output_path.suffix}.universal2")
+            subprocess.run(
+                [
+                    lipo,
+                    "-create",
+                    "-arch",
+                    "arm64",
+                    str(arm64_path),
+                    "-arch",
+                    "x86_64",
+                    str(x86_64_path),
+                    "-output",
+                    str(merged_path),
+                ],
+                check=True,
+            )
+            merged_path.replace(output_path)
+        elif (
+            relative_path == Path("Contents/Resources/base_library.zip")
+            and _matching_python_bytecode_archives(arm64_path, x86_64_path)
+        ):
+            print("Keeping the arm64 base_library.zip; both builds contain matching bytecode modules.")
+        elif relative_path.parent.name.endswith(".dist-info"):
+            print(f"Keeping arm64 wheel metadata: {relative_path}")
+        elif not filecmp.cmp(arm64_path, x86_64_path, shallow=False):
+            raise SystemExit(
+                f"Non-binary bundle file differs between architectures: {relative_path}"
+            )
+
+    validate_universal2_app(output_app, arch_specific_binaries)
+    return output_app
+
+
+def validate_universal2_app(
+    app_path: Path, arch_specific_binaries: dict[Path, str] | None = None
+) -> None:
+    """Ensure shared Mach-O files are universal and exceptions have one expected slice."""
+    arch_specific_binaries = arch_specific_binaries or {}
+    invalid_paths: list[str] = []
+    for path in app_path.rglob("*"):
+        if not path.is_file() or path.is_symlink() or not _is_macho_binary(path):
+            continue
+        result = subprocess.run(
+            ["lipo", "-archs", str(path)],
+            check=True,
+            stdout=subprocess.PIPE,
+            text=True,
+        )
+        relative_path = path.relative_to(app_path)
+        expected_architectures = set(MACOS_ARCHITECTURES)
+        if relative_path in arch_specific_binaries:
+            expected_architectures = {arch_specific_binaries[relative_path]}
+        if set(result.stdout.split()) != expected_architectures:
+            invalid_paths.append(str(path.relative_to(app_path)))
+    if invalid_paths:
+        raise SystemExit(
+            "Universal2 bundle contains binaries with unexpected architectures: "
+            f"{', '.join(invalid_paths[:10])}"
+        )
 
 
 def clean_pyinstaller_artifacts(work_dir: Path, name: str) -> None:
@@ -506,14 +759,41 @@ def main() -> None:
     final_app_path: Path | None = None
     success = False
     try:
-        result_path = run_pyinstaller(
-            args.entry,
-            args.name,
-            build_dir,
-            args.icon,
-            exclude_modules=unused_modules,
-            target_arch=args.target_arch,
-        )
+        if args.target_arch == "universal2":
+            arm64_python = python_command(args.arm64_python, "arm64")
+            x86_64_python = python_command(args.x86_64_python, "x86_64")
+            arm64_app = run_pyinstaller(
+                args.entry,
+                args.name,
+                build_dir / "arm64",
+                args.icon,
+                exclude_modules=unused_modules,
+                target_arch=None,
+                python_cmd=arm64_python,
+            )
+            x86_64_app = run_pyinstaller(
+                args.entry,
+                args.name,
+                build_dir / "x86_64",
+                args.icon,
+                exclude_modules=unused_modules,
+                target_arch=None,
+                python_cmd=x86_64_python,
+                environment=native_macos_tool_environment(build_dir / "x86_64"),
+            )
+            result_path = merge_universal2_apps(
+                arm64_app, x86_64_app, build_dir / f"{args.name}.app"
+            )
+        else:
+            result_path = run_pyinstaller(
+                args.entry,
+                args.name,
+                build_dir,
+                args.icon,
+                exclude_modules=unused_modules,
+                target_arch=args.target_arch,
+                python_cmd=[sys.executable or ensure_command("python3")],
+            )
         copy_qt_licenses(result_path)
         doc_icon_file = ensure_document_icon(result_path, build_dir, args.icon)
         update_info_plist(result_path, args.name, doc_icon_file)
