@@ -1,4 +1,5 @@
 from __future__ import annotations
+import math
 from PySide6 import QtCore, QtGui, QtWidgets
 import cairo
 import sys
@@ -78,6 +79,23 @@ class DrawUtilView(QtWidgets.QWidget):
         self._scroll_y_px: float = 0.0
         self._middle_pan_active: bool = False
         self._middle_pan_last_pos: QtCore.QPointF | None = None
+        # 3D rotate mode: Shift + middle-drag tilts the paper around its center;
+        # a middle click (press/release without dragging) returns to the flat view.
+        self._rotate_active: bool = False
+        # Paper orientation as a 3x3 rotation matrix (x right, y down, z away from viewer).
+        self._rot: list[list[float]] = [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]]
+        self._rotate_deg_per_px: float = 0.4
+        # Camera distance as a multiple of the paper's largest side; larger = flatter perspective.
+        self._camera_distance_factor: float = 2.5
+        # Shift+scroll in rotate mode moves the camera along its view axis (dolly).
+        # 1.0 = default distance; >1 moves the camera away from the paper.
+        self._camera_dolly: float = 1.0
+        self._camera_dolly_min: float = 0.5
+        self._camera_dolly_max: float = 10.0
+        self._camera_dolly_step: float = 1.15
+        self._middle_press_pos: QtCore.QPointF | None = None
+        self._middle_dragged: bool = False
+        self._middle_click_threshold_px: float = 4.0
         self._zoom_factor: float = 1.0
         self._image_render_zoom_factor: float = 1.0
         self._prev_image_render_zoom_factor: float = 1.0
@@ -193,6 +211,103 @@ class DrawUtilView(QtWidgets.QWidget):
         self._scroll_y_px = 0.0
         self.update()
         self._zoom_rerender_timer.start()
+
+    def _is_rotated(self) -> bool:
+        r = self._rot
+        return any(abs(r[i][j] - (1.0 if i == j else 0.0)) > 1e-9 for i in range(3) for j in range(3))
+
+    def _is_front_facing(self) -> bool:
+        # The printed side's normal starts as -z (toward the viewer); it stays visible
+        # while the rotated normal still points toward the camera at (0, 0, -dist).
+        return self._rot[2][2] > 0.0
+
+    def _apply_drag_rotation(self, dx: float, dy: float) -> None:
+        """Trackball-style rotation about the screen axes: the paper follows the mouse."""
+        a = math.radians(-dx * self._rotate_deg_per_px)  # about screen Y axis
+        b = math.radians(dy * self._rotate_deg_per_px)   # about screen X axis
+        ca, sa, cb, sb = math.cos(a), math.sin(a), math.cos(b), math.sin(b)
+        ry = [[ca, 0.0, sa], [0.0, 1.0, 0.0], [-sa, 0.0, ca]]
+        rx = [[1.0, 0.0, 0.0], [0.0, cb, -sb], [0.0, sb, cb]]
+
+        def _mul(m: list[list[float]], n: list[list[float]]) -> list[list[float]]:
+            return [[sum(m[i][k] * n[k][j] for k in range(3)) for j in range(3)] for i in range(3)]
+
+        r = _mul(rx, _mul(ry, self._rot))
+        # Re-orthonormalize (Gram-Schmidt on columns) to prevent drift/shear over many drags.
+        c0 = [r[0][0], r[1][0], r[2][0]]
+        c1 = [r[0][1], r[1][1], r[2][1]]
+        n0 = math.sqrt(sum(v * v for v in c0)) or 1.0
+        c0 = [v / n0 for v in c0]
+        d = sum(c0[i] * c1[i] for i in range(3))
+        c1 = [c1[i] - d * c0[i] for i in range(3)]
+        n1 = math.sqrt(sum(v * v for v in c1)) or 1.0
+        c1 = [v / n1 for v in c1]
+        c2 = [c0[1] * c1[2] - c0[2] * c1[1], c0[2] * c1[0] - c0[0] * c1[2], c0[0] * c1[1] - c0[1] * c1[0]]
+        self._rot = [[c0[i], c1[i], c2[i]] for i in range(3)]
+
+    def _projected_paper(self, rect: QtCore.QRectF) -> tuple[QtGui.QTransform | None, bool, float]:
+        """Rotate the paper's corners in 3D around its center and project them once
+        through a single pinhole camera. Since the paper is planar, the resulting
+        homography (quad-to-quad) is an exact perspective view of the rotated sheet.
+
+        Returns (transform, front_facing, facing_cos).
+        """
+        cx, cy = rect.center().x(), rect.center().y()
+        hw, hh = rect.width() * 0.5, rect.height() * 0.5
+        dist = max(rect.width(), rect.height()) * float(self._camera_distance_factor)
+        r = self._rot
+        src = QtGui.QPolygonF()
+        dst = QtGui.QPolygonF()
+        for px, py in ((-hw, -hh), (hw, -hh), (hw, hh), (-hw, hh)):
+            x3 = r[0][0] * px + r[0][1] * py
+            y3 = r[1][0] * px + r[1][1] * py
+            z3 = r[2][0] * px + r[2][1] * py
+            s = dist / max(1e-6, dist * float(self._camera_dolly) + z3)
+            src.append(QtCore.QPointF(cx + px, cy + py))
+            dst.append(QtCore.QPointF(cx + x3 * s, cy + y3 * s))
+        nz = r[2][2]
+        transform = QtGui.QTransform.quadToQuad(src, dst)
+        return transform, self._is_front_facing(), abs(nz)
+
+    def _dolly_source_image(self, img: QtGui.QImage) -> QtGui.QImage:
+        """When the camera is far away, return a smoothly pre-downscaled copy so thin
+        lines don't break up under the perspective transform's coarse sampling."""
+        if self._camera_dolly <= 1.3:
+            return img
+        factor = round(1.0 / float(self._camera_dolly), 2)
+        key = (img.cacheKey(), factor)
+        cache = getattr(self, '_dolly_cache', None)
+        if cache is None:
+            cache = self._dolly_cache = {}
+        if key in cache:
+            return cache[key]
+        w = max(1, int(round(img.width() * factor)))
+        h = max(1, int(round(img.height() * factor)))
+        scaled = img.scaled(w, h, QtCore.Qt.AspectRatioMode.IgnoreAspectRatio, QtCore.Qt.TransformationMode.SmoothTransformation)
+        scaled.setDevicePixelRatio(img.devicePixelRatio())
+        # Keep at most two entries (current + previous image during cross-fades).
+        while len(cache) >= 2:
+            cache.pop(next(iter(cache)))
+        cache[key] = scaled
+        return scaled
+
+    def _in_3d_mode(self) -> bool:
+        return self._is_rotated() or abs(self._camera_dolly - 1.0) > 1e-9
+
+    def reset_rotation(self) -> None:
+        if not self._in_3d_mode():
+            return
+        self._rot = [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]]
+        self._camera_dolly = 1.0
+        self.update()
+
+    def _apply_camera_dolly_steps(self, steps: int) -> None:
+        # Positive steps (scroll up) move the camera closer; negative move it away.
+        new_dolly = float(self._camera_dolly) * (float(self._camera_dolly_step) ** float(-steps))
+        new_dolly = max(float(self._camera_dolly_min), min(float(self._camera_dolly_max), new_dolly))
+        if abs(new_dolly - self._camera_dolly) > 1e-9:
+            self._camera_dolly = new_dolly
+            self.update()
 
     def _scaled_image_metrics(self, img: QtGui.QImage, render_zoom_factor: float | None = None) -> tuple[int, int, int, int, float, float, float]:
         img_w = float(img.width()) / max(1e-6, float(img.devicePixelRatio()))
@@ -335,6 +450,17 @@ class DrawUtilView(QtWidgets.QWidget):
 
             tgt_w, tgt_h, x, y, _scale, _max_scroll_x, _max_scroll_y = self._scaled_image_metrics(self._image)
 
+            front_facing = True
+            facing_cos = 1.0
+            if self._in_3d_mode():
+                paper_tf, front_facing, facing_cos = self._projected_paper(
+                    QtCore.QRectF(float(x), float(y), float(tgt_w), float(tgt_h))
+                )
+                painter.setRenderHint(QtGui.QPainter.RenderHint.SmoothPixmapTransform, True)
+                painter.setRenderHint(QtGui.QPainter.RenderHint.Antialiasing, True)
+                if paper_tf is not None:
+                    painter.setWorldTransform(paper_tf)
+
             # Keep a permanent paper layer behind transition frames so cross-fades remain white.
             painter.fillRect(QtCore.QRect(x, y, tgt_w, tgt_h), paper_qcolor)
 
@@ -346,15 +472,33 @@ class DrawUtilView(QtWidgets.QWidget):
                 else:
                     img_zoom = float(self._image_render_zoom_factor)
                 tgt_w, tgt_h, x, y, _scale, _max_scroll_x, _max_scroll_y = self._scaled_image_metrics(img, img_zoom)
-                painter.drawImage(QtCore.QRect(x, y, tgt_w, tgt_h), img)
+                painter.drawImage(QtCore.QRect(x, y, tgt_w, tgt_h), self._dolly_source_image(img))
                 painter.restore()
 
-            if self._prev_image is not None and self._fade_progress < 1.0:
+            if not front_facing:
+                # Opaque sheet: the back side is blank paper.
+                pass
+            elif self._prev_image is not None and self._fade_progress < 1.0:
                 # Keep the old frame fully visible and fade only the new frame on top.
                 _draw_image(self._prev_image, 1.0)
                 _draw_image(self._image, self._fade_progress)
             else:
                 _draw_image(self._image, 1.0)
+
+            if self._in_3d_mode():
+                # Simple diffuse lighting: the sheet darkens as it turns away from the light.
+                shade = max(0.0, min(1.0, 1.0 - float(facing_cos)))
+                if not front_facing:
+                    shade = min(1.0, shade + 0.08)
+                if shade > 0.0:
+                    painter.fillRect(QtCore.QRect(x, y, tgt_w, tgt_h), QtGui.QColor(0, 0, 0, int(round(shade * 55))))
+                painter.save()
+                pen = QtGui.QPen(QtGui.QColor(0, 0, 0, 60))
+                pen.setCosmetic(True)
+                painter.setPen(pen)
+                painter.setBrush(QtCore.Qt.BrushStyle.NoBrush)
+                painter.drawRect(QtCore.QRectF(float(x), float(y), float(tgt_w), float(tgt_h)))
+                painter.restore()
 
         # --- Playhead overlay (drawn on top of the page image) ---
         if (
@@ -362,6 +506,7 @@ class DrawUtilView(QtWidgets.QWidget):
             and self._playhead_x1_mm is not None
             and self._playhead_x2_mm is not None
             and self._image is not None
+            and self._is_front_facing()
         ):
             try:
                 from ui.style import Style as _Style
@@ -412,6 +557,24 @@ class DrawUtilView(QtWidgets.QWidget):
         painter.end()
 
     def wheelEvent(self, ev: QtGui.QWheelEvent) -> None:
+        if (
+            self._in_3d_mode()
+            and (ev.modifiers() & QtCore.Qt.KeyboardModifier.ShiftModifier)
+            and not self._zoom_modifiers_active(ev.modifiers())
+        ):
+            # Some platforms report Shift+wheel as horizontal; accept either axis.
+            angle_delta = ev.angleDelta()
+            raw = angle_delta.y() if angle_delta.y() != 0 else angle_delta.x()
+            if raw == 0:
+                pixel_delta = ev.pixelDelta()
+                raw = (pixel_delta.y() if pixel_delta.y() != 0 else pixel_delta.x()) * 3
+            acc = float(self._wheel_angle_remainder_y) + float(raw)
+            steps = int(acc / 120.0)
+            self._wheel_angle_remainder_y = acc - float(steps) * 120.0
+            if steps != 0:
+                self._apply_camera_dolly_steps(steps)
+            ev.accept()
+            return
         if self._zoom_modifiers_active(ev.modifiers()):
             angle_delta = ev.angleDelta()
             raw = angle_delta.y() if angle_delta.y() != 0 else angle_delta.x()
@@ -491,9 +654,15 @@ class DrawUtilView(QtWidgets.QWidget):
 
     def mousePressEvent(self, ev: QtGui.QMouseEvent) -> None:
         if ev.button() == QtCore.Qt.MouseButton.MiddleButton:
-            self._middle_pan_active = True
+            self._middle_press_pos = ev.position()
+            self._middle_dragged = False
+            if ev.modifiers() & QtCore.Qt.KeyboardModifier.ShiftModifier:
+                self._rotate_active = True
+                self.setCursor(QtCore.Qt.CursorShape.SizeAllCursor)
+            else:
+                self._middle_pan_active = True
+                self.setCursor(QtCore.Qt.CursorShape.ClosedHandCursor)
             self._middle_pan_last_pos = ev.position()
-            self.setCursor(QtCore.Qt.CursorShape.ClosedHandCursor)
             self.grabMouse()
             ev.accept()
             return
@@ -526,6 +695,19 @@ class DrawUtilView(QtWidgets.QWidget):
             print("Hit: none")
 
     def mouseMoveEvent(self, ev: QtGui.QMouseEvent) -> None:
+        if (self._middle_pan_active or self._rotate_active) and self._middle_press_pos is not None and not self._middle_dragged:
+            moved = ev.position() - self._middle_press_pos
+            if abs(moved.x()) + abs(moved.y()) >= self._middle_click_threshold_px:
+                self._middle_dragged = True
+        if self._rotate_active:
+            if self._middle_pan_last_pos is not None and self._middle_dragged:
+                dx = float(ev.position().x()) - float(self._middle_pan_last_pos.x())
+                dy = float(ev.position().y()) - float(self._middle_pan_last_pos.y())
+                self._apply_drag_rotation(dx, dy)
+                self._middle_pan_last_pos = ev.position()
+                self.update()
+            ev.accept()
+            return
         if self._middle_pan_active:
             if self._image is not None and self._middle_pan_last_pos is not None:
                 _tgt_w, _tgt_h, _img_x, _img_y, _scale, max_scroll_x, max_scroll_y = self._scaled_image_metrics(self._image)
@@ -541,10 +723,16 @@ class DrawUtilView(QtWidgets.QWidget):
 
     def mouseReleaseEvent(self, ev: QtGui.QMouseEvent) -> None:
         if ev.button() == QtCore.Qt.MouseButton.MiddleButton:
+            was_click = not self._middle_dragged
             self._middle_pan_active = False
+            self._rotate_active = False
             self._middle_pan_last_pos = None
+            self._middle_press_pos = None
+            self._middle_dragged = False
             self.unsetCursor()
             self.releaseMouse()
+            if was_click:
+                self.reset_rotation()
             ev.accept()
             return
         super().mouseReleaseEvent(ev)
