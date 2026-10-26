@@ -93,6 +93,20 @@ class DrawUtilView(QtWidgets.QWidget):
         self._camera_dolly_min: float = 0.5
         self._camera_dolly_max: float = 10.0
         self._camera_dolly_step: float = 1.15
+        # Depth-of-field eye candy in 3D mode: the paper point under the mouse is in
+        # focus, parts at a different depth get progressively (mildly) blurred.
+        self._dof_enabled: bool = True
+        self._dof_focus_uv: tuple[float, float] | None = None  # paper coords 0..1
+        # Depth difference (as a fraction of the paper's largest side) at which blur is maximal.
+        self._dof_range: float = 0.45
+        # Number of blur levels blended across the depth range (more = smoother falloff).
+        self._dof_levels: int = 6
+        # Blur radius (logical screen px, Qt blur-radius units) at full depth distance.
+        self._dof_max_blur_px: float = 7.0
+        # Fraction of the depth range around the focus that stays fully sharp.
+        self._dof_sharp_plateau: float = 0.04
+        self._dof_blur_cache: dict = {}
+        self.setMouseTracking(True)
         self._middle_press_pos: QtCore.QPointF | None = None
         self._middle_dragged: bool = False
         self._middle_click_threshold_px: float = 4.0
@@ -269,6 +283,122 @@ class DrawUtilView(QtWidgets.QWidget):
         transform = QtGui.QTransform.quadToQuad(src, dst)
         return transform, self._is_front_facing(), abs(nz)
 
+    def _blurred_image(self, src: QtGui.QImage, radius_src_px: float) -> QtGui.QImage:
+        """Cached high-quality (Gaussian-like) blur using Qt's native blur effect."""
+        radius = max(0.0, float(radius_src_px))
+        key = (src.cacheKey(), round(radius, 2))
+        cached = self._dof_blur_cache.get(key)
+        if cached is not None:
+            return cached
+        w, h = src.width(), src.height()
+        scene = QtWidgets.QGraphicsScene()
+        item = QtWidgets.QGraphicsPixmapItem(QtGui.QPixmap.fromImage(src))
+        effect = QtWidgets.QGraphicsBlurEffect()
+        effect.setBlurRadius(radius)
+        effect.setBlurHints(QtWidgets.QGraphicsBlurEffect.BlurHint.QualityHint)
+        item.setGraphicsEffect(effect)
+        scene.addItem(item)
+        out = QtGui.QImage(w, h, QtGui.QImage.Format.Format_ARGB32_Premultiplied)
+        out.fill(QtCore.Qt.GlobalColor.transparent)
+        p = QtGui.QPainter(out)
+        p.setRenderHint(QtGui.QPainter.RenderHint.SmoothPixmapTransform, True)
+        scene.render(p, QtCore.QRectF(0, 0, w, h), QtCore.QRectF(0, 0, w, h))
+        p.end()
+        out.setDevicePixelRatio(src.devicePixelRatio())
+        # Keep blur levels for at most two source images (current + cross-fade previous).
+        src_keys = {k[0] for k in self._dof_blur_cache}
+        if src.cacheKey() not in src_keys and len(src_keys) >= 2:
+            oldest = next(iter(self._dof_blur_cache))[0]
+            self._dof_blur_cache = {k: v for k, v in self._dof_blur_cache.items() if k[0] != oldest}
+        self._dof_blur_cache[key] = out
+        return out
+
+    def _compose_dof_image(self, src: QtGui.QImage, tgt_w: float, tgt_h: float) -> QtGui.QImage:
+        """Blend sharp/mild/strong blur versions of the page, weighted by each point's
+        depth distance from the focus point. The paper is planar, so depth is linear in
+        paper coordinates and the blend masks are simple linear gradients."""
+        r = self._rot
+        W, H = src.width(), src.height()
+        if W <= 0 or H <= 0 or tgt_w <= 0 or tgt_h <= 0:
+            return src
+        sx, sy = tgt_w / float(W), tgt_h / float(H)
+        # Depth gradient (camera z per source pixel).
+        gx, gy = r[2][0] * sx, r[2][1] * sy
+        glen = math.hypot(gx, gy)
+        depth_full = float(self._dof_range) * max(tgt_w, tgt_h)
+        if glen * max(W, H) < 1e-3 * depth_full:
+            return src  # Facing the camera: whole sheet at the same depth.
+        u, v = self._dof_focus_uv if self._dof_focus_uv is not None else (0.5, 0.5)
+        fx, fy = u * W, v * H
+        # Points on the gradient line where the depth offset reaches depth_full.
+        reach = depth_full / glen
+        nx, ny = gx / glen, gy / glen
+        p0 = QtCore.QPointF(fx - nx * reach, fy - ny * reach)
+        p1 = QtCore.QPointF(fx + nx * reach, fy + ny * reach)
+
+        src_per_screen = 1.0 / max(1e-6, min(sx, sy))
+        n = max(2, int(self._dof_levels))
+        plateau = max(0.0, min(0.9, float(self._dof_sharp_plateau)))
+        # Level k sits at normalized depth distance d_k; its blur grows linearly with
+        # depth (like a real lens' circle of confusion). Between neighbouring levels the
+        # result is linearly cross-faded, so the falloff has no visible steps.
+        depths = [plateau + (1.0 - plateau) * k / (n - 1) for k in range(n)]
+        levels = [src] + [
+            self._blurred_image(src, float(self._dof_max_blur_px) * src_per_screen * (k / (n - 1)))
+            for k in range(1, n)
+        ]
+
+        def _mask(d_opaque: float, d_clear: float) -> QtGui.QLinearGradient:
+            # Symmetric profile around the focus line: position 0.5 is the focus depth.
+            g = QtGui.QLinearGradient(p0, p1)
+            g.setSpread(QtGui.QGradient.Spread.PadSpread)
+            opaque = QtGui.QColor(0, 0, 0, 255)
+            clear = QtGui.QColor(0, 0, 0, 0)
+            g.setColorAt(0.5, opaque)
+            g.setColorAt(max(0.0, 0.5 - d_opaque * 0.5), opaque)
+            g.setColorAt(min(1.0, 0.5 + d_opaque * 0.5), opaque)
+            g.setColorAt(max(0.0, 0.5 - d_clear * 0.5), clear)
+            g.setColorAt(min(1.0, 0.5 + d_clear * 0.5), clear)
+            return g
+
+        def _masked(img: QtGui.QImage, grad: QtGui.QLinearGradient) -> QtGui.QImage:
+            layer = img.convertToFormat(QtGui.QImage.Format.Format_ARGB32_Premultiplied)
+            lp = QtGui.QPainter(layer)
+            lp.setCompositionMode(QtGui.QPainter.CompositionMode.CompositionMode_DestinationIn)
+            lp.fillRect(QtCore.QRect(0, 0, W, H), QtGui.QBrush(grad))
+            lp.end()
+            return layer
+
+        # Start from the blurriest level and lay progressively sharper levels on top.
+        out = levels[-1].copy()
+        p = QtGui.QPainter(out)
+        for k in range(n - 2, -1, -1):
+            # Level k: fully opaque up to depth d_k, fading out by d_{k+1}.
+            p.drawImage(0, 0, _masked(levels[k], _mask(depths[k], depths[k + 1])))
+        p.end()
+        out.setDevicePixelRatio(src.devicePixelRatio())
+        return out
+
+    def _update_dof_focus(self, pos: QtCore.QPointF) -> None:
+        if not self._dof_enabled or self._image is None or not self._in_3d_mode():
+            return
+        tgt_w, tgt_h, x, y, _s, _mx, _my = self._scaled_image_metrics(self._image)
+        tf, _front, _cos = self._projected_paper(QtCore.QRectF(float(x), float(y), float(tgt_w), float(tgt_h)))
+        if tf is None:
+            return
+        inv, ok = tf.inverted()
+        if not ok:
+            return
+        pt = inv.map(pos)
+        u = (pt.x() - x) / max(1e-6, float(tgt_w))
+        v = (pt.y() - y) / max(1e-6, float(tgt_h))
+        if not (math.isfinite(u) and math.isfinite(v)):
+            return
+        uv = (max(0.0, min(1.0, u)), max(0.0, min(1.0, v)))
+        if self._dof_focus_uv is None or abs(uv[0] - self._dof_focus_uv[0]) + abs(uv[1] - self._dof_focus_uv[1]) > 1e-3:
+            self._dof_focus_uv = uv
+            self.update()
+
     def _dolly_source_image(self, img: QtGui.QImage) -> QtGui.QImage:
         """When the camera is far away, return a smoothly pre-downscaled copy so thin
         lines don't break up under the perspective transform's coarse sampling."""
@@ -299,6 +429,8 @@ class DrawUtilView(QtWidgets.QWidget):
             return
         self._rot = [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]]
         self._camera_dolly = 1.0
+        self._dof_focus_uv = None
+        self._dof_blur_cache = {}
         self.update()
 
     def _apply_camera_dolly_steps(self, steps: int) -> None:
@@ -472,7 +604,10 @@ class DrawUtilView(QtWidgets.QWidget):
                 else:
                     img_zoom = float(self._image_render_zoom_factor)
                 tgt_w, tgt_h, x, y, _scale, _max_scroll_x, _max_scroll_y = self._scaled_image_metrics(img, img_zoom)
-                painter.drawImage(QtCore.QRect(x, y, tgt_w, tgt_h), self._dolly_source_image(img))
+                src = self._dolly_source_image(img)
+                if self._in_3d_mode() and self._dof_enabled:
+                    src = self._compose_dof_image(src, float(tgt_w), float(tgt_h))
+                painter.drawImage(QtCore.QRect(x, y, tgt_w, tgt_h), src)
                 painter.restore()
 
             if not front_facing:
@@ -573,6 +708,7 @@ class DrawUtilView(QtWidgets.QWidget):
             self._wheel_angle_remainder_y = acc - float(steps) * 120.0
             if steps != 0:
                 self._apply_camera_dolly_steps(steps)
+                self._update_dof_focus(ev.position())
             ev.accept()
             return
         if self._zoom_modifiers_active(ev.modifiers()):
@@ -695,6 +831,8 @@ class DrawUtilView(QtWidgets.QWidget):
             print("Hit: none")
 
     def mouseMoveEvent(self, ev: QtGui.QMouseEvent) -> None:
+        if not self._rotate_active and self._in_3d_mode():
+            self._update_dof_focus(ev.position())
         if (self._middle_pan_active or self._rotate_active) and self._middle_press_pos is not None and not self._middle_dragged:
             moved = ev.position() - self._middle_press_pos
             if abs(moved.x()) + abs(moved.y()) >= self._middle_click_threshold_px:
@@ -704,6 +842,7 @@ class DrawUtilView(QtWidgets.QWidget):
                 dx = float(ev.position().x()) - float(self._middle_pan_last_pos.x())
                 dy = float(ev.position().y()) - float(self._middle_pan_last_pos.y())
                 self._apply_drag_rotation(dx, dy)
+                self._update_dof_focus(ev.position())
                 self._middle_pan_last_pos = ev.position()
                 self.update()
             ev.accept()
