@@ -102,11 +102,22 @@ class DrawUtilView(QtWidgets.QWidget):
         # Number of blur levels blended across the depth range (more = smoother falloff).
         self._dof_levels: int = 6
         # Blur radius (logical screen px, Qt blur-radius units) at full depth distance.
-        self._dof_max_blur_px: float = 7.0
+        self._dof_max_blur_px: float = 2.5
         # Fraction of the depth range around the focus that stays fully sharp.
         self._dof_sharp_plateau: float = 0.04
         self._dof_blur_cache: dict = {}
+        # Soft glow around the paper, shown only while it is rotated.
+        self._glow_enabled: bool = True
+        self._glow_radius_px: float = 44.0
+        self._glow_opacity: float = 1.0
+        # Glow is rendered at 1/N resolution, then upscaled smoothly (it's low-frequency).
+        self._glow_downscale: int = 4
+        self._glow_color: QtGui.QColor = QtGui.QColor('#888')
+        # Background shown behind the paper while in 3D (rotated / dollied) mode.
+        self._rotate_background_color: QtGui.QColor = QtGui.QColor('#aaa')
         self.setMouseTracking(True)
+        # Depth-of-field blur is only active while the mouse hovers over this view.
+        self._mouse_inside: bool = False
         self._middle_press_pos: QtCore.QPointF | None = None
         self._middle_dragged: bool = False
         self._middle_click_threshold_px: float = 4.0
@@ -399,6 +410,57 @@ class DrawUtilView(QtWidgets.QWidget):
             self._dof_focus_uv = uv
             self.update()
 
+    def _paint_paper_glow(self, painter: QtGui.QPainter, paper_tf: QtGui.QTransform, rect: QtCore.QRectF) -> None:
+        """Draw a soft halo behind the projected sheet (screen space, before the
+        paper transform is applied)."""
+        try:
+            quad = paper_tf.map(QtGui.QPolygonF(rect))
+            ds = max(1, int(self._glow_downscale))
+            radius = max(1.0, float(self._glow_radius_px)) * min(1.0, 1.0 / max(1e-6, float(self._camera_dolly)) ** 0.5)
+            margin = radius * 2.0
+            bounds = quad.boundingRect().adjusted(-margin, -margin, margin, margin)
+            bounds = bounds.intersected(QtCore.QRectF(self.rect()).adjusted(-margin, -margin, margin, margin))
+            if bounds.width() < 1.0 or bounds.height() < 1.0:
+                return
+            sw = max(1, int(math.ceil(bounds.width() / ds)))
+            sh = max(1, int(math.ceil(bounds.height() / ds)))
+            mask = QtGui.QImage(sw, sh, QtGui.QImage.Format.Format_ARGB32_Premultiplied)
+            mask.fill(QtCore.Qt.GlobalColor.transparent)
+            glow_color = QtGui.QColor(self._glow_color)
+            mp = QtGui.QPainter(mask)
+            mp.setRenderHint(QtGui.QPainter.RenderHint.Antialiasing, True)
+            mp.scale(1.0 / ds, 1.0 / ds)
+            mp.translate(-bounds.left(), -bounds.top())
+            mp.setBrush(glow_color)
+            # A thick outline pushes the halo's core slightly beyond the paper edge.
+            spread_pen = QtGui.QPen(glow_color, radius * 0.35)
+            spread_pen.setJoinStyle(QtCore.Qt.PenJoinStyle.RoundJoin)
+            mp.setPen(spread_pen)
+            mp.drawPolygon(quad)
+            mp.end()
+
+            scene = QtWidgets.QGraphicsScene()
+            item = QtWidgets.QGraphicsPixmapItem(QtGui.QPixmap.fromImage(mask))
+            effect = QtWidgets.QGraphicsBlurEffect()
+            effect.setBlurRadius(radius / ds)
+            effect.setBlurHints(QtWidgets.QGraphicsBlurEffect.BlurHint.QualityHint)
+            item.setGraphicsEffect(effect)
+            scene.addItem(item)
+            blurred = QtGui.QImage(sw, sh, QtGui.QImage.Format.Format_ARGB32_Premultiplied)
+            blurred.fill(QtCore.Qt.GlobalColor.transparent)
+            bp = QtGui.QPainter(blurred)
+            scene.render(bp, QtCore.QRectF(0, 0, sw, sh), QtCore.QRectF(0, 0, sw, sh))
+            bp.end()
+
+            painter.save()
+            painter.resetTransform()
+            painter.setOpacity(max(0.0, min(1.0, float(self._glow_opacity))))
+            painter.setRenderHint(QtGui.QPainter.RenderHint.SmoothPixmapTransform, True)
+            painter.drawImage(QtCore.QRectF(bounds.left(), bounds.top(), sw * ds, sh * ds), blurred)
+            painter.restore()
+        except Exception:
+            pass
+
     def _dolly_source_image(self, img: QtGui.QImage) -> QtGui.QImage:
         """When the camera is far away, return a smoothly pre-downscaled copy so thin
         lines don't break up under the perspective transform's coarse sampling."""
@@ -571,7 +633,10 @@ class DrawUtilView(QtWidgets.QWidget):
     def paintEvent(self, ev: QtGui.QPaintEvent) -> None:
         painter = QtGui.QPainter(self)
         try:
-            painter.fillRect(self.rect(), self.palette().window())
+            if self._in_3d_mode():
+                painter.fillRect(self.rect(), self._rotate_background_color)
+            else:
+                painter.fillRect(self.rect(), self.palette().window())
         except Exception:
             painter.fillRect(self.rect(), QtCore.Qt.GlobalColor.white)
         if self._image is not None:
@@ -591,6 +656,8 @@ class DrawUtilView(QtWidgets.QWidget):
                 painter.setRenderHint(QtGui.QPainter.RenderHint.SmoothPixmapTransform, True)
                 painter.setRenderHint(QtGui.QPainter.RenderHint.Antialiasing, True)
                 if paper_tf is not None:
+                    if self._glow_enabled and self._is_rotated():
+                        self._paint_paper_glow(painter, paper_tf, QtCore.QRectF(float(x), float(y), float(tgt_w), float(tgt_h)))
                     painter.setWorldTransform(paper_tf)
 
             # Keep a permanent paper layer behind transition frames so cross-fades remain white.
@@ -605,7 +672,7 @@ class DrawUtilView(QtWidgets.QWidget):
                     img_zoom = float(self._image_render_zoom_factor)
                 tgt_w, tgt_h, x, y, _scale, _max_scroll_x, _max_scroll_y = self._scaled_image_metrics(img, img_zoom)
                 src = self._dolly_source_image(img)
-                if self._in_3d_mode() and self._dof_enabled:
+                if self._in_3d_mode() and self._dof_enabled and (self._mouse_inside or self._rotate_active):
                     src = self._compose_dof_image(src, float(tgt_w), float(tgt_h))
                 painter.drawImage(QtCore.QRect(x, y, tgt_w, tgt_h), src)
                 painter.restore()
@@ -789,21 +856,38 @@ class DrawUtilView(QtWidgets.QWidget):
         super().keyPressEvent(ev)
 
     def mousePressEvent(self, ev: QtGui.QMouseEvent) -> None:
+        if (
+            ev.button() == QtCore.Qt.MouseButton.LeftButton
+            and ev.modifiers() & QtCore.Qt.KeyboardModifier.ShiftModifier
+        ):
+            # Shift + left drag rotates the paper in 3D; a Shift-click alone does nothing.
+            self._rotate_active = True
+            self._middle_press_pos = ev.position()
+            self._middle_dragged = False
+            self._middle_pan_last_pos = ev.position()
+            self.setCursor(QtCore.Qt.CursorShape.SizeAllCursor)
+            self.grabMouse()
+            ev.accept()
+            return
         if ev.button() == QtCore.Qt.MouseButton.MiddleButton:
             self._middle_press_pos = ev.position()
             self._middle_dragged = False
-            if ev.modifiers() & QtCore.Qt.KeyboardModifier.ShiftModifier:
-                self._rotate_active = True
-                self.setCursor(QtCore.Qt.CursorShape.SizeAllCursor)
-            else:
-                self._middle_pan_active = True
-                self.setCursor(QtCore.Qt.CursorShape.ClosedHandCursor)
+            self._middle_pan_active = True
+            self.setCursor(QtCore.Qt.CursorShape.ClosedHandCursor)
             self._middle_pan_last_pos = ev.position()
             self.grabMouse()
             ev.accept()
             return
         if ev.button() == QtCore.Qt.MouseButton.LeftButton and callable(self._page_prev_cb):
             self._page_prev_cb()
+            return
+        if (
+            ev.button() == QtCore.Qt.MouseButton.RightButton
+            and ev.modifiers() & QtCore.Qt.KeyboardModifier.ShiftModifier
+        ):
+            # Shift + right click returns to the normal (flat) print view.
+            self.reset_rotation()
+            ev.accept()
             return
         if ev.button() == QtCore.Qt.MouseButton.RightButton and callable(self._page_next_cb):
             self._page_next_cb()
@@ -830,7 +914,23 @@ class DrawUtilView(QtWidgets.QWidget):
         else:
             print("Hit: none")
 
+    def enterEvent(self, ev: QtGui.QEnterEvent) -> None:
+        self._mouse_inside = True
+        if self._in_3d_mode():
+            self._update_dof_focus(ev.position())
+            self.update()
+        super().enterEvent(ev)
+
+    def leaveEvent(self, ev: QtCore.QEvent) -> None:
+        self._mouse_inside = False
+        if self._in_3d_mode():
+            self.update()
+        super().leaveEvent(ev)
+
     def mouseMoveEvent(self, ev: QtGui.QMouseEvent) -> None:
+        if not self._mouse_inside and self.rect().contains(ev.position().toPoint()):
+            self._mouse_inside = True
+            self.update()
         if not self._rotate_active and self._in_3d_mode():
             self._update_dof_focus(ev.position())
         if (self._middle_pan_active or self._rotate_active) and self._middle_press_pos is not None and not self._middle_dragged:
@@ -861,10 +961,21 @@ class DrawUtilView(QtWidgets.QWidget):
         super().mouseMoveEvent(ev)
 
     def mouseReleaseEvent(self, ev: QtGui.QMouseEvent) -> None:
+        if ev.button() == QtCore.Qt.MouseButton.LeftButton and self._rotate_active:
+            self._rotate_active = False
+            self._middle_pan_last_pos = None
+            self._middle_press_pos = None
+            self._middle_dragged = False
+            self.unsetCursor()
+            self.releaseMouse()
+            # Leave events can be swallowed while the mouse is grabbed; re-sync hover state.
+            self._mouse_inside = self.rect().contains(ev.position().toPoint())
+            self.update()
+            ev.accept()
+            return
         if ev.button() == QtCore.Qt.MouseButton.MiddleButton:
             was_click = not self._middle_dragged
             self._middle_pan_active = False
-            self._rotate_active = False
             self._middle_pan_last_pos = None
             self._middle_press_pos = None
             self._middle_dragged = False
