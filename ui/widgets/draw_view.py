@@ -541,11 +541,14 @@ class DrawUtilView(QtWidgets.QWidget):
         max_scroll_y = max(0.0, float(tgt_h - self.height()))
         self._scroll_x_px = max(0.0, min(float(max_scroll_x), float(self._scroll_x_px)))
         self._scroll_y_px = max(0.0, min(float(max_scroll_y), float(self._scroll_y_px)))
-        if tgt_w <= self.width():
+        # In 3D mode the sheet rotates around its center, so keep it centered in the
+        # viewport even when it overflows; scroll offsets only apply to the flat view.
+        center_3d = self._in_3d_mode()
+        if center_3d or tgt_w <= self.width():
             img_x = (self.width() - tgt_w) // 2
         else:
             img_x = -int(round(self._scroll_x_px))
-        if tgt_h <= self.height():
+        if center_3d or tgt_h <= self.height():
             img_y = (self.height() - tgt_h) // 2
         else:
             img_y = -int(round(self._scroll_y_px))
