@@ -7,6 +7,7 @@ from ui.widgets.draw_util import DrawUtil, make_image_surface, finalize_image_su
 from ui.style import Style
 from utils.CONSTANT import ENGRAVER_LAYERING, ENABLE_MACOS_NATIVE_SCROLLING
 from engraver.engraver import do_engrave
+from icons.icons import get_qicon
 
 
 
@@ -58,6 +59,7 @@ class DrawUtilView(QtWidgets.QWidget):
         self.setFocusPolicy(QtCore.Qt.FocusPolicy.StrongFocus)
         self._image: QtGui.QImage | None = None
         self._prev_image: QtGui.QImage | None = None
+        self._back_icon_image: QtGui.QImage | None = None
         self._fade_progress: float = 1.0
         self._fade_elapsed_ms: int = 0
         self._fade_duration_ms: int = 500
@@ -293,6 +295,28 @@ class DrawUtilView(QtWidgets.QWidget):
         nz = r[2][2]
         transform = QtGui.QTransform.quadToQuad(src, dst)
         return transform, self._is_front_facing(), abs(nz)
+
+    def _paint_paper_back(self, painter: QtGui.QPainter, rect: QtCore.QRectF) -> None:
+        if self._back_icon_image is None:
+            icon = get_qicon('keyTAB')
+            if icon is None or icon.isNull():
+                raise RuntimeError("Could not load the keyTAB icon for the paper back")
+            self._back_icon_image = icon.pixmap(1024, 1024).toImage()
+            if self._back_icon_image.isNull():
+                raise RuntimeError("Could not render the keyTAB icon for the paper back")
+
+        side = min(rect.width(), rect.height()) * 0.65
+        size = QtCore.QSizeF(self._back_icon_image.size())
+        size.scale(QtCore.QSizeF(side, side), QtCore.Qt.AspectRatioMode.KeepAspectRatio)
+        painter.save()
+        painter.translate(rect.center())
+        # Back-side artwork faces outward, not mirrored through the front of the sheet.
+        painter.scale(-1.0, 1.0)
+        painter.drawImage(
+            QtCore.QRectF(-size.width() * 0.5, -size.height() * 0.5, size.width(), size.height()),
+            self._back_icon_image,
+        )
+        painter.restore()
 
     def _blurred_image(self, src: QtGui.QImage, radius_src_px: float) -> QtGui.QImage:
         """Cached high-quality (Gaussian-like) blur using Qt's native blur effect."""
@@ -678,8 +702,7 @@ class DrawUtilView(QtWidgets.QWidget):
                 painter.restore()
 
             if not front_facing:
-                # Opaque sheet: the back side is blank paper.
-                pass
+                self._paint_paper_back(painter, QtCore.QRectF(float(x), float(y), float(tgt_w), float(tgt_h)))
             elif self._prev_image is not None and self._fade_progress < 1.0:
                 # Keep the old frame fully visible and fade only the new frame on top.
                 _draw_image(self._prev_image, 1.0)

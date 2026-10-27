@@ -36,6 +36,12 @@ Welcome to **keyTAB**, a passion project for creating, editing, and engraving Kl
 - `Backspace` / `Delete`: remove selection.
 - `Ctrl/Cmd+Z`, `Ctrl/Cmd+Shift+Z`: undo/redo.
 
+## Print View Easter Egg
+Shift + left-drag rotates the paper in 3D. Turn it over to reveal a large keyTAB
+app icon centered on the back of the sheet. This decoration is preview-only and
+does not appear in printed scores or PDF exports. Shift + right-click or a middle
+click returns to the normal view.
+
 ## MIDI Import
 - Pure-Python byte-level parser — no dependency on `mido` or `pretty_midi`.
 - Handles corrupt or truncated MIDI files: bad meta-message fields are defaulted rather than crashing.
